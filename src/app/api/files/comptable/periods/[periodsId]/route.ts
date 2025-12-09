@@ -19,11 +19,11 @@ const s3Client = new S3Client({
   },
 });
 
-// const clickhouseClient = createClickhouseClient({
-//   url: process.env.CLICKHOUSE_HOST || "http://localhost:8123",
-//   username: process.env.CLICKHOUSE_USER || "default",
-//   password: process.env.CLICKHOUSE_PASSWORD || "",
-// });
+ const clickhouseClient = createClickhouseClient({
+   url: process.env.CLICKHOUSE_HOST || "http://localhost:8123",
+   username: process.env.CLICKHOUSE_USER || "default",
+   password: process.env.CLICKHOUSE_PASSWORD || "",
+ });
 
 export async function DELETE(
   req: NextRequest,
