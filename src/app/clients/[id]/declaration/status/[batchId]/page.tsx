@@ -1,11 +1,19 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
-import { CheckCircle, Clock, XCircle, Loader2, Download } from "lucide-react";
+import {
+  CheckCircle,
+  Clock,
+  XCircle,
+  Loader2,
+  Download,
+  RotateCw,
+} from "lucide-react";
 import { toast } from "sonner";
 
 export default function StatusPage({
@@ -13,6 +21,7 @@ export default function StatusPage({
 }: {
   params: Promise<{ clientId: string; batchId: string }>;
 }) {
+  const router = useRouter();
   const [status, setStatus] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [params, setParams] = useState<{
@@ -20,9 +29,11 @@ export default function StatusPage({
     batchId: string;
   } | null>(null);
   const [downloading, setDownloading] = useState(false);
+  const [reprocessing, setReprocessing] = useState(false);
 
   // Download Excel handler, same as in index.tsx (92-124)
   const handleDownloadExcel = async () => {
+    console.log("status_", status);
     if (!status?.periodId) return;
     setDownloading(true);
     try {
@@ -55,6 +66,37 @@ export default function StatusPage({
       );
     } finally {
       setDownloading(false);
+    }
+  };
+
+  // Handler for relancer le traitement ETL si Echec
+  const handleRetryETL = async () => {
+    if (!params?.batchId) return;
+    setReprocessing(true);
+    try {
+      const response = await fetch("/api/files/comptable/trigger-etl", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ batchId: params.batchId }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Erreur lors du déclenchement");
+      }
+
+      toast.success("Traitement ETL relancé avec succès");
+      // Actualiser la page pour relancer le status polling
+      // ou bien router.refresh() si Next.js 13+
+      // Pour forcer update immédiat aussi, on peut refetch status
+      setTimeout(() => {
+        window.location.reload();
+      }, 300); // donne le temps d'afficher le toast
+    } catch (error: any) {
+      toast.error(error.message);
+    } finally {
+      setReprocessing(false);
     }
   };
 
@@ -178,11 +220,29 @@ export default function StatusPage({
             <Button
               size="sm"
               onClick={handleDownloadExcel}
-              disabled={downloading}
-              className="gap-2"
+              // disabled={downloading}
+              className="gap-2 cursor-pointer"
             >
               <Download className="w-4 h-4" />
               {downloading ? "Téléchargement..." : "Télécharger l'export Excel"}
+            </Button>
+          </div>
+        )}
+
+        {/* Button Retry (relancer) if Echec */}
+        {status.status === "FAILED" && (
+          <div className="mb-6 flex">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={handleRetryETL}
+              disabled={reprocessing}
+              className="gap-2 text-red-600 border-red-200 hover:bg-red-50 cursor-pointer"
+            >
+              <RotateCw
+                className={`w-4 h-4 ${reprocessing ? "animate-spin" : ""}`}
+              />
+              {reprocessing ? "Relance en cours..." : "Relancer le traitement"}
             </Button>
           </div>
         )}
