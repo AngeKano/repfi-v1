@@ -21,7 +21,7 @@ const s3Client = new S3Client({
 
 // ClickHouse client
 const clickhouseClient = createClickhouseClient({
-  host: `http://${process.env.CLICKHOUSE_HOST}:8123`,
+  url: process.env.CLICKHOUSE_HOST || "http://localhost:8123",
   username: process.env.CLICKHOUSE_USER || "default",
   password: process.env.CLICKHOUSE_PASSWORD || "",
 });
