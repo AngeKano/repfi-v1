@@ -109,8 +109,11 @@ export default function DeclarationComptable({
 
   // Année sélectionnée
   const currentYear = new Date().getFullYear();
-  const years = Array.from({ length: 6 }, (_, i) => currentYear - i);
+  const years = Array.from({ length: 10 }, (_, i) => currentYear - i);
   const [selectedYear, setSelectedYear] = useState<number>(currentYear);
+  const [calendarMonth, setCalendarMonth] = useState<Date>(
+    new Date(selectedYear, 0)
+  );
 
   // Fetch des périodes existantes
   useEffect(() => {
@@ -169,7 +172,7 @@ export default function DeclarationComptable({
   };
 
   // Handler pour la sélection de période
-  const handleDateSelect = (range: DateRange | undefined) => {
+  const handleDateSelect = (range: DateRange | undefined): void => {
     if (!range) {
       setDateRange(undefined);
       return;
@@ -179,6 +182,7 @@ export default function DeclarationComptable({
     if (range.from && range.to) {
       if (range.from.getFullYear() !== range.to.getFullYear()) {
         toast.error("La période doit être dans la même année");
+        setDateRange(undefined);
         return;
       }
     }
@@ -398,7 +402,6 @@ export default function DeclarationComptable({
       if (!response.ok) {
         throw new Error(data.error || "Erreur lors de l'upload");
       }
-      console.log("first_", data);
       setUploadResult(data);
       toast.success(
         `Fichiers uploadés - Période: ${new Date(
@@ -461,8 +464,10 @@ export default function DeclarationComptable({
           <Select
             value={selectedYear.toString()}
             onValueChange={(value) => {
-              setSelectedYear(Number(value));
+              const year = Number(value);
+              setSelectedYear(year);
               setDateRange(undefined);
+              setCalendarMonth(new Date(year, 0)); // <- Ajouter cette ligne
             }}
           >
             <SelectTrigger className="w-[120px]" aria-label="Année">
@@ -502,13 +507,11 @@ export default function DeclarationComptable({
           numberOfMonths={2}
           selected={dateRange}
           onSelect={handleDateSelect}
-          defaultMonth={new Date(selectedYear, 0)}
+          month={calendarMonth} 
+          onMonthChange={setCalendarMonth}
           className="rounded-lg border shadow-sm"
           disabled={(date) => {
-            // Désactiver les dates hors de l'année sélectionnée
             if (!isDateInSelectedYear(date)) return true;
-
-            // Désactiver les dates des périodes existantes
             return disabledDates.some(
               (d) => d.toDateString() === date.toDateString()
             );
@@ -646,9 +649,7 @@ export default function DeclarationComptable({
                   "fr-FR"
                 )}{" "}
                 au{" "}
-                {new Date(uploadResult.period.end).toLocaleDateString(
-                  "fr-FR"
-                )}
+                {new Date(uploadResult.period.end).toLocaleDateString("fr-FR")}
               </p>
               <p>
                 <strong>Batch ID:</strong> {uploadResult.batchId}
