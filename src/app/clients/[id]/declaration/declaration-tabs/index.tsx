@@ -17,7 +17,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import Link from "next/link";
-import { FileText, Calendar, Eye, Trash2, Download } from "lucide-react";
+import { FileText, Calendar, Eye, Trash2, Download, Edit } from "lucide-react";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 
@@ -130,12 +130,26 @@ const DeclarationTabs: React.FC<DeclarationTabsProps> = ({ clientId }) => {
             <h2 className="text-lg font-semibold">
               Documents de reporting financier
             </h2>
-            <Link href={`/clients/${clientId}/declaration`}>
-              <Button size="sm">
-                <FileText className="w-4 h-4 mr-2" />
-                Nouveaux documents
-              </Button>
-            </Link>
+            <div className=" flex flex-row items-center gap-x-3">
+              {periods && periods.length > 0 && (
+                <Link href={`/clients/${clientId}/declaration/update`}>
+                  <Button
+                    className="cursor-pointer"
+                    size="sm"
+                    variant="outline"
+                  >
+                    <Edit className="w-4 h-4" />
+                  </Button>
+                </Link>
+              )}
+
+              <Link href={`/clients/${clientId}/declaration/create`}>
+                <Button size="sm">
+                  <FileText className="w-4 h-4 mr-2" />
+                  Nouveaux documents
+                </Button>
+              </Link>
+            </div>
           </div>
           {periods && periods.length > 0 ? (
             <div className="space-y-3">
@@ -192,6 +206,7 @@ const DeclarationTabs: React.FC<DeclarationTabsProps> = ({ clientId }) => {
                         <Download className="w-4 h-4" />
                       </Button>
                     )}
+
                     <Link
                       href={`/clients/${clientId}/declaration/status/${period.batchId}`}
                     >
@@ -223,7 +238,7 @@ const DeclarationTabs: React.FC<DeclarationTabsProps> = ({ clientId }) => {
             <div className="text-center py-12">
               <FileText className="w-12 h-12 text-gray-300 mx-auto mb-3" />
               <p className="text-gray-500">Aucune déclaration comptable</p>
-              <Link href={`/clients/${clientId}/declaration`}>
+              <Link href={`/clients/${clientId}/declaration/create`}>
                 <Button variant="outline" className="mt-4">
                   <FileText className="w-4 h-4 mr-2" />
                   Nouveaux documents
