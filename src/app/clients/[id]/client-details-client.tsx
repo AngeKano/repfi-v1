@@ -28,6 +28,7 @@ import Link from "next/link";
 import { toast } from "sonner";
 import FilesTabs from "./files-tabs";
 import DeclarationTabs from "./declaration/declaration-tabs";
+import ClientReportingChart from "@/components/reporting/client-reporting-chart";
 
 interface ClientDetailsClientProps {
   session: any;
@@ -177,9 +178,9 @@ export default function ClientDetailsClient({
           </Alert>
         )}
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="w-full">
           {/* Left Column - Info */}
-          <div className="lg:col-span-1 space-y-6">
+          <div className="lg:col-span-1 space-y-6 hidden">
             {/* Basic Info */}
             <Card className="p-6">
               <h2 className="text-lg font-semibold mb-4">Informations</h2>
@@ -360,9 +361,13 @@ export default function ClientDetailsClient({
                 </TabsTrigger>
               </TabsList>
 
+              {/* Reporting */}
+
               {/* Overview Tab */}
               <TabsContent value="overview">
-                <Card className="p-6">
+                <ClientReportingChart clientId={client.id} />
+
+                <Card className="p-6 hidden">
                   <h2 className="text-lg font-semibold mb-4">Description</h2>
                   {client.description ? (
                     <p className="text-gray-700 whitespace-pre-wrap">
