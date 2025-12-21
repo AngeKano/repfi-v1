@@ -5,10 +5,10 @@ import { createClient as createClickhouseClient } from "@clickhouse/client";
 import { prisma } from "@/lib/prisma";
 
 const clickhouseClient = createClickhouseClient({
-  url: `http://${process.env.CLICKHOUSE_HOST}:8123`,
-  username: process.env.CLICKHOUSE_USER || "default",
-  password: process.env.CLICKHOUSE_PASSWORD || "",
-});
+    url: process.env.CLICKHOUSE_HOST || "http://localhost:8123",
+    username: process.env.CLICKHOUSE_USER || "default",
+    password: process.env.CLICKHOUSE_PASSWORD || "",
+  });
 
 function getClickhouseDbName(id: string): string {
   const cleanId = id.replace(/[^a-zA-Z0-9]/g, "_");
