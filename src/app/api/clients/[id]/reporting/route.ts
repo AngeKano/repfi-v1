@@ -20,29 +20,51 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    // DEBUG: Entrée dans la fonction GET reporting
+    console.log("Reporting API Request:", req.url);
+
     const session = await getServerSession(authOptions);
+    // DEBUG: Session info
+    console.log("Session:", session);
+
     if (!session?.user) {
+      console.warn("Non authentifié");
       return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
     }
 
     const { id } = await params;
+    // DEBUG: Params et id client
+    console.log("Client ID reçu:", id);
+
     const { searchParams } = new URL(req.url);
     const year = searchParams.get("year") || new Date().getFullYear().toString();
+    // DEBUG: Query year
+    console.log("Year param:", year);
 
     const client = await prisma.client.findUnique({
       where: { id },
       select: { id: true, name: true, companyId: true },
     });
+    // DEBUG: client trouvé (ou non)
+    console.log("Client de la requête:", client);
 
     if (!client) {
+      console.warn("Client non trouvé pour ID:", id);
       return NextResponse.json({ error: "Client non trouvé" }, { status: 404 });
     }
 
     if (client.companyId !== session.user.companyId) {
+      console.warn(
+        "Accès non autorisé pour user", session.user.id,
+        "sur companyId", client.companyId,
+        "(user companyId:", session.user.companyId, ")"
+      );
       return NextResponse.json({ error: "Accès non autorisé" }, { status: 403 });
     }
 
     const dbName = getClickhouseDbName(id);
+    // DEBUG: Nom de la base Clickhouse
+    console.log("Nom DB ClickHouse utilisée:", dbName);
 
     // 1. Récupérer les périodes depuis PostgreSQL pour cette année
     const postgresPeriodsData = await prisma.comptablePeriod.findMany({
@@ -63,6 +85,8 @@ export async function GET(
       },
       orderBy: { periodStart: "asc" },
     });
+    // DEBUG: Périodes PG pour cette année
+    console.log(`Périodes comptables PG année ${year}:`, postgresPeriodsData);
 
     // 2. Années disponibles depuis PostgreSQL
     const availableYearsData = await prisma.comptablePeriod.findMany({
@@ -70,23 +94,31 @@ export async function GET(
       select: { periodStart: true },
       distinct: ["periodStart"],
     });
+    // DEBUG: Années disponibles dans PG
+    console.log("Années disponibles (PG):", availableYearsData);
 
     const availableYears = [
       ...new Set(
         availableYearsData.map((p) => p.periodStart.getFullYear().toString())
       ),
     ].sort((a, b) => parseInt(b) - parseInt(a));
+    // DEBUG: Années disponibles après Set & sort
+    console.log("Années disponibles triées:", availableYears);
 
     // 3. Récupérer les batch_ids des périodes PostgreSQL
     const batchIds = postgresPeriodsData
       .map((p) => p.batchId)
       .filter((b): b is string => !!b);
+    // DEBUG: batchIds trouvés
+    console.log("Batch IDs à requêter sur ClickHouse:", batchIds);
 
     // 4. Données agrégées par mois depuis ClickHouse (filtré par batch_ids)
     // Classe 6 = Charges (dépenses), Classe 7 = Produits (revenus)
     let monthlyRows: any[] = [];
 
     if (batchIds.length > 0) {
+      // DEBUG: Lancement de la requête ClickHouse pour les mois
+      console.log("Requête ClickHouse AGGREG Month lancée...");
       const monthlyData = await clickhouseClient.query({
         query: `
           SELECT 
@@ -107,9 +139,12 @@ export async function GET(
       });
 
       monthlyRows = (await monthlyData.json()) as any[];
+      // DEBUG: Données mois ClickHouse
+      console.log("Résultat ClickHouse mensualisé:", monthlyRows);
+    } else {
+      // DEBUG: Pas de batchIds donc aucun mois à requêter
+      console.log("Aucun batchIds cette année, pas de requête ClickHouse");
     }
-
-    console.log("Monthly data from ClickHouse:", monthlyRows);
 
     // 5. Créer tous les mois (même vides)
     const monthNames = [
@@ -130,12 +165,18 @@ export async function GET(
         nbTransactions: found ? parseInt(found.nb_transactions) || 0 : 0,
       });
     }
+    // DEBUG: Tableau allMonths après construction
+    console.log("allMonths (complété):", allMonths);
 
     // 6. Calculer solde cumulé (Résultat = Produits - Charges)
     let cumulativeBalance = 0;
-    const monthlyWithCumulative = allMonths.map((row) => {
+    const monthlyWithCumulative = allMonths.map((row, idx) => {
       const resultat = row.produits - row.charges;
       cumulativeBalance += resultat;
+      // DEBUG: Valeurs pour chaque mois du cumul
+      console.log(
+        `[${row.monthLabel}] Charges: ${row.charges}, Produits: ${row.produits}, Résultat: ${resultat}, Cumul: ${cumulativeBalance}`
+      );
       return {
         ...row,
         resultat,
@@ -150,6 +191,10 @@ export async function GET(
 
         if (pgPeriod.batchId) {
           try {
+            // DEBUG: Requête ClickHouse agrégée pour la période/batch
+            console.log(
+              `Requête stats ClickHouse pour la période PG batchId=${pgPeriod.batchId}...`
+            );
             const statsData = await clickhouseClient.query({
               query: `
                 SELECT 
@@ -163,12 +208,19 @@ export async function GET(
               format: "JSONEachRow",
             });
             const statsRows = (await statsData.json()) as any[];
+            // DEBUG: Affichage stats de cette période/batch
+            console.log(`Stats pour batch ${pgPeriod.batchId}:`, statsRows);
             if (statsRows.length > 0) {
               stats = statsRows[0];
             }
           } catch (e) {
             console.error("Stats error for batch:", pgPeriod.batchId, e);
           }
+        } else {
+          // DEBUG: Pas de batchId pour cette période, donc stats à 0
+          console.log(
+            "Période PG sans batchId (aucune stats ClickHouse attendue)", pgPeriod
+          );
         }
 
         return {
@@ -184,6 +236,8 @@ export async function GET(
         };
       })
     );
+    // DEBUG: Tableau periods construit
+    console.log("Périodes enrichies (periods):", periods);
 
     // 8. Totaux
     const totals = monthlyWithCumulative.reduce(
@@ -194,7 +248,10 @@ export async function GET(
       }),
       { totalCharges: 0, totalProduits: 0, totalTransactions: 0 }
     );
+    // DEBUG: Totaux cumulés
+    console.log("Totaux de l'année:", totals);
 
+    // DEBUG: Fin de traitement, on renvoie la réponse
     return NextResponse.json({
       client: { id: client.id, name: client.name },
       year,
