@@ -30,9 +30,7 @@ RUN chmod +x docker-entrypoint.sh
 
 USER nextjs
 EXPOSE 3000
-EXPOSE 5555
 ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
 
-# Supporter le lancement simultané de Next.js et de Prisma Studio
-CMD ["sh", "-c", "/app/docker-entrypoint.sh & npx prisma studio --port 5555 --browser none && wait"]
+ENTRYPOINT ["/app/docker-entrypoint.sh"]
