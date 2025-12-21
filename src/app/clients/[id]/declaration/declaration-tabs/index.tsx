@@ -131,24 +131,25 @@ const DeclarationTabs: React.FC<DeclarationTabsProps> = ({ clientId }) => {
               Documents de reporting financier
             </h2>
             <div className=" flex flex-row items-center gap-x-3">
+              {periods && periods.length > 0 && (
+                <Link href={`/clients/${clientId}/declaration/update`}>
+                  <Button
+                    className="cursor-pointer"
+                    size="sm"
+                    variant="outline"
+                  >
+                    <Edit className="w-4 h-4" />
+                  </Button>
+                </Link>
+              )}
 
-
-{
-periods && periods.length > 0 && 
-
-            <Link href={`/clients/${clientId}/declaration/update`}>
-              <Button className="cursor-pointer" size="sm" variant="outline">
-                <Edit className="w-4 h-4" />
-              </Button>
-            </Link>
-            <Link href={`/clients/${clientId}/declaration/create`}>
-              <Button size="sm">
-                <FileText className="w-4 h-4 mr-2" />
-                Nouveaux documents
-              </Button>
-            </Link>
+              <Link href={`/clients/${clientId}/declaration/create`}>
+                <Button size="sm">
+                  <FileText className="w-4 h-4 mr-2" />
+                  Nouveaux documents
+                </Button>
+              </Link>
             </div>
-
           </div>
           {periods && periods.length > 0 ? (
             <div className="space-y-3">
