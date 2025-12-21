@@ -60,6 +60,7 @@ export async function GET(
     const progress = totalFiles > 0 ? (processedFiles / totalFiles) * 100 : 0;
 
     return NextResponse.json({
+      periodId: period.id,
       batchId: period.batchId,
       status: period.status,
       progress: Math.round(progress),

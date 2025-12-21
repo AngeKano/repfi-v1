@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -14,17 +14,21 @@ import {
   Play,
   X,
   FileSpreadsheet,
-  ArrowLeft,
 } from "lucide-react";
 import { toast } from "sonner";
-import Link from "next/link";
+import * as React from "react";
+import { Calendar } from "@/components/ui/calendar";
+import { DateRange } from "react-day-picker";
 
-interface UploadFile {
-  file: File;
-  id: string;
-  fileType?: string;
-  error?: string;
-}
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectLabel,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 const REQUIRED_FILE_TYPES = [
   { type: "GRAND_LIVRE_COMPTES", label: "Grand Livre des Comptes" },
@@ -34,8 +38,52 @@ const REQUIRED_FILE_TYPES = [
   { type: "CODE_JOURNAL", label: "Code Journal" },
 ];
 
-const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
-const MAX_FILES = 10;
+function FileTypeSelect({
+  value,
+  onChange,
+  excludeTypes = [],
+}: {
+  value: string | undefined;
+  onChange: (v: string) => void;
+  excludeTypes?: string[];
+}) {
+  const filteredTypes = REQUIRED_FILE_TYPES.filter(
+    (t) => !excludeTypes.includes(t.type)
+  );
+
+  return (
+    <Select value={value || ""} onValueChange={onChange}>
+      <SelectTrigger className="w-[220px]">
+        <SelectValue placeholder="Choisir le type" />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectGroup>
+          <SelectLabel>Types de fichiers</SelectLabel>
+          {filteredTypes.map((option) => (
+            <SelectItem key={option.type} value={option.type}>
+              {option.label}
+            </SelectItem>
+          ))}
+        </SelectGroup>
+      </SelectContent>
+    </Select>
+  );
+}
+
+interface UploadFile {
+  file: File;
+  id: string;
+  fileType?: string;
+  error?: string;
+}
+
+interface Period {
+  periodStart: string;
+  periodEnd: string;
+}
+
+const MAX_FILE_SIZE = 10 * 1024 * 1024;
+const MAX_FILES = 5;
 
 export default function DeclarationComptable({
   session,
@@ -47,12 +95,133 @@ export default function DeclarationComptable({
   const router = useRouter();
 
   const [files, setFiles] = useState<UploadFile[]>([]);
+  const [filesCount, setFilesCount] = useState<number>(0);
   const [uploading, setUploading] = useState(false);
   const [uploadResult, setUploadResult] = useState<any>(null);
   const [processing, setProcessing] = useState(false);
   const [dragActive, setDragActive] = useState(false);
-  const [periodStart, setPeriodStart] = useState<string>("");
-  const [periodEnd, setPeriodEnd] = useState<string>("");
+
+  // Périodes existantes (récupérées depuis l'API)
+  const [existingPeriods, setExistingPeriods] = useState<Period[]>([]);
+
+  // Période sélectionnée
+  const [dateRange, setDateRange] = useState<DateRange | undefined>();
+
+  // Année sélectionnée
+  const currentYear = new Date().getFullYear();
+  const years = Array.from({ length: 10 }, (_, i) => currentYear - i);
+  const [selectedYear, setSelectedYear] = useState<number>(currentYear);
+  const [calendarMonth, setCalendarMonth] = useState<Date>(
+    new Date(selectedYear, 0)
+  );
+
+  // Fetch des périodes existantes
+  useEffect(() => {
+    if (!client?.id) return;
+
+    const fetchPeriods = async () => {
+      try {
+        const res = await fetch(
+          `/api/files/comptable/periods?clientId=${client.id}`
+        );
+        const data = await res.json();
+
+        if (Array.isArray(data.periods) && data.periods.length > 0) {
+          const formattedPeriods: Period[] = data.periods.map((p: any) => ({
+            periodStart: p.periodStart?.slice(0, 10) || "",
+            periodEnd: p.periodEnd?.slice(0, 10) || "",
+          }));
+          setExistingPeriods(formattedPeriods);
+        }
+      } catch (e) {
+        console.error("Erreur fetch periods:", e);
+      }
+    };
+
+    fetchPeriods();
+  }, [client?.id]);
+
+  useEffect(() => {
+    setFilesCount(files.length);
+  }, [files]);
+
+  // Générer les dates désactivées (périodes existantes)
+  const getDisabledDates = (): Date[] => {
+    const disabledDates: Date[] = [];
+
+    existingPeriods.forEach((period) => {
+      if (period.periodStart && period.periodEnd) {
+        const start = new Date(period.periodStart);
+        const end = new Date(period.periodEnd);
+
+        // Ajouter chaque jour de la période aux dates désactivées
+        const current = new Date(start);
+        while (current <= end) {
+          disabledDates.push(new Date(current));
+          current.setDate(current.getDate() + 1);
+        }
+      }
+    });
+
+    return disabledDates;
+  };
+
+  // Vérifier si une date est dans l'année sélectionnée
+  const isDateInSelectedYear = (date: Date): boolean => {
+    return date.getFullYear() === selectedYear;
+  };
+
+  // Handler pour la sélection de période
+  const handleDateSelect = (range: DateRange | undefined): void => {
+    if (!range) {
+      setDateRange(undefined);
+      return;
+    }
+
+    // Vérifier que les deux dates sont dans la même année
+    if (range.from && range.to) {
+      if (range.from.getFullYear() !== range.to.getFullYear()) {
+        toast.error("La période doit être dans la même année");
+        setDateRange(undefined);
+        return;
+      }
+    }
+
+    setDateRange(range);
+  };
+
+  // Handler pour sélectionner toute l'année
+  const handleFullYearClick = () => {
+    const yearStart = new Date(selectedYear, 0, 1);
+    const yearEnd = new Date(selectedYear, 11, 31);
+
+    // Vérifier si l'année complète chevauche une période existante
+    const hasOverlap = existingPeriods.some((period) => {
+      const pStart = new Date(period.periodStart);
+      const pEnd = new Date(period.periodEnd);
+      return pStart <= yearEnd && pEnd >= yearStart;
+    });
+
+    if (hasOverlap) {
+      toast.error("Cette année contient des périodes déjà déclarées");
+      return;
+    }
+
+    setDateRange({ from: yearStart, to: yearEnd });
+  };
+
+  // Reset la sélection
+  const handleResetSelection = () => {
+    setDateRange(undefined);
+  };
+
+  // Périodes formatées pour l'affichage
+  const periodStart = dateRange?.from
+    ? dateRange.from.toISOString().slice(0, 10)
+    : "";
+  const periodEnd = dateRange?.to
+    ? dateRange.to.toISOString().slice(0, 10)
+    : "";
 
   const isValidExcel = (file: File) => {
     const validTypes = [
@@ -113,14 +282,23 @@ export default function DeclarationComptable({
     if (!newFiles) return;
 
     const fileArray = Array.from(newFiles);
-    const validFiles: UploadFile[] = [];
+    const currentCount = files.length;
+    const availableSlots = MAX_FILES - currentCount;
 
-    fileArray.forEach((file) => {
-      if (files.length + validFiles.length >= MAX_FILES) return;
+    if (availableSlots <= 0) {
+      toast.error("Vous ne pouvez pas ajouter plus de 5 fichiers.");
+      return;
+    }
+
+    const validFiles: UploadFile[] = [];
+    let added = 0;
+
+    for (let i = 0; i < fileArray.length && added < availableSlots; i++) {
+      const file = fileArray[i];
 
       if (!isValidExcel(file)) {
         toast.error(`${file.name} n'est pas un fichier Excel valide`);
-        return;
+        continue;
       }
 
       if (file.size > MAX_FILE_SIZE) {
@@ -129,7 +307,8 @@ export default function DeclarationComptable({
           id: Math.random().toString(36),
           error: "Fichier trop volumineux (max 10MB)",
         });
-        return;
+        added++;
+        continue;
       }
 
       const detectedType = detectFileType(file.name);
@@ -138,7 +317,8 @@ export default function DeclarationComptable({
         id: Math.random().toString(36),
         fileType: detectedType,
       });
-    });
+      added++;
+    }
 
     setFiles((prev) => [...prev, ...validFiles].slice(0, MAX_FILES));
   };
@@ -157,6 +337,11 @@ export default function DeclarationComptable({
     e.preventDefault();
     e.stopPropagation();
     setDragActive(false);
+
+    if (filesCount >= MAX_FILES) {
+      toast.error("Vous ne pouvez pas ajouter plus de 5 fichiers.");
+      return;
+    }
     handleFiles(e.dataTransfer.files);
   };
 
@@ -169,7 +354,7 @@ export default function DeclarationComptable({
   };
 
   const allFilesValid = () => {
-    if (files.length !== 5) return false;
+    if (filesCount !== 5) return false;
 
     const types = files.map((f) => f.fileType);
     const requiredTypes = REQUIRED_FILE_TYPES.map((t) => t.type);
@@ -217,13 +402,12 @@ export default function DeclarationComptable({
       if (!response.ok) {
         throw new Error(data.error || "Erreur lors de l'upload");
       }
-
       setUploadResult(data);
       toast.success(
         `Fichiers uploadés - Période: ${new Date(
-          data.period.start
+          data.period.periodStart
         ).toLocaleDateString("fr-FR")} au ${new Date(
-          data.period.end
+          data.period.periodEnd
         ).toLocaleDateString("fr-FR")}`
       );
     } catch (error: any) {
@@ -261,210 +445,298 @@ export default function DeclarationComptable({
     }
   };
 
+  const getAlreadySelectedTypes = (excludeId?: string) =>
+    files
+      .filter((f) => f.fileType && (!excludeId || f.id !== excludeId))
+      .map((f) => f.fileType!);
+
+  const hasMaxFiles = filesCount >= MAX_FILES;
+  const disabledDates = getDisabledDates();
+
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="bg-white border-b">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
-            <div className="flex items-center gap-3">
-              <Link href={`/clients/${client.id}`}>
-                <Button variant="ghost" size="icon">
-                  <ArrowLeft className="w-5 h-5" />
-                </Button>
-              </Link>
-              <div>
-                <h1 className="text-2xl font-bold text-gray-900">
-                  Ajouter des documents
-                </h1>
-                <p className="text-sm text-gray-500">{client.name}</p>
-              </div>
+    <main className="max-w-7xl flex items-start flex-row gap-x-3 mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div>
+        <Label className="block text-sm font-medium mb-2">
+          Période de la déclaration
+        </Label>
+
+        <div className="flex items-center gap-2 mb-4">
+          <Select
+            value={selectedYear.toString()}
+            onValueChange={(value) => {
+              const year = Number(value);
+              setSelectedYear(year);
+              setDateRange(undefined);
+              setCalendarMonth(new Date(year, 0)); // <- Ajouter cette ligne
+            }}
+          >
+            <SelectTrigger className="w-[120px]" aria-label="Année">
+              <SelectValue placeholder="Année" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectGroup>
+                <SelectLabel>Année</SelectLabel>
+                {years.map((year) => (
+                  <SelectItem key={year} value={year.toString()}>
+                    {year}
+                  </SelectItem>
+                ))}
+              </SelectGroup>
+            </SelectContent>
+          </Select>
+
+          <Button type="button" variant="outline" onClick={handleFullYearClick}>
+            Toute l&apos;année {selectedYear}
+          </Button>
+
+          {dateRange && (
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              onClick={handleResetSelection}
+              className="text-xs"
+            >
+              <X className="w-4 h-4" />
+            </Button>
+          )}
+        </div>
+
+        <Calendar
+          mode="range"
+          numberOfMonths={2}
+          selected={dateRange}
+          onSelect={handleDateSelect}
+          month={calendarMonth} 
+          onMonthChange={setCalendarMonth}
+          className="rounded-lg border shadow-sm"
+          disabled={(date) => {
+            if (!isDateInSelectedYear(date)) return true;
+            return disabledDates.some(
+              (d) => d.toDateString() === date.toDateString()
+            );
+          }}
+          modifiers={{
+            existing: disabledDates,
+          }}
+          modifiersStyles={{
+            existing: {
+              backgroundColor: "rgba(239, 68, 68, 0.2)",
+              color: "#991b1b",
+              textDecoration: "line-through",
+            },
+          }}
+        />
+
+        {/* Affichage des périodes existantes */}
+        {existingPeriods.length > 0 && (
+          <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+            <p className="text-sm font-medium text-red-800 mb-2">
+              Périodes déjà déclarées :
+            </p>
+            <ul className="text-sm text-red-700 space-y-1">
+              {existingPeriods.map((p, idx) => (
+                <li key={idx}>
+                  {new Date(p.periodStart).toLocaleDateString("fr-FR")} →{" "}
+                  {new Date(p.periodEnd).toLocaleDateString("fr-FR")}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {/* Période sélectionnée */}
+        {dateRange?.from && dateRange?.to && (
+          <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg">
+            <p className="text-sm font-medium text-green-800">
+              Période sélectionnée :
+            </p>
+            <p className="text-sm text-green-700">
+              {dateRange.from.toLocaleDateString("fr-FR")} →{" "}
+              {dateRange.to.toLocaleDateString("fr-FR")}
+            </p>
+          </div>
+        )}
+      </div>
+
+      <Card className="p-6 w-full">
+        {/* Drag & Drop Zone */}
+        <div
+          className={`flex flex-col items-center justify-center border-2 border-dashed rounded-lg p-8 text-center transition-colors mb-6 ${
+            dragActive
+              ? "border-blue-500 bg-blue-50"
+              : hasMaxFiles
+              ? "border-gray-200 bg-gray-100 opacity-60 pointer-events-none"
+              : "border-gray-300 hover:border-gray-400"
+          }`}
+          onDragEnter={hasMaxFiles ? undefined : handleDrag}
+          onDragLeave={hasMaxFiles ? undefined : handleDrag}
+          onDragOver={hasMaxFiles ? undefined : handleDrag}
+          onDrop={hasMaxFiles ? undefined : handleDrop}
+          style={hasMaxFiles ? { pointerEvents: "none" } : {}}
+        >
+          <Upload className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+          <p className="text-lg font-medium mb-2">
+            Glissez-déposez vos 5 fichiers Excel ici
+          </p>
+          <p className="text-sm text-gray-500 mb-4">
+            ou cliquez pour sélectionner (max 10MB chacun)
+          </p>
+          <Input
+            type="file"
+            multiple
+            accept=".xlsx,.xls"
+            onChange={(e) => handleFiles(e.target.files)}
+            className="hidden"
+            id="file-input"
+            disabled={hasMaxFiles}
+          />
+          <Label htmlFor="file-input">
+            <Button
+              variant="outline"
+              type="button"
+              asChild
+              disabled={hasMaxFiles}
+              aria-disabled={hasMaxFiles}
+              tabIndex={hasMaxFiles ? -1 : undefined}
+            >
+              <span>
+                {hasMaxFiles
+                  ? "Maximum 5 fichiers atteints"
+                  : "Sélectionner des fichiers"}
+              </span>
+            </Button>
+          </Label>
+          {hasMaxFiles && (
+            <div className="mt-2 text-sm text-gray-500 flex items-center gap-1">
+              <AlertCircle className="w-4 h-4 text-yellow-500" />
+              Vous avez atteint la limite de 5 fichiers.
+            </div>
+          )}
+        </div>
+
+        {/* Actions */}
+        <div className="flex justify-end gap-3">
+          {!uploadResult ? (
+            <Button
+              onClick={handleUpload}
+              disabled={
+                !allFilesValid() || uploading || !periodStart || !periodEnd
+              }
+              size="lg"
+            >
+              <Upload className="w-4 h-4 mr-2" />
+              {uploading ? "Upload en cours..." : "Uploader les fichiers"}
+            </Button>
+          ) : (
+            <Button onClick={handleTriggerETL} disabled={processing} size="lg">
+              <Play className="w-4 h-4 mr-2" />
+              {processing ? "Démarrage..." : "Lancer le traitement ETL"}
+            </Button>
+          )}
+        </div>
+
+        {/* Upload Result */}
+        {uploadResult && (
+          <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg">
+            <h3 className="font-semibold text-green-900 mb-2">
+              Fichiers uploadés avec succès
+            </h3>
+            <div className="text-sm text-green-800">
+              <p>
+                <strong>Période:</strong>{" "}
+                {new Date(uploadResult.period.start).toLocaleDateString(
+                  "fr-FR"
+                )}{" "}
+                au{" "}
+                {new Date(uploadResult.period.end).toLocaleDateString("fr-FR")}
+              </p>
+              <p>
+                <strong>Batch ID:</strong> {uploadResult.batchId}
+              </p>
             </div>
           </div>
-        </div>
-      </header>
-      <main className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="mb-4 grid grid-cols-2 gap-4">
-          <div>
-            <Label className="block text-sm font-medium mb-2">
-              Date de début de période
-            </Label>
-            <Input
-              type="date"
-              value={periodStart}
-              onChange={(e) => setPeriodStart(e.target.value)}
-              required
-            />
-          </div>
-          <div>
-            <Label className="block text-sm font-medium mb-2">
-              Date de fin de période
-            </Label>
-            <Input
-              type="date"
-              value={periodEnd}
-              onChange={(e) => setPeriodEnd(e.target.value)}
-              required
-            />
-          </div>
-        </div>
+        )}
 
-        <Card className="p-6">
-          {/* Drag & Drop Zone */}
-          <div
-            className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors mb-6 ${
-              dragActive
-                ? "border-blue-500 bg-blue-50"
-                : "border-gray-300 hover:border-gray-400"
-            }`}
-            onDragEnter={handleDrag}
-            onDragLeave={handleDrag}
-            onDragOver={handleDrag}
-            onDrop={handleDrop}
-          >
-            <Upload className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-            <p className="text-lg font-medium mb-2">
-              Glissez-déposez vos 5 fichiers Excel ici
-            </p>
-            <p className="text-sm text-gray-500 mb-4">
-              ou cliquez pour sélectionner (max 10MB chacun)
-            </p>
-            <Input
-              type="file"
-              multiple
-              accept=".xlsx,.xls"
-              onChange={(e) => handleFiles(e.target.files)}
-              className="hidden"
-              id="file-input"
-            />
-            <Label htmlFor="file-input">
-              <Button variant="outline" type="button" asChild>
-                <span>Sélectionner des fichiers</span>
-              </Button>
-            </Label>
-          </div>
-
-          {/* Files List */}
-          {files.length > 0 && (
-            <div className="space-y-3 mb-6">
-              <Label>Fichiers sélectionnés ({files.length}/5 requis)</Label>
-              {files.map((uploadFile) => (
-                <div
-                  key={uploadFile.id}
-                  className="flex items-center gap-3 p-3 border rounded-lg"
-                >
-                  <FileSpreadsheet className="w-5 h-5 text-green-600 flex-shrink-0" />
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium truncate">
-                      {uploadFile.file.name}
-                    </p>
-                    <p className="text-sm text-gray-500">
-                      {(uploadFile.file.size / 1024).toFixed(2)} KB
-                    </p>
-                    {uploadFile.error && (
-                      <p className="text-sm text-red-500">{uploadFile.error}</p>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {uploadFile.fileType ? (
-                      <Badge variant="default">
-                        <FileCheck className="w-3 h-3 mr-1" />
-                        {REQUIRED_FILE_TYPES.find(
-                          (t) => t.type === uploadFile.fileType
-                        )?.label || uploadFile.fileType}
-                      </Badge>
-                    ) : (
+        {/* Files List */}
+        {filesCount > 0 && (
+          <div className="space-y-3 mb-6">
+            <Label>Fichiers sélectionnés ({filesCount}/5 requis)</Label>
+            {files.map((uploadFile) => (
+              <div
+                key={uploadFile.id}
+                className="flex items-center gap-3 p-3 border rounded-lg"
+              >
+                <FileSpreadsheet className="w-5 h-5 text-green-600 flex-shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <p className="font-medium truncate">{uploadFile.file.name}</p>
+                  <p className="text-sm text-gray-500">
+                    {(uploadFile.file.size / 1024).toFixed(2)} KB
+                  </p>
+                  {uploadFile.error && (
+                    <p className="text-sm text-red-500">{uploadFile.error}</p>
+                  )}
+                </div>
+                <div className="flex items-center gap-2">
+                  {uploadFile.fileType ? (
+                    <Badge variant="default">
+                      <FileCheck className="w-3 h-3 mr-1" />
+                      {REQUIRED_FILE_TYPES.find(
+                        (t) => t.type === uploadFile.fileType
+                      )?.label || uploadFile.fileType}
+                    </Badge>
+                  ) : (
+                    <div className="flex items-center gap-2">
                       <Badge variant="secondary">
                         <AlertCircle className="w-3 h-3 mr-1" />
                         Type non détecté
                       </Badge>
-                    )}
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => removeFile(uploadFile.id)}
-                    >
-                      <X className="w-4 h-4" />
-                    </Button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {/* Types manquants */}
-          {files.length > 0 && (
-            <div className="mb-6 p-4 bg-gray-50 rounded-lg">
-              <p className="text-sm font-medium mb-2">
-                Types de fichiers requis:
-              </p>
-              <div className="flex flex-wrap gap-2">
-                {REQUIRED_FILE_TYPES.map(({ type, label }) => {
-                  const hasType = files.some((f) => f.fileType === type);
-                  return (
-                    <Badge key={type} variant={hasType ? "default" : "outline"}>
-                      {hasType ? (
-                        <FileCheck className="w-3 h-3 mr-1" />
-                      ) : (
-                        <AlertCircle className="w-3 h-3 mr-1" />
-                      )}
-                      {label}
-                    </Badge>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
-          {/* Upload Result */}
-          {uploadResult && (
-            <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg">
-              <h3 className="font-semibold text-green-900 mb-2">
-                Fichiers uploadés avec succès
-              </h3>
-              <div className="text-sm text-green-800">
-                <p>
-                  <strong>Période:</strong>{" "}
-                  {new Date(uploadResult.period.start).toLocaleDateString(
-                    "fr-FR"
-                  )}{" "}
-                  au{" "}
-                  {new Date(uploadResult.period.end).toLocaleDateString(
-                    "fr-FR"
+                      <FileTypeSelect
+                        value={undefined}
+                        excludeTypes={getAlreadySelectedTypes(uploadFile.id)}
+                        onChange={(type) => {
+                          updateFileType(uploadFile.id, type);
+                        }}
+                      />
+                    </div>
                   )}
-                </p>
-                <p>
-                  <strong>Batch ID:</strong> {uploadResult.batchId}
-                </p>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => removeFile(uploadFile.id)}
+                  >
+                    <X className="w-4 h-4" />
+                  </Button>
+                </div>
               </div>
-            </div>
-          )}
-
-          {/* Actions */}
-          <div className="flex justify-end gap-3">
-            {!uploadResult ? (
-              <Button
-                onClick={handleUpload}
-                disabled={
-                  !allFilesValid() || uploading || !periodStart || !periodEnd
-                }
-                size="lg"
-              >
-                <Upload className="w-4 h-4 mr-2" />
-                {uploading ? "Upload en cours..." : "Uploader les fichiers"}
-              </Button>
-            ) : (
-              <Button
-                onClick={handleTriggerETL}
-                disabled={processing}
-                size="lg"
-              >
-                <Play className="w-4 h-4 mr-2" />
-                {processing ? "Démarrage..." : "Lancer le traitement ETL"}
-              </Button>
-            )}
+            ))}
           </div>
-        </Card>
-      </main>
-    </div>
+        )}
+
+        {/* Types manquants */}
+        {filesCount > 0 && (
+          <div className="mb-6 p-4 bg-gray-50 rounded-lg">
+            <p className="text-sm font-medium mb-2">
+              Types de fichiers requis:
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {REQUIRED_FILE_TYPES.map(({ type, label }) => {
+                const hasType = files.some((f) => f.fileType === type);
+                return (
+                  <Badge key={type} variant={hasType ? "default" : "outline"}>
+                    {hasType ? (
+                      <FileCheck className="w-3 h-3 mr-1" />
+                    ) : (
+                      <AlertCircle className="w-3 h-3 mr-1" />
+                    )}
+                    {label}
+                  </Badge>
+                );
+              })}
+            </div>
+          </div>
+        )}
+      </Card>
+    </main>
   );
 }

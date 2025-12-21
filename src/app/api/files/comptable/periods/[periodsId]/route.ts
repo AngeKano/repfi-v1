@@ -19,11 +19,18 @@ const s3Client = new S3Client({
   },
 });
 
-//  const clickhouseClient = createClickhouseClient({
-//    url: process.env.CLICKHOUSE_HOST || "http://localhost:8123",
-//    username: process.env.CLICKHOUSE_USER || "default",
-//    password: process.env.CLICKHOUSE_PASSWORD || "",
-//  });
+// ClickHouse client
+const clickhouseClient = createClickhouseClient({
+  host: `http://${process.env.CLICKHOUSE_HOST}:8123`,
+  username: process.env.CLICKHOUSE_USER || "default",
+  password: process.env.CLICKHOUSE_PASSWORD || "",
+});
+
+// Helper pour obtenir le nom de la DB ClickHouse
+function getClickhouseDbName(clientId: string): string {
+  const cleanId = clientId.replace(/[^a-zA-Z0-9]/g, "_");
+  return `repfi_${cleanId}`;
+}
 
 export async function DELETE(
   req: NextRequest,
@@ -35,12 +42,10 @@ export async function DELETE(
       return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
     }
 
-    // Get id from param
     const { periodsId } = await params;
-
     const periodId = periodsId;
 
-    // Retrieve the period with files (must select id field!)
+    // Retrieve the period with files
     const period = await prisma.comptablePeriod.findUnique({
       where: { id: periodId },
       include: {
@@ -88,10 +93,13 @@ export async function DELETE(
     const periodFolder = `periode-${formatDateYYYYMMDD(
       period.periodStart
     )}-${formatDateYYYYMMDD(period.periodEnd)}`;
-    const s3Prefix = `${period.client.id}/declaration/${year}/${periodFolder}/`;
+    const companyName = period.client.name.replace(/\s+/g, "_").replace(/[^\w\-]/g, "");
+    const clientName = period.client.name.replace(/\s+/g, "_").replace(/[^\w\-]/g, "");
+    const s3Prefix = `${companyName}_${period.client.companyId}/${clientName}_${period.client.id}/declaration/${year}/${periodFolder}/`;
 
     // 1. Supprimer tous les fichiers S3 du dossier de la période
     try {
+      console.log("S3 bucket:", bucket, "S3 prefix:", s3Prefix);
       const listResponse = await s3Client.send(
         new ListObjectsV2Command({
           Bucket: bucket,
@@ -113,41 +121,31 @@ export async function DELETE(
       }
     } catch (s3Error) {
       console.error("Erreur suppression S3:", s3Error);
-      // Continuer même si erreur S3
     }
 
-    // 2. Supprimer les données ClickHouse
-    // try {
-    //   const batchId = period.batchId;
-    //   const clientId = period.client.id;
+    // 2. Supprimer les données ClickHouse (tables grand_livre, gl_compte, gl_tiers)
+    try {
+      const batchId = period.batchId;
+      const clientId = period.client.id;
+      const dbName = getClickhouseDbName(clientId);
 
-    //   // Supprimer de toutes les tables ClickHouse
-    //   await clickhouseClient.command({
-    //     query: `DELETE FROM GrandLivre WHERE client_id = '${clientId}' AND batch_id = '${batchId}'`,
-    //   });
+      const tablesToDelete = ["grand_livre", "gl_compte", "gl_tiers"];
 
-    //   await clickhouseClient.command({
-    //     query: `DELETE FROM PlanTiers WHERE client_id = '${clientId}'`,
-    //   });
-
-    //   await clickhouseClient.command({
-    //     query: `DELETE FROM PlanComptable WHERE client_id = '${clientId}'`,
-    //   });
-
-    //   await clickhouseClient.command({
-    //     query: `DELETE FROM CodeJournal WHERE client_id = '${clientId}'`,
-    //   });
-
-    //   await clickhouseClient.command({
-    //     query: `DELETE FROM etl_metadata WHERE batch_id = '${batchId}'`,
-    //   });
-    // } catch (clickhouseError) {
-    //   console.error("Erreur suppression ClickHouse:", clickhouseError);
-    //   // Continuer même si erreur ClickHouse
-    // }
+      for (const table of tablesToDelete) {
+        console.log(
+          `🗑️ Suppression ClickHouse: ${dbName}.${table} WHERE batch_id = '${batchId}'`
+        );
+        await clickhouseClient.command({
+          query: `ALTER TABLE ${dbName}.${table} DELETE WHERE batch_id = '${batchId}'`,
+        });
+        console.log(`✅ Données ClickHouse supprimées pour batch_id: ${batchId} dans ${table}`);
+      }
+    } catch (clickhouseError) {
+      console.error("Erreur suppression ClickHouse:", clickhouseError);
+      // Continuer même si erreur ClickHouse
+    }
 
     // 3. Supprimer les enregistrements Postgres
-    // Les fichiers seront supprimés en cascade grâce à onDelete: Cascade
     await prisma.comptablePeriod.delete({
       where: { id: periodId },
     });

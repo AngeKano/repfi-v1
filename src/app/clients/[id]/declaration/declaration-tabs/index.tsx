@@ -185,24 +185,28 @@ const DeclarationTabs: React.FC<DeclarationTabsProps> = ({ clientId }) => {
                       <Button
                         size="sm"
                         variant="outline"
+                        className="cursor-pointer"
                         onClick={() => handleDownloadExcel(period)}
                         title="Télécharger le fichier Excel"
                       >
-                        <Download className="w-4 h-4 mr-1" />
-                        Télécharger
+                        <Download className="w-4 h-4" />
                       </Button>
                     )}
                     <Link
                       href={`/clients/${clientId}/declaration/status/${period.batchId}`}
                     >
-                      <Button size="sm" variant="outline">
+                      <Button
+                        className="cursor-pointer"
+                        size="sm"
+                        variant="outline"
+                      >
                         <Eye className="w-4 h-4" />
                       </Button>
                     </Link>
                     <Button
                       size="sm"
                       variant="ghost"
-                      className="opacity-0 group-hover:opacity-100 transition-opacity"
+                      className="opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
                       onClick={() => handleDeleteClick(period)}
                       disabled={
                         period.status === "PROCESSING" ||

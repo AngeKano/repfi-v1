@@ -138,12 +138,6 @@ export async function POST(req: NextRequest) {
         d.getDate()
       ).padStart(2, "0")}`;
 
-    // S3 Key prefix généré comme dans l'upload :
-    // Exemples à tester directement :
-    // CLIENT ID : cmhyjxmyw0004m9fs00s3tck0
-    // BATCH ID : f3b12858-3478-4be1-ae2c-2e46a76d08a3
-    // Format attendu :
-    //   NEVO_cmhyjxmyw0004m9fs00s3tck0/declaration/2016/periode-20161227-20251114/
     const clientName = comptablePeriod.client.name
       .replace(/\s+/g, "_")
       .replace(/[^\w\-]/g, "");
@@ -159,8 +153,6 @@ export async function POST(req: NextRequest) {
       comptablePeriod.periodStart
     )}-${formatDate(comptablePeriod.periodEnd)}`;
     const s3Prefix = `${companyName}_${companyId}/${clientName}_${comptablePeriod.clientId}/declaration/${year}/${periodFolder}/`;
-
-    console.log("s3Prefix ", s3Prefix);
 
     const dagRunId = await triggerAirflowDAG(
       batchId,
