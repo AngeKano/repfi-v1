@@ -1,10 +1,10 @@
 // app/clients/[id]/assign/page.tsx
 import { getServerSession } from "next-auth";
-import { authOptions } from "../../../api/auth/[...nextauth]/route";
+import { authOptions } from "../../../../api/auth/[...nextauth]/route";
 import { redirect } from "next/navigation";
 import { Button } from "@/components/ui/button";
 
-import DeclarationComptable from "./declaration-comptable";
+import DeclarationComptable from "./create-component";
 
 import { prisma } from "@/lib/prisma";
 import { ArrowLeft } from "lucide-react";

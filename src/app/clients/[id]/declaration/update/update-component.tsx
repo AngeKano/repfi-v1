@@ -1,0 +1,1017 @@
+"use client";
+
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import { Label } from "@/components/ui/label";
+import {
+  Upload,
+  FileCheck,
+  AlertCircle,
+  Play,
+  X,
+  FileSpreadsheet,
+  Edit,
+  RotateCcw,
+} from "lucide-react";
+import { toast } from "sonner";
+import * as React from "react";
+import { Calendar } from "@/components/ui/calendar";
+import { DateRange } from "react-day-picker";
+
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectLabel,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+
+const REQUIRED_FILE_TYPES = [
+  { type: "GRAND_LIVRE_COMPTES", label: "Grand Livre des Comptes" },
+  { type: "GRAND_LIVRE_TIERS", label: "Grand Livre des Tiers" },
+  { type: "PLAN_COMPTES", label: "Plan Comptable" },
+  { type: "PLAN_TIERS", label: "Plan des Tiers" },
+  { type: "CODE_JOURNAL", label: "Code Journal" },
+];
+
+function FileTypeSelect({
+  value,
+  onChange,
+  excludeTypes = [],
+}: {
+  value: string | undefined;
+  onChange: (v: string) => void;
+  excludeTypes?: string[];
+}) {
+  const filteredTypes = REQUIRED_FILE_TYPES.filter(
+    (t) => !excludeTypes.includes(t.type)
+  );
+
+  return (
+    <Select value={value || ""} onValueChange={onChange}>
+      <SelectTrigger className="w-[220px]">
+        <SelectValue placeholder="Choisir le type" />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectGroup>
+          <SelectLabel>Types de fichiers</SelectLabel>
+          {filteredTypes.map((option) => (
+            <SelectItem key={option.type} value={option.type}>
+              {option.label}
+            </SelectItem>
+          ))}
+        </SelectGroup>
+      </SelectContent>
+    </Select>
+  );
+}
+
+interface UploadFile {
+  file: File;
+  id: string;
+  fileType?: string;
+  error?: string;
+}
+
+interface Period {
+  id: string;
+  batchId: string;
+  periodStart: string;
+  periodEnd: string;
+  status: string;
+}
+
+const MAX_FILE_SIZE = 10 * 1024 * 1024;
+const MAX_FILES = 5;
+
+export default function DeclarationComptable({
+  session,
+  client,
+}: {
+  session: any;
+  client: any;
+}) {
+  const router = useRouter();
+
+  const [files, setFiles] = useState<UploadFile[]>([]);
+  const [filesCount, setFilesCount] = useState<number>(0);
+  const [uploading, setUploading] = useState(false);
+  const [uploadResult, setUploadResult] = useState<any>(null);
+  const [processing, setProcessing] = useState(false);
+  const [dragActive, setDragActive] = useState(false);
+
+  // Mode édition
+  const [editMode, setEditMode] = useState(false);
+  const [selectedPeriodToEdit, setSelectedPeriodToEdit] =
+    useState<Period | null>(null);
+
+  // Périodes existantes
+  const [existingPeriods, setExistingPeriods] = useState<Period[]>([]);
+
+  // Période sélectionnée
+  const [dateRange, setDateRange] = useState<DateRange | undefined>();
+
+  // Année sélectionnée
+  const currentYear = new Date().getFullYear();
+  const years = Array.from({ length: 10 }, (_, i) => currentYear - i);
+  const [selectedYear, setSelectedYear] = useState<number>(currentYear);
+  const [calendarMonth, setCalendarMonth] = useState<Date>(
+    new Date(selectedYear, 0)
+  );
+
+  // Fetch des périodes existantes
+  useEffect(() => {
+    if (!client?.id) return;
+    fetchPeriods();
+  }, [client?.id]);
+
+  const fetchPeriods = async () => {
+    try {
+      const res = await fetch(
+        `/api/files/comptable/periods?clientId=${client.id}`
+      );
+      const data = await res.json();
+
+      if (Array.isArray(data.periods) && data.periods.length > 0) {
+        const formattedPeriods: Period[] = data.periods.map((p: any) => ({
+          id: p.id,
+          batchId: p.batchId,
+          periodStart: p.periodStart?.slice(0, 10) || "",
+          periodEnd: p.periodEnd?.slice(0, 10) || "",
+          status: p.status,
+        }));
+        setExistingPeriods(formattedPeriods);
+      }
+    } catch (e) {
+      console.error("Erreur fetch periods:", e);
+    }
+  };
+
+  useEffect(() => {
+    setFilesCount(files.length);
+  }, [files]);
+
+  // Générer les dates désactivées (périodes existantes non sélectionnées pour modification)
+  const getDisabledDates = (): Date[] => {
+    if (editMode && selectedPeriodToEdit) return [];
+
+    const disabledDates: Date[] = [];
+
+    existingPeriods.forEach((period) => {
+      // En mode édition, ne pas désactiver la période sélectionnée
+      if (editMode && selectedPeriodToEdit?.id === period.id) return;
+
+      if (period.periodStart && period.periodEnd) {
+        const start = new Date(period.periodStart);
+        const end = new Date(period.periodEnd);
+
+        const current = new Date(start);
+        while (current <= end) {
+          disabledDates.push(new Date(current));
+          current.setDate(current.getDate() + 1);
+        }
+      }
+    });
+
+    return disabledDates;
+  };
+
+  // Dates des périodes modifiables (jaune)
+  const getEditableDates = (): Date[] => {
+    const editableDates: Date[] = [];
+
+    existingPeriods.forEach((period) => {
+      // Seulement les périodes COMPLETED peuvent être modifiées
+      if (period.status !== "COMPLETED") return;
+
+      if (period.periodStart && period.periodEnd) {
+        const start = new Date(period.periodStart);
+        const end = new Date(period.periodEnd);
+
+        const current = new Date(start);
+        while (current <= end) {
+          editableDates.push(new Date(current));
+          current.setDate(current.getDate() + 1);
+        }
+      }
+    });
+
+    return editableDates;
+  };
+
+  // Vérifier si une date est dans l'année sélectionnée
+  const isDateInSelectedYear = (date: Date): boolean => {
+    return date.getFullYear() === selectedYear;
+  };
+
+  // Trouver la période correspondant à une date
+  const findPeriodByDate = (date: Date): Period | undefined => {
+    return existingPeriods.find((period) => {
+      const start = new Date(period.periodStart);
+      const end = new Date(period.periodEnd);
+      return date >= start && date <= end;
+    });
+  };
+
+  // Handler pour clic sur une date (pour sélectionner une période à modifier)
+  const handleDayClick = (day: Date) => {
+    const period = findPeriodByDate(day);
+
+    if (period && period.status === "COMPLETED" && !editMode) {
+      // Proposer de modifier cette période
+      setSelectedPeriodToEdit(period);
+      setEditMode(true);
+      setDateRange({
+        from: new Date(period.periodStart),
+        to: new Date(period.periodEnd),
+      });
+      setFiles([]);
+      setUploadResult(null);
+      toast.info(
+        `Mode modification: ${new Date(period.periodStart).toLocaleDateString(
+          "fr-FR"
+        )} - ${new Date(period.periodEnd).toLocaleDateString("fr-FR")}`
+      );
+    }
+  };
+
+  // Handler pour la sélection de période (nouveau)
+  const handleDateSelect = (range: DateRange | undefined): void => {
+    if (editMode) return; // En mode édition, on ne peut pas changer la période
+
+    if (!range) {
+      setDateRange(undefined);
+      return;
+    }
+
+    if (range.from && range.to) {
+      if (range.from.getFullYear() !== range.to.getFullYear()) {
+        toast.error("La période doit être dans la même année");
+        setDateRange(undefined);
+        return;
+      }
+    }
+
+    setDateRange(range);
+  };
+
+  // Annuler le mode édition
+  const cancelEditMode = () => {
+    setEditMode(false);
+    setSelectedPeriodToEdit(null);
+    setDateRange(undefined);
+    setFiles([]);
+    setUploadResult(null);
+  };
+
+  // Handler pour sélectionner toute l'année
+  const handleFullYearClick = () => {
+    if (editMode) return;
+
+    const yearStart = new Date(selectedYear, 0, 1);
+    const yearEnd = new Date(selectedYear, 11, 31);
+
+    const hasOverlap = existingPeriods.some((period) => {
+      const pStart = new Date(period.periodStart);
+      const pEnd = new Date(period.periodEnd);
+      return pStart <= yearEnd && pEnd >= yearStart;
+    });
+
+    if (hasOverlap) {
+      toast.error("Cette année contient des périodes déjà déclarées");
+      return;
+    }
+
+    setDateRange({ from: yearStart, to: yearEnd });
+  };
+
+  // Reset la sélection
+  const handleResetSelection = () => {
+    if (editMode) {
+      cancelEditMode();
+    } else {
+      setDateRange(undefined);
+    }
+  };
+
+  // Périodes formatées pour l'affichage
+  const periodStart = dateRange?.from
+    ? dateRange.from.toISOString().slice(0, 10)
+    : "";
+  const periodEnd = dateRange?.to
+    ? dateRange.to.toISOString().slice(0, 10)
+    : "";
+
+  const isValidExcel = (file: File) => {
+    const validTypes = [
+      "application/vnd.ms-excel",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    ];
+    return (
+      validTypes.includes(file.type) ||
+      file.name.endsWith(".xlsx") ||
+      file.name.endsWith(".xls")
+    );
+  };
+
+  const detectFileType = (fileName: string): string | undefined => {
+    const normalizedName = fileName
+      .toLowerCase()
+      .replace(/[0-9_\-\.]/g, " ")
+      .trim();
+
+    const keywords = {
+      GRAND_LIVRE_COMPTES: ["grand", "livre", "compte", "glcompte"],
+      GRAND_LIVRE_TIERS: ["grand", "livre", "tiers", "gltiers"],
+      PLAN_COMPTES: ["plan", "compte", "plancompte"],
+      PLAN_TIERS: ["plan", "tiers", "plantiers"],
+      CODE_JOURNAL: ["code", "journal", "codejournal"],
+    };
+
+    const matchesType = (words: string[]): number => {
+      let score = 0;
+      words.forEach((word) => {
+        if (normalizedName.includes(word)) score += word.length;
+      });
+      return score;
+    };
+
+    const scores = [
+      {
+        type: "GRAND_LIVRE_COMPTES",
+        score: matchesType(keywords.GRAND_LIVRE_COMPTES),
+      },
+      {
+        type: "GRAND_LIVRE_TIERS",
+        score: matchesType(keywords.GRAND_LIVRE_TIERS),
+      },
+      { type: "PLAN_COMPTES", score: matchesType(keywords.PLAN_COMPTES) },
+      { type: "PLAN_TIERS", score: matchesType(keywords.PLAN_TIERS) },
+      { type: "CODE_JOURNAL", score: matchesType(keywords.CODE_JOURNAL) },
+    ];
+
+    const bestMatch = scores.reduce((prev, current) =>
+      current.score > prev.score ? current : prev
+    );
+
+    return bestMatch.score > 0 ? bestMatch.type : undefined;
+  };
+
+  const handleFiles = (newFiles: FileList | null) => {
+    if (!newFiles) return;
+
+    const fileArray = Array.from(newFiles);
+    const currentCount = files.length;
+    const availableSlots = MAX_FILES - currentCount;
+
+    if (availableSlots <= 0) {
+      toast.error("Vous ne pouvez pas ajouter plus de 5 fichiers.");
+      return;
+    }
+
+    const validFiles: UploadFile[] = [];
+    let added = 0;
+
+    for (let i = 0; i < fileArray.length && added < availableSlots; i++) {
+      const file = fileArray[i];
+
+      if (!isValidExcel(file)) {
+        toast.error(`${file.name} n'est pas un fichier Excel valide`);
+        continue;
+      }
+
+      if (file.size > MAX_FILE_SIZE) {
+        validFiles.push({
+          file,
+          id: Math.random().toString(36),
+          error: "Fichier trop volumineux (max 10MB)",
+        });
+        added++;
+        continue;
+      }
+
+      const detectedType = detectFileType(file.name);
+      validFiles.push({
+        file,
+        id: Math.random().toString(36),
+        fileType: detectedType,
+      });
+      added++;
+    }
+
+    setFiles((prev) => [...prev, ...validFiles].slice(0, MAX_FILES));
+  };
+
+  const handleDrag = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.type === "dragenter" || e.type === "dragover") {
+      setDragActive(true);
+    } else if (e.type === "dragleave") {
+      setDragActive(false);
+    }
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragActive(false);
+
+    if (filesCount >= MAX_FILES) {
+      toast.error("Vous ne pouvez pas ajouter plus de 5 fichiers.");
+      return;
+    }
+    handleFiles(e.dataTransfer.files);
+  };
+
+  const removeFile = (id: string) => {
+    setFiles((prev) => prev.filter((f) => f.id !== id));
+  };
+
+  const updateFileType = (id: string, fileType: string) => {
+    setFiles((prev) => prev.map((f) => (f.id === id ? { ...f, fileType } : f)));
+  };
+
+  const allFilesValid = () => {
+    if (filesCount !== 5) return false;
+
+    const types = files.map((f) => f.fileType);
+    const requiredTypes = REQUIRED_FILE_TYPES.map((t) => t.type);
+
+    return (
+      requiredTypes.every((type) => types.includes(type)) &&
+      files.every((f) => f.fileType && !f.error)
+    );
+  };
+
+  // Upload pour nouvelle période
+  const handleUpload = async () => {
+    if (!periodStart || !periodEnd) {
+      toast.error("Veuillez sélectionner les dates de période");
+      return;
+    }
+
+    if (!allFilesValid()) {
+      toast.error(
+        "Veuillez sélectionner les 5 fichiers obligatoires avec des types valides"
+      );
+      return;
+    }
+
+    setUploading(true);
+
+    try {
+      const formData = new FormData();
+      formData.append("clientId", client.id);
+      formData.append("periodStart", periodStart);
+      formData.append("periodEnd", periodEnd);
+
+      files.forEach((uploadFile) => {
+        if (uploadFile.fileType) {
+          formData.append(uploadFile.fileType, uploadFile.file);
+        }
+      });
+
+      const response = await fetch("/api/files/comptable/upload", {
+        method: "POST",
+        body: formData,
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Erreur lors de l'upload");
+      }
+
+      setUploadResult(data);
+      toast.success(`Fichiers uploadés avec succès`);
+    } catch (error: any) {
+      toast.error(error.message);
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  // Upload pour modification de période existante
+  const handleUpdate = async () => {
+    if (!selectedPeriodToEdit) {
+      toast.error("Aucune période sélectionnée");
+      return;
+    }
+
+    if (!allFilesValid()) {
+      toast.error(
+        "Veuillez sélectionner les 5 fichiers obligatoires avec des types valides"
+      );
+      return;
+    }
+
+    setUploading(true);
+
+    try {
+      const formData = new FormData();
+      formData.append("periodId", selectedPeriodToEdit.id);
+
+      files.forEach((uploadFile) => {
+        if (uploadFile.fileType) {
+          formData.append(uploadFile.fileType, uploadFile.file);
+        }
+      });
+
+      const response = await fetch("/api/files/comptable/update", {
+        method: "PUT",
+        body: formData,
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Erreur lors de la mise à jour");
+      }
+
+      setUploadResult(data);
+      toast.success("Période mise à jour avec succès");
+    } catch (error: any) {
+      toast.error(error.message);
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleTriggerETL = async () => {
+    if (!uploadResult?.batchId) return;
+
+    setProcessing(true);
+
+    try {
+      const response = await fetch("/api/files/comptable/trigger-etl", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ batchId: uploadResult.batchId }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Erreur lors du déclenchement");
+      }
+
+      toast.success("Traitement ETL lancé avec succès");
+      router.push(
+        `/clients/${client.id}/declaration/status/${uploadResult.batchId}`
+      );
+    } catch (error: any) {
+      toast.error(error.message);
+      setProcessing(false);
+    }
+  };
+
+  const getAlreadySelectedTypes = (excludeId?: string) =>
+    files
+      .filter((f) => f.fileType && (!excludeId || f.id !== excludeId))
+      .map((f) => f.fileType!);
+
+  const hasMaxFiles = filesCount >= MAX_FILES;
+  const disabledDates = getDisabledDates();
+  const editableDates = getEditableDates();
+
+  return (
+    <main className="max-w-7xl flex items-start flex-row gap-x-3 mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div>
+        <Label className="block text-sm font-medium mb-2">
+          {editMode
+            ? "Période en cours de modification"
+            : "Période de la déclaration"}
+        </Label>
+
+        {/* Mode édition banner */}
+        {editMode && (
+          <div className="mb-4 p-3 border  rounded-lg flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Edit className="w-4 h-4 " />
+              <span className="text-sm font-medium ">Mode modification</span>
+            </div>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={cancelEditMode}
+            >
+              <RotateCcw className="w-4 h-4 mr-1" />
+              Annuler
+            </Button>
+          </div>
+        )}
+
+        <div className="flex items-center gap-2 mb-4">
+          <Select
+            value={selectedYear.toString()}
+            onValueChange={(value) => {
+              const year = Number(value);
+              setSelectedYear(year);
+              setDateRange(undefined);
+              setCalendarMonth(new Date(year, 0));
+              if (editMode) cancelEditMode();
+            }}
+            disabled={editMode}
+          >
+            <SelectTrigger className="w-[120px]" aria-label="Année">
+              <SelectValue placeholder="Année" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectGroup>
+                <SelectLabel>Année</SelectLabel>
+                {years.map((year) => (
+                  <SelectItem key={year} value={year.toString()}>
+                    {year}
+                  </SelectItem>
+                ))}
+              </SelectGroup>
+            </SelectContent>
+          </Select>
+
+          {!editMode && (
+            <Button
+              type="button"
+              variant="outline"
+              onClick={handleFullYearClick}
+            >
+              Toute l&apos;année {selectedYear}
+            </Button>
+          )}
+
+          {(dateRange || editMode) && (
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              onClick={handleResetSelection}
+              className="text-xs"
+            >
+              <X className="w-4 h-4" />
+            </Button>
+          )}
+        </div>
+
+        <Calendar
+          mode="range"
+          numberOfMonths={2}
+          selected={dateRange}
+          onSelect={handleDateSelect}
+          onDayClick={handleDayClick}
+          month={calendarMonth}
+          onMonthChange={setCalendarMonth}
+          className="rounded-lg border shadow-sm"
+          disabled={(date) => {
+            if (!isDateInSelectedYear(date)) return true;
+            if (editMode) return false; // En mode édition, rien n'est désactivé
+            return disabledDates.some(
+              (d) => d.toDateString() === date.toDateString()
+            );
+          }}
+          modifiers={{
+            existing: disabledDates,
+            editable: editableDates,
+            editing:
+              editMode && dateRange?.from && dateRange?.to
+                ? (() => {
+                    const dates: Date[] = [];
+                    const current = new Date(dateRange.from!);
+                    while (current <= dateRange.to!) {
+                      dates.push(new Date(current));
+                      current.setDate(current.getDate() + 1);
+                    }
+                    return dates;
+                  })()
+                : [],
+          }}
+          modifiersStyles={{
+            existing: {
+              backgroundColor: "rgba(239, 68, 68, 0.2)",
+              color: "#991b1b",
+              textDecoration: "line-through",
+            },
+            editable: editMode
+              ? {}
+              : {
+                  backgroundColor: "rgba(234, 179, 8, 0.3)",
+                  color: "#854d0e",
+                  cursor: "pointer",
+                },
+            editing: {
+              backgroundColor: "rgba(234, 179, 8, 0.5)",
+              color: "#854d0e",
+              fontWeight: "bold",
+            },
+          }}
+        />
+
+        {/* Légende */}
+        <div className="mt-4 flex gap-4 text-xs">
+          <div className="flex items-center gap-1">
+            <div
+              className="w-3 h-3 rounded"
+              style={{ backgroundColor: "rgba(239, 68, 68, 0.2)" }}
+            />
+            <span>Période déclarée (non modifiable)</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <div
+              className="w-3 h-3 rounded"
+              style={{ backgroundColor: "rgba(234, 179, 8, 0.3)" }}
+            />
+            <span>Cliquer pour modifier</span>
+          </div>
+        </div>
+
+        {/* Affichage des périodes existantes */}
+        {existingPeriods.length > 0 && !editMode && (
+          <div className="mt-4 p-3 bg-gray-50 border border-gray-200 rounded-lg">
+            <p className="text-sm font-medium text-gray-800 mb-2">
+              Périodes existantes (cliquez pour modifier) :
+            </p>
+            <ul className="text-sm text-gray-700 space-y-1">
+              {existingPeriods.map((p) => (
+                <li
+                  key={p.id}
+                  className={`flex items-center justify-between p-2 rounded cursor-pointer hover:bg-gray-100 ${
+                    p.status === "COMPLETED" ? "hover:bg-yellow-50" : ""
+                  }`}
+                  onClick={() => {
+                    if (p.status === "COMPLETED") {
+                      setSelectedPeriodToEdit(p);
+                      setEditMode(true);
+                      setDateRange({
+                        from: new Date(p.periodStart),
+                        to: new Date(p.periodEnd),
+                      });
+                      setFiles([]);
+                      setUploadResult(null);
+                    }
+                  }}
+                >
+                  <span>
+                    {new Date(p.periodStart).toLocaleDateString("fr-FR")} →{" "}
+                    {new Date(p.periodEnd).toLocaleDateString("fr-FR")}
+                  </span>
+                  <Badge
+                    variant={p.status === "COMPLETED" ? "default" : "secondary"}
+                  >
+                    {p.status === "COMPLETED" ? (
+                      <>
+                        <Edit className="w-3 h-3 mr-1" />
+                        Modifier
+                      </>
+                    ) : (
+                      p.status
+                    )}
+                  </Badge>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {/* Période sélectionnée / en modification */}
+        {dateRange?.from && dateRange?.to && (
+          <div
+            className={`mt-4 p-3 border rounded-lg ${
+              editMode
+                ? "bg-yellow-50 border-yellow-300"
+                : "bg-green-50 border-green-200"
+            }`}
+          >
+            <p
+              className={`text-sm font-medium ${
+                editMode ? "text-yellow-800" : "text-green-800"
+              }`}
+            >
+              {editMode ? "Période à modifier :" : "Période sélectionnée :"}
+            </p>
+            <p
+              className={`text-sm ${
+                editMode ? "text-yellow-700" : "text-green-700"
+              }`}
+            >
+              {dateRange.from.toLocaleDateString("fr-FR")} →{" "}
+              {dateRange.to.toLocaleDateString("fr-FR")}
+            </p>
+          </div>
+        )}
+      </div>
+
+      <Card className="p-6 w-full">
+        {/* Drag & Drop Zone */}
+        <div
+          className={`flex flex-col items-center justify-center border-2 border-dashed rounded-lg p-8 text-center transition-colors mb-6 ${
+            dragActive
+              ? "border-blue-500 bg-blue-50"
+              : hasMaxFiles
+              ? "border-gray-200 bg-gray-100 opacity-60 pointer-events-none"
+              : editMode
+              ? "border-yellow-400 hover:border-yellow-500"
+              : "border-gray-300 hover:border-gray-400"
+          }`}
+          onDragEnter={hasMaxFiles ? undefined : handleDrag}
+          onDragLeave={hasMaxFiles ? undefined : handleDrag}
+          onDragOver={hasMaxFiles ? undefined : handleDrag}
+          onDrop={hasMaxFiles ? undefined : handleDrop}
+          style={hasMaxFiles ? { pointerEvents: "none" } : {}}
+        >
+          <Upload
+            className={`w-12 h-12 mx-auto mb-4 ${
+              editMode ? "text-yellow-500" : "text-gray-400"
+            }`}
+          />
+          <p className="text-lg font-medium mb-2">
+            {editMode
+              ? "Glissez les nouveaux fichiers pour remplacer"
+              : "Glissez-déposez vos 5 fichiers Excel ici"}
+          </p>
+          <p className="text-sm text-gray-500 mb-4">
+            ou cliquez pour sélectionner (max 10MB chacun)
+          </p>
+          <Input
+            type="file"
+            multiple
+            accept=".xlsx,.xls"
+            onChange={(e) => handleFiles(e.target.files)}
+            className="hidden"
+            id="file-input"
+            disabled={hasMaxFiles}
+          />
+          <Label htmlFor="file-input">
+            <Button
+              variant={editMode ? "default" : "outline"}
+              type="button"
+              asChild
+              disabled={hasMaxFiles}
+            >
+              <span>
+                {hasMaxFiles
+                  ? "Maximum 5 fichiers atteints"
+                  : editMode
+                  ? "Sélectionner les nouveaux fichiers"
+                  : "Sélectionner des fichiers"}
+              </span>
+            </Button>
+          </Label>
+        </div>
+
+        {/* Actions */}
+        <div className="flex justify-end gap-3">
+          {!uploadResult ? (
+            editMode ? (
+              <Button
+                onClick={handleUpdate}
+                disabled={!allFilesValid() || uploading}
+                size="lg"
+                className="bg-yellow-600 hover:bg-yellow-700"
+              >
+                <Edit className="w-4 h-4 mr-2" />
+                {uploading ? "Mise à jour..." : "Mettre à jour les fichiers"}
+              </Button>
+            ) : (
+              <Button
+                onClick={handleUpload}
+                disabled={
+                  !allFilesValid() || uploading || !periodStart || !periodEnd
+                }
+                size="lg"
+              >
+                <Upload className="w-4 h-4 mr-2" />
+                {uploading ? "Upload en cours..." : "Uploader les fichiers"}
+              </Button>
+            )
+          ) : (
+            <Button onClick={handleTriggerETL} disabled={processing} size="lg">
+              <Play className="w-4 h-4 mr-2" />
+              {processing ? "Démarrage..." : "Lancer le traitement ETL"}
+            </Button>
+          )}
+        </div>
+
+        {/* Upload Result */}
+        {uploadResult && (
+          <div
+            className={`mb-6 p-4 border rounded-lg ${
+              editMode
+                ? "bg-yellow-50 border-yellow-200"
+                : "bg-green-50 border-green-200"
+            }`}
+          >
+            <h3
+              className={`font-semibold mb-2 ${
+                editMode ? "text-yellow-900" : "text-green-900"
+              }`}
+            >
+              {editMode
+                ? "Fichiers mis à jour avec succès"
+                : "Fichiers uploadés avec succès"}
+            </h3>
+            <div
+              className={`text-sm ${
+                editMode ? "text-yellow-800" : "text-green-800"
+              }`}
+            >
+              <p>
+                <strong>Période:</strong>{" "}
+                {new Date(uploadResult.period.start).toLocaleDateString(
+                  "fr-FR"
+                )}{" "}
+                au{" "}
+                {new Date(uploadResult.period.end).toLocaleDateString("fr-FR")}
+              </p>
+              <p>
+                <strong>Batch ID:</strong> {uploadResult.batchId}
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* Files List */}
+        {filesCount > 0 && (
+          <div className="space-y-3 mb-6">
+            <Label>Fichiers sélectionnés ({filesCount}/5 requis)</Label>
+            {files.map((uploadFile) => (
+              <div
+                key={uploadFile.id}
+                className="flex items-center gap-3 p-3 border rounded-lg"
+              >
+                <FileSpreadsheet className="w-5 h-5 text-green-600 flex-shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <p className="font-medium truncate">{uploadFile.file.name}</p>
+                  <p className="text-sm text-gray-500">
+                    {(uploadFile.file.size / 1024).toFixed(2)} KB
+                  </p>
+                  {uploadFile.error && (
+                    <p className="text-sm text-red-500">{uploadFile.error}</p>
+                  )}
+                </div>
+                <div className="flex items-center gap-2">
+                  {uploadFile.fileType ? (
+                    <Badge variant="default">
+                      <FileCheck className="w-3 h-3 mr-1" />
+                      {REQUIRED_FILE_TYPES.find(
+                        (t) => t.type === uploadFile.fileType
+                      )?.label || uploadFile.fileType}
+                    </Badge>
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      <Badge variant="secondary">
+                        <AlertCircle className="w-3 h-3 mr-1" />
+                        Type non détecté
+                      </Badge>
+                      <FileTypeSelect
+                        value={undefined}
+                        excludeTypes={getAlreadySelectedTypes(uploadFile.id)}
+                        onChange={(type) => updateFileType(uploadFile.id, type)}
+                      />
+                    </div>
+                  )}
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => removeFile(uploadFile.id)}
+                  >
+                    <X className="w-4 h-4" />
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Types manquants */}
+        {filesCount > 0 && (
+          <div className="mb-6 p-4 bg-gray-50 rounded-lg">
+            <p className="text-sm font-medium mb-2">
+              Types de fichiers requis:
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {REQUIRED_FILE_TYPES.map(({ type, label }) => {
+                const hasType = files.some((f) => f.fileType === type);
+                return (
+                  <Badge key={type} variant={hasType ? "default" : "outline"}>
+                    {hasType ? (
+                      <FileCheck className="w-3 h-3 mr-1" />
+                    ) : (
+                      <AlertCircle className="w-3 h-3 mr-1" />
+                    )}
+                    {label}
+                  </Badge>
+                );
+              })}
+            </div>
+          </div>
+        )}
+      </Card>
+    </main>
+  );
+}
