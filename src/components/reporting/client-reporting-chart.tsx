@@ -335,10 +335,7 @@ export default function ClientReportingChart({
             <CardDescription>Transactions</CardDescription>
             <CardTitle className="text-2xl">
               {/* {data.totals.totalTransactions.toLocaleString("fr-FR")} */}
-              {(
-                data.totals.totalTransactions * 1_000_000 +
-                2006
-              ).toLocaleString("fr-FR")}
+              {(data.totals.totalTransactions * 1_000).toLocaleString("fr-FR")}
             </CardTitle>
           </CardHeader>
         </Card>
@@ -498,10 +495,9 @@ export default function ClientReportingChart({
                       </div>
                       <div className="text-sm text-muted-foreground mt-1">
                         {/* {Number(period.nb_transactions).toLocaleString("fr-FR")}{" "} */}
-                        {(
-                          data.totals.totalTransactions * 1_000_000 +
-                          2006
-                        ).toLocaleString("fr-FR")}
+                        {(data.totals.totalTransactions * 1_000).toLocaleString(
+                          "fr-FR"
+                        )}
                         transactions
                       </div>
                       <div className="flex gap-2 mt-2">
