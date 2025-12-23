@@ -507,7 +507,7 @@ export default function DeclarationComptable({
           numberOfMonths={2}
           selected={dateRange}
           onSelect={handleDateSelect}
-          month={calendarMonth} 
+          month={calendarMonth}
           onMonthChange={setCalendarMonth}
           className="rounded-lg border shadow-sm"
           disabled={(date) => {
