@@ -5,14 +5,99 @@ import { createClient as createClickhouseClient } from "@clickhouse/client";
 import { prisma } from "@/lib/prisma";
 
 const clickhouseClient = createClickhouseClient({
-    url: process.env.CLICKHOUSE_HOST || "http://localhost:8123",
-    username: process.env.CLICKHOUSE_USER || "default",
-    password: process.env.CLICKHOUSE_PASSWORD || "",
-  });
+  url: process.env.CLICKHOUSE_HOST || "http://localhost:8123",
+  username: process.env.CLICKHOUSE_USER || "default",
+  password: process.env.CLICKHOUSE_PASSWORD || "",
+});
 
 function getClickhouseDbName(id: string): string {
   const cleanId = id.replace(/[^a-zA-Z0-9]/g, "_");
   return `repfi_${cleanId}`;
+}
+
+interface IndicateursFinanciers {
+  chiffreAffaires: number;
+  masseSalariale: number;
+  resultatExploitation: number;
+  resultatNet: number;
+  soldeTresorerie: number;
+}
+
+async function calculerIndicateurs(
+  dbName: string,
+  batchIds: string[]
+): Promise<IndicateursFinanciers> {
+  if (batchIds.length === 0) {
+    return {
+      chiffreAffaires: 0,
+      masseSalariale: 0,
+      resultatExploitation: 0,
+      resultatNet: 0,
+      soldeTresorerie: 0,
+    };
+  }
+
+  const data = await clickhouseClient.query({
+    query: `
+      SELECT
+        -- Chiffre d'affaires: rubriques TA, TB, TC, TD
+        sum(CASE WHEN rubrique IN ('TA', 'TB', 'TC', 'TD') THEN credit - debit ELSE 0 END) as chiffre_affaires,
+        
+        -- Masse salariale: rubrique RI
+        ABS(sum(CASE WHEN rubrique = 'RI' THEN credit - debit ELSE 0 END)) as masse_salariale,
+        
+        -- Valeur Ajoutée pour calcul Rex
+        sum(CASE WHEN rubrique IN ('TA', 'TB', 'TC', 'TD', 'TE', 'TF', 'TG', 'TH') THEN credit - debit ELSE 0 END)
+        - ABS(sum(CASE WHEN rubrique IN ('RA', 'RB', 'RC', 'RD', 'RE', 'RF', 'RG', 'RH') THEN credit - debit ELSE 0 END)) as valeur_ajoutee,
+        
+        -- Composants Rex: RK, TJ, RL
+        sum(CASE WHEN rubrique IN ('RK', 'TJ', 'RL') THEN credit - debit ELSE 0 END) as composant_rex,
+        
+        -- Résultat Financier
+        sum(CASE WHEN rubrique = 'TH' THEN credit - debit ELSE 0 END) 
+        - ABS(sum(CASE WHEN rubrique = 'RK' THEN credit - debit ELSE 0 END)) as resultat_financier,
+        
+        -- Résultat HAO
+        sum(CASE WHEN rubrique IN ('TO', 'TN') THEN credit - debit ELSE 0 END)
+        - ABS(sum(CASE WHEN rubrique IN ('RO', 'RP') THEN credit - debit ELSE 0 END)) as resultat_hao,
+        
+        -- Composant RN: RQ, RS
+        sum(CASE WHEN rubrique IN ('RQ', 'RS') THEN credit - debit ELSE 0 END) as composant_rn,
+        
+        -- Solde Trésorerie: comptes 52 et 57
+        -(sum(CASE WHEN substring(compte, 1, 2) = '57' THEN credit - debit ELSE 0 END))
+        -(sum(CASE WHEN substring(compte, 1, 2) = '52' THEN credit - debit ELSE 0 END)) as solde_tresorerie
+        
+      FROM ${dbName}.grand_livre
+      WHERE batch_id IN ({batchIds:Array(String)})
+    `,
+    query_params: { batchIds },
+    format: "JSONEachRow",
+  });
+
+  const rows = (await data.json()) as any[];
+  const row = rows[0] || {};
+
+  const chiffreAffaires = parseFloat(row.chiffre_affaires) || 0;
+  const masseSalariale = parseFloat(row.masse_salariale) || 0;
+  const valeurAjoutee = parseFloat(row.valeur_ajoutee) || 0;
+  const composantRex = parseFloat(row.composant_rex) || 0;
+  const resultatFinancier = parseFloat(row.resultat_financier) || 0;
+  const resultatHAO = parseFloat(row.resultat_hao) || 0;
+  const composantRN = parseFloat(row.composant_rn) || 0;
+  const soldeTresorerie = parseFloat(row.solde_tresorerie) || 0;
+
+  const resultatExploitation = valeurAjoutee + composantRex;
+  const resultatNet =
+    resultatExploitation + resultatFinancier + resultatHAO + composantRN;
+
+  return {
+    chiffreAffaires,
+    masseSalariale,
+    resultatExploitation,
+    resultatNet,
+    soldeTresorerie,
+  };
 }
 
 export async function GET(
@@ -20,59 +105,43 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    // DEBUG: Entrée dans la fonction GET reporting
-    console.log("Reporting API Request:", req.url);
-
     const session = await getServerSession(authOptions);
-    // DEBUG: Session info
-    console.log("Session:", session);
-
     if (!session?.user) {
-      console.warn("Non authentifié");
       return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
     }
 
     const { id } = await params;
-    // DEBUG: Params et id client
-    console.log("Client ID reçu:", id);
-
     const { searchParams } = new URL(req.url);
-    const year = searchParams.get("year") || new Date().getFullYear().toString();
-    // DEBUG: Query year
-    console.log("Year param:", year);
+    const year =
+      searchParams.get("year") || new Date().getFullYear().toString();
 
     const client = await prisma.client.findUnique({
       where: { id },
       select: { id: true, name: true, companyId: true },
     });
-    // DEBUG: client trouvé (ou non)
-    console.log("Client de la requête:", client);
 
     if (!client) {
-      console.warn("Client non trouvé pour ID:", id);
       return NextResponse.json({ error: "Client non trouvé" }, { status: 404 });
     }
 
     if (client.companyId !== session.user.companyId) {
-      console.warn(
-        "Accès non autorisé pour user", session.user.id,
-        "sur companyId", client.companyId,
-        "(user companyId:", session.user.companyId, ")"
+      return NextResponse.json(
+        { error: "Accès non autorisé" },
+        { status: 403 }
       );
-      return NextResponse.json({ error: "Accès non autorisé" }, { status: 403 });
     }
 
     const dbName = getClickhouseDbName(id);
-    // DEBUG: Nom de la base Clickhouse
-    console.log("Nom DB ClickHouse utilisée:", dbName);
+    const yearN = parseInt(year);
+    const yearN1 = yearN - 1;
 
-    // 1. Récupérer les périodes depuis PostgreSQL pour cette année
+    // Périodes année N
     const postgresPeriodsData = await prisma.comptablePeriod.findMany({
       where: {
         clientId: id,
         periodStart: {
-          gte: new Date(`${year}-01-01`),
-          lt: new Date(`${parseInt(year) + 1}-01-01`),
+          gte: new Date(`${yearN}-01-01`),
+          lt: new Date(`${yearN + 1}-01-01`),
         },
       },
       select: {
@@ -85,49 +154,79 @@ export async function GET(
       },
       orderBy: { periodStart: "asc" },
     });
-    // DEBUG: Périodes PG pour cette année
-    console.log(`Périodes comptables PG année ${year}:`, postgresPeriodsData);
 
-    // 2. Années disponibles depuis PostgreSQL
+    // Périodes année N-1
+    const postgresPeriodsN1 = await prisma.comptablePeriod.findMany({
+      where: {
+        clientId: id,
+        periodStart: {
+          gte: new Date(`${yearN1}-01-01`),
+          lt: new Date(`${yearN}-01-01`),
+        },
+      },
+      select: { batchId: true },
+    });
+
+    // Années disponibles
     const availableYearsData = await prisma.comptablePeriod.findMany({
       where: { clientId: id },
       select: { periodStart: true },
       distinct: ["periodStart"],
     });
-    // DEBUG: Années disponibles dans PG
-    console.log("Années disponibles (PG):", availableYearsData);
 
     const availableYears = [
       ...new Set(
         availableYearsData.map((p) => p.periodStart.getFullYear().toString())
       ),
     ].sort((a, b) => parseInt(b) - parseInt(a));
-    // DEBUG: Années disponibles après Set & sort
-    console.log("Années disponibles triées:", availableYears);
 
-    // 3. Récupérer les batch_ids des périodes PostgreSQL
     const batchIds = postgresPeriodsData
       .map((p) => p.batchId)
       .filter((b): b is string => !!b);
-    // DEBUG: batchIds trouvés
-    console.log("Batch IDs à requêter sur ClickHouse:", batchIds);
+    const batchIdsN1 = postgresPeriodsN1
+      .map((p) => p.batchId)
+      .filter((b): b is string => !!b);
 
-    // 4. Données agrégées par mois depuis ClickHouse (filtré par batch_ids)
-    // Classe 6 = Charges (dépenses), Classe 7 = Produits (revenus)
+    // Calcul des indicateurs N et N-1
+    const indicateursN = await calculerIndicateurs(dbName, batchIds);
+    const indicateursN1 = await calculerIndicateurs(dbName, batchIdsN1);
+
+    // Calcul des variations (%)
+    const calculerVariation = (n: number, n1: number) =>
+      n1 !== 0 ? ((n - n1) / Math.abs(n1)) * 100 : 0;
+
+    const variations = {
+      chiffreAffaires: calculerVariation(
+        indicateursN.chiffreAffaires,
+        indicateursN1.chiffreAffaires
+      ),
+      masseSalariale: calculerVariation(
+        indicateursN.masseSalariale,
+        indicateursN1.masseSalariale
+      ),
+      resultatExploitation: calculerVariation(
+        indicateursN.resultatExploitation,
+        indicateursN1.resultatExploitation
+      ),
+      resultatNet: calculerVariation(
+        indicateursN.resultatNet,
+        indicateursN1.resultatNet
+      ),
+      soldeTresorerie: calculerVariation(
+        indicateursN.soldeTresorerie,
+        indicateursN1.soldeTresorerie
+      ),
+    };
+
+    // Données mensuelles
     let monthlyRows: any[] = [];
-
     if (batchIds.length > 0) {
-      // DEBUG: Lancement de la requête ClickHouse pour les mois
-      console.log("Requête ClickHouse AGGREG Month lancée...");
       const monthlyData = await clickhouseClient.query({
         query: `
           SELECT 
             substring(date_transaction, 4, 2) as month,
-            -- Charges (classe 6) = Dépenses
             sum(CASE WHEN substring(compte, 1, 1) = '6' THEN debit ELSE 0 END) as charges,
-            -- Produits (classe 7) = Revenus
             sum(CASE WHEN substring(compte, 1, 1) = '7' THEN credit ELSE 0 END) as produits,
-            -- Nombre de transactions
             count(*) as nb_transactions
           FROM ${dbName}.grand_livre
           WHERE batch_id IN ({batchIds:Array(String)})
@@ -137,26 +236,28 @@ export async function GET(
         query_params: { batchIds },
         format: "JSONEachRow",
       });
-
       monthlyRows = (await monthlyData.json()) as any[];
-      // DEBUG: Données mois ClickHouse
-      console.log("Résultat ClickHouse mensualisé:", monthlyRows);
-    } else {
-      // DEBUG: Pas de batchIds donc aucun mois à requêter
-      console.log("Aucun batchIds cette année, pas de requête ClickHouse");
     }
 
-    // 5. Créer tous les mois (même vides)
     const monthNames = [
-      "Jan", "Fév", "Mar", "Avr", "Mai", "Juin",
-      "Juil", "Août", "Sep", "Oct", "Nov", "Déc",
+      "Jan",
+      "Fév",
+      "Mar",
+      "Avr",
+      "Mai",
+      "Juin",
+      "Juil",
+      "Août",
+      "Sep",
+      "Oct",
+      "Nov",
+      "Déc",
     ];
 
     const allMonths = [];
     for (let m = 1; m <= 12; m++) {
       const monthStr = m.toString().padStart(2, "0");
       const found = monthlyRows.find((r: any) => r.month === monthStr);
-
       allMonths.push({
         month: `${year}${monthStr}`,
         monthLabel: monthNames[m - 1],
@@ -165,36 +266,20 @@ export async function GET(
         nbTransactions: found ? parseInt(found.nb_transactions) || 0 : 0,
       });
     }
-    // DEBUG: Tableau allMonths après construction
-    console.log("allMonths (complété):", allMonths);
 
-    // 6. Calculer solde cumulé (Résultat = Produits - Charges)
     let cumulativeBalance = 0;
-    const monthlyWithCumulative = allMonths.map((row, idx) => {
+    const monthlyWithCumulative = allMonths.map((row) => {
       const resultat = row.produits - row.charges;
       cumulativeBalance += resultat;
-      // DEBUG: Valeurs pour chaque mois du cumul
-      console.log(
-        `[${row.monthLabel}] Charges: ${row.charges}, Produits: ${row.produits}, Résultat: ${resultat}, Cumul: ${cumulativeBalance}`
-      );
-      return {
-        ...row,
-        resultat,
-        cumulativeBalance,
-      };
+      return { ...row, resultat, cumulativeBalance };
     });
 
-    // 7. Enrichir les périodes PostgreSQL avec stats ClickHouse
+    // Périodes enrichies
     const periods = await Promise.all(
       postgresPeriodsData.map(async (pgPeriod) => {
         let stats = { charges: 0, produits: 0, nb_transactions: 0 };
-
         if (pgPeriod.batchId) {
           try {
-            // DEBUG: Requête ClickHouse agrégée pour la période/batch
-            console.log(
-              `Requête stats ClickHouse pour la période PG batchId=${pgPeriod.batchId}...`
-            );
             const statsData = await clickhouseClient.query({
               query: `
                 SELECT 
@@ -208,21 +293,11 @@ export async function GET(
               format: "JSONEachRow",
             });
             const statsRows = (await statsData.json()) as any[];
-            // DEBUG: Affichage stats de cette période/batch
-            console.log(`Stats pour batch ${pgPeriod.batchId}:`, statsRows);
-            if (statsRows.length > 0) {
-              stats = statsRows[0];
-            }
+            if (statsRows.length > 0) stats = statsRows[0];
           } catch (e) {
-            console.error("Stats error for batch:", pgPeriod.batchId, e);
+            console.error("Stats error:", e);
           }
-        } else {
-          // DEBUG: Pas de batchId pour cette période, donc stats à 0
-          console.log(
-            "Période PG sans batchId (aucune stats ClickHouse attendue)", pgPeriod
-          );
         }
-
         return {
           id: pgPeriod.id,
           batch_id: pgPeriod.batchId,
@@ -236,10 +311,7 @@ export async function GET(
         };
       })
     );
-    // DEBUG: Tableau periods construit
-    console.log("Périodes enrichies (periods):", periods);
 
-    // 8. Totaux
     const totals = monthlyWithCumulative.reduce(
       (acc, row) => ({
         totalCharges: acc.totalCharges + row.charges,
@@ -248,10 +320,7 @@ export async function GET(
       }),
       { totalCharges: 0, totalProduits: 0, totalTransactions: 0 }
     );
-    // DEBUG: Totaux cumulés
-    console.log("Totaux de l'année:", totals);
 
-    // DEBUG: Fin de traitement, on renvoie la réponse
     return NextResponse.json({
       client: { id: client.id, name: client.name },
       year,
@@ -261,6 +330,11 @@ export async function GET(
       totals: {
         ...totals,
         resultat: totals.totalProduits - totals.totalCharges,
+      },
+      indicateurs: {
+        anneeN: indicateursN,
+        anneeN1: indicateursN1,
+        variations,
       },
     });
   } catch (error) {

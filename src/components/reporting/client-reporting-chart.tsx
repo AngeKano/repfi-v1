@@ -41,6 +41,12 @@ import {
   Loader2,
   TrendingUp,
   TrendingDown,
+  Minus,
+  DollarSign,
+  Users,
+  Activity,
+  Wallet,
+  PiggyBank,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -66,6 +72,22 @@ interface Period {
   nb_transactions: number;
 }
 
+interface IndicateursFinanciers {
+  chiffreAffaires: number;
+  masseSalariale: number;
+  resultatExploitation: number;
+  resultatNet: number;
+  soldeTresorerie: number;
+}
+
+interface Variations {
+  chiffreAffaires: number;
+  masseSalariale: number;
+  resultatExploitation: number;
+  resultatNet: number;
+  soldeTresorerie: number;
+}
+
 interface ReportingData {
   client: { id: string; name: string };
   year: string;
@@ -78,28 +100,21 @@ interface ReportingData {
     totalTransactions: number;
     resultat: number;
   };
+  indicateurs: {
+    anneeN: IndicateursFinanciers;
+    anneeN1: IndicateursFinanciers;
+    variations: Variations;
+  };
 }
 
 const chartConfigArea: ChartConfig = {
-  produits: {
-    label: "Produits (Ventes)",
-    color: "hsl(142, 76%, 36%)",
-  },
-  charges: {
-    label: "Charges (Achats)",
-    color: "hsl(0, 84%, 60%)",
-  },
+  produits: { label: "Produits (Ventes)", color: "hsl(142, 76%, 36%)" },
+  charges: { label: "Charges (Achats)", color: "hsl(0, 84%, 60%)" },
 };
 
 const chartConfigBar: ChartConfig = {
-  charges: {
-    label: "Charges",
-    color: "hsl(0, 84%, 60%)",
-  },
-  produits: {
-    label: "Produits",
-    color: "hsl(142, 76%, 36%)",
-  },
+  charges: { label: "Charges", color: "hsl(0, 84%, 60%)" },
+  produits: { label: "Produits", color: "hsl(142, 76%, 36%)" },
 };
 
 export default function ClientReportingChart({
@@ -148,9 +163,7 @@ export default function ClientReportingChart({
       toast.error("ID de période manquant");
       return;
     }
-
     if (!confirm(`Supprimer cette période ?`)) return;
-
     try {
       const res = await fetch(`/api/files/comptable/periods/${period.id}`, {
         method: "DELETE",
@@ -166,11 +179,7 @@ export default function ClientReportingChart({
   const handleHidePeriod = (periodId: string) => {
     setHiddenPeriods((prev) => {
       const next = new Set(prev);
-      if (next.has(periodId)) {
-        next.delete(periodId);
-      } else {
-        next.add(periodId);
-      }
+      next.has(periodId) ? next.delete(periodId) : next.add(periodId);
       return next;
     });
   };
@@ -180,7 +189,6 @@ export default function ClientReportingChart({
       toast.error("ID de période manquant");
       return;
     }
-
     try {
       const res = await fetch(`/api/files/download/${period.id}`);
       const json = await res.json();
@@ -203,15 +211,18 @@ export default function ClientReportingChart({
     }).format(value);
   };
 
+  const formatVariation = (value: number): string => {
+    const sign = value >= 0 ? "+" : "";
+    return `${sign}${value.toFixed(1)}%`;
+  };
+
   const formatPeriodLabel = (
-    periodStart: string | undefined,
-    periodEnd: string | undefined
+    periodStart?: string,
+    periodEnd?: string
   ): string => {
     if (!periodStart || !periodEnd) return "Période";
-
     const start = new Date(periodStart);
     const end = new Date(periodEnd);
-
     const months = [
       "Janvier",
       "Février",
@@ -226,15 +237,38 @@ export default function ClientReportingChart({
       "Novembre",
       "Décembre",
     ];
-
     const startMonth = months[start.getMonth()];
     const endMonth = months[end.getMonth()];
     const yearStr = start.getFullYear();
-
-    if (start.getMonth() === end.getMonth()) {
-      return `${startMonth} ${yearStr}`;
-    }
+    if (start.getMonth() === end.getMonth()) return `${startMonth} ${yearStr}`;
     return `${startMonth} - ${endMonth} ${yearStr}`;
+  };
+
+  const VariationBadge = ({ value }: { value: number }) => {
+    if (value === 0) {
+      return (
+        <Badge variant="outline" className="text-gray-500">
+          <Minus className="w-3 h-3 mr-1" /> 0%
+        </Badge>
+      );
+    }
+    return (
+      <Badge
+        variant="outline"
+        className={
+          value > 0
+            ? "text-green-600 border-green-200"
+            : "text-red-600 border-red-200"
+        }
+      >
+        {value > 0 ? (
+          <TrendingUp className="w-3 h-3 mr-1" />
+        ) : (
+          <TrendingDown className="w-3 h-3 mr-1" />
+        )}
+        {formatVariation(value)}
+      </Badge>
+    );
   };
 
   if (loading) {
@@ -260,10 +294,12 @@ export default function ClientReportingChart({
   const visibleMonthly = data.monthly.filter(
     (m) => !hiddenPeriods.has(m.month)
   );
+  const yearN = parseInt(year);
+  const yearN1 = yearN - 1;
 
   return (
     <div className="space-y-6">
-      {/* Header avec navigation année */}
+      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-bold">{data.client.name}</h2>
@@ -295,7 +331,145 @@ export default function ClientReportingChart({
         </div>
       </div>
 
-      {/* Totaux */}
+      {/* KPIs */}
+      <div className="grid grid-cols-5 gap-4">
+        {/* Chiffre d'affaires */}
+        <Card>
+          <CardHeader className="pb-2">
+            <div className="flex items-center justify-between">
+              <CardDescription className="flex items-center gap-2">
+                <DollarSign className="w-4 h-4 text-blue-600" />
+                Chiffre d&apos;affaires
+              </CardDescription>
+              <VariationBadge
+                value={data.indicateurs.variations.chiffreAffaires}
+              />
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-blue-600">
+              {formatCurrency(data.indicateurs.anneeN.chiffreAffaires)}
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">
+              {yearN1}:{" "}
+              {formatCurrency(data.indicateurs.anneeN1.chiffreAffaires)}
+            </p>
+          </CardContent>
+        </Card>
+
+        {/* Masse salariale */}
+        <Card>
+          <CardHeader className="pb-2">
+            <div className="flex items-center justify-between">
+              <CardDescription className="flex items-center gap-2">
+                <Users className="w-4 h-4 text-orange-600" />
+                Masse salariale
+              </CardDescription>
+              <VariationBadge
+                value={data.indicateurs.variations.masseSalariale}
+              />
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-orange-600">
+              {formatCurrency(data.indicateurs.anneeN.masseSalariale)}
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">
+              {yearN1}:{" "}
+              {formatCurrency(data.indicateurs.anneeN1.masseSalariale)}
+            </p>
+          </CardContent>
+        </Card>
+
+        {/* Résultat d'exploitation */}
+        <Card>
+          <CardHeader className="pb-2">
+            <div className="flex items-center justify-between">
+              <CardDescription className="flex items-center gap-2">
+                <Activity className="w-4 h-4 text-purple-600" />
+                Résultat exploitation
+              </CardDescription>
+              <VariationBadge
+                value={data.indicateurs.variations.resultatExploitation}
+              />
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div
+              className={`text-2xl font-bold ${
+                data.indicateurs.anneeN.resultatExploitation >= 0
+                  ? "text-purple-600"
+                  : "text-red-600"
+              }`}
+            >
+              {formatCurrency(data.indicateurs.anneeN.resultatExploitation)}
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">
+              {yearN1}:{" "}
+              {formatCurrency(data.indicateurs.anneeN1.resultatExploitation)}
+            </p>
+          </CardContent>
+        </Card>
+
+        {/* Résultat Net */}
+        <Card>
+          <CardHeader className="pb-2">
+            <div className="flex items-center justify-between">
+              <CardDescription className="flex items-center gap-2">
+                <PiggyBank className="w-4 h-4 text-green-600" />
+                Résultat Net
+              </CardDescription>
+              <VariationBadge value={data.indicateurs.variations.resultatNet} />
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div
+              className={`text-2xl font-bold ${
+                data.indicateurs.anneeN.resultatNet >= 0
+                  ? "text-green-600"
+                  : "text-red-600"
+              }`}
+            >
+              {formatCurrency(data.indicateurs.anneeN.resultatNet)}
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">
+              {yearN1}: {formatCurrency(data.indicateurs.anneeN1.resultatNet)}
+            </p>
+          </CardContent>
+        </Card>
+
+        {/* Trésorerie */}
+        <Card>
+          <CardHeader className="pb-2">
+            <div className="flex items-center justify-between">
+              <CardDescription className="flex items-center gap-2">
+                <Wallet className="w-4 h-4 text-cyan-600" />
+                Trésorerie
+              </CardDescription>
+              <VariationBadge
+                value={data.indicateurs.variations.soldeTresorerie}
+              />
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div
+              className={`text-2xl font-bold ${
+                data.indicateurs.anneeN.soldeTresorerie >= 0
+                  ? "text-cyan-600"
+                  : "text-red-600"
+              }`}
+            >
+              {formatCurrency(data.indicateurs.anneeN.soldeTresorerie)}
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">
+              {yearN1}:{" "}
+              {formatCurrency(data.indicateurs.anneeN1.soldeTresorerie)}
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Totaux secondaires */}
       <div className="grid grid-cols-4 gap-4">
         <Card>
           <CardHeader className="pb-2">
@@ -334,14 +508,13 @@ export default function ClientReportingChart({
           <CardHeader className="pb-2">
             <CardDescription>Transactions</CardDescription>
             <CardTitle className="text-2xl">
-              {/* {data.totals.totalTransactions.toLocaleString("fr-FR")} */}
-              {(data.totals.totalTransactions * 1_000).toLocaleString("fr-FR")}
+              {data.totals.totalTransactions.toLocaleString("fr-FR")}
             </CardTitle>
           </CardHeader>
         </Card>
       </div>
 
-      {/* Area Chart - Évolution Produits vs Charges */}
+      {/* Charts */}
       <Card>
         <CardHeader>
           <CardTitle>Évolution des flux financiers</CardTitle>
@@ -420,7 +593,6 @@ export default function ClientReportingChart({
       </Card>
 
       <div className="flex flex-row w-full justify-between gap-3">
-        {/* Bar Chart - Charges vs Produits par mois */}
         <Card className="flex-1">
           <CardHeader>
             <CardTitle>Comparaison mensuelle</CardTitle>
@@ -469,7 +641,6 @@ export default function ClientReportingChart({
           </CardContent>
         </Card>
 
-        {/* Timeline des périodes avec menu contextuel */}
         <Card className="flex-1">
           <CardHeader>
             <CardTitle>Périodes déclarées</CardTitle>
@@ -494,10 +665,7 @@ export default function ClientReportingChart({
                         )}
                       </div>
                       <div className="text-sm text-muted-foreground mt-1">
-                        {/* {Number(period.nb_transactions).toLocaleString("fr-FR")}{" "} */}
-                        {(data.totals.totalTransactions * 1_000).toLocaleString(
-                          "fr-FR"
-                        )}
+                        {Number(period.nb_transactions).toLocaleString("fr-FR")}{" "}
                         transactions
                       </div>
                       <div className="flex gap-2 mt-2">
@@ -536,13 +704,12 @@ export default function ClientReportingChart({
                     <ContextMenuItem
                       onClick={() => handleDownloadExcel(period)}
                     >
-                      <Download className="w-4 h-4 mr-2" />
-                      Télécharger Excel
+                      <Download className="w-4 h-4 mr-2" /> Télécharger Excel
                     </ContextMenuItem>
                     <ContextMenuItem
                       onClick={() => handleHidePeriod(period.id || "")}
                     >
-                      <EyeOff className="w-4 h-4 mr-2" />
+                      <EyeOff className="w-4 h-4 mr-2" />{" "}
                       {hiddenPeriods.has(period.id || "")
                         ? "Afficher"
                         : "Masquer"}
@@ -552,8 +719,7 @@ export default function ClientReportingChart({
                       onClick={() => handleDeletePeriod(period)}
                       className="text-red-600 focus:text-red-600"
                     >
-                      <Trash2 className="w-4 h-4 mr-2" />
-                      Supprimer
+                      <Trash2 className="w-4 h-4 mr-2" /> Supprimer
                     </ContextMenuItem>
                   </ContextMenuContent>
                 </ContextMenu>
