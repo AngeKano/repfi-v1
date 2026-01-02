@@ -43,8 +43,8 @@ async function calculerIndicateurs(
         -- Chiffre d'affaires: rubriques TA, TB, TC, TD
         sum(CASE WHEN rubrique IN ('TA', 'TB', 'TC', 'TD') THEN credit - debit ELSE 0 END) as chiffre_affaires,
         
-        -- Masse salariale: rubrique RI
-        ABS(sum(CASE WHEN rubrique = 'RI' THEN credit - debit ELSE 0 END)) as masse_salariale,
+        -- Masse salariale: rubrique RK
+        ABS(sum(CASE WHEN rubrique = 'RK' THEN credit - debit ELSE 0 END)) as masse_salariale,
         
         -- Valeur Ajoutée pour calcul Rex
         sum(CASE WHEN rubrique IN ('TA', 'TB', 'TC', 'TD', 'TE', 'TF', 'TG', 'TH') THEN credit - debit ELSE 0 END)
@@ -53,14 +53,25 @@ async function calculerIndicateurs(
         -- Composants Rex: RK, TJ, RL
         sum(CASE WHEN rubrique IN ('RK', 'TJ', 'RL') THEN credit - debit ELSE 0 END) as composant_rex,
         
+        --------------------------------------------------------------
         -- Résultat Financier
-        sum(CASE WHEN rubrique = 'TH' THEN credit - debit ELSE 0 END) 
-        - ABS(sum(CASE WHEN rubrique = 'RK' THEN credit - debit ELSE 0 END)) as resultat_financier,
-        
+
+        -- Produit financier: TK, TL, TM
+        sum(CASE WHEN rubrique IN ('TK', 'TL', 'TM') THEN credit - debit ELSE 0 END) as produit_financier,
+        -- Charges financieres: RM, RN
+        sum(CASE WHEN rubrique IN ('RM', 'RN') THEN credit - debit ELSE 0 END) as charges_financieres,
+
+
+    --------------------------------------------------------------
         -- Résultat HAO
-        sum(CASE WHEN rubrique IN ('TO', 'TN') THEN credit - debit ELSE 0 END)
-        - ABS(sum(CASE WHEN rubrique IN ('RO', 'RP') THEN credit - debit ELSE 0 END)) as resultat_hao,
-        
+
+        -- Produit HAO: TO, TN
+        sum(CASE WHEN rubrique IN ('TO', 'TN') THEN credit - debit ELSE 0 END) as produit_HAO,
+        -- Charges HAO: RO, RP
+        sum(CASE WHEN rubrique IN ('RO', 'RP') THEN credit - debit ELSE 0 END) as charges_HAO,
+
+    --------------------------------------------------------------
+      
         -- Composant RN: RQ, RS
         sum(CASE WHEN rubrique IN ('RQ', 'RS') THEN credit - debit ELSE 0 END) as composant_rn,
         
@@ -82,14 +93,32 @@ async function calculerIndicateurs(
   const masseSalariale = parseFloat(row.masse_salariale) || 0;
   const valeurAjoutee = parseFloat(row.valeur_ajoutee) || 0;
   const composantRex = parseFloat(row.composant_rex) || 0;
-  const resultatFinancier = parseFloat(row.resultat_financier) || 0;
-  const resultatHAO = parseFloat(row.resultat_hao) || 0;
+ 
+
+  // Resultat NET = Résultat Exploitation + Résultat Financier + Résultat HAO + Composant RN
+  // const resultatFinancier = parseFloat(row.resultat_financier) || 0;
+  // const resultatHAO = parseFloat(row.resultat_hao) || 0;
+
   const composantRN = parseFloat(row.composant_rn) || 0;
+
   const soldeTresorerie = parseFloat(row.solde_tresorerie) || 0;
 
   const resultatExploitation = valeurAjoutee + composantRex;
-  const resultatNet =
-    resultatExploitation + resultatFinancier + resultatHAO + composantRN;
+
+  
+
+  // RESULTAT HAO
+  const produitHAO = parseFloat(row.produit_HAO) || 0;
+  const chargesHAO = parseFloat(row.charges_HAO) || 0;
+  const resultatHAO = produitHAO + chargesHAO;
+
+
+// RESULTAT NET
+const produitFinancier = parseFloat(row.produit_financier) || 0;
+const chargesFinancieres = parseFloat(row.charges_financieres) || 0;
+const resultatFinancier = produitFinancier + chargesFinancieres;
+const resultatNet = resultatFinancier + resultatHAO + composantRN;
+
 
   return {
     chiffreAffaires,
