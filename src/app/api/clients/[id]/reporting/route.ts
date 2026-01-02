@@ -15,12 +15,228 @@ function getClickhouseDbName(id: string): string {
   return `repfi_${cleanId}`;
 }
 
+// ============================================================================
+// STRUCTURE OHADA - COMPTE DE RÉSULTAT (SYSCOHADA)
+// ============================================================================
+
+interface RubriquesOHADA {
+  // --- ACTIVITÉ D'EXPLOITATION ---
+  // Chiffre d'affaires (XB)
+  TA: number; // Ventes de marchandises (+)
+  TB: number; // Ventes de produits fabriqués (+)
+  TC: number; // Travaux, services vendus (+)
+  TD: number; // Produits accessoires (+)
+
+  // Marge commerciale (XA)
+  RA: number; // Achats de marchandises (-)
+  RB: number; // Variation de stocks de marchandises (-/+)
+
+  // Valeur ajoutée (XC)
+  TE: number; // Production stockée (-/+)
+  TF: number; // Production immobilisée (+)
+  TG: number; // Subventions d'exploitation (+)
+  TH: number; // Autres produits (+)
+  TI: number; // Transferts de charges d'exploitation (+)
+  RC: number; // Achats de matières premières (-)
+  RD: number; // Variation de stocks matières premières (-/+)
+  RE: number; // Autres achats (-)
+  RF: number; // Variation de stocks autres approvisionnements (-/+)
+  RG: number; // Transports (-)
+  RH: number; // Services extérieurs (-)
+  RI: number; // Impôts et taxes (-)
+  RJ: number; // Autres charges (-)
+
+  // Excédent brut d'exploitation (XD)
+  RK: number; // Charges de personnel (-)
+
+  // Résultat d'exploitation (XE)
+  TJ: number; // Reprises d'amortissements, provisions et dépréciations (+)
+  RL: number; // Dotations aux amortissements, provisions et dépréciations (-)
+
+  // --- ACTIVITÉ FINANCIÈRE ---
+  // Résultat financier (XF)
+  TK: number; // Revenus financiers et assimilés (+)
+  TL: number; // Reprises de provisions financières (+)
+  TM: number; // Transferts de charges financières (+)
+  RM: number; // Frais financiers et charges assimilées (-)
+  RN: number; // Dotations aux provisions financières (-)
+
+  // --- HORS ACTIVITÉS ORDINAIRES (HAO) ---
+  // Résultat HAO (XH)
+  TN: number; // Produits des cessions d'immobilisations (+)
+  TO: number; // Autres produits HAO (+)
+  RO: number; // Valeurs comptables des cessions d'immobilisations (-)
+  RP: number; // Autres charges HAO (-)
+
+  // --- RÉSULTAT NET ---
+  RQ: number; // Participation des travailleurs (-)
+  RS: number; // Impôts sur le résultat (-)
+}
+
+interface SoldesIntermediairesGestion {
+  // Soldes intermédiaires de gestion (SIG)
+  XA: number; // Marge commerciale
+  XB: number; // Chiffre d'affaires
+  XC: number; // Valeur ajoutée
+  XD: number; // Excédent brut d'exploitation (EBE)
+  XE: number; // Résultat d'exploitation
+  XF: number; // Résultat financier
+  XG: number; // Résultat des activités ordinaires (RAO)
+  XH: number; // Résultat hors activités ordinaires (HAO)
+  XI: number; // Résultat net
+}
+
 interface IndicateursFinanciers {
-  chiffreAffaires: number;
-  masseSalariale: number;
-  resultatExploitation: number;
-  resultatNet: number;
+  chiffreAffaires: number;      // XB
+  masseSalariale: number;       // RK (valeur absolue)
+  resultatExploitation: number; // XE
+  resultatNet: number;          // XI
   soldeTresorerie: number;
+  // Détails supplémentaires
+  margeCommerciale: number;     // XA
+  valeurAjoutee: number;        // XC
+  ebe: number;                  // XD - Excédent Brut d'Exploitation
+  resultatFinancier: number;    // XF
+  resultatHAO: number;          // XH
+}
+
+async function recupererRubriques(
+  dbName: string,
+  batchIds: string[]
+): Promise<RubriquesOHADA> {
+  const rubriquesVides: RubriquesOHADA = {
+    TA: 0, TB: 0, TC: 0, TD: 0,
+    RA: 0, RB: 0,
+    TE: 0, TF: 0, TG: 0, TH: 0, TI: 0,
+    RC: 0, RD: 0, RE: 0, RF: 0, RG: 0, RH: 0, RI: 0, RJ: 0,
+    RK: 0,
+    TJ: 0, RL: 0,
+    TK: 0, TL: 0, TM: 0, RM: 0, RN: 0,
+    TN: 0, TO: 0, RO: 0, RP: 0,
+    RQ: 0, RS: 0,
+  };
+
+  if (batchIds.length === 0) {
+    return rubriquesVides;
+  }
+
+  // Requête structurée par rubrique
+  const data = await clickhouseClient.query({
+    query: `
+      SELECT
+        rubrique,
+        sum(credit - debit) as solde
+      FROM ${dbName}.grand_livre
+      WHERE batch_id IN ({batchIds:Array(String)})
+        AND rubrique IN (
+          'TA', 'TB', 'TC', 'TD',
+          'RA', 'RB',
+          'TE', 'TF', 'TG', 'TH', 'TI',
+          'RC', 'RD', 'RE', 'RF', 'RG', 'RH', 'RI', 'RJ',
+          'RK',
+          'TJ', 'RL',
+          'TK', 'TL', 'TM', 'RM', 'RN',
+          'TN', 'TO', 'RO', 'RP',
+          'RQ', 'RS'
+        )
+      GROUP BY rubrique
+    `,
+    query_params: { batchIds },
+    format: "JSONEachRow",
+  });
+
+  const rows = (await data.json()) as Array<{ rubrique: string; solde: string }>;
+
+  const rubriques = { ...rubriquesVides };
+  for (const row of rows) {
+    const key = row.rubrique as keyof RubriquesOHADA;
+    if (key in rubriques) {
+      rubriques[key] = parseFloat(row.solde) || 0;
+    }
+  }
+
+  return rubriques;
+}
+
+async function recupererSoldeTresorerie(
+  dbName: string,
+  batchIds: string[]
+): Promise<number> {
+  if (batchIds.length === 0) return 0;
+
+  const data = await clickhouseClient.query({
+    query: `
+      SELECT
+        sum(CASE WHEN startsWith(compte, '52') THEN debit - credit ELSE 0 END) as banques,
+        sum(CASE WHEN startsWith(compte, '57') THEN debit - credit ELSE 0 END) as caisse
+      FROM ${dbName}.grand_livre
+      WHERE batch_id IN ({batchIds:Array(String)})
+    `,
+    query_params: { batchIds },
+    format: "JSONEachRow",
+  });
+
+  const rows = (await data.json()) as any[];
+  const row = rows[0] || {};
+  
+  const banques = parseFloat(row.banques) || 0;
+  const caisse = parseFloat(row.caisse) || 0;
+  
+  return banques + caisse;
+}
+
+function calculerSIG(rubriques: RubriquesOHADA): SoldesIntermediairesGestion {
+  const {
+    TA, TB, TC, TD,
+    RA, RB,
+    TE, TF, TG, TH, TI,
+    RC, RD, RE, RF, RG, RH, RI, RJ,
+    RK,
+    TJ, RL,
+    TK, TL, TM, RM, RN,
+    TN, TO, RO, RP,
+    RQ, RS,
+  } = rubriques;
+
+  // ============================================================================
+  // CALCUL DES SOLDES INTERMÉDIAIRES DE GESTION (SIG) - SYSCOHADA
+  // ============================================================================
+
+  // XB - CHIFFRE D'AFFAIRES = TA + TB + TC + TD
+  const XB = TA + TB + TC + TD;
+
+  // XA - MARGE COMMERCIALE = TA + RA + RB
+  // Note: RA et RB ont déjà le signe négatif (charges)
+  const XA = TA + RA + RB;
+
+  // XC - VALEUR AJOUTÉE = XB + RA + RB + (somme TE à RJ)
+  // Formule: XA + TB + TC + TD + TE + TF + TG + TH + TI + RC + RD + RE + RF + RG + RH + RI + RJ
+  const XC = XA + TB + TC + TD + TE + TF + TG + TH + TI + RC + RD + RE + RF + RG + RH + RI + RJ;
+
+  // XD - EXCÉDENT BRUT D'EXPLOITATION (EBE) = XC + RK
+  // Note: RK a le signe négatif (charge)
+  const XD = XC + RK;
+
+  // XE - RÉSULTAT D'EXPLOITATION = XD + TJ + RL
+  // TJ (+) reprises, RL (-) dotations
+  const XE = XD + TJ + RL;
+
+  // XF - RÉSULTAT FINANCIER = TK + TL + TM + RM + RN
+  // TK, TL, TM (+) produits, RM, RN (-) charges
+  const XF = TK + TL + TM + RM + RN;
+
+  // XG - RÉSULTAT DES ACTIVITÉS ORDINAIRES = XE + XF
+  const XG = XE + XF;
+
+  // XH - RÉSULTAT HAO = TN + TO + RO + RP
+  // TN, TO (+) produits, RO, RP (-) charges
+  const XH = TN + TO + RO + RP;
+
+  // XI - RÉSULTAT NET = XG + XH + RQ + RS
+  // RQ, RS (-) charges
+  const XI = XG + XH + RQ + RS;
+
+  return { XA, XB, XC, XD, XE, XF, XG, XH, XI };
 }
 
 async function calculerIndicateurs(
@@ -34,98 +250,34 @@ async function calculerIndicateurs(
       resultatExploitation: 0,
       resultatNet: 0,
       soldeTresorerie: 0,
+      margeCommerciale: 0,
+      valeurAjoutee: 0,
+      ebe: 0,
+      resultatFinancier: 0,
+      resultatHAO: 0,
     };
   }
 
-  const data = await clickhouseClient.query({
-    query: `
-      SELECT
-        -- Chiffre d'affaires: rubriques TA, TB, TC, TD
-        sum(CASE WHEN rubrique IN ('TA', 'TB', 'TC', 'TD') THEN credit - debit ELSE 0 END) as chiffre_affaires,
-        
-        -- Masse salariale: rubrique RK
-        ABS(sum(CASE WHEN rubrique = 'RK' THEN credit - debit ELSE 0 END)) as masse_salariale,
-        
-        -- Valeur Ajoutée pour calcul Rex
-        sum(CASE WHEN rubrique IN ('TA', 'TB', 'TC', 'TD', 'TE', 'TF', 'TG', 'TH') THEN credit - debit ELSE 0 END)
-        - ABS(sum(CASE WHEN rubrique IN ('RA', 'RB', 'RC', 'RD', 'RE', 'RF', 'RG', 'RH') THEN credit - debit ELSE 0 END)) as valeur_ajoutee,
-        
-        -- Composants Rex: RK, TJ, RL
-        sum(CASE WHEN rubrique IN ('RK', 'TJ', 'RL') THEN credit - debit ELSE 0 END) as composant_rex,
-        
-        --------------------------------------------------------------
-        -- Résultat Financier
-
-        -- Produit financier: TK, TL, TM
-        sum(CASE WHEN rubrique IN ('TK', 'TL', 'TM') THEN credit - debit ELSE 0 END) as produit_financier,
-        -- Charges financieres: RM, RN
-        sum(CASE WHEN rubrique IN ('RM', 'RN') THEN credit - debit ELSE 0 END) as charges_financieres,
-
-
-    --------------------------------------------------------------
-        -- Résultat HAO
-
-        -- Produit HAO: TO, TN
-        sum(CASE WHEN rubrique IN ('TO', 'TN') THEN credit - debit ELSE 0 END) as produit_HAO,
-        -- Charges HAO: RO, RP
-        sum(CASE WHEN rubrique IN ('RO', 'RP') THEN credit - debit ELSE 0 END) as charges_HAO,
-
-    --------------------------------------------------------------
-      
-        -- Composant RN: RQ, RS
-        sum(CASE WHEN rubrique IN ('RQ', 'RS') THEN credit - debit ELSE 0 END) as composant_rn,
-        
-        -- Solde Trésorerie: comptes 52 et 57
-        -(sum(CASE WHEN substring(compte, 1, 2) = '57' THEN credit - debit ELSE 0 END))
-        -(sum(CASE WHEN substring(compte, 1, 2) = '52' THEN credit - debit ELSE 0 END)) as solde_tresorerie
-        
-      FROM ${dbName}.grand_livre
-      WHERE batch_id IN ({batchIds:Array(String)})
-    `,
-    query_params: { batchIds },
-    format: "JSONEachRow",
-  });
-
-  const rows = (await data.json()) as any[];
-  const row = rows[0] || {};
-
-  const chiffreAffaires = parseFloat(row.chiffre_affaires) || 0;
-  const masseSalariale = parseFloat(row.masse_salariale) || 0;
-  const valeurAjoutee = parseFloat(row.valeur_ajoutee) || 0;
-  const composantRex = parseFloat(row.composant_rex) || 0;
- 
-
-  // Resultat NET = Résultat Exploitation + Résultat Financier + Résultat HAO + Composant RN
-  // const resultatFinancier = parseFloat(row.resultat_financier) || 0;
-  // const resultatHAO = parseFloat(row.resultat_hao) || 0;
-
-  const composantRN = parseFloat(row.composant_rn) || 0;
-
-  const soldeTresorerie = parseFloat(row.solde_tresorerie) || 0;
-
-  const resultatExploitation = valeurAjoutee + composantRex;
-
+  // Récupérer les rubriques OHADA
+  const rubriques = await recupererRubriques(dbName, batchIds);
   
-
-  // RESULTAT HAO
-  const produitHAO = parseFloat(row.produit_HAO) || 0;
-  const chargesHAO = parseFloat(row.charges_HAO) || 0;
-  const resultatHAO = produitHAO + chargesHAO;
-
-
-// RESULTAT NET
-const produitFinancier = parseFloat(row.produit_financier) || 0;
-const chargesFinancieres = parseFloat(row.charges_financieres) || 0;
-const resultatFinancier = produitFinancier + chargesFinancieres;
-const resultatNet = resultatFinancier + resultatHAO + composantRN;
-
+  // Calculer les SIG
+  const sig = calculerSIG(rubriques);
+  
+  // Récupérer le solde de trésorerie (comptes 52 et 57)
+  const soldeTresorerie = await recupererSoldeTresorerie(dbName, batchIds);
 
   return {
-    chiffreAffaires,
-    masseSalariale,
-    resultatExploitation,
-    resultatNet,
+    chiffreAffaires: sig.XB,
+    masseSalariale: Math.abs(rubriques.RK), // Valeur absolue pour affichage
+    resultatExploitation: sig.XE,
+    resultatNet: sig.XI,
     soldeTresorerie,
+    margeCommerciale: sig.XA,
+    valeurAjoutee: sig.XC,
+    ebe: sig.XD,
+    resultatFinancier: sig.XF,
+    resultatHAO: sig.XH,
   };
 }
 
@@ -141,8 +293,7 @@ export async function GET(
 
     const { id } = await params;
     const { searchParams } = new URL(req.url);
-    const year =
-      searchParams.get("year") || new Date().getFullYear().toString();
+    const year = searchParams.get("year") || new Date().getFullYear().toString();
 
     const client = await prisma.client.findUnique({
       where: { id },
@@ -154,10 +305,7 @@ export async function GET(
     }
 
     if (client.companyId !== session.user.companyId) {
-      return NextResponse.json(
-        { error: "Accès non autorisé" },
-        { status: 403 }
-      );
+      return NextResponse.json({ error: "Accès non autorisé" }, { status: 403 });
     }
 
     const dbName = getClickhouseDbName(id);
@@ -221,30 +369,20 @@ export async function GET(
     const indicateursN1 = await calculerIndicateurs(dbName, batchIdsN1);
 
     // Calcul des variations (%)
-    const calculerVariation = (n: number, n1: number) =>
-      n1 !== 0 ? ((n - n1) / Math.abs(n1)) * 100 : 0;
+    const calculerVariation = (n: number, n1: number): number =>
+      n1 !== 0 ? ((n - n1) / Math.abs(n1)) * 100 : n !== 0 ? 100 : 0;
 
     const variations = {
-      chiffreAffaires: calculerVariation(
-        indicateursN.chiffreAffaires,
-        indicateursN1.chiffreAffaires
-      ),
-      masseSalariale: calculerVariation(
-        indicateursN.masseSalariale,
-        indicateursN1.masseSalariale
-      ),
-      resultatExploitation: calculerVariation(
-        indicateursN.resultatExploitation,
-        indicateursN1.resultatExploitation
-      ),
-      resultatNet: calculerVariation(
-        indicateursN.resultatNet,
-        indicateursN1.resultatNet
-      ),
-      soldeTresorerie: calculerVariation(
-        indicateursN.soldeTresorerie,
-        indicateursN1.soldeTresorerie
-      ),
+      chiffreAffaires: calculerVariation(indicateursN.chiffreAffaires, indicateursN1.chiffreAffaires),
+      masseSalariale: calculerVariation(indicateursN.masseSalariale, indicateursN1.masseSalariale),
+      resultatExploitation: calculerVariation(indicateursN.resultatExploitation, indicateursN1.resultatExploitation),
+      resultatNet: calculerVariation(indicateursN.resultatNet, indicateursN1.resultatNet),
+      soldeTresorerie: calculerVariation(indicateursN.soldeTresorerie, indicateursN1.soldeTresorerie),
+      margeCommerciale: calculerVariation(indicateursN.margeCommerciale, indicateursN1.margeCommerciale),
+      valeurAjoutee: calculerVariation(indicateursN.valeurAjoutee, indicateursN1.valeurAjoutee),
+      ebe: calculerVariation(indicateursN.ebe, indicateursN1.ebe),
+      resultatFinancier: calculerVariation(indicateursN.resultatFinancier, indicateursN1.resultatFinancier),
+      resultatHAO: calculerVariation(indicateursN.resultatHAO, indicateursN1.resultatHAO),
     };
 
     // Données mensuelles
@@ -254,8 +392,8 @@ export async function GET(
         query: `
           SELECT 
             substring(date_transaction, 4, 2) as month,
-            sum(CASE WHEN substring(compte, 1, 1) = '6' THEN debit ELSE 0 END) as charges,
-            sum(CASE WHEN substring(compte, 1, 1) = '7' THEN credit ELSE 0 END) as produits,
+            sum(CASE WHEN startsWith(compte, '6') THEN debit - credit ELSE 0 END) as charges,
+            sum(CASE WHEN startsWith(compte, '7') THEN credit - debit ELSE 0 END) as produits,
             count(*) as nb_transactions
           FROM ${dbName}.grand_livre
           WHERE batch_id IN ({batchIds:Array(String)})
@@ -269,18 +407,8 @@ export async function GET(
     }
 
     const monthNames = [
-      "Jan",
-      "Fév",
-      "Mar",
-      "Avr",
-      "Mai",
-      "Juin",
-      "Juil",
-      "Août",
-      "Sep",
-      "Oct",
-      "Nov",
-      "Déc",
+      "Jan", "Fév", "Mar", "Avr", "Mai", "Juin",
+      "Juil", "Août", "Sep", "Oct", "Nov", "Déc",
     ];
 
     const allMonths = [];
@@ -312,8 +440,8 @@ export async function GET(
             const statsData = await clickhouseClient.query({
               query: `
                 SELECT 
-                  sum(CASE WHEN substring(compte, 1, 1) = '6' THEN debit ELSE 0 END) as charges,
-                  sum(CASE WHEN substring(compte, 1, 1) = '7' THEN credit ELSE 0 END) as produits,
+                  sum(CASE WHEN startsWith(compte, '6') THEN debit - credit ELSE 0 END) as charges,
+                  sum(CASE WHEN startsWith(compte, '7') THEN credit - debit ELSE 0 END) as produits,
                   count(*) as nb_transactions
                 FROM ${dbName}.grand_livre
                 WHERE batch_id = {batchId:String}
