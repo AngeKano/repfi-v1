@@ -11,6 +11,13 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   ChartConfig,
   ChartContainer,
   ChartTooltip,
@@ -21,9 +28,13 @@ import {
   Line,
   BarChart,
   Bar,
+  AreaChart,
+  Area,
   XAxis,
   YAxis,
   CartesianGrid,
+  Legend,
+  ResponsiveContainer,
 } from "recharts";
 import {
   ContextMenu,
@@ -47,17 +58,28 @@ import {
   Activity,
   Wallet,
   PiggyBank,
+  ShoppingCart,
+  Calendar,
+  CalendarDays,
+  CalendarRange,
 } from "lucide-react";
 import { toast } from "sonner";
 
 interface MonthlyData {
   month: string;
   monthLabel: string;
+  monthNumber: string;
   charges: number;
   produits: number;
   resultat: number;
   cumulativeBalance: number;
   nbTransactions: number;
+  chiffreAffaires: number;
+  chiffreAffairesN1: number;
+  soldeTresorerie: number;
+  soldeTresorerieN1: number;
+  margeCommerciale: number;
+  margeCommercialeN1: number;
 }
 
 interface Period {
@@ -78,6 +100,11 @@ interface IndicateursFinanciers {
   resultatExploitation: number;
   resultatNet: number;
   soldeTresorerie: number;
+  margeCommerciale: number;
+  valeurAjoutee: number;
+  ebe: number;
+  resultatFinancier: number;
+  resultatHAO: number;
 }
 
 interface Variations {
@@ -86,13 +113,22 @@ interface Variations {
   resultatExploitation: number;
   resultatNet: number;
   soldeTresorerie: number;
+  margeCommerciale: number;
+  valeurAjoutee: number;
+  ebe: number;
+  resultatFinancier: number;
+  resultatHAO: number;
 }
 
 interface ReportingData {
   client: { id: string; name: string };
   year: string;
+  yearN1: string;
+  periodType: string;
+  selectedMonth: string | null;
   availableYears: string[];
   monthly: MonthlyData[];
+  filteredMonthly: MonthlyData[];
   periods: Period[];
   totals: {
     totalCharges: number;
@@ -107,6 +143,8 @@ interface ReportingData {
   };
 }
 
+type PeriodType = "year" | "month" | "ytd";
+
 const chartConfigArea: ChartConfig = {
   produits: { label: "Produits (Ventes)", color: "hsl(142, 76%, 36%)" },
   charges: { label: "Charges (Achats)", color: "hsl(0, 84%, 60%)" },
@@ -117,6 +155,31 @@ const chartConfigBar: ChartConfig = {
   produits: { label: "Produits", color: "hsl(142, 76%, 36%)" },
 };
 
+const chartConfigCA: ChartConfig = {
+  chiffreAffaires: { label: "CA Année N", color: "hsl(221, 83%, 53%)" },
+  chiffreAffairesN1: { label: "CA Année N-1", color: "hsl(221, 83%, 73%)" },
+};
+
+const chartConfigTresorerie: ChartConfig = {
+  soldeTresorerie: { label: "Trésorerie N", color: "hsl(174, 72%, 46%)" },
+  soldeTresorerieN1: { label: "Trésorerie N-1", color: "hsl(174, 72%, 66%)" },
+};
+
+const MONTHS = [
+  { value: "01", label: "Janvier" },
+  { value: "02", label: "Février" },
+  { value: "03", label: "Mars" },
+  { value: "04", label: "Avril" },
+  { value: "05", label: "Mai" },
+  { value: "06", label: "Juin" },
+  { value: "07", label: "Juillet" },
+  { value: "08", label: "Août" },
+  { value: "09", label: "Septembre" },
+  { value: "10", label: "Octobre" },
+  { value: "11", label: "Novembre" },
+  { value: "12", label: "Décembre" },
+];
+
 export default function ClientReportingChart({
   clientId,
 }: {
@@ -125,18 +188,22 @@ export default function ClientReportingChart({
   const [data, setData] = useState<ReportingData | null>(null);
   const [loading, setLoading] = useState(true);
   const [year, setYear] = useState<string>(new Date().getFullYear().toString());
+  const [periodType, setPeriodType] = useState<PeriodType>("year");
+  const [selectedMonth, setSelectedMonth] = useState<string>("12");
   const [hiddenPeriods, setHiddenPeriods] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     fetchData();
-  }, [clientId, year]);
+  }, [clientId, year, periodType, selectedMonth]);
 
   const fetchData = async () => {
     setLoading(true);
     try {
-      const res = await fetch(
-        `/api/clients/${clientId}/reporting?year=${year}`
-      );
+      let url = `/api/clients/${clientId}/reporting?year=${year}&periodType=${periodType}`;
+      if ((periodType === "month" || periodType === "ytd") && selectedMonth) {
+        url += `&month=${selectedMonth}`;
+      }
+      const res = await fetch(url);
       if (!res.ok) throw new Error("Erreur API");
       const json = await res.json();
       setData(json);
@@ -244,6 +311,19 @@ export default function ClientReportingChart({
     return `${startMonth} - ${endMonth} ${yearStr}`;
   };
 
+  const getPeriodLabel = (): string => {
+    if (periodType === "year") return `Année ${year}`;
+    if (periodType === "month") {
+      const month = MONTHS.find((m) => m.value === selectedMonth);
+      return `${month?.label || ""} ${year}`;
+    }
+    if (periodType === "ytd") {
+      const month = MONTHS.find((m) => m.value === selectedMonth);
+      return `Janvier - ${month?.label || ""} ${year}`;
+    }
+    return year;
+  };
+
   const VariationBadge = ({ value }: { value: number }) => {
     if (value === 0) {
       return (
@@ -291,7 +371,7 @@ export default function ClientReportingChart({
     );
   }
 
-  const visibleMonthly = data.monthly.filter(
+  const visibleMonthly = data.filteredMonthly.filter(
     (m) => !hiddenPeriods.has(m.month)
   );
   const yearN = parseInt(year);
@@ -303,9 +383,59 @@ export default function ClientReportingChart({
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-bold">{data.client.name}</h2>
-          <p className="text-muted-foreground">Reporting comptable</p>
+          <p className="text-muted-foreground">
+            Reporting comptable - {getPeriodLabel()}
+          </p>
         </div>
         <div className="flex items-center gap-4">
+          {/* Sélecteur de type de période */}
+          <div className="flex items-center gap-2 bg-muted rounded-lg p-1">
+            <Button
+              variant={periodType === "year" ? "default" : "ghost"}
+              size="sm"
+              onClick={() => setPeriodType("year")}
+              className="gap-1"
+            >
+              <Calendar className="w-4 h-4" />
+              Année
+            </Button>
+            <Button
+              variant={periodType === "month" ? "default" : "ghost"}
+              size="sm"
+              onClick={() => setPeriodType("month")}
+              className="gap-1"
+            >
+              <CalendarDays className="w-4 h-4" />
+              Mois
+            </Button>
+            <Button
+              variant={periodType === "ytd" ? "default" : "ghost"}
+              size="sm"
+              onClick={() => setPeriodType("ytd")}
+              className="gap-1"
+            >
+              <CalendarRange className="w-4 h-4" />
+              YTD
+            </Button>
+          </div>
+
+          {/* Sélecteur de mois (visible si month ou ytd) */}
+          {(periodType === "month" || periodType === "ytd") && (
+            <Select value={selectedMonth} onValueChange={setSelectedMonth}>
+              <SelectTrigger className="w-[140px]">
+                <SelectValue placeholder="Mois" />
+              </SelectTrigger>
+              <SelectContent>
+                {MONTHS.map((month) => (
+                  <SelectItem key={month.value} value={month.value}>
+                    {month.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+
+          {/* Navigation année */}
           <Button
             variant="outline"
             size="icon"
@@ -331,8 +461,8 @@ export default function ClientReportingChart({
         </div>
       </div>
 
-      {/* KPIs */}
-      <div className="grid grid-cols-5 gap-4">
+      {/* KPIs - 6 colonnes */}
+      <div className="grid grid-cols-6 gap-4">
         {/* Chiffre d'affaires */}
         <Card>
           <CardHeader className="pb-2">
@@ -353,6 +483,36 @@ export default function ClientReportingChart({
             <p className="text-xs text-muted-foreground mt-1">
               {yearN1}:{" "}
               {formatCurrency(data.indicateurs.anneeN1.chiffreAffaires)}
+            </p>
+          </CardContent>
+        </Card>
+
+        {/* Marge Commerciale */}
+        <Card>
+          <CardHeader className="pb-2">
+            <div className="flex items-center justify-between">
+              <CardDescription className="flex items-center gap-2">
+                <ShoppingCart className="w-4 h-4 text-indigo-600" />
+                Marge Commerciale
+              </CardDescription>
+              <VariationBadge
+                value={data.indicateurs.variations.margeCommerciale}
+              />
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div
+              className={`text-2xl font-bold ${
+                data.indicateurs.anneeN.margeCommerciale >= 0
+                  ? "text-indigo-600"
+                  : "text-red-600"
+              }`}
+            >
+              {formatCurrency(data.indicateurs.anneeN.margeCommerciale)}
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">
+              {yearN1}:{" "}
+              {formatCurrency(data.indicateurs.anneeN1.margeCommerciale)}
             </p>
           </CardContent>
         </Card>
@@ -514,7 +674,170 @@ export default function ClientReportingChart({
         </Card>
       </div>
 
-      {/* Charts */}
+      {/* Graphique Évolution du Chiffre d'Affaires N vs N-1 */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Évolution du Chiffre d&apos;Affaires</CardTitle>
+          <CardDescription>
+            Comparaison {yearN} vs {yearN1}
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <ChartContainer config={chartConfigCA} className="h-[300px] w-full">
+            <AreaChart
+              data={data.monthly}
+              margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
+            >
+              <defs>
+                <linearGradient id="colorCAN" x1="0" y1="0" x2="0" y2="1">
+                  <stop
+                    offset="5%"
+                    stopColor="hsl(221, 83%, 53%)"
+                    stopOpacity={0.8}
+                  />
+                  <stop
+                    offset="95%"
+                    stopColor="hsl(221, 83%, 53%)"
+                    stopOpacity={0.1}
+                  />
+                </linearGradient>
+                <linearGradient id="colorCAN1" x1="0" y1="0" x2="0" y2="1">
+                  <stop
+                    offset="5%"
+                    stopColor="hsl(221, 83%, 73%)"
+                    stopOpacity={0.6}
+                  />
+                  <stop
+                    offset="95%"
+                    stopColor="hsl(221, 83%, 73%)"
+                    stopOpacity={0.1}
+                  />
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} />
+              <XAxis dataKey="monthLabel" tickLine={false} axisLine={false} />
+              <YAxis
+                tickLine={false}
+                axisLine={false}
+                tickFormatter={(value) => `${(value / 1000000).toFixed(0)}M`}
+              />
+              <ChartTooltip
+                content={
+                  <ChartTooltipContent
+                    formatter={(value, name) => [
+                      formatCurrency(value as number),
+                      name === "chiffreAffaires"
+                        ? `CA ${yearN}`
+                        : `CA ${yearN1}`,
+                    ]}
+                  />
+                }
+              />
+              <Area
+                type="monotone"
+                dataKey="chiffreAffairesN1"
+                name={`CA ${yearN1}`}
+                stroke="hsl(221, 83%, 73%)"
+                fillOpacity={1}
+                fill="url(#colorCAN1)"
+              />
+              <Area
+                type="monotone"
+                dataKey="chiffreAffaires"
+                name={`CA ${yearN}`}
+                stroke="hsl(221, 83%, 53%)"
+                fillOpacity={1}
+                fill="url(#colorCAN)"
+              />
+            </AreaChart>
+          </ChartContainer>
+        </CardContent>
+      </Card>
+
+      {/* Graphique Évolution de la Trésorerie N vs N-1 */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Évolution de la Trésorerie</CardTitle>
+          <CardDescription>
+            Solde cumulé {yearN} vs {yearN1}
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <ChartContainer
+            config={chartConfigTresorerie}
+            className="h-[300px] w-full"
+          >
+            <AreaChart
+              data={data.monthly}
+              margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
+            >
+              <defs>
+                <linearGradient id="colorTresoN" x1="0" y1="0" x2="0" y2="1">
+                  <stop
+                    offset="5%"
+                    stopColor="hsl(174, 72%, 46%)"
+                    stopOpacity={0.8}
+                  />
+                  <stop
+                    offset="95%"
+                    stopColor="hsl(174, 72%, 46%)"
+                    stopOpacity={0.1}
+                  />
+                </linearGradient>
+                <linearGradient id="colorTresoN1" x1="0" y1="0" x2="0" y2="1">
+                  <stop
+                    offset="5%"
+                    stopColor="hsl(174, 72%, 66%)"
+                    stopOpacity={0.6}
+                  />
+                  <stop
+                    offset="95%"
+                    stopColor="hsl(174, 72%, 66%)"
+                    stopOpacity={0.1}
+                  />
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} />
+              <XAxis dataKey="monthLabel" tickLine={false} axisLine={false} />
+              <YAxis
+                tickLine={false}
+                axisLine={false}
+                tickFormatter={(value) => `${(value / 1000000).toFixed(0)}M`}
+              />
+              <ChartTooltip
+                content={
+                  <ChartTooltipContent
+                    formatter={(value, name) => [
+                      formatCurrency(value as number),
+                      name === "soldeTresorerie"
+                        ? `Trésorerie ${yearN}`
+                        : `Trésorerie ${yearN1}`,
+                    ]}
+                  />
+                }
+              />
+              <Area
+                type="monotone"
+                dataKey="soldeTresorerieN1"
+                name={`Trésorerie ${yearN1}`}
+                stroke="hsl(174, 72%, 66%)"
+                fillOpacity={1}
+                fill="url(#colorTresoN1)"
+              />
+              <Area
+                type="monotone"
+                dataKey="soldeTresorerie"
+                name={`Trésorerie ${yearN}`}
+                stroke="hsl(174, 72%, 46%)"
+                fillOpacity={1}
+                fill="url(#colorTresoN)"
+              />
+            </AreaChart>
+          </ChartContainer>
+        </CardContent>
+      </Card>
+
+      {/* Graphique Flux financiers */}
       <Card>
         <CardHeader>
           <CardTitle>Évolution des flux financiers</CardTitle>
@@ -576,16 +899,16 @@ export default function ClientReportingChart({
                 dataKey="produits"
                 name="Produits"
                 stroke="hsl(142, 76%, 36%)"
-                fillOpacity={1}
-                fill="url(#colorProduits)"
+                strokeWidth={2}
+                dot={{ r: 4 }}
               />
               <Line
                 type="monotone"
                 dataKey="charges"
                 name="Charges"
                 stroke="hsl(0, 84%, 60%)"
-                fillOpacity={1}
-                fill="url(#colorCharges)"
+                strokeWidth={2}
+                dot={{ r: 4 }}
               />
             </LineChart>
           </ChartContainer>
