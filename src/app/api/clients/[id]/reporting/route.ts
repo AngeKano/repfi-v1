@@ -20,107 +20,215 @@ function getClickhouseDbName(id: string): string {
 // ============================================================================
 
 interface RubriquesOHADA {
-  // --- ACTIVITÉ D'EXPLOITATION ---
-  // Chiffre d'affaires (XB)
-  TA: number; // Ventes de marchandises (+)
-  TB: number; // Ventes de produits fabriqués (+)
-  TC: number; // Travaux, services vendus (+)
-  TD: number; // Produits accessoires (+)
-
-  // Marge commerciale (XA)
-  RA: number; // Achats de marchandises (-)
-  RB: number; // Variation de stocks de marchandises (-/+)
-
-  // Valeur ajoutée (XC)
-  TE: number; // Production stockée (-/+)
-  TF: number; // Production immobilisée (+)
-  TG: number; // Subventions d'exploitation (+)
-  TH: number; // Autres produits (+)
-  TI: number; // Transferts de charges d'exploitation (+)
-  RC: number; // Achats de matières premières (-)
-  RD: number; // Variation de stocks matières premières (-/+)
-  RE: number; // Autres achats (-)
-  RF: number; // Variation de stocks autres approvisionnements (-/+)
-  RG: number; // Transports (-)
-  RH: number; // Services extérieurs (-)
-  RI: number; // Impôts et taxes (-)
-  RJ: number; // Autres charges (-)
-
-  // Excédent brut d'exploitation (XD)
-  RK: number; // Charges de personnel (-)
-
-  // Résultat d'exploitation (XE)
-  TJ: number; // Reprises d'amortissements, provisions et dépréciations (+)
-  RL: number; // Dotations aux amortissements, provisions et dépréciations (-)
-
-  // --- ACTIVITÉ FINANCIÈRE ---
-  // Résultat financier (XF)
-  TK: number; // Revenus financiers et assimilés (+)
-  TL: number; // Reprises de provisions financières (+)
-  TM: number; // Transferts de charges financières (+)
-  RM: number; // Frais financiers et charges assimilées (-)
-  RN: number; // Dotations aux provisions financières (-)
-
-  // --- HORS ACTIVITÉS ORDINAIRES (HAO) ---
-  // Résultat HAO (XH)
-  TN: number; // Produits des cessions d'immobilisations (+)
-  TO: number; // Autres produits HAO (+)
-  RO: number; // Valeurs comptables des cessions d'immobilisations (-)
-  RP: number; // Autres charges HAO (-)
-
-  // --- RÉSULTAT NET ---
-  RQ: number; // Participation des travailleurs (-)
-  RS: number; // Impôts sur le résultat (-)
+  TA: number;
+  TB: number;
+  TC: number;
+  TD: number;
+  RA: number;
+  RB: number;
+  TE: number;
+  TF: number;
+  TG: number;
+  TH: number;
+  TI: number;
+  RC: number;
+  RD: number;
+  RE: number;
+  RF: number;
+  RG: number;
+  RH: number;
+  RI: number;
+  RJ: number;
+  RK: number;
+  TJ: number;
+  RL: number;
+  TK: number;
+  TL: number;
+  TM: number;
+  RM: number;
+  RN: number;
+  TN: number;
+  TO: number;
+  RO: number;
+  RP: number;
+  RQ: number;
+  RS: number;
 }
 
 interface SoldesIntermediairesGestion {
-  // Soldes intermédiaires de gestion (SIG)
-  XA: number; // Marge commerciale
-  XB: number; // Chiffre d'affaires
-  XC: number; // Valeur ajoutée
-  XD: number; // Excédent brut d'exploitation (EBE)
-  XE: number; // Résultat d'exploitation
-  XF: number; // Résultat financier
-  XG: number; // Résultat des activités ordinaires (RAO)
-  XH: number; // Résultat hors activités ordinaires (HAO)
-  XI: number; // Résultat net
+  XA: number;
+  XB: number;
+  XC: number;
+  XD: number;
+  XE: number;
+  XF: number;
+  XG: number;
+  XH: number;
+  XI: number;
 }
 
 interface IndicateursFinanciers {
-  chiffreAffaires: number;      // XB
-  masseSalariale: number;       // RK (valeur absolue)
-  resultatExploitation: number; // XE
-  resultatNet: number;          // XI
+  chiffreAffaires: number;
+  masseSalariale: number;
+  resultatExploitation: number;
+  resultatNet: number;
   soldeTresorerie: number;
-  // Détails supplémentaires
-  margeCommerciale: number;     // XA
-  valeurAjoutee: number;        // XC
-  ebe: number;                  // XD - Excédent Brut d'Exploitation
-  resultatFinancier: number;    // XF
-  resultatHAO: number;          // XH
+  margeCommerciale: number;
+  valeurAjoutee: number;
+  ebe: number;
+  resultatFinancier: number;
+  resultatHAO: number;
+}
+
+interface MonthlyDataExtended {
+  month: string;
+  monthLabel: string;
+  monthNumber: string;
+  charges: number;
+  produits: number;
+  resultat: number;
+  cumulativeBalance: number;
+  nbTransactions: number;
+  // Nouvelles données mensuelles
+  chiffreAffaires: number;
+  chiffreAffairesN1: number;
+  soldeTresorerie: number;
+  soldeTresorerieN1: number;
+  margeCommerciale: number;
+  margeCommercialeN1: number;
+}
+
+const RUBRIQUES_VIDES: RubriquesOHADA = {
+  TA: 0,
+  TB: 0,
+  TC: 0,
+  TD: 0,
+  RA: 0,
+  RB: 0,
+  TE: 0,
+  TF: 0,
+  TG: 0,
+  TH: 0,
+  TI: 0,
+  RC: 0,
+  RD: 0,
+  RE: 0,
+  RF: 0,
+  RG: 0,
+  RH: 0,
+  RI: 0,
+  RJ: 0,
+  RK: 0,
+  TJ: 0,
+  RL: 0,
+  TK: 0,
+  TL: 0,
+  TM: 0,
+  RM: 0,
+  RN: 0,
+  TN: 0,
+  TO: 0,
+  RO: 0,
+  RP: 0,
+  RQ: 0,
+  RS: 0,
+};
+
+async function recupererRubriquesParMois(
+  dbName: string,
+  batchIds: string[]
+): Promise<Map<string, RubriquesOHADA>> {
+  const result = new Map<string, RubriquesOHADA>();
+
+  if (batchIds.length === 0) return result;
+
+  const data = await clickhouseClient.query({
+    query: `
+      SELECT
+        substring(date_transaction, 4, 2) as month,
+        rubrique,
+        sum(credit - debit) as solde
+      FROM ${dbName}.grand_livre
+      WHERE batch_id IN ({batchIds:Array(String)})
+        AND rubrique IN (
+          'TA', 'TB', 'TC', 'TD',
+          'RA', 'RB',
+          'TE', 'TF', 'TG', 'TH', 'TI',
+          'RC', 'RD', 'RE', 'RF', 'RG', 'RH', 'RI', 'RJ',
+          'RK',
+          'TJ', 'RL',
+          'TK', 'TL', 'TM', 'RM', 'RN',
+          'TN', 'TO', 'RO', 'RP',
+          'RQ', 'RS'
+        )
+      GROUP BY month, rubrique
+      ORDER BY month
+    `,
+    query_params: { batchIds },
+    format: "JSONEachRow",
+  });
+
+  const rows = (await data.json()) as Array<{
+    month: string;
+    rubrique: string;
+    solde: string;
+  }>;
+
+  for (const row of rows) {
+    if (!result.has(row.month)) {
+      result.set(row.month, { ...RUBRIQUES_VIDES });
+    }
+    const rubriques = result.get(row.month)!;
+    const key = row.rubrique as keyof RubriquesOHADA;
+    if (key in rubriques) {
+      rubriques[key] = parseFloat(row.solde) || 0;
+    }
+  }
+
+  return result;
+}
+
+async function recupererTresorerieParMois(
+  dbName: string,
+  batchIds: string[]
+): Promise<Map<string, number>> {
+  const result = new Map<string, number>();
+
+  if (batchIds.length === 0) return result;
+
+  const data = await clickhouseClient.query({
+    query: `
+      SELECT
+        substring(date_transaction, 4, 2) as month,
+        sum(CASE WHEN startsWith(compte, '52') THEN debit - credit ELSE 0 END) +
+        sum(CASE WHEN startsWith(compte, '57') THEN debit - credit ELSE 0 END) as solde_tresorerie
+      FROM ${dbName}.grand_livre
+      WHERE batch_id IN ({batchIds:Array(String)})
+      GROUP BY month
+      ORDER BY month
+    `,
+    query_params: { batchIds },
+    format: "JSONEachRow",
+  });
+
+  const rows = (await data.json()) as Array<{
+    month: string;
+    solde_tresorerie: string;
+  }>;
+
+  for (const row of rows) {
+    result.set(row.month, parseFloat(row.solde_tresorerie) || 0);
+  }
+
+  return result;
 }
 
 async function recupererRubriques(
   dbName: string,
   batchIds: string[]
 ): Promise<RubriquesOHADA> {
-  const rubriquesVides: RubriquesOHADA = {
-    TA: 0, TB: 0, TC: 0, TD: 0,
-    RA: 0, RB: 0,
-    TE: 0, TF: 0, TG: 0, TH: 0, TI: 0,
-    RC: 0, RD: 0, RE: 0, RF: 0, RG: 0, RH: 0, RI: 0, RJ: 0,
-    RK: 0,
-    TJ: 0, RL: 0,
-    TK: 0, TL: 0, TM: 0, RM: 0, RN: 0,
-    TN: 0, TO: 0, RO: 0, RP: 0,
-    RQ: 0, RS: 0,
-  };
+  if (batchIds.length === 0) return { ...RUBRIQUES_VIDES };
 
-  if (batchIds.length === 0) {
-    return rubriquesVides;
-  }
-
-  // Requête structurée par rubrique
   const data = await clickhouseClient.query({
     query: `
       SELECT
@@ -145,9 +253,12 @@ async function recupererRubriques(
     format: "JSONEachRow",
   });
 
-  const rows = (await data.json()) as Array<{ rubrique: string; solde: string }>;
+  const rows = (await data.json()) as Array<{
+    rubrique: string;
+    solde: string;
+  }>;
+  const rubriques = { ...RUBRIQUES_VIDES };
 
-  const rubriques = { ...rubriquesVides };
   for (const row of rows) {
     const key = row.rubrique as keyof RubriquesOHADA;
     if (key in rubriques) {
@@ -178,62 +289,72 @@ async function recupererSoldeTresorerie(
 
   const rows = (await data.json()) as any[];
   const row = rows[0] || {};
-  
-  const banques = parseFloat(row.banques) || 0;
-  const caisse = parseFloat(row.caisse) || 0;
-  
-  return banques + caisse;
+
+  return (parseFloat(row.banques) || 0) + (parseFloat(row.caisse) || 0);
 }
 
 function calculerSIG(rubriques: RubriquesOHADA): SoldesIntermediairesGestion {
   const {
-    TA, TB, TC, TD,
-    RA, RB,
-    TE, TF, TG, TH, TI,
-    RC, RD, RE, RF, RG, RH, RI, RJ,
+    TA,
+    TB,
+    TC,
+    TD,
+    RA,
+    RB,
+    TE,
+    TF,
+    TG,
+    TH,
+    TI,
+    RC,
+    RD,
+    RE,
+    RF,
+    RG,
+    RH,
+    RI,
+    RJ,
     RK,
-    TJ, RL,
-    TK, TL, TM, RM, RN,
-    TN, TO, RO, RP,
-    RQ, RS,
+    TJ,
+    RL,
+    TK,
+    TL,
+    TM,
+    RM,
+    RN,
+    TN,
+    TO,
+    RO,
+    RP,
+    RQ,
+    RS,
   } = rubriques;
 
-  // ============================================================================
-  // CALCUL DES SOLDES INTERMÉDIAIRES DE GESTION (SIG) - SYSCOHADA
-  // ============================================================================
-
-  // XB - CHIFFRE D'AFFAIRES = TA + TB + TC + TD
   const XB = TA + TB + TC + TD;
-
-  // XA - MARGE COMMERCIALE = TA + RA + RB
-  // Note: RA et RB ont déjà le signe négatif (charges)
   const XA = TA + RA + RB;
-
-  // XC - VALEUR AJOUTÉE = XB + RA + RB + (somme TE à RJ)
-  // Formule: XA + TB + TC + TD + TE + TF + TG + TH + TI + RC + RD + RE + RF + RG + RH + RI + RJ
-  const XC = XA + TB + TC + TD + TE + TF + TG + TH + TI + RC + RD + RE + RF + RG + RH + RI + RJ;
-
-  // XD - EXCÉDENT BRUT D'EXPLOITATION (EBE) = XC + RK
-  // Note: RK a le signe négatif (charge)
+  const XC =
+    XA +
+    TB +
+    TC +
+    TD +
+    TE +
+    TF +
+    TG +
+    TH +
+    TI +
+    RC +
+    RD +
+    RE +
+    RF +
+    RG +
+    RH +
+    RI +
+    RJ;
   const XD = XC + RK;
-
-  // XE - RÉSULTAT D'EXPLOITATION = XD + TJ + RL
-  // TJ (+) reprises, RL (-) dotations
   const XE = XD + TJ + RL;
-
-  // XF - RÉSULTAT FINANCIER = TK + TL + TM + RM + RN
-  // TK, TL, TM (+) produits, RM, RN (-) charges
   const XF = TK + TL + TM + RM + RN;
-
-  // XG - RÉSULTAT DES ACTIVITÉS ORDINAIRES = XE + XF
   const XG = XE + XF;
-
-  // XH - RÉSULTAT HAO = TN + TO + RO + RP
-  // TN, TO (+) produits, RO, RP (-) charges
   const XH = TN + TO + RO + RP;
-
-  // XI - RÉSULTAT NET = XG + XH + RQ + RS
-  // RQ, RS (-) charges
   const XI = XG + XH + RQ + RS;
 
   return { XA, XB, XC, XD, XE, XF, XG, XH, XI };
@@ -258,18 +379,13 @@ async function calculerIndicateurs(
     };
   }
 
-  // Récupérer les rubriques OHADA
   const rubriques = await recupererRubriques(dbName, batchIds);
-  
-  // Calculer les SIG
   const sig = calculerSIG(rubriques);
-  
-  // Récupérer le solde de trésorerie (comptes 52 et 57)
   const soldeTresorerie = await recupererSoldeTresorerie(dbName, batchIds);
 
   return {
     chiffreAffaires: sig.XB,
-    masseSalariale: Math.abs(rubriques.RK), // Valeur absolue pour affichage
+    masseSalariale: Math.abs(rubriques.RK),
     resultatExploitation: sig.XE,
     resultatNet: sig.XI,
     soldeTresorerie,
@@ -293,7 +409,10 @@ export async function GET(
 
     const { id } = await params;
     const { searchParams } = new URL(req.url);
-    const year = searchParams.get("year") || new Date().getFullYear().toString();
+    const year =
+      searchParams.get("year") || new Date().getFullYear().toString();
+    const periodType = searchParams.get("periodType") || "year"; // year, month, ytd
+    const selectedMonth = searchParams.get("month"); // 01-12
 
     const client = await prisma.client.findUnique({
       where: { id },
@@ -305,7 +424,10 @@ export async function GET(
     }
 
     if (client.companyId !== session.user.companyId) {
-      return NextResponse.json({ error: "Accès non autorisé" }, { status: 403 });
+      return NextResponse.json(
+        { error: "Accès non autorisé" },
+        { status: 403 }
+      );
     }
 
     const dbName = getClickhouseDbName(id);
@@ -364,28 +486,22 @@ export async function GET(
       .map((p) => p.batchId)
       .filter((b): b is string => !!b);
 
-    // Calcul des indicateurs N et N-1
-    const indicateursN = await calculerIndicateurs(dbName, batchIds);
-    const indicateursN1 = await calculerIndicateurs(dbName, batchIdsN1);
+    // Données mensuelles détaillées N et N-1
+    const rubriquesParMoisN = await recupererRubriquesParMois(dbName, batchIds);
+    const rubriquesParMoisN1 = await recupererRubriquesParMois(
+      dbName,
+      batchIdsN1
+    );
+    const tresorerieParMoisN = await recupererTresorerieParMois(
+      dbName,
+      batchIds
+    );
+    const tresorerieParMoisN1 = await recupererTresorerieParMois(
+      dbName,
+      batchIdsN1
+    );
 
-    // Calcul des variations (%)
-    const calculerVariation = (n: number, n1: number): number =>
-      n1 !== 0 ? ((n - n1) / Math.abs(n1)) * 100 : n !== 0 ? 100 : 0;
-
-    const variations = {
-      chiffreAffaires: calculerVariation(indicateursN.chiffreAffaires, indicateursN1.chiffreAffaires),
-      masseSalariale: calculerVariation(indicateursN.masseSalariale, indicateursN1.masseSalariale),
-      resultatExploitation: calculerVariation(indicateursN.resultatExploitation, indicateursN1.resultatExploitation),
-      resultatNet: calculerVariation(indicateursN.resultatNet, indicateursN1.resultatNet),
-      soldeTresorerie: calculerVariation(indicateursN.soldeTresorerie, indicateursN1.soldeTresorerie),
-      margeCommerciale: calculerVariation(indicateursN.margeCommerciale, indicateursN1.margeCommerciale),
-      valeurAjoutee: calculerVariation(indicateursN.valeurAjoutee, indicateursN1.valeurAjoutee),
-      ebe: calculerVariation(indicateursN.ebe, indicateursN1.ebe),
-      resultatFinancier: calculerVariation(indicateursN.resultatFinancier, indicateursN1.resultatFinancier),
-      resultatHAO: calculerVariation(indicateursN.resultatHAO, indicateursN1.resultatHAO),
-    };
-
-    // Données mensuelles
+    // Données mensuelles charges/produits
     let monthlyRows: any[] = [];
     if (batchIds.length > 0) {
       const monthlyData = await clickhouseClient.query({
@@ -407,29 +523,181 @@ export async function GET(
     }
 
     const monthNames = [
-      "Jan", "Fév", "Mar", "Avr", "Mai", "Juin",
-      "Juil", "Août", "Sep", "Oct", "Nov", "Déc",
+      "Jan",
+      "Fév",
+      "Mar",
+      "Avr",
+      "Mai",
+      "Juin",
+      "Juil",
+      "Août",
+      "Sep",
+      "Oct",
+      "Nov",
+      "Déc",
     ];
 
-    const allMonths = [];
+    // Construction des données mensuelles étendues
+    const allMonths: MonthlyDataExtended[] = [];
+    let cumulativeBalance = 0;
+    let cumulativeTresorerieN = 0;
+    let cumulativeTresorerieN1 = 0;
+
     for (let m = 1; m <= 12; m++) {
       const monthStr = m.toString().padStart(2, "0");
       const found = monthlyRows.find((r: any) => r.month === monthStr);
+
+      const rubriquesN = rubriquesParMoisN.get(monthStr) || {
+        ...RUBRIQUES_VIDES,
+      };
+      const rubriquesN1Mois = rubriquesParMoisN1.get(monthStr) || {
+        ...RUBRIQUES_VIDES,
+      };
+
+      const sigN = calculerSIG(rubriquesN);
+      const sigN1 = calculerSIG(rubriquesN1Mois);
+
+      const tresoMoisN = tresorerieParMoisN.get(monthStr) || 0;
+      const tresoMoisN1 = tresorerieParMoisN1.get(monthStr) || 0;
+
+      cumulativeTresorerieN += tresoMoisN;
+      cumulativeTresorerieN1 += tresoMoisN1;
+
+      const charges = found ? parseFloat(found.charges) || 0 : 0;
+      const produits = found ? parseFloat(found.produits) || 0 : 0;
+      const resultat = produits - charges;
+      cumulativeBalance += resultat;
+
       allMonths.push({
         month: `${year}${monthStr}`,
         monthLabel: monthNames[m - 1],
-        charges: found ? parseFloat(found.charges) || 0 : 0,
-        produits: found ? parseFloat(found.produits) || 0 : 0,
+        monthNumber: monthStr,
+        charges,
+        produits,
+        resultat,
+        cumulativeBalance,
         nbTransactions: found ? parseInt(found.nb_transactions) || 0 : 0,
+        chiffreAffaires: sigN.XB,
+        chiffreAffairesN1: sigN1.XB,
+        soldeTresorerie: cumulativeTresorerieN,
+        soldeTresorerieN1: cumulativeTresorerieN1,
+        margeCommerciale: sigN.XA,
+        margeCommercialeN1: sigN1.XA,
       });
     }
 
-    let cumulativeBalance = 0;
-    const monthlyWithCumulative = allMonths.map((row) => {
-      const resultat = row.produits - row.charges;
-      cumulativeBalance += resultat;
-      return { ...row, resultat, cumulativeBalance };
-    });
+    // Filtrage selon le type de période
+    let filteredMonths = allMonths;
+    let monthsToIncludeN: string[] = [];
+    let monthsToIncludeN1: string[] = [];
+
+    if (periodType === "month" && selectedMonth) {
+      filteredMonths = allMonths.filter((m) => m.monthNumber === selectedMonth);
+      monthsToIncludeN = [selectedMonth];
+      monthsToIncludeN1 = [selectedMonth];
+    } else if (periodType === "ytd" && selectedMonth) {
+      const endMonth = parseInt(selectedMonth);
+      filteredMonths = allMonths.filter(
+        (m) => parseInt(m.monthNumber) <= endMonth
+      );
+      monthsToIncludeN = filteredMonths.map((m) => m.monthNumber);
+      monthsToIncludeN1 = monthsToIncludeN;
+    } else {
+      monthsToIncludeN = allMonths.map((m) => m.monthNumber);
+      monthsToIncludeN1 = monthsToIncludeN;
+    }
+
+    // Calcul des indicateurs selon la période
+    const calculerIndicateursPeriode = (
+      rubriquesParMois: Map<string, RubriquesOHADA>,
+      tresorerieParMois: Map<string, number>,
+      monthsToInclude: string[]
+    ): IndicateursFinanciers => {
+      const rubriquesAgregees = { ...RUBRIQUES_VIDES };
+      let tresorerieTotal = 0;
+
+      for (const month of monthsToInclude) {
+        const rubriques = rubriquesParMois.get(month);
+        if (rubriques) {
+          for (const key of Object.keys(
+            rubriquesAgregees
+          ) as (keyof RubriquesOHADA)[]) {
+            rubriquesAgregees[key] += rubriques[key];
+          }
+        }
+        tresorerieTotal += tresorerieParMois.get(month) || 0;
+      }
+
+      const sig = calculerSIG(rubriquesAgregees);
+
+      return {
+        chiffreAffaires: sig.XB,
+        masseSalariale: Math.abs(rubriquesAgregees.RK),
+        resultatExploitation: sig.XE,
+        resultatNet: sig.XI,
+        soldeTresorerie: tresorerieTotal,
+        margeCommerciale: sig.XA,
+        valeurAjoutee: sig.XC,
+        ebe: sig.XD,
+        resultatFinancier: sig.XF,
+        resultatHAO: sig.XH,
+      };
+    };
+
+    const indicateursN = calculerIndicateursPeriode(
+      rubriquesParMoisN,
+      tresorerieParMoisN,
+      monthsToIncludeN
+    );
+    const indicateursN1 = calculerIndicateursPeriode(
+      rubriquesParMoisN1,
+      tresorerieParMoisN1,
+      monthsToIncludeN1
+    );
+
+    // Calcul des variations (%)
+    const calculerVariation = (n: number, n1: number): number =>
+      n1 !== 0 ? ((n - n1) / Math.abs(n1)) * 100 : n !== 0 ? 100 : 0;
+
+    const variations = {
+      chiffreAffaires: calculerVariation(
+        indicateursN.chiffreAffaires,
+        indicateursN1.chiffreAffaires
+      ),
+      masseSalariale: calculerVariation(
+        indicateursN.masseSalariale,
+        indicateursN1.masseSalariale
+      ),
+      resultatExploitation: calculerVariation(
+        indicateursN.resultatExploitation,
+        indicateursN1.resultatExploitation
+      ),
+      resultatNet: calculerVariation(
+        indicateursN.resultatNet,
+        indicateursN1.resultatNet
+      ),
+      soldeTresorerie: calculerVariation(
+        indicateursN.soldeTresorerie,
+        indicateursN1.soldeTresorerie
+      ),
+      margeCommerciale: calculerVariation(
+        indicateursN.margeCommerciale,
+        indicateursN1.margeCommerciale
+      ),
+      valeurAjoutee: calculerVariation(
+        indicateursN.valeurAjoutee,
+        indicateursN1.valeurAjoutee
+      ),
+      ebe: calculerVariation(indicateursN.ebe, indicateursN1.ebe),
+      resultatFinancier: calculerVariation(
+        indicateursN.resultatFinancier,
+        indicateursN1.resultatFinancier
+      ),
+      resultatHAO: calculerVariation(
+        indicateursN.resultatHAO,
+        indicateursN1.resultatHAO
+      ),
+    };
 
     // Périodes enrichies
     const periods = await Promise.all(
@@ -469,7 +737,7 @@ export async function GET(
       })
     );
 
-    const totals = monthlyWithCumulative.reduce(
+    const totals = filteredMonths.reduce(
       (acc, row) => ({
         totalCharges: acc.totalCharges + row.charges,
         totalProduits: acc.totalProduits + row.produits,
@@ -481,8 +749,12 @@ export async function GET(
     return NextResponse.json({
       client: { id: client.id, name: client.name },
       year,
+      yearN1: yearN1.toString(),
+      periodType,
+      selectedMonth,
       availableYears: availableYears.length > 0 ? availableYears : [year],
-      monthly: monthlyWithCumulative,
+      monthly: allMonths,
+      filteredMonthly: filteredMonths,
       periods,
       totals: {
         ...totals,
