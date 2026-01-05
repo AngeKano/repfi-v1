@@ -80,16 +80,15 @@ interface IndicateursFinanciers {
   resultatHAO: number;
 }
 
-interface MonthlyDataExtended {
-  month: string;
-  monthLabel: string;
-  monthNumber: string;
+interface DataPoint {
+  label: string;
+  period: string;
+  periodNumber: string;
   charges: number;
   produits: number;
   resultat: number;
   cumulativeBalance: number;
   nbTransactions: number;
-  // Nouvelles données mensuelles
   chiffreAffaires: number;
   chiffreAffairesN1: number;
   soldeTresorerie: number;
@@ -134,51 +133,125 @@ const RUBRIQUES_VIDES: RubriquesOHADA = {
   RS: 0,
 };
 
+const RUBRIQUES_LIST = [
+  "TA",
+  "TB",
+  "TC",
+  "TD",
+  "RA",
+  "RB",
+  "TE",
+  "TF",
+  "TG",
+  "TH",
+  "TI",
+  "RC",
+  "RD",
+  "RE",
+  "RF",
+  "RG",
+  "RH",
+  "RI",
+  "RJ",
+  "RK",
+  "TJ",
+  "RL",
+  "TK",
+  "TL",
+  "TM",
+  "RM",
+  "RN",
+  "TN",
+  "TO",
+  "RO",
+  "RP",
+  "RQ",
+  "RS",
+];
+
+function getDaysInMonth(year: number, month: number): number {
+  return new Date(year, month, 0).getDate();
+}
+
 async function recupererRubriquesParMois(
   dbName: string,
   batchIds: string[]
 ): Promise<Map<string, RubriquesOHADA>> {
   const result = new Map<string, RubriquesOHADA>();
-
   if (batchIds.length === 0) return result;
 
   const data = await clickhouseClient.query({
     query: `
       SELECT
-        substring(date_transaction, 4, 2) as month,
+        substring(date_transaction, 4, 2) as period,
         rubrique,
         sum(credit - debit) as solde
       FROM ${dbName}.grand_livre
       WHERE batch_id IN ({batchIds:Array(String)})
-        AND rubrique IN (
-          'TA', 'TB', 'TC', 'TD',
-          'RA', 'RB',
-          'TE', 'TF', 'TG', 'TH', 'TI',
-          'RC', 'RD', 'RE', 'RF', 'RG', 'RH', 'RI', 'RJ',
-          'RK',
-          'TJ', 'RL',
-          'TK', 'TL', 'TM', 'RM', 'RN',
-          'TN', 'TO', 'RO', 'RP',
-          'RQ', 'RS'
-        )
-      GROUP BY month, rubrique
-      ORDER BY month
+        AND rubrique IN ({rubriques:Array(String)})
+      GROUP BY period, rubrique
+      ORDER BY period
     `,
-    query_params: { batchIds },
+    query_params: { batchIds, rubriques: RUBRIQUES_LIST },
     format: "JSONEachRow",
   });
 
   const rows = (await data.json()) as Array<{
-    month: string;
+    period: string;
     rubrique: string;
     solde: string;
   }>;
 
   for (const row of rows) {
-    if (!result.has(row.month)) {
-      result.set(row.month, { ...RUBRIQUES_VIDES });
+    if (!result.has(row.period)) {
+      result.set(row.period, { ...RUBRIQUES_VIDES });
     }
-    const rubriques = result.get(row.month)!;
+    const rubriques = result.get(row.period)!;
+    const key = row.rubrique as keyof RubriquesOHADA;
+    if (key in rubriques) {
+      rubriques[key] = parseFloat(row.solde) || 0;
+    }
+  }
+
+  return result;
+}
+
+async function recupererRubriquesParJour(
+  dbName: string,
+  batchIds: string[],
+  monthFilter: string
+): Promise<Map<string, RubriquesOHADA>> {
+  const result = new Map<string, RubriquesOHADA>();
+  if (batchIds.length === 0) return result;
+
+  const data = await clickhouseClient.query({
+    query: `
+      SELECT
+        substring(date_transaction, 1, 2) as period,
+        rubrique,
+        sum(credit - debit) as solde
+      FROM ${dbName}.grand_livre
+      WHERE batch_id IN ({batchIds:Array(String)})
+        AND substring(date_transaction, 4, 2) = {monthFilter:String}
+        AND rubrique IN ({rubriques:Array(String)})
+      GROUP BY period, rubrique
+      ORDER BY period
+    `,
+    query_params: { batchIds, monthFilter, rubriques: RUBRIQUES_LIST },
+    format: "JSONEachRow",
+  });
+
+  const rows = (await data.json()) as Array<{
+    period: string;
+    rubrique: string;
+    solde: string;
+  }>;
+
+  for (const row of rows) {
+    if (!result.has(row.period)) {
+      result.set(row.period, { ...RUBRIQUES_VIDES });
+    }
+    const rubriques = result.get(row.period)!;
     const key = row.rubrique as keyof RubriquesOHADA;
     if (key in rubriques) {
       rubriques[key] = parseFloat(row.solde) || 0;
@@ -193,104 +266,163 @@ async function recupererTresorerieParMois(
   batchIds: string[]
 ): Promise<Map<string, number>> {
   const result = new Map<string, number>();
-
   if (batchIds.length === 0) return result;
 
   const data = await clickhouseClient.query({
     query: `
       SELECT
-        substring(date_transaction, 4, 2) as month,
+        substring(date_transaction, 4, 2) as period,
         sum(CASE WHEN startsWith(compte, '52') THEN debit - credit ELSE 0 END) +
         sum(CASE WHEN startsWith(compte, '57') THEN debit - credit ELSE 0 END) as solde_tresorerie
       FROM ${dbName}.grand_livre
       WHERE batch_id IN ({batchIds:Array(String)})
-      GROUP BY month
-      ORDER BY month
+      GROUP BY period
+      ORDER BY period
     `,
     query_params: { batchIds },
     format: "JSONEachRow",
   });
 
   const rows = (await data.json()) as Array<{
-    month: string;
+    period: string;
     solde_tresorerie: string;
   }>;
 
   for (const row of rows) {
-    result.set(row.month, parseFloat(row.solde_tresorerie) || 0);
+    result.set(row.period, parseFloat(row.solde_tresorerie) || 0);
   }
 
   return result;
 }
 
-async function recupererRubriques(
+async function recupererTresorerieParJour(
   dbName: string,
-  batchIds: string[]
-): Promise<RubriquesOHADA> {
-  if (batchIds.length === 0) return { ...RUBRIQUES_VIDES };
+  batchIds: string[],
+  monthFilter: string
+): Promise<Map<string, number>> {
+  const result = new Map<string, number>();
+  if (batchIds.length === 0) return result;
 
   const data = await clickhouseClient.query({
     query: `
       SELECT
-        rubrique,
-        sum(credit - debit) as solde
+        substring(date_transaction, 1, 2) as period,
+        sum(CASE WHEN startsWith(compte, '52') THEN debit - credit ELSE 0 END) +
+        sum(CASE WHEN startsWith(compte, '57') THEN debit - credit ELSE 0 END) as solde_tresorerie
       FROM ${dbName}.grand_livre
       WHERE batch_id IN ({batchIds:Array(String)})
-        AND rubrique IN (
-          'TA', 'TB', 'TC', 'TD',
-          'RA', 'RB',
-          'TE', 'TF', 'TG', 'TH', 'TI',
-          'RC', 'RD', 'RE', 'RF', 'RG', 'RH', 'RI', 'RJ',
-          'RK',
-          'TJ', 'RL',
-          'TK', 'TL', 'TM', 'RM', 'RN',
-          'TN', 'TO', 'RO', 'RP',
-          'RQ', 'RS'
-        )
-      GROUP BY rubrique
+        AND substring(date_transaction, 4, 2) = {monthFilter:String}
+      GROUP BY period
+      ORDER BY period
+    `,
+    query_params: { batchIds, monthFilter },
+    format: "JSONEachRow",
+  });
+
+  const rows = (await data.json()) as Array<{
+    period: string;
+    solde_tresorerie: string;
+  }>;
+
+  for (const row of rows) {
+    result.set(row.period, parseFloat(row.solde_tresorerie) || 0);
+  }
+
+  return result;
+}
+
+async function recupererFluxParMois(
+  dbName: string,
+  batchIds: string[]
+): Promise<
+  Map<string, { charges: number; produits: number; nbTransactions: number }>
+> {
+  const result = new Map<
+    string,
+    { charges: number; produits: number; nbTransactions: number }
+  >();
+  if (batchIds.length === 0) return result;
+
+  const data = await clickhouseClient.query({
+    query: `
+      SELECT 
+        substring(date_transaction, 4, 2) as period,
+        sum(CASE WHEN startsWith(compte, '6') THEN debit - credit ELSE 0 END) as charges,
+        sum(CASE WHEN startsWith(compte, '7') THEN credit - debit ELSE 0 END) as produits,
+        count(*) as nb_transactions
+      FROM ${dbName}.grand_livre
+      WHERE batch_id IN ({batchIds:Array(String)})
+      GROUP BY period
+      ORDER BY period
     `,
     query_params: { batchIds },
     format: "JSONEachRow",
   });
 
   const rows = (await data.json()) as Array<{
-    rubrique: string;
-    solde: string;
+    period: string;
+    charges: string;
+    produits: string;
+    nb_transactions: string;
   }>;
-  const rubriques = { ...RUBRIQUES_VIDES };
 
   for (const row of rows) {
-    const key = row.rubrique as keyof RubriquesOHADA;
-    if (key in rubriques) {
-      rubriques[key] = parseFloat(row.solde) || 0;
-    }
+    result.set(row.period, {
+      charges: parseFloat(row.charges) || 0,
+      produits: parseFloat(row.produits) || 0,
+      nbTransactions: parseInt(row.nb_transactions) || 0,
+    });
   }
 
-  return rubriques;
+  return result;
 }
 
-async function recupererSoldeTresorerie(
+async function recupererFluxParJour(
   dbName: string,
-  batchIds: string[]
-): Promise<number> {
-  if (batchIds.length === 0) return 0;
+  batchIds: string[],
+  monthFilter: string
+): Promise<
+  Map<string, { charges: number; produits: number; nbTransactions: number }>
+> {
+  const result = new Map<
+    string,
+    { charges: number; produits: number; nbTransactions: number }
+  >();
+  if (batchIds.length === 0) return result;
 
   const data = await clickhouseClient.query({
     query: `
-      SELECT
-        sum(CASE WHEN startsWith(compte, '52') THEN debit - credit ELSE 0 END) as banques,
-        sum(CASE WHEN startsWith(compte, '57') THEN debit - credit ELSE 0 END) as caisse
+      SELECT 
+        substring(date_transaction, 1, 2) as period,
+        sum(CASE WHEN startsWith(compte, '6') THEN debit - credit ELSE 0 END) as charges,
+        sum(CASE WHEN startsWith(compte, '7') THEN credit - debit ELSE 0 END) as produits,
+        count(*) as nb_transactions
       FROM ${dbName}.grand_livre
       WHERE batch_id IN ({batchIds:Array(String)})
+        AND substring(date_transaction, 4, 2) = {monthFilter:String}
+      GROUP BY period
+      ORDER BY period
     `,
-    query_params: { batchIds },
+    query_params: { batchIds, monthFilter },
     format: "JSONEachRow",
   });
 
-  const rows = (await data.json()) as any[];
-  const row = rows[0] || {};
+  const rows = (await data.json()) as Array<{
+    period: string;
+    charges: string;
+    produits: string;
+    nb_transactions: string;
+  }>;
 
-  return (parseFloat(row.banques) || 0) + (parseFloat(row.caisse) || 0);
+  for (const row of rows) {
+    result.set(row.period, {
+      charges: parseFloat(row.charges) || 0,
+      produits: parseFloat(row.produits) || 0,
+      nbTransactions: parseInt(row.nb_transactions) || 0,
+    });
+  }
+
+  return result;
 }
 
 function calculerSIG(rubriques: RubriquesOHADA): SoldesIntermediairesGestion {
@@ -360,35 +492,34 @@ function calculerSIG(rubriques: RubriquesOHADA): SoldesIntermediairesGestion {
   return { XA, XB, XC, XD, XE, XF, XG, XH, XI };
 }
 
-async function calculerIndicateurs(
-  dbName: string,
-  batchIds: string[]
-): Promise<IndicateursFinanciers> {
-  if (batchIds.length === 0) {
-    return {
-      chiffreAffaires: 0,
-      masseSalariale: 0,
-      resultatExploitation: 0,
-      resultatNet: 0,
-      soldeTresorerie: 0,
-      margeCommerciale: 0,
-      valeurAjoutee: 0,
-      ebe: 0,
-      resultatFinancier: 0,
-      resultatHAO: 0,
-    };
+function calculerIndicateursPeriode(
+  rubriquesParPeriode: Map<string, RubriquesOHADA>,
+  tresorerieParPeriode: Map<string, number>,
+  periodesToInclude: string[]
+): IndicateursFinanciers {
+  const rubriquesAgregees = { ...RUBRIQUES_VIDES };
+  let tresorerieTotal = 0;
+
+  for (const period of periodesToInclude) {
+    const rubriques = rubriquesParPeriode.get(period);
+    if (rubriques) {
+      for (const key of Object.keys(
+        rubriquesAgregees
+      ) as (keyof RubriquesOHADA)[]) {
+        rubriquesAgregees[key] += rubriques[key];
+      }
+    }
+    tresorerieTotal += tresorerieParPeriode.get(period) || 0;
   }
 
-  const rubriques = await recupererRubriques(dbName, batchIds);
-  const sig = calculerSIG(rubriques);
-  const soldeTresorerie = await recupererSoldeTresorerie(dbName, batchIds);
+  const sig = calculerSIG(rubriquesAgregees);
 
   return {
     chiffreAffaires: sig.XB,
-    masseSalariale: Math.abs(rubriques.RK),
+    masseSalariale: Math.abs(rubriquesAgregees.RK),
     resultatExploitation: sig.XE,
     resultatNet: sig.XI,
-    soldeTresorerie,
+    soldeTresorerie: tresorerieTotal,
     margeCommerciale: sig.XA,
     valeurAjoutee: sig.XC,
     ebe: sig.XD,
@@ -396,6 +527,9 @@ async function calculerIndicateurs(
     resultatHAO: sig.XH,
   };
 }
+
+const calculerVariation = (n: number, n1: number): number =>
+  n1 !== 0 ? ((n - n1) / Math.abs(n1)) * 100 : n !== 0 ? 100 : 0;
 
 export async function GET(
   req: NextRequest,
@@ -411,8 +545,8 @@ export async function GET(
     const { searchParams } = new URL(req.url);
     const year =
       searchParams.get("year") || new Date().getFullYear().toString();
-    const periodType = searchParams.get("periodType") || "year"; // year, month, ytd
-    const selectedMonth = searchParams.get("month"); // 01-12
+    const periodType = searchParams.get("periodType") || "year";
+    const selectedMonth = searchParams.get("month");
 
     const client = await prisma.client.findUnique({
       where: { id },
@@ -486,42 +620,6 @@ export async function GET(
       .map((p) => p.batchId)
       .filter((b): b is string => !!b);
 
-    // Données mensuelles détaillées N et N-1
-    const rubriquesParMoisN = await recupererRubriquesParMois(dbName, batchIds);
-    const rubriquesParMoisN1 = await recupererRubriquesParMois(
-      dbName,
-      batchIdsN1
-    );
-    const tresorerieParMoisN = await recupererTresorerieParMois(
-      dbName,
-      batchIds
-    );
-    const tresorerieParMoisN1 = await recupererTresorerieParMois(
-      dbName,
-      batchIdsN1
-    );
-
-    // Données mensuelles charges/produits
-    let monthlyRows: any[] = [];
-    if (batchIds.length > 0) {
-      const monthlyData = await clickhouseClient.query({
-        query: `
-          SELECT 
-            substring(date_transaction, 4, 2) as month,
-            sum(CASE WHEN startsWith(compte, '6') THEN debit - credit ELSE 0 END) as charges,
-            sum(CASE WHEN startsWith(compte, '7') THEN credit - debit ELSE 0 END) as produits,
-            count(*) as nb_transactions
-          FROM ${dbName}.grand_livre
-          WHERE batch_id IN ({batchIds:Array(String)})
-          GROUP BY month
-          ORDER BY month
-        `,
-        query_params: { batchIds },
-        format: "JSONEachRow",
-      });
-      monthlyRows = (await monthlyData.json()) as any[];
-    }
-
     const monthNames = [
       "Jan",
       "Fév",
@@ -537,15 +635,207 @@ export async function GET(
       "Déc",
     ];
 
-    // Construction des données mensuelles étendues
-    const allMonths: MonthlyDataExtended[] = [];
+    let chartData: DataPoint[] = [];
+    let periodsToIncludeN: string[] = [];
+    let periodsToIncludeN1: string[] = [];
+
+    // ========================================================================
+    // MODE MOIS : Données journalières
+    // ========================================================================
+    if (periodType === "month" && selectedMonth) {
+      const monthNum = parseInt(selectedMonth);
+      const daysInMonthN = getDaysInMonth(yearN, monthNum);
+      const daysInMonthN1 = getDaysInMonth(yearN1, monthNum);
+      const maxDays = Math.max(daysInMonthN, daysInMonthN1);
+
+      const rubriquesParJourN = await recupererRubriquesParJour(
+        dbName,
+        batchIds,
+        selectedMonth
+      );
+      const rubriquesParJourN1 = await recupererRubriquesParJour(
+        dbName,
+        batchIdsN1,
+        selectedMonth
+      );
+      const tresorerieParJourN = await recupererTresorerieParJour(
+        dbName,
+        batchIds,
+        selectedMonth
+      );
+      const tresorerieParJourN1 = await recupererTresorerieParJour(
+        dbName,
+        batchIdsN1,
+        selectedMonth
+      );
+      const fluxParJourN = await recupererFluxParJour(
+        dbName,
+        batchIds,
+        selectedMonth
+      );
+
+      let cumulativeBalanceN = 0;
+      let cumulativeTresoN = 0;
+      let cumulativeTresoN1 = 0;
+
+      for (let d = 1; d <= maxDays; d++) {
+        const dayStr = d.toString().padStart(2, "0");
+
+        const rubriquesN = rubriquesParJourN.get(dayStr) || {
+          ...RUBRIQUES_VIDES,
+        };
+        const rubriquesN1Jour = rubriquesParJourN1.get(dayStr) || {
+          ...RUBRIQUES_VIDES,
+        };
+
+        const sigN = calculerSIG(rubriquesN);
+        const sigN1 = calculerSIG(rubriquesN1Jour);
+
+        const tresoJourN = tresorerieParJourN.get(dayStr) || 0;
+        const tresoJourN1 = tresorerieParJourN1.get(dayStr) || 0;
+
+        cumulativeTresoN += tresoJourN;
+        cumulativeTresoN1 += tresoJourN1;
+
+        const fluxN = fluxParJourN.get(dayStr) || {
+          charges: 0,
+          produits: 0,
+          nbTransactions: 0,
+        };
+        const resultatN = fluxN.produits - fluxN.charges;
+        cumulativeBalanceN += resultatN;
+
+        chartData.push({
+          label: `${d}`,
+          period: `${year}${selectedMonth}${dayStr}`,
+          periodNumber: dayStr,
+          charges: fluxN.charges,
+          produits: fluxN.produits,
+          resultat: resultatN,
+          cumulativeBalance: cumulativeBalanceN,
+          nbTransactions: fluxN.nbTransactions,
+          chiffreAffaires: sigN.XB,
+          chiffreAffairesN1: sigN1.XB,
+          soldeTresorerie: cumulativeTresoN,
+          soldeTresorerieN1: cumulativeTresoN1,
+          margeCommerciale: sigN.XA,
+          margeCommercialeN1: sigN1.XA,
+        });
+      }
+
+      periodsToIncludeN = chartData.map((d) => d.periodNumber);
+      periodsToIncludeN1 = periodsToIncludeN;
+
+      const indicateursN = calculerIndicateursPeriode(
+        rubriquesParJourN,
+        tresorerieParJourN,
+        periodsToIncludeN
+      );
+      const indicateursN1 = calculerIndicateursPeriode(
+        rubriquesParJourN1,
+        tresorerieParJourN1,
+        periodsToIncludeN1
+      );
+
+      const variations = {
+        chiffreAffaires: calculerVariation(
+          indicateursN.chiffreAffaires,
+          indicateursN1.chiffreAffaires
+        ),
+        masseSalariale: calculerVariation(
+          indicateursN.masseSalariale,
+          indicateursN1.masseSalariale
+        ),
+        resultatExploitation: calculerVariation(
+          indicateursN.resultatExploitation,
+          indicateursN1.resultatExploitation
+        ),
+        resultatNet: calculerVariation(
+          indicateursN.resultatNet,
+          indicateursN1.resultatNet
+        ),
+        soldeTresorerie: calculerVariation(
+          indicateursN.soldeTresorerie,
+          indicateursN1.soldeTresorerie
+        ),
+        margeCommerciale: calculerVariation(
+          indicateursN.margeCommerciale,
+          indicateursN1.margeCommerciale
+        ),
+        valeurAjoutee: calculerVariation(
+          indicateursN.valeurAjoutee,
+          indicateursN1.valeurAjoutee
+        ),
+        ebe: calculerVariation(indicateursN.ebe, indicateursN1.ebe),
+        resultatFinancier: calculerVariation(
+          indicateursN.resultatFinancier,
+          indicateursN1.resultatFinancier
+        ),
+        resultatHAO: calculerVariation(
+          indicateursN.resultatHAO,
+          indicateursN1.resultatHAO
+        ),
+      };
+
+      const totals = chartData.reduce(
+        (acc, row) => ({
+          totalCharges: acc.totalCharges + row.charges,
+          totalProduits: acc.totalProduits + row.produits,
+          totalTransactions: acc.totalTransactions + row.nbTransactions,
+        }),
+        { totalCharges: 0, totalProduits: 0, totalTransactions: 0 }
+      );
+
+      const periods = await enrichirPeriodes(postgresPeriodsData, dbName);
+
+      return NextResponse.json({
+        client: { id: client.id, name: client.name },
+        year,
+        yearN1: yearN1.toString(),
+        periodType,
+        selectedMonth,
+        availableYears: availableYears.length > 0 ? availableYears : [year],
+        chartData,
+        periods,
+        totals: {
+          ...totals,
+          resultat: totals.totalProduits - totals.totalCharges,
+        },
+        indicateurs: {
+          anneeN: indicateursN,
+          anneeN1: indicateursN1,
+          variations,
+        },
+      });
+    }
+
+    // ========================================================================
+    // MODE ANNÉE ou YTD : Données mensuelles
+    // ========================================================================
+    const rubriquesParMoisN = await recupererRubriquesParMois(dbName, batchIds);
+    const rubriquesParMoisN1 = await recupererRubriquesParMois(
+      dbName,
+      batchIdsN1
+    );
+    const tresorerieParMoisN = await recupererTresorerieParMois(
+      dbName,
+      batchIds
+    );
+    const tresorerieParMoisN1 = await recupererTresorerieParMois(
+      dbName,
+      batchIdsN1
+    );
+    const fluxParMoisN = await recupererFluxParMois(dbName, batchIds);
+
     let cumulativeBalance = 0;
     let cumulativeTresorerieN = 0;
     let cumulativeTresorerieN1 = 0;
 
+    const endMonth =
+      periodType === "ytd" && selectedMonth ? parseInt(selectedMonth) : 12;
+
     for (let m = 1; m <= 12; m++) {
       const monthStr = m.toString().padStart(2, "0");
-      const found = monthlyRows.find((r: any) => r.month === monthStr);
 
       const rubriquesN = rubriquesParMoisN.get(monthStr) || {
         ...RUBRIQUES_VIDES,
@@ -563,20 +853,23 @@ export async function GET(
       cumulativeTresorerieN += tresoMoisN;
       cumulativeTresorerieN1 += tresoMoisN1;
 
-      const charges = found ? parseFloat(found.charges) || 0 : 0;
-      const produits = found ? parseFloat(found.produits) || 0 : 0;
-      const resultat = produits - charges;
+      const fluxN = fluxParMoisN.get(monthStr) || {
+        charges: 0,
+        produits: 0,
+        nbTransactions: 0,
+      };
+      const resultat = fluxN.produits - fluxN.charges;
       cumulativeBalance += resultat;
 
-      allMonths.push({
-        month: `${year}${monthStr}`,
-        monthLabel: monthNames[m - 1],
-        monthNumber: monthStr,
-        charges,
-        produits,
+      chartData.push({
+        label: monthNames[m - 1],
+        period: `${year}${monthStr}`,
+        periodNumber: monthStr,
+        charges: fluxN.charges,
+        produits: fluxN.produits,
         resultat,
         cumulativeBalance,
-        nbTransactions: found ? parseInt(found.nb_transactions) || 0 : 0,
+        nbTransactions: fluxN.nbTransactions,
         chiffreAffaires: sigN.XB,
         chiffreAffairesN1: sigN1.XB,
         soldeTresorerie: cumulativeTresorerieN,
@@ -586,78 +879,24 @@ export async function GET(
       });
     }
 
-    // Filtrage selon le type de période
-    let filteredMonths = allMonths;
-    let monthsToIncludeN: string[] = [];
-    let monthsToIncludeN1: string[] = [];
-
-    if (periodType === "month" && selectedMonth) {
-      filteredMonths = allMonths.filter((m) => m.monthNumber === selectedMonth);
-      monthsToIncludeN = [selectedMonth];
-      monthsToIncludeN1 = [selectedMonth];
-    } else if (periodType === "ytd" && selectedMonth) {
-      const endMonth = parseInt(selectedMonth);
-      filteredMonths = allMonths.filter(
-        (m) => parseInt(m.monthNumber) <= endMonth
-      );
-      monthsToIncludeN = filteredMonths.map((m) => m.monthNumber);
-      monthsToIncludeN1 = monthsToIncludeN;
-    } else {
-      monthsToIncludeN = allMonths.map((m) => m.monthNumber);
-      monthsToIncludeN1 = monthsToIncludeN;
+    // Filtrage YTD
+    if (periodType === "ytd" && selectedMonth) {
+      chartData = chartData.filter((d) => parseInt(d.periodNumber) <= endMonth);
     }
 
-    // Calcul des indicateurs selon la période
-    const calculerIndicateursPeriode = (
-      rubriquesParMois: Map<string, RubriquesOHADA>,
-      tresorerieParMois: Map<string, number>,
-      monthsToInclude: string[]
-    ): IndicateursFinanciers => {
-      const rubriquesAgregees = { ...RUBRIQUES_VIDES };
-      let tresorerieTotal = 0;
-
-      for (const month of monthsToInclude) {
-        const rubriques = rubriquesParMois.get(month);
-        if (rubriques) {
-          for (const key of Object.keys(
-            rubriquesAgregees
-          ) as (keyof RubriquesOHADA)[]) {
-            rubriquesAgregees[key] += rubriques[key];
-          }
-        }
-        tresorerieTotal += tresorerieParMois.get(month) || 0;
-      }
-
-      const sig = calculerSIG(rubriquesAgregees);
-
-      return {
-        chiffreAffaires: sig.XB,
-        masseSalariale: Math.abs(rubriquesAgregees.RK),
-        resultatExploitation: sig.XE,
-        resultatNet: sig.XI,
-        soldeTresorerie: tresorerieTotal,
-        margeCommerciale: sig.XA,
-        valeurAjoutee: sig.XC,
-        ebe: sig.XD,
-        resultatFinancier: sig.XF,
-        resultatHAO: sig.XH,
-      };
-    };
+    periodsToIncludeN = chartData.map((m) => m.periodNumber);
+    periodsToIncludeN1 = periodsToIncludeN;
 
     const indicateursN = calculerIndicateursPeriode(
       rubriquesParMoisN,
       tresorerieParMoisN,
-      monthsToIncludeN
+      periodsToIncludeN
     );
     const indicateursN1 = calculerIndicateursPeriode(
       rubriquesParMoisN1,
       tresorerieParMoisN1,
-      monthsToIncludeN1
+      periodsToIncludeN1
     );
-
-    // Calcul des variations (%)
-    const calculerVariation = (n: number, n1: number): number =>
-      n1 !== 0 ? ((n - n1) / Math.abs(n1)) * 100 : n !== 0 ? 100 : 0;
 
     const variations = {
       chiffreAffaires: calculerVariation(
@@ -699,45 +938,7 @@ export async function GET(
       ),
     };
 
-    // Périodes enrichies
-    const periods = await Promise.all(
-      postgresPeriodsData.map(async (pgPeriod) => {
-        let stats = { charges: 0, produits: 0, nb_transactions: 0 };
-        if (pgPeriod.batchId) {
-          try {
-            const statsData = await clickhouseClient.query({
-              query: `
-                SELECT 
-                  sum(CASE WHEN startsWith(compte, '6') THEN debit - credit ELSE 0 END) as charges,
-                  sum(CASE WHEN startsWith(compte, '7') THEN credit - debit ELSE 0 END) as produits,
-                  count(*) as nb_transactions
-                FROM ${dbName}.grand_livre
-                WHERE batch_id = {batchId:String}
-              `,
-              query_params: { batchId: pgPeriod.batchId },
-              format: "JSONEachRow",
-            });
-            const statsRows = (await statsData.json()) as any[];
-            if (statsRows.length > 0) stats = statsRows[0];
-          } catch (e) {
-            console.error("Stats error:", e);
-          }
-        }
-        return {
-          id: pgPeriod.id,
-          batch_id: pgPeriod.batchId,
-          periodStart: pgPeriod.periodStart,
-          periodEnd: pgPeriod.periodEnd,
-          status: pgPeriod.status,
-          excelFileUrl: pgPeriod.excelFileUrl,
-          charges: parseFloat(stats.charges as any) || 0,
-          produits: parseFloat(stats.produits as any) || 0,
-          nb_transactions: stats.nb_transactions || 0,
-        };
-      })
-    );
-
-    const totals = filteredMonths.reduce(
+    const totals = chartData.reduce(
       (acc, row) => ({
         totalCharges: acc.totalCharges + row.charges,
         totalProduits: acc.totalProduits + row.produits,
@@ -746,6 +947,8 @@ export async function GET(
       { totalCharges: 0, totalProduits: 0, totalTransactions: 0 }
     );
 
+    const periods = await enrichirPeriodes(postgresPeriodsData, dbName);
+
     return NextResponse.json({
       client: { id: client.id, name: client.name },
       year,
@@ -753,18 +956,13 @@ export async function GET(
       periodType,
       selectedMonth,
       availableYears: availableYears.length > 0 ? availableYears : [year],
-      monthly: allMonths,
-      filteredMonthly: filteredMonths,
+      chartData,
       periods,
       totals: {
         ...totals,
         resultat: totals.totalProduits - totals.totalCharges,
       },
-      indicateurs: {
-        anneeN: indicateursN,
-        anneeN1: indicateursN1,
-        variations,
-      },
+      indicateurs: { anneeN: indicateursN, anneeN1: indicateursN1, variations },
     });
   } catch (error) {
     console.error("Reporting API error:", error);
@@ -773,4 +971,43 @@ export async function GET(
       { status: 500 }
     );
   }
+}
+
+async function enrichirPeriodes(postgresPeriodsData: any[], dbName: string) {
+  return Promise.all(
+    postgresPeriodsData.map(async (pgPeriod) => {
+      let stats = { charges: 0, produits: 0, nb_transactions: 0 };
+      if (pgPeriod.batchId) {
+        try {
+          const statsData = await clickhouseClient.query({
+            query: `
+              SELECT 
+                sum(CASE WHEN startsWith(compte, '6') THEN debit - credit ELSE 0 END) as charges,
+                sum(CASE WHEN startsWith(compte, '7') THEN credit - debit ELSE 0 END) as produits,
+                count(*) as nb_transactions
+              FROM ${dbName}.grand_livre
+              WHERE batch_id = {batchId:String}
+            `,
+            query_params: { batchId: pgPeriod.batchId },
+            format: "JSONEachRow",
+          });
+          const statsRows = (await statsData.json()) as any[];
+          if (statsRows.length > 0) stats = statsRows[0];
+        } catch (e) {
+          console.error("Stats error:", e);
+        }
+      }
+      return {
+        id: pgPeriod.id,
+        batch_id: pgPeriod.batchId,
+        periodStart: pgPeriod.periodStart,
+        periodEnd: pgPeriod.periodEnd,
+        status: pgPeriod.status,
+        excelFileUrl: pgPeriod.excelFileUrl,
+        charges: parseFloat(stats.charges as any) || 0,
+        produits: parseFloat(stats.produits as any) || 0,
+        nb_transactions: stats.nb_transactions || 0,
+      };
+    })
+  );
 }
