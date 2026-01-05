@@ -716,32 +716,6 @@ export default function ClientReportingChart({
               data={visibleChartData}
               margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
             >
-              <defs>
-                <linearGradient id="colorCAN" x1="0" y1="0" x2="0" y2="1">
-                  <stop
-                    offset="5%"
-                    stopColor="hsl(221, 83%, 53%)"
-                    stopOpacity={0.8}
-                  />
-                  <stop
-                    offset="95%"
-                    stopColor="hsl(221, 83%, 53%)"
-                    stopOpacity={0.1}
-                  />
-                </linearGradient>
-                <linearGradient id="colorCAN1" x1="0" y1="0" x2="0" y2="1">
-                  <stop
-                    offset="5%"
-                    stopColor="hsl(221, 83%, 73%)"
-                    stopOpacity={0.6}
-                  />
-                  <stop
-                    offset="95%"
-                    stopColor="hsl(221, 83%, 73%)"
-                    stopOpacity={0.1}
-                  />
-                </linearGradient>
-              </defs>
               <CartesianGrid strokeDasharray="3 3" vertical={false} />
               <XAxis
                 dataKey="label"
@@ -767,21 +741,22 @@ export default function ClientReportingChart({
                   />
                 }
               />
-              <Area
+              <Line
                 type="monotone"
                 dataKey="chiffreAffairesN1"
                 name={`CA ${yearN1}`}
                 stroke="hsl(221, 83%, 73%)"
-                fillOpacity={1}
-                fill="url(#colorCAN1)"
+                strokeWidth={2}
+                dot={{ r: 3 }}
+                strokeDasharray="5 5"
               />
-              <Area
+              <Line
                 type="monotone"
                 dataKey="chiffreAffaires"
                 name={`CA ${yearN}`}
                 stroke="hsl(221, 83%, 53%)"
-                fillOpacity={1}
-                fill="url(#colorCAN)"
+                strokeWidth={2}
+                dot={{ r: 4 }}
               />
             </LineChart>
           </ChartContainer>
