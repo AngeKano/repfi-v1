@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import {
   Card,
   CardContent,
@@ -33,8 +33,6 @@ import {
   XAxis,
   YAxis,
   CartesianGrid,
-  Legend,
-  ResponsiveContainer,
 } from "recharts";
 import {
   ContextMenu,
@@ -62,13 +60,16 @@ import {
   Calendar,
   CalendarDays,
   CalendarRange,
+  Receipt,
+  CreditCard,
+  BarChart3,
 } from "lucide-react";
 import { toast } from "sonner";
 
-interface MonthlyData {
-  month: string;
-  monthLabel: string;
-  monthNumber: string;
+interface DataPoint {
+  label: string;
+  period: string;
+  periodNumber: string;
   charges: number;
   produits: number;
   resultat: number;
@@ -127,8 +128,7 @@ interface ReportingData {
   periodType: string;
   selectedMonth: string | null;
   availableYears: string[];
-  monthly: MonthlyData[];
-  filteredMonthly: MonthlyData[];
+  chartData: DataPoint[];
   periods: Period[];
   totals: {
     totalCharges: number;
@@ -145,19 +145,14 @@ interface ReportingData {
 
 type PeriodType = "year" | "month" | "ytd";
 
-const chartConfigArea: ChartConfig = {
-  produits: { label: "Produits (Ventes)", color: "hsl(142, 76%, 36%)" },
-  charges: { label: "Charges (Achats)", color: "hsl(0, 84%, 60%)" },
-};
-
-const chartConfigBar: ChartConfig = {
-  charges: { label: "Charges", color: "hsl(0, 84%, 60%)" },
+const chartConfigFlux: ChartConfig = {
   produits: { label: "Produits", color: "hsl(142, 76%, 36%)" },
+  charges: { label: "Charges", color: "hsl(0, 84%, 60%)" },
 };
 
 const chartConfigCA: ChartConfig = {
-  chiffreAffaires: { label: "CA Année N", color: "hsl(221, 83%, 53%)" },
-  chiffreAffairesN1: { label: "CA Année N-1", color: "hsl(221, 83%, 73%)" },
+  chiffreAffaires: { label: "CA N", color: "hsl(221, 83%, 53%)" },
+  chiffreAffairesN1: { label: "CA N-1", color: "hsl(221, 83%, 73%)" },
 };
 
 const chartConfigTresorerie: ChartConfig = {
@@ -324,10 +319,14 @@ export default function ClientReportingChart({
     return year;
   };
 
+  const getXAxisLabel = (): string => {
+    return periodType === "month" ? "Jour" : "Mois";
+  };
+
   const VariationBadge = ({ value }: { value: number }) => {
     if (value === 0) {
       return (
-        <Badge variant="outline" className="text-gray-500">
+        <Badge variant="outline" className="text-gray-500 text-xs">
           <Minus className="w-3 h-3 mr-1" /> 0%
         </Badge>
       );
@@ -335,11 +334,11 @@ export default function ClientReportingChart({
     return (
       <Badge
         variant="outline"
-        className={
+        className={`text-xs ${
           value > 0
             ? "text-green-600 border-green-200"
             : "text-red-600 border-red-200"
-        }
+        }`}
       >
         {value > 0 ? (
           <TrendingUp className="w-3 h-3 mr-1" />
@@ -351,6 +350,11 @@ export default function ClientReportingChart({
     );
   };
 
+  const visibleChartData = useMemo(() => {
+    if (!data) return [];
+    return data.chartData.filter((d) => !hiddenPeriods.has(d.period));
+  }, [data, hiddenPeriods]);
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-96">
@@ -359,7 +363,7 @@ export default function ClientReportingChart({
     );
   }
 
-  if (!data || data.monthly.length === 0) {
+  if (!data || data.chartData.length === 0) {
     return (
       <Card>
         <CardContent className="flex items-center justify-center h-96">
@@ -371,9 +375,6 @@ export default function ClientReportingChart({
     );
   }
 
-  const visibleMonthly = data.filteredMonthly.filter(
-    (m) => !hiddenPeriods.has(m.month)
-  );
   const yearN = parseInt(year);
   const yearN1 = yearN - 1;
 
@@ -389,7 +390,7 @@ export default function ClientReportingChart({
         </div>
         <div className="flex items-center gap-4">
           {/* Sélecteur de type de période */}
-          <div className="flex items-center gap-2 bg-muted rounded-lg p-1">
+          <div className="flex items-center gap-1 bg-muted rounded-lg p-1">
             <Button
               variant={periodType === "year" ? "default" : "ghost"}
               size="sm"
@@ -419,7 +420,7 @@ export default function ClientReportingChart({
             </Button>
           </div>
 
-          {/* Sélecteur de mois (visible si month ou ytd) */}
+          {/* Sélecteur de mois */}
           {(periodType === "month" || periodType === "ytd") && (
             <Select value={selectedMonth} onValueChange={setSelectedMonth}>
               <SelectTrigger className="w-[140px]">
@@ -461,26 +462,27 @@ export default function ClientReportingChart({
         </div>
       </div>
 
-      {/* KPIs - 6 colonnes */}
-      <div className="grid grid-cols-6 gap-4">
+      {/* KPIs + Totaux - Grille 5x2 */}
+      <div className="grid grid-cols-5 gap-4">
+        {/* Ligne 1 */}
         {/* Chiffre d'affaires */}
         <Card>
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
-              <CardDescription className="flex items-center gap-2">
+              <CardDescription className="flex items-center gap-1 text-xs">
                 <DollarSign className="w-4 h-4 text-blue-600" />
-                Chiffre d&apos;affaires
+                CA
               </CardDescription>
               <VariationBadge
                 value={data.indicateurs.variations.chiffreAffaires}
               />
             </div>
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-blue-600">
+          <CardContent className="pt-0">
+            <div className="text-xl font-bold text-blue-600">
               {formatCurrency(data.indicateurs.anneeN.chiffreAffaires)}
             </div>
-            <p className="text-xs text-muted-foreground mt-1">
+            <p className="text-xs text-muted-foreground">
               {yearN1}:{" "}
               {formatCurrency(data.indicateurs.anneeN1.chiffreAffaires)}
             </p>
@@ -491,18 +493,18 @@ export default function ClientReportingChart({
         <Card>
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
-              <CardDescription className="flex items-center gap-2">
+              <CardDescription className="flex items-center gap-1 text-xs">
                 <ShoppingCart className="w-4 h-4 text-indigo-600" />
-                Marge Commerciale
+                Marge Comm.
               </CardDescription>
               <VariationBadge
                 value={data.indicateurs.variations.margeCommerciale}
               />
             </div>
           </CardHeader>
-          <CardContent>
+          <CardContent className="pt-0">
             <div
-              className={`text-2xl font-bold ${
+              className={`text-xl font-bold ${
                 data.indicateurs.anneeN.margeCommerciale >= 0
                   ? "text-indigo-600"
                   : "text-red-600"
@@ -510,7 +512,7 @@ export default function ClientReportingChart({
             >
               {formatCurrency(data.indicateurs.anneeN.margeCommerciale)}
             </div>
-            <p className="text-xs text-muted-foreground mt-1">
+            <p className="text-xs text-muted-foreground">
               {yearN1}:{" "}
               {formatCurrency(data.indicateurs.anneeN1.margeCommerciale)}
             </p>
@@ -521,20 +523,20 @@ export default function ClientReportingChart({
         <Card>
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
-              <CardDescription className="flex items-center gap-2">
+              <CardDescription className="flex items-center gap-1 text-xs">
                 <Users className="w-4 h-4 text-orange-600" />
-                Masse salariale
+                Masse Salariale
               </CardDescription>
               <VariationBadge
                 value={data.indicateurs.variations.masseSalariale}
               />
             </div>
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-orange-600">
+          <CardContent className="pt-0">
+            <div className="text-xl font-bold text-orange-600">
               {formatCurrency(data.indicateurs.anneeN.masseSalariale)}
             </div>
-            <p className="text-xs text-muted-foreground mt-1">
+            <p className="text-xs text-muted-foreground">
               {yearN1}:{" "}
               {formatCurrency(data.indicateurs.anneeN1.masseSalariale)}
             </p>
@@ -545,18 +547,18 @@ export default function ClientReportingChart({
         <Card>
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
-              <CardDescription className="flex items-center gap-2">
+              <CardDescription className="flex items-center gap-1 text-xs">
                 <Activity className="w-4 h-4 text-purple-600" />
-                Résultat exploitation
+                Rex
               </CardDescription>
               <VariationBadge
                 value={data.indicateurs.variations.resultatExploitation}
               />
             </div>
           </CardHeader>
-          <CardContent>
+          <CardContent className="pt-0">
             <div
-              className={`text-2xl font-bold ${
+              className={`text-xl font-bold ${
                 data.indicateurs.anneeN.resultatExploitation >= 0
                   ? "text-purple-600"
                   : "text-red-600"
@@ -564,7 +566,7 @@ export default function ClientReportingChart({
             >
               {formatCurrency(data.indicateurs.anneeN.resultatExploitation)}
             </div>
-            <p className="text-xs text-muted-foreground mt-1">
+            <p className="text-xs text-muted-foreground">
               {yearN1}:{" "}
               {formatCurrency(data.indicateurs.anneeN1.resultatExploitation)}
             </p>
@@ -575,16 +577,16 @@ export default function ClientReportingChart({
         <Card>
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
-              <CardDescription className="flex items-center gap-2">
+              <CardDescription className="flex items-center gap-1 text-xs">
                 <PiggyBank className="w-4 h-4 text-green-600" />
                 Résultat Net
               </CardDescription>
               <VariationBadge value={data.indicateurs.variations.resultatNet} />
             </div>
           </CardHeader>
-          <CardContent>
+          <CardContent className="pt-0">
             <div
-              className={`text-2xl font-bold ${
+              className={`text-xl font-bold ${
                 data.indicateurs.anneeN.resultatNet >= 0
                   ? "text-green-600"
                   : "text-red-600"
@@ -592,17 +594,18 @@ export default function ClientReportingChart({
             >
               {formatCurrency(data.indicateurs.anneeN.resultatNet)}
             </div>
-            <p className="text-xs text-muted-foreground mt-1">
+            <p className="text-xs text-muted-foreground">
               {yearN1}: {formatCurrency(data.indicateurs.anneeN1.resultatNet)}
             </p>
           </CardContent>
         </Card>
 
+        {/* Ligne 2 */}
         {/* Trésorerie */}
         <Card>
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
-              <CardDescription className="flex items-center gap-2">
+              <CardDescription className="flex items-center gap-1 text-xs">
                 <Wallet className="w-4 h-4 text-cyan-600" />
                 Trésorerie
               </CardDescription>
@@ -611,9 +614,9 @@ export default function ClientReportingChart({
               />
             </div>
           </CardHeader>
-          <CardContent>
+          <CardContent className="pt-0">
             <div
-              className={`text-2xl font-bold ${
+              className={`text-xl font-bold ${
                 data.indicateurs.anneeN.soldeTresorerie >= 0
                   ? "text-cyan-600"
                   : "text-red-600"
@@ -621,56 +624,80 @@ export default function ClientReportingChart({
             >
               {formatCurrency(data.indicateurs.anneeN.soldeTresorerie)}
             </div>
-            <p className="text-xs text-muted-foreground mt-1">
+            <p className="text-xs text-muted-foreground">
               {yearN1}:{" "}
               {formatCurrency(data.indicateurs.anneeN1.soldeTresorerie)}
             </p>
           </CardContent>
         </Card>
-      </div>
 
-      {/* Totaux secondaires */}
-      <div className="grid grid-cols-4 gap-4">
+        {/* Produits */}
         <Card>
           <CardHeader className="pb-2">
-            <CardDescription>Produits (Ventes)</CardDescription>
-            <CardTitle className="text-2xl text-green-600">
+            <CardDescription className="flex items-center gap-1 text-xs">
+              <TrendingUp className="w-4 h-4 text-green-600" />
+              Produits
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="pt-0">
+            <div className="text-xl font-bold text-green-600">
               {formatCurrency(data.totals.totalProduits)}
-            </CardTitle>
-          </CardHeader>
+            </div>
+          </CardContent>
         </Card>
+
+        {/* Charges */}
         <Card>
           <CardHeader className="pb-2">
-            <CardDescription>Charges (Achats)</CardDescription>
-            <CardTitle className="text-2xl text-red-600">
+            <CardDescription className="flex items-center gap-1 text-xs">
+              <CreditCard className="w-4 h-4 text-red-600" />
+              Charges
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="pt-0">
+            <div className="text-xl font-bold text-red-600">
               {formatCurrency(data.totals.totalCharges)}
-            </CardTitle>
-          </CardHeader>
+            </div>
+          </CardContent>
         </Card>
+
+        {/* Résultat période */}
         <Card>
           <CardHeader className="pb-2">
-            <CardDescription>Résultat</CardDescription>
-            <CardTitle
-              className={`text-2xl flex items-center gap-2 ${
+            <CardDescription className="flex items-center gap-1 text-xs">
+              <Receipt className="w-4 h-4" />
+              Résultat Période
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="pt-0">
+            <div
+              className={`text-xl font-bold flex items-center gap-1 ${
                 data.totals.resultat >= 0 ? "text-green-600" : "text-red-600"
               }`}
             >
               {data.totals.resultat >= 0 ? (
-                <TrendingUp className="w-5 h-5" />
+                <TrendingUp className="w-4 h-4" />
               ) : (
-                <TrendingDown className="w-5 h-5" />
+                <TrendingDown className="w-4 h-4" />
               )}
               {formatCurrency(data.totals.resultat)}
-            </CardTitle>
-          </CardHeader>
+            </div>
+          </CardContent>
         </Card>
+
+        {/* Transactions */}
         <Card>
           <CardHeader className="pb-2">
-            <CardDescription>Transactions</CardDescription>
-            <CardTitle className="text-2xl">
-              {data.totals.totalTransactions.toLocaleString("fr-FR")}
-            </CardTitle>
+            <CardDescription className="flex items-center gap-1 text-xs">
+              <BarChart3 className="w-4 h-4" />
+              Transactions
+            </CardDescription>
           </CardHeader>
+          <CardContent className="pt-0">
+            <div className="text-xl font-bold">
+              {data.totals.totalTransactions.toLocaleString("fr-FR")}
+            </div>
+          </CardContent>
         </Card>
       </div>
 
@@ -679,13 +706,14 @@ export default function ClientReportingChart({
         <CardHeader>
           <CardTitle>Évolution du Chiffre d&apos;Affaires</CardTitle>
           <CardDescription>
-            Comparaison {yearN} vs {yearN1}
+            Comparaison {yearN} vs {yearN1} - par{" "}
+            {getXAxisLabel().toLowerCase()}
           </CardDescription>
         </CardHeader>
         <CardContent>
           <ChartContainer config={chartConfigCA} className="h-[300px] w-full">
             <AreaChart
-              data={data.monthly}
+              data={visibleChartData}
               margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
             >
               <defs>
@@ -715,11 +743,17 @@ export default function ClientReportingChart({
                 </linearGradient>
               </defs>
               <CartesianGrid strokeDasharray="3 3" vertical={false} />
-              <XAxis dataKey="monthLabel" tickLine={false} axisLine={false} />
+              <XAxis
+                dataKey="label"
+                tickLine={false}
+                axisLine={false}
+                fontSize={12}
+              />
               <YAxis
                 tickLine={false}
                 axisLine={false}
                 tickFormatter={(value) => `${(value / 1000000).toFixed(0)}M`}
+                fontSize={12}
               />
               <ChartTooltip
                 content={
@@ -754,12 +788,13 @@ export default function ClientReportingChart({
         </CardContent>
       </Card>
 
-      {/* Graphique Évolution de la Trésorerie N vs N-1 */}
+      {/* Graphique Évolution de la Trésorerie N vs N-1 - LineChart */}
       <Card>
         <CardHeader>
           <CardTitle>Évolution de la Trésorerie</CardTitle>
           <CardDescription>
-            Solde cumulé {yearN} vs {yearN1}
+            Solde cumulé {yearN} vs {yearN1} - par{" "}
+            {getXAxisLabel().toLowerCase()}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -767,42 +802,22 @@ export default function ClientReportingChart({
             config={chartConfigTresorerie}
             className="h-[300px] w-full"
           >
-            <AreaChart
-              data={data.monthly}
+            <LineChart
+              data={visibleChartData}
               margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
             >
-              <defs>
-                <linearGradient id="colorTresoN" x1="0" y1="0" x2="0" y2="1">
-                  <stop
-                    offset="5%"
-                    stopColor="hsl(174, 72%, 46%)"
-                    stopOpacity={0.8}
-                  />
-                  <stop
-                    offset="95%"
-                    stopColor="hsl(174, 72%, 46%)"
-                    stopOpacity={0.1}
-                  />
-                </linearGradient>
-                <linearGradient id="colorTresoN1" x1="0" y1="0" x2="0" y2="1">
-                  <stop
-                    offset="5%"
-                    stopColor="hsl(174, 72%, 66%)"
-                    stopOpacity={0.6}
-                  />
-                  <stop
-                    offset="95%"
-                    stopColor="hsl(174, 72%, 66%)"
-                    stopOpacity={0.1}
-                  />
-                </linearGradient>
-              </defs>
               <CartesianGrid strokeDasharray="3 3" vertical={false} />
-              <XAxis dataKey="monthLabel" tickLine={false} axisLine={false} />
+              <XAxis
+                dataKey="label"
+                tickLine={false}
+                axisLine={false}
+                fontSize={12}
+              />
               <YAxis
                 tickLine={false}
                 axisLine={false}
                 tickFormatter={(value) => `${(value / 1000000).toFixed(0)}M`}
+                fontSize={12}
               />
               <ChartTooltip
                 content={
@@ -816,23 +831,24 @@ export default function ClientReportingChart({
                   />
                 }
               />
-              <Area
+              <Line
                 type="monotone"
                 dataKey="soldeTresorerieN1"
                 name={`Trésorerie ${yearN1}`}
                 stroke="hsl(174, 72%, 66%)"
-                fillOpacity={1}
-                fill="url(#colorTresoN1)"
+                strokeWidth={2}
+                dot={{ r: 3 }}
+                strokeDasharray="5 5"
               />
-              <Area
+              <Line
                 type="monotone"
                 dataKey="soldeTresorerie"
                 name={`Trésorerie ${yearN}`}
                 stroke="hsl(174, 72%, 46%)"
-                fillOpacity={1}
-                fill="url(#colorTresoN)"
+                strokeWidth={2}
+                dot={{ r: 4 }}
               />
-            </AreaChart>
+            </LineChart>
           </ChartContainer>
         </CardContent>
       </Card>
@@ -842,47 +858,27 @@ export default function ClientReportingChart({
         <CardHeader>
           <CardTitle>Évolution des flux financiers</CardTitle>
           <CardDescription>
-            Produits (ventes) vs Charges (achats) par mois
+            Produits vs Charges - par {getXAxisLabel().toLowerCase()}
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <ChartContainer config={chartConfigArea} className="h-[300px] w-full">
+          <ChartContainer config={chartConfigFlux} className="h-[300px] w-full">
             <LineChart
-              data={visibleMonthly}
+              data={visibleChartData}
               margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
             >
-              <defs>
-                <linearGradient id="colorProduits" x1="0" y1="0" x2="0" y2="1">
-                  <stop
-                    offset="5%"
-                    stopColor="hsl(142, 76%, 36%)"
-                    stopOpacity={0.8}
-                  />
-                  <stop
-                    offset="95%"
-                    stopColor="hsl(142, 76%, 36%)"
-                    stopOpacity={0.1}
-                  />
-                </linearGradient>
-                <linearGradient id="colorCharges" x1="0" y1="0" x2="0" y2="1">
-                  <stop
-                    offset="5%"
-                    stopColor="hsl(0, 84%, 60%)"
-                    stopOpacity={0.8}
-                  />
-                  <stop
-                    offset="95%"
-                    stopColor="hsl(0, 84%, 60%)"
-                    stopOpacity={0.1}
-                  />
-                </linearGradient>
-              </defs>
               <CartesianGrid strokeDasharray="3 3" vertical={false} />
-              <XAxis dataKey="monthLabel" tickLine={false} axisLine={false} />
+              <XAxis
+                dataKey="label"
+                tickLine={false}
+                axisLine={false}
+                fontSize={12}
+              />
               <YAxis
                 tickLine={false}
                 axisLine={false}
                 tickFormatter={(value) => `${(value / 1000000).toFixed(0)}M`}
+                fontSize={12}
               />
               <ChartTooltip
                 content={
@@ -915,27 +911,36 @@ export default function ClientReportingChart({
         </CardContent>
       </Card>
 
-      <div className="flex flex-row w-full justify-between gap-3">
+      {/* Comparaison et Périodes */}
+      <div className="flex flex-row w-full justify-between gap-4">
         <Card className="flex-1">
           <CardHeader>
-            <CardTitle>Comparaison mensuelle</CardTitle>
-            <CardDescription>Charges et Produits par mois</CardDescription>
+            <CardTitle>
+              Comparaison {periodType === "month" ? "journalière" : "mensuelle"}
+            </CardTitle>
+            <CardDescription>Charges et Produits</CardDescription>
           </CardHeader>
           <CardContent>
             <ChartContainer
-              config={chartConfigBar}
+              config={chartConfigFlux}
               className="h-[300px] w-full"
             >
               <BarChart
-                data={visibleMonthly}
+                data={visibleChartData}
                 margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
               >
                 <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                <XAxis dataKey="monthLabel" tickLine={false} axisLine={false} />
+                <XAxis
+                  dataKey="label"
+                  tickLine={false}
+                  axisLine={false}
+                  fontSize={12}
+                />
                 <YAxis
                   tickLine={false}
                   axisLine={false}
                   tickFormatter={(value) => `${(value / 1000000).toFixed(0)}M`}
+                  fontSize={12}
                 />
                 <ChartTooltip
                   content={
@@ -970,24 +975,24 @@ export default function ClientReportingChart({
             <CardDescription>Clic droit pour les actions</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="flex flex-wrap gap-3">
+            <div className="flex flex-wrap gap-3 max-h-[300px] overflow-y-auto">
               {data.periods.map((period) => (
                 <ContextMenu key={period.batch_id}>
                   <ContextMenuTrigger>
                     <div
-                      className={`p-4 border rounded-lg cursor-pointer transition-all hover:shadow-md ${
+                      className={`p-3 border rounded-lg cursor-pointer transition-all hover:shadow-md ${
                         hiddenPeriods.has(period.id || "")
                           ? "opacity-40 bg-muted"
                           : "bg-card hover:bg-accent"
                       }`}
                     >
-                      <div className="font-medium">
+                      <div className="font-medium text-sm">
                         {formatPeriodLabel(
                           period.periodStart,
                           period.periodEnd
                         )}
                       </div>
-                      <div className="text-sm text-muted-foreground mt-1">
+                      <div className="text-xs text-muted-foreground mt-1">
                         {Number(period.nb_transactions).toLocaleString("fr-FR")}{" "}
                         transactions
                       </div>
@@ -1032,7 +1037,7 @@ export default function ClientReportingChart({
                     <ContextMenuItem
                       onClick={() => handleHidePeriod(period.id || "")}
                     >
-                      <EyeOff className="w-4 h-4 mr-2" />{" "}
+                      <EyeOff className="w-4 h-4 mr-2" />
                       {hiddenPeriods.has(period.id || "")
                         ? "Afficher"
                         : "Masquer"}
