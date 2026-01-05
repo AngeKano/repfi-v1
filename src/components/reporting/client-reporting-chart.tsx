@@ -712,7 +712,7 @@ export default function ClientReportingChart({
         </CardHeader>
         <CardContent>
           <ChartContainer config={chartConfigCA} className="h-[300px] w-full">
-            <AreaChart
+            <LineChart
               data={visibleChartData}
               margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
             >
@@ -783,7 +783,7 @@ export default function ClientReportingChart({
                 fillOpacity={1}
                 fill="url(#colorCAN)"
               />
-            </AreaChart>
+            </LineChart>
           </ChartContainer>
         </CardContent>
       </Card>
