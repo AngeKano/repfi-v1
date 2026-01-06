@@ -712,7 +712,7 @@ export default function ClientReportingChart({
         </CardHeader>
         <CardContent>
           <ChartContainer config={chartConfigCA} className="h-[300px] w-full">
-            <LineChart
+            <BarChart
               data={visibleChartData}
               margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
             >
@@ -741,24 +741,21 @@ export default function ClientReportingChart({
                   />
                 }
               />
-              <Line
-                type="monotone"
+              <Bar
                 dataKey="chiffreAffairesN1"
                 name={`CA ${yearN1}`}
-                stroke="hsl(221, 83%, 73%)"
-                strokeWidth={2}
-                dot={{ r: 3 }}
-                strokeDasharray="5 5"
+                fill="hsl(221, 83%, 73%)"
+                barSize={32}
+                radius={[4, 4, 0, 0]}
               />
-              <Line
-                type="monotone"
+              <Bar
                 dataKey="chiffreAffaires"
                 name={`CA ${yearN}`}
-                stroke="hsl(221, 83%, 53%)"
-                strokeWidth={2}
-                dot={{ r: 4 }}
+                fill="hsl(221, 83%, 53%)"
+                barSize={32}
+                radius={[4, 4, 0, 0]}
               />
-            </LineChart>
+            </BarChart>
           </ChartContainer>
         </CardContent>
       </Card>
