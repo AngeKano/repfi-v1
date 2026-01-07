@@ -28,8 +28,6 @@ import {
   Line,
   BarChart,
   Bar,
-  AreaChart,
-  Area,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -41,6 +39,11 @@ import {
   ContextMenuSeparator,
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   ChevronLeft,
   ChevronRight,
@@ -63,6 +66,11 @@ import {
   Receipt,
   CreditCard,
   BarChart3,
+  Settings2,
+  Eye,
+  EyeOffIcon,
+  ArrowUp,
+  ArrowDown,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -145,6 +153,66 @@ interface ReportingData {
 
 type PeriodType = "year" | "month" | "ytd";
 
+interface TunnelMetric {
+  id: string;
+  label: string;
+  key: keyof IndicateursFinanciers;
+  visible: boolean;
+  order: number;
+}
+
+const INITIAL_TUNNEL_METRICS: TunnelMetric[] = [
+  {
+    id: "ca",
+    label: "Chiffre d'affaires",
+    key: "chiffreAffaires",
+    visible: true,
+    order: 0,
+  },
+  {
+    id: "marge",
+    label: "Marge Brute",
+    key: "margeCommerciale",
+    visible: true,
+    order: 1,
+  },
+  {
+    id: "va",
+    label: "Valeur Ajoutée",
+    key: "valeurAjoutee",
+    visible: true,
+    order: 2,
+  },
+  {
+    id: "rex",
+    label: "Résultat Exploitation",
+    key: "resultatExploitation",
+    visible: true,
+    order: 3,
+  },
+  {
+    id: "rf",
+    label: "Résultat Financier",
+    key: "resultatFinancier",
+    visible: true,
+    order: 4,
+  },
+  {
+    id: "rhao",
+    label: "Résultat HAO",
+    key: "resultatHAO",
+    visible: true,
+    order: 5,
+  },
+  {
+    id: "rn",
+    label: "Résultat Net",
+    key: "resultatNet",
+    visible: true,
+    order: 6,
+  },
+];
+
 const chartConfigFlux: ChartConfig = {
   produits: { label: "Produits", color: "hsl(142, 76%, 36%)" },
   charges: { label: "Charges", color: "hsl(0, 84%, 60%)" },
@@ -186,6 +254,9 @@ export default function ClientReportingChart({
   const [periodType, setPeriodType] = useState<PeriodType>("year");
   const [selectedMonth, setSelectedMonth] = useState<string>("12");
   const [hiddenPeriods, setHiddenPeriods] = useState<Set<string>>(new Set());
+  const [tunnelMetrics, setTunnelMetrics] = useState<TunnelMetric[]>(
+    INITIAL_TUNNEL_METRICS
+  );
 
   useEffect(() => {
     fetchData();
@@ -264,6 +335,31 @@ export default function ClientReportingChart({
     }
   };
 
+  const toggleMetricVisibility = (id: string) => {
+    setTunnelMetrics((prev) =>
+      prev.map((m) => (m.id === id ? { ...m, visible: !m.visible } : m))
+    );
+  };
+
+  const moveMetric = (id: string, direction: "up" | "down") => {
+    setTunnelMetrics((prev) => {
+      const sorted = [...prev].sort((a, b) => a.order - b.order);
+      const index = sorted.findIndex((m) => m.id === id);
+      if (index === -1) return prev;
+
+      const newIndex = direction === "up" ? index - 1 : index + 1;
+      if (newIndex < 0 || newIndex >= sorted.length) return prev;
+
+      const newSorted = [...sorted];
+      [newSorted[index], newSorted[newIndex]] = [
+        newSorted[newIndex],
+        newSorted[index],
+      ];
+
+      return newSorted.map((m, i) => ({ ...m, order: i }));
+    });
+  };
+
   const formatCurrency = (value: number): string => {
     return new Intl.NumberFormat("fr-FR", {
       style: "currency",
@@ -271,6 +367,20 @@ export default function ClientReportingChart({
       minimumFractionDigits: 0,
       maximumFractionDigits: 0,
     }).format(value);
+  };
+
+  const formatCompact = (value: number): string => {
+    const absValue = Math.abs(value);
+    if (absValue >= 1000000000) {
+      return `${(value / 1000000000).toFixed(2)}Md`;
+    }
+    if (absValue >= 1000000) {
+      return `${(value / 1000000).toFixed(2)}M`;
+    }
+    if (absValue >= 1000) {
+      return `${(value / 1000).toFixed(0)}K`;
+    }
+    return value.toFixed(0);
   };
 
   const formatVariation = (value: number): string => {
@@ -355,6 +465,32 @@ export default function ClientReportingChart({
     return data.chartData.filter((d) => !hiddenPeriods.has(d.period));
   }, [data, hiddenPeriods]);
 
+  const tunnelData = useMemo(() => {
+    if (!data) return [];
+
+    const ca = data.indicateurs.anneeN.chiffreAffaires;
+    const sortedMetrics = [...tunnelMetrics]
+      .filter((m) => m.visible)
+      .sort((a, b) => a.order - b.order);
+
+    return sortedMetrics.map((metric) => {
+      const value = data.indicateurs.anneeN[metric.key];
+      const percentage = ca !== 0 ? (value / ca) * 100 : 0;
+
+      return {
+        id: metric.id,
+        name: metric.label,
+        value,
+        percentage,
+      };
+    });
+  }, [data, tunnelMetrics]);
+
+  const maxAbsValue = useMemo(() => {
+    if (tunnelData.length === 0) return 0;
+    return Math.max(...tunnelData.map((d) => Math.abs(d.value)));
+  }, [tunnelData]);
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-96">
@@ -389,7 +525,6 @@ export default function ClientReportingChart({
           </p>
         </div>
         <div className="flex items-center gap-4">
-          {/* Sélecteur de type de période */}
           <div className="flex items-center gap-1 bg-muted rounded-lg p-1">
             <Button
               variant={periodType === "year" ? "default" : "ghost"}
@@ -420,7 +555,6 @@ export default function ClientReportingChart({
             </Button>
           </div>
 
-          {/* Sélecteur de mois */}
           {(periodType === "month" || periodType === "ytd") && (
             <Select value={selectedMonth} onValueChange={setSelectedMonth}>
               <SelectTrigger className="w-[140px]">
@@ -436,7 +570,6 @@ export default function ClientReportingChart({
             </Select>
           )}
 
-          {/* Navigation année */}
           <Button
             variant="outline"
             size="icon"
@@ -464,8 +597,6 @@ export default function ClientReportingChart({
 
       {/* KPIs + Totaux - Grille 5x2 */}
       <div className="grid grid-cols-5 gap-4">
-        {/* Ligne 1 */}
-        {/* Chiffre d'affaires */}
         <Card>
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
@@ -489,7 +620,6 @@ export default function ClientReportingChart({
           </CardContent>
         </Card>
 
-        {/* Marge Commerciale */}
         <Card>
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
@@ -519,7 +649,6 @@ export default function ClientReportingChart({
           </CardContent>
         </Card>
 
-        {/* Masse salariale */}
         <Card>
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
@@ -543,7 +672,6 @@ export default function ClientReportingChart({
           </CardContent>
         </Card>
 
-        {/* Résultat d'exploitation */}
         <Card>
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
@@ -573,7 +701,6 @@ export default function ClientReportingChart({
           </CardContent>
         </Card>
 
-        {/* Résultat Net */}
         <Card>
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
@@ -600,8 +727,6 @@ export default function ClientReportingChart({
           </CardContent>
         </Card>
 
-        {/* Ligne 2 */}
-        {/* Trésorerie */}
         <Card>
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
@@ -631,7 +756,6 @@ export default function ClientReportingChart({
           </CardContent>
         </Card>
 
-        {/* Produits */}
         <Card>
           <CardHeader className="pb-2">
             <CardDescription className="flex items-center gap-1 text-xs">
@@ -646,7 +770,6 @@ export default function ClientReportingChart({
           </CardContent>
         </Card>
 
-        {/* Charges */}
         <Card>
           <CardHeader className="pb-2">
             <CardDescription className="flex items-center gap-1 text-xs">
@@ -661,7 +784,6 @@ export default function ClientReportingChart({
           </CardContent>
         </Card>
 
-        {/* Résultat période */}
         <Card>
           <CardHeader className="pb-2">
             <CardDescription className="flex items-center gap-1 text-xs">
@@ -685,7 +807,6 @@ export default function ClientReportingChart({
           </CardContent>
         </Card>
 
-        {/* Transactions */}
         <Card>
           <CardHeader className="pb-2">
             <CardDescription className="flex items-center gap-1 text-xs">
@@ -700,6 +821,150 @@ export default function ClientReportingChart({
           </CardContent>
         </Card>
       </div>
+
+      {/* Tunnel de rentabilité */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle>Tunnel de rentabilité</CardTitle>
+              <CardDescription>
+                Décomposition du résultat - Base 100% = Chiffre d&apos;affaires
+              </CardDescription>
+            </div>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm" className="gap-2">
+                  <Settings2 className="w-4 h-4" />
+                  Configurer
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-64">
+                {[...tunnelMetrics]
+                  .sort((a, b) => a.order - b.order)
+                  .map((metric, index) => (
+                    <div
+                      key={metric.id}
+                      className="flex items-center gap-2 px-2 py-1.5"
+                    >
+                      <div className="flex flex-col gap-0.5">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-4 w-4"
+                          onClick={() => moveMetric(metric.id, "up")}
+                          disabled={index === 0}
+                        >
+                          <ArrowUp className="h-3 w-3" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-4 w-4"
+                          onClick={() => moveMetric(metric.id, "down")}
+                          disabled={index === tunnelMetrics.length - 1}
+                        >
+                          <ArrowDown className="h-3 w-3" />
+                        </Button>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-6 w-6"
+                        onClick={() => toggleMetricVisibility(metric.id)}
+                      >
+                        {metric.visible ? (
+                          <Eye className="h-4 w-4" />
+                        ) : (
+                          <EyeOffIcon className="h-4 w-4 text-muted-foreground" />
+                        )}
+                      </Button>
+                      <span
+                        className={`text-sm flex-1 ${
+                          !metric.visible ? "text-muted-foreground" : ""
+                        }`}
+                      >
+                        {metric.label}
+                      </span>
+                    </div>
+                  ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-3">
+            {tunnelData.map((item) => {
+              const barWidth =
+                maxAbsValue !== 0
+                  ? (Math.abs(item.value) / maxAbsValue) * 50
+                  : 0;
+              const isPositive = item.value >= 0;
+
+              return (
+                <div key={item.id} className="flex items-center gap-4">
+                  <div className="w-44 text-sm font-medium text-right shrink-0">
+                    {item.name}
+                  </div>
+                  <div className="flex-1 flex items-center h-9">
+                    {/* Zone négative (gauche) */}
+                    <div className="w-1/2 flex justify-end pr-1">
+                      {!isPositive && (
+                        <div
+                          className="h-7 rounded-l-md transition-all duration-500 ease-out flex items-center justify-end pr-2"
+                          style={{
+                            width: `${barWidth}%`,
+                            backgroundColor: "hsl(0, 84%, 60%)",
+                            minWidth: item.value !== 0 ? "40px" : "0",
+                          }}
+                        >
+                          <span className="text-xs font-semibold text-white whitespace-nowrap">
+                            {formatCompact(item.value)}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                    {/* Ligne centrale */}
+                    <div className="w-0.5 h-9 bg-gray-300 shrink-0" />
+                    {/* Zone positive (droite) */}
+                    <div className="w-1/2 flex justify-start pl-1">
+                      {isPositive && (
+                        <div
+                          className="h-7 rounded-r-md transition-all duration-500 ease-out flex items-center pl-2"
+                          style={{
+                            width: `${barWidth}%`,
+                            backgroundColor: "hsl(221, 83%, 53%)",
+                            minWidth: item.value !== 0 ? "40px" : "0",
+                          }}
+                        >
+                          <span className="text-xs font-semibold text-white whitespace-nowrap">
+                            {formatCompact(item.value)}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  <div className="w-20 text-sm font-medium text-right shrink-0">
+                    {item.percentage.toFixed(1)}%
+                  </div>
+                </div>
+              );
+            })}
+            {/* Légende */}
+            <div className="flex items-center gap-4 mt-6 pt-4 border-t">
+              <div className="w-44" />
+              <div className="flex-1 flex items-center text-xs text-muted-foreground">
+                <span className="w-1/2 text-right pr-4">← Négatif</span>
+                <div className="w-0.5 h-4 bg-gray-300" />
+                <span className="w-1/2 text-left pl-4">Positif →</span>
+              </div>
+              <div className="w-20 text-xs text-muted-foreground text-right">
+                % du CA
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Graphique Évolution du Chiffre d'Affaires N vs N-1 */}
       <Card>
@@ -760,7 +1025,7 @@ export default function ClientReportingChart({
         </CardContent>
       </Card>
 
-      {/* Graphique Évolution de la Trésorerie N vs N-1 - LineChart */}
+      {/* Graphique Évolution de la Trésorerie N vs N-1 */}
       <Card>
         <CardHeader>
           <CardTitle>Évolution de la Trésorerie</CardTitle>
