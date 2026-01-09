@@ -71,8 +71,13 @@ import {
   EyeOffIcon,
   ArrowUp,
   ArrowDown,
+  LayoutDashboard,
+  LineChartIcon,
+  PieChart,
+  ChevronDown,
 } from "lucide-react";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 
 interface DataPoint {
   label: string;
@@ -152,6 +157,7 @@ interface ReportingData {
 }
 
 type PeriodType = "year" | "month" | "ytd";
+type TabId = "synthese" | "chiffre-affaires" | "resultat";
 
 interface TunnelMetric {
   id: string;
@@ -160,6 +166,42 @@ interface TunnelMetric {
   visible: boolean;
   order: number;
 }
+
+interface NavItem {
+  id: TabId;
+  label: string;
+  icon: React.ElementType;
+  subItems?: string[];
+}
+
+const NAV_ITEMS: NavItem[] = [
+  {
+    id: "synthese",
+    label: "Synthèse financière",
+    icon: LayoutDashboard,
+    subItems: [
+      "CA",
+      "Masse Salariale",
+      "Résultat d'exploitation",
+      "Résultat net",
+      "Trésorerie",
+      "Évolution trésorerie",
+      "Tunnel de rentabilité",
+    ],
+  },
+  {
+    id: "chiffre-affaires",
+    label: "Chiffre d'affaires",
+    icon: LineChartIcon,
+    subItems: ["Évolution du CA"],
+  },
+  {
+    id: "resultat",
+    label: "Résultat",
+    icon: PieChart,
+    subItems: ["Tunnel de rentabilité"],
+  },
+];
 
 const INITIAL_TUNNEL_METRICS: TunnelMetric[] = [
   {
@@ -256,6 +298,10 @@ export default function ClientReportingChart({
   const [hiddenPeriods, setHiddenPeriods] = useState<Set<string>>(new Set());
   const [tunnelMetrics, setTunnelMetrics] = useState<TunnelMetric[]>(
     INITIAL_TUNNEL_METRICS
+  );
+  const [activeTab, setActiveTab] = useState<TabId>("synthese");
+  const [expandedNav, setExpandedNav] = useState<Set<TabId>>(
+    new Set(["synthese"])
   );
 
   useEffect(() => {
@@ -357,6 +403,14 @@ export default function ClientReportingChart({
       ];
 
       return newSorted.map((m, i) => ({ ...m, order: i }));
+    });
+  };
+
+  const toggleNavExpand = (id: TabId) => {
+    setExpandedNav((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
     });
   };
 
@@ -514,784 +568,837 @@ export default function ClientReportingChart({
   const yearN = parseInt(year);
   const yearN1 = yearN - 1;
 
-  return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-bold">{data.client.name}</h2>
-          <p className="text-muted-foreground">
-            Reporting comptable - {getPeriodLabel()}
-          </p>
-        </div>
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-1 bg-muted rounded-lg p-1">
-            <Button
-              variant={periodType === "year" ? "default" : "ghost"}
-              size="sm"
-              onClick={() => setPeriodType("year")}
-              className="gap-1"
-            >
-              <Calendar className="w-4 h-4" />
-              Année
-            </Button>
-            <Button
-              variant={periodType === "month" ? "default" : "ghost"}
-              size="sm"
-              onClick={() => setPeriodType("month")}
-              className="gap-1"
-            >
-              <CalendarDays className="w-4 h-4" />
-              Mois
-            </Button>
-            <Button
-              variant={periodType === "ytd" ? "default" : "ghost"}
-              size="sm"
-              onClick={() => setPeriodType("ytd")}
-              className="gap-1"
-            >
-              <CalendarRange className="w-4 h-4" />
-              YTD
-            </Button>
+  // Composant Tunnel de rentabilité
+  const TunnelRentabilite = () => (
+    <Card>
+      <CardHeader>
+        <div className="flex items-center justify-between">
+          <div>
+            <CardTitle>Tunnel de rentabilité</CardTitle>
+            <CardDescription>
+              Décomposition du résultat - Base 100% = Chiffre d&apos;affaires
+            </CardDescription>
           </div>
-
-          {(periodType === "month" || periodType === "ytd") && (
-            <Select value={selectedMonth} onValueChange={setSelectedMonth}>
-              <SelectTrigger className="w-[140px]">
-                <SelectValue placeholder="Mois" />
-              </SelectTrigger>
-              <SelectContent>
-                {MONTHS.map((month) => (
-                  <SelectItem key={month.value} value={month.value}>
-                    {month.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          )}
-
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={() => handleYearChange("prev")}
-            disabled={
-              data.availableYears.indexOf(year) >=
-              data.availableYears.length - 1
-            }
-          >
-            <ChevronLeft className="w-4 h-4" />
-          </Button>
-          <span className="text-xl font-semibold min-w-[80px] text-center">
-            {year}
-          </span>
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={() => handleYearChange("next")}
-            disabled={data.availableYears.indexOf(year) <= 0}
-          >
-            <ChevronRight className="w-4 h-4" />
-          </Button>
-        </div>
-      </div>
-
-      {/* KPIs + Totaux - Grille 5x2 */}
-      <div className="grid grid-cols-5 gap-4">
-        <Card>
-          <CardHeader className="pb-2">
-            <div className="flex items-center justify-between">
-              <CardDescription className="flex items-center gap-1 text-xs">
-                <DollarSign className="w-4 h-4 text-blue-600" />
-                CA
-              </CardDescription>
-              <VariationBadge
-                value={data.indicateurs.variations.chiffreAffaires}
-              />
-            </div>
-          </CardHeader>
-          <CardContent className="pt-0">
-            <div className="text-xl font-bold text-blue-600">
-              {formatCurrency(data.indicateurs.anneeN.chiffreAffaires)}
-            </div>
-            <p className="text-xs text-muted-foreground">
-              {yearN1}:{" "}
-              {formatCurrency(data.indicateurs.anneeN1.chiffreAffaires)}
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-2">
-            <div className="flex items-center justify-between">
-              <CardDescription className="flex items-center gap-1 text-xs">
-                <ShoppingCart className="w-4 h-4 text-indigo-600" />
-                Marge Comm.
-              </CardDescription>
-              <VariationBadge
-                value={data.indicateurs.variations.margeCommerciale}
-              />
-            </div>
-          </CardHeader>
-          <CardContent className="pt-0">
-            <div
-              className={`text-xl font-bold ${
-                data.indicateurs.anneeN.margeCommerciale >= 0
-                  ? "text-indigo-600"
-                  : "text-red-600"
-              }`}
-            >
-              {formatCurrency(data.indicateurs.anneeN.margeCommerciale)}
-            </div>
-            <p className="text-xs text-muted-foreground">
-              {yearN1}:{" "}
-              {formatCurrency(data.indicateurs.anneeN1.margeCommerciale)}
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-2">
-            <div className="flex items-center justify-between">
-              <CardDescription className="flex items-center gap-1 text-xs">
-                <Users className="w-4 h-4 text-orange-600" />
-                Masse Salariale
-              </CardDescription>
-              <VariationBadge
-                value={data.indicateurs.variations.masseSalariale}
-              />
-            </div>
-          </CardHeader>
-          <CardContent className="pt-0">
-            <div className="text-xl font-bold text-orange-600">
-              {formatCurrency(data.indicateurs.anneeN.masseSalariale)}
-            </div>
-            <p className="text-xs text-muted-foreground">
-              {yearN1}:{" "}
-              {formatCurrency(data.indicateurs.anneeN1.masseSalariale)}
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-2">
-            <div className="flex items-center justify-between">
-              <CardDescription className="flex items-center gap-1 text-xs">
-                <Activity className="w-4 h-4 text-purple-600" />
-                Rex
-              </CardDescription>
-              <VariationBadge
-                value={data.indicateurs.variations.resultatExploitation}
-              />
-            </div>
-          </CardHeader>
-          <CardContent className="pt-0">
-            <div
-              className={`text-xl font-bold ${
-                data.indicateurs.anneeN.resultatExploitation >= 0
-                  ? "text-purple-600"
-                  : "text-red-600"
-              }`}
-            >
-              {formatCurrency(data.indicateurs.anneeN.resultatExploitation)}
-            </div>
-            <p className="text-xs text-muted-foreground">
-              {yearN1}:{" "}
-              {formatCurrency(data.indicateurs.anneeN1.resultatExploitation)}
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-2">
-            <div className="flex items-center justify-between">
-              <CardDescription className="flex items-center gap-1 text-xs">
-                <PiggyBank className="w-4 h-4 text-green-600" />
-                Résultat Net
-              </CardDescription>
-              <VariationBadge value={data.indicateurs.variations.resultatNet} />
-            </div>
-          </CardHeader>
-          <CardContent className="pt-0">
-            <div
-              className={`text-xl font-bold ${
-                data.indicateurs.anneeN.resultatNet >= 0
-                  ? "text-green-600"
-                  : "text-red-600"
-              }`}
-            >
-              {formatCurrency(data.indicateurs.anneeN.resultatNet)}
-            </div>
-            <p className="text-xs text-muted-foreground">
-              {yearN1}: {formatCurrency(data.indicateurs.anneeN1.resultatNet)}
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-2">
-            <div className="flex items-center justify-between">
-              <CardDescription className="flex items-center gap-1 text-xs">
-                <Wallet className="w-4 h-4 text-cyan-600" />
-                Trésorerie
-              </CardDescription>
-              <VariationBadge
-                value={data.indicateurs.variations.soldeTresorerie}
-              />
-            </div>
-          </CardHeader>
-          <CardContent className="pt-0">
-            <div
-              className={`text-xl font-bold ${
-                data.indicateurs.anneeN.soldeTresorerie >= 0
-                  ? "text-cyan-600"
-                  : "text-red-600"
-              }`}
-            >
-              {formatCurrency(data.indicateurs.anneeN.soldeTresorerie)}
-            </div>
-            <p className="text-xs text-muted-foreground">
-              {yearN1}:{" "}
-              {formatCurrency(data.indicateurs.anneeN1.soldeTresorerie)}
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription className="flex items-center gap-1 text-xs">
-              <TrendingUp className="w-4 h-4 text-green-600" />
-              Produits
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="pt-0">
-            <div className="text-xl font-bold text-green-600">
-              {formatCurrency(data.totals.totalProduits)}
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription className="flex items-center gap-1 text-xs">
-              <CreditCard className="w-4 h-4 text-red-600" />
-              Charges
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="pt-0">
-            <div className="text-xl font-bold text-red-600">
-              {formatCurrency(data.totals.totalCharges)}
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription className="flex items-center gap-1 text-xs">
-              <Receipt className="w-4 h-4" />
-              Résultat Période
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="pt-0">
-            <div
-              className={`text-xl font-bold flex items-center gap-1 ${
-                data.totals.resultat >= 0 ? "text-green-600" : "text-red-600"
-              }`}
-            >
-              {data.totals.resultat >= 0 ? (
-                <TrendingUp className="w-4 h-4" />
-              ) : (
-                <TrendingDown className="w-4 h-4" />
-              )}
-              {formatCurrency(data.totals.resultat)}
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription className="flex items-center gap-1 text-xs">
-              <BarChart3 className="w-4 h-4" />
-              Transactions
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="pt-0">
-            <div className="text-xl font-bold">
-              {data.totals.totalTransactions.toLocaleString("fr-FR")}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Tunnel de rentabilité */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle>Tunnel de rentabilité</CardTitle>
-              <CardDescription>
-                Décomposition du résultat - Base 100% = Chiffre d&apos;affaires
-              </CardDescription>
-            </div>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="sm" className="gap-2">
-                  <Settings2 className="w-4 h-4" />
-                  Configurer
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-64">
-                {[...tunnelMetrics]
-                  .sort((a, b) => a.order - b.order)
-                  .map((metric, index) => (
-                    <div
-                      key={metric.id}
-                      className="flex items-center gap-2 px-2 py-1.5"
-                    >
-                      <div className="flex flex-col gap-0.5">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-4 w-4"
-                          onClick={() => moveMetric(metric.id, "up")}
-                          disabled={index === 0}
-                        >
-                          <ArrowUp className="h-3 w-3" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-4 w-4"
-                          onClick={() => moveMetric(metric.id, "down")}
-                          disabled={index === tunnelMetrics.length - 1}
-                        >
-                          <ArrowDown className="h-3 w-3" />
-                        </Button>
-                      </div>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm" className="gap-2">
+                <Settings2 className="w-4 h-4" />
+                Configurer
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-64">
+              {[...tunnelMetrics]
+                .sort((a, b) => a.order - b.order)
+                .map((metric, index) => (
+                  <div
+                    key={metric.id}
+                    className="flex items-center gap-2 px-2 py-1.5"
+                  >
+                    <div className="flex flex-col gap-0.5">
                       <Button
                         variant="ghost"
                         size="icon"
-                        className="h-6 w-6"
-                        onClick={() => toggleMetricVisibility(metric.id)}
+                        className="h-4 w-4"
+                        onClick={() => moveMetric(metric.id, "up")}
+                        disabled={index === 0}
                       >
-                        {metric.visible ? (
-                          <Eye className="h-4 w-4" />
-                        ) : (
-                          <EyeOffIcon className="h-4 w-4 text-muted-foreground" />
-                        )}
+                        <ArrowUp className="h-3 w-3" />
                       </Button>
-                      <span
-                        className={`text-sm flex-1 ${
-                          !metric.visible ? "text-muted-foreground" : ""
-                        }`}
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-4 w-4"
+                        onClick={() => moveMetric(metric.id, "down")}
+                        disabled={index === tunnelMetrics.length - 1}
                       >
-                        {metric.label}
-                      </span>
+                        <ArrowDown className="h-3 w-3" />
+                      </Button>
                     </div>
-                  ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-3">
-            {tunnelData.map((item) => {
-              const barWidth =
-                maxAbsValue !== 0
-                  ? (Math.abs(item.value) / maxAbsValue) * 50
-                  : 0;
-              const isPositive = item.value >= 0;
-
-              return (
-                <div key={item.id} className="flex items-center gap-4">
-                  <div className="w-44 text-sm font-medium text-right shrink-0">
-                    {item.name}
-                  </div>
-                  <div className="flex-1 flex items-center h-9">
-                    {/* Zone négative (gauche) */}
-                    <div className="w-1/2 flex justify-end pr-1">
-                      {!isPositive && (
-                        <div
-                          className="h-7 rounded-l-md transition-all duration-500 ease-out flex items-center justify-end pr-2"
-                          style={{
-                            width: `${barWidth}%`,
-                            backgroundColor: "hsl(0, 84%, 60%)",
-                            minWidth: item.value !== 0 ? "40px" : "0",
-                          }}
-                        >
-                          <span className="text-xs font-semibold text-white whitespace-nowrap">
-                            {formatCompact(item.value)}
-                          </span>
-                        </div>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-6 w-6"
+                      onClick={() => toggleMetricVisibility(metric.id)}
+                    >
+                      {metric.visible ? (
+                        <Eye className="h-4 w-4" />
+                      ) : (
+                        <EyeOffIcon className="h-4 w-4 text-muted-foreground" />
                       )}
-                    </div>
-                    {/* Ligne centrale */}
-                    <div className="w-0.5 h-9 bg-gray-300 shrink-0" />
-                    {/* Zone positive (droite) */}
-                    <div className="w-1/2 flex justify-start pl-1">
-                      {isPositive && (
-                        <div
-                          className="h-7 rounded-r-md transition-all duration-500 ease-out flex items-center pl-2"
-                          style={{
-                            width: `${barWidth}%`,
-                            backgroundColor: "hsl(221, 83%, 53%)",
-                            minWidth: item.value !== 0 ? "40px" : "0",
-                          }}
-                        >
-                          <span className="text-xs font-semibold text-white whitespace-nowrap">
-                            {formatCompact(item.value)}
-                          </span>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                  <div className="w-20 text-sm font-medium text-right shrink-0">
-                    {item.percentage.toFixed(1)}%
-                  </div>
-                </div>
-              );
-            })}
-            {/* Légende */}
-            <div className="flex items-center gap-4 mt-6 pt-4 border-t">
-              <div className="w-44" />
-              <div className="flex-1 flex items-center text-xs text-muted-foreground">
-                <span className="w-1/2 text-right pr-4">← Négatif</span>
-                <div className="w-0.5 h-4 bg-gray-300" />
-                <span className="w-1/2 text-left pl-4">Positif →</span>
-              </div>
-              <div className="w-20 text-xs text-muted-foreground text-right">
-                % du CA
-              </div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Graphique Évolution du Chiffre d'Affaires N vs N-1 */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Évolution du Chiffre d&apos;Affaires</CardTitle>
-          <CardDescription>
-            Comparaison {yearN} vs {yearN1} - par{" "}
-            {getXAxisLabel().toLowerCase()}
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <ChartContainer config={chartConfigCA} className="h-[300px] w-full">
-            <BarChart
-              data={visibleChartData}
-              margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
-            >
-              <CartesianGrid strokeDasharray="3 3" vertical={false} />
-              <XAxis
-                dataKey="label"
-                tickLine={false}
-                axisLine={false}
-                fontSize={12}
-              />
-              <YAxis
-                tickLine={false}
-                axisLine={false}
-                tickFormatter={(value) => `${(value / 1000000).toFixed(0)}M`}
-                fontSize={12}
-              />
-              <ChartTooltip
-                content={
-                  <ChartTooltipContent
-                    formatter={(value, name) => [
-                      formatCurrency(value as number),
-                      name === "chiffreAffaires"
-                        ? `CA ${yearN}`
-                        : `CA ${yearN1}`,
-                    ]}
-                  />
-                }
-              />
-              <Bar
-                dataKey="chiffreAffairesN1"
-                name={`CA ${yearN1}`}
-                fill="hsl(221, 83%, 73%)"
-                barSize={32}
-                radius={[4, 4, 0, 0]}
-              />
-              <Bar
-                dataKey="chiffreAffaires"
-                name={`CA ${yearN}`}
-                fill="hsl(221, 83%, 53%)"
-                barSize={32}
-                radius={[4, 4, 0, 0]}
-              />
-            </BarChart>
-          </ChartContainer>
-        </CardContent>
-      </Card>
-
-      {/* Graphique Évolution de la Trésorerie N vs N-1 */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Évolution de la Trésorerie</CardTitle>
-          <CardDescription>
-            Solde cumulé {yearN} vs {yearN1} - par{" "}
-            {getXAxisLabel().toLowerCase()}
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <ChartContainer
-            config={chartConfigTresorerie}
-            className="h-[300px] w-full"
-          >
-            <LineChart
-              data={visibleChartData}
-              margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
-            >
-              <CartesianGrid strokeDasharray="3 3" vertical={false} />
-              <XAxis
-                dataKey="label"
-                tickLine={false}
-                axisLine={false}
-                fontSize={12}
-              />
-              <YAxis
-                tickLine={false}
-                axisLine={false}
-                tickFormatter={(value) => `${(value / 1000000).toFixed(0)}M`}
-                fontSize={12}
-              />
-              <ChartTooltip
-                content={
-                  <ChartTooltipContent
-                    formatter={(value, name) => [
-                      formatCurrency(value as number),
-                      name === "soldeTresorerie"
-                        ? `Trésorerie ${yearN}`
-                        : `Trésorerie ${yearN1}`,
-                    ]}
-                  />
-                }
-              />
-              <Line
-                type="monotone"
-                dataKey="soldeTresorerieN1"
-                name={`Trésorerie ${yearN1}`}
-                stroke="hsl(174, 72%, 66%)"
-                strokeWidth={2}
-                dot={{ r: 3 }}
-                strokeDasharray="5 5"
-              />
-              <Line
-                type="monotone"
-                dataKey="soldeTresorerie"
-                name={`Trésorerie ${yearN}`}
-                stroke="hsl(174, 72%, 46%)"
-                strokeWidth={2}
-                dot={{ r: 4 }}
-              />
-            </LineChart>
-          </ChartContainer>
-        </CardContent>
-      </Card>
-
-      {/* Graphique Flux financiers */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Évolution des flux financiers</CardTitle>
-          <CardDescription>
-            Produits vs Charges - par {getXAxisLabel().toLowerCase()}
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <ChartContainer config={chartConfigFlux} className="h-[300px] w-full">
-            <LineChart
-              data={visibleChartData}
-              margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
-            >
-              <CartesianGrid strokeDasharray="3 3" vertical={false} />
-              <XAxis
-                dataKey="label"
-                tickLine={false}
-                axisLine={false}
-                fontSize={12}
-              />
-              <YAxis
-                tickLine={false}
-                axisLine={false}
-                tickFormatter={(value) => `${(value / 1000000).toFixed(0)}M`}
-                fontSize={12}
-              />
-              <ChartTooltip
-                content={
-                  <ChartTooltipContent
-                    formatter={(value, name) => [
-                      formatCurrency(value as number),
-                      name,
-                    ]}
-                  />
-                }
-              />
-              <Line
-                type="monotone"
-                dataKey="produits"
-                name="Produits"
-                stroke="hsl(142, 76%, 36%)"
-                strokeWidth={2}
-                dot={{ r: 4 }}
-              />
-              <Line
-                type="monotone"
-                dataKey="charges"
-                name="Charges"
-                stroke="hsl(0, 84%, 60%)"
-                strokeWidth={2}
-                dot={{ r: 4 }}
-              />
-            </LineChart>
-          </ChartContainer>
-        </CardContent>
-      </Card>
-
-      {/* Comparaison et Périodes */}
-      <div className="flex flex-row w-full justify-between gap-4">
-        <Card className="flex-1">
-          <CardHeader>
-            <CardTitle>
-              Comparaison {periodType === "month" ? "journalière" : "mensuelle"}
-            </CardTitle>
-            <CardDescription>Charges et Produits</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ChartContainer
-              config={chartConfigFlux}
-              className="h-[300px] w-full"
-            >
-              <BarChart
-                data={visibleChartData}
-                margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
-              >
-                <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                <XAxis
-                  dataKey="label"
-                  tickLine={false}
-                  axisLine={false}
-                  fontSize={12}
-                />
-                <YAxis
-                  tickLine={false}
-                  axisLine={false}
-                  tickFormatter={(value) => `${(value / 1000000).toFixed(0)}M`}
-                  fontSize={12}
-                />
-                <ChartTooltip
-                  content={
-                    <ChartTooltipContent
-                      formatter={(value, name) => [
-                        formatCurrency(value as number),
-                        name,
-                      ]}
-                    />
-                  }
-                />
-                <Bar
-                  dataKey="charges"
-                  name="Charges"
-                  fill="hsl(0, 84%, 60%)"
-                  radius={[4, 4, 0, 0]}
-                />
-                <Bar
-                  dataKey="produits"
-                  name="Produits"
-                  fill="hsl(142, 76%, 36%)"
-                  radius={[4, 4, 0, 0]}
-                />
-              </BarChart>
-            </ChartContainer>
-          </CardContent>
-        </Card>
-
-        <Card className="flex-1">
-          <CardHeader>
-            <CardTitle>Périodes déclarées</CardTitle>
-            <CardDescription>Clic droit pour les actions</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="flex flex-wrap gap-3 max-h-[300px] overflow-y-auto">
-              {data.periods.map((period) => (
-                <ContextMenu key={period.batch_id}>
-                  <ContextMenuTrigger>
-                    <div
-                      className={`p-3 border rounded-lg cursor-pointer transition-all hover:shadow-md ${
-                        hiddenPeriods.has(period.id || "")
-                          ? "opacity-40 bg-muted"
-                          : "bg-card hover:bg-accent"
+                    </Button>
+                    <span
+                      className={`text-sm flex-1 ${
+                        !metric.visible ? "text-muted-foreground" : ""
                       }`}
                     >
-                      <div className="font-medium text-sm">
-                        {formatPeriodLabel(
-                          period.periodStart,
-                          period.periodEnd
-                        )}
+                      {metric.label}
+                    </span>
+                  </div>
+                ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-3">
+          {tunnelData.map((item) => {
+            const barWidth =
+              maxAbsValue !== 0 ? (Math.abs(item.value) / maxAbsValue) * 50 : 0;
+            const isPositive = item.value >= 0;
+
+            return (
+              <div key={item.id} className="flex items-center gap-4">
+                <div className="w-44 text-sm font-medium text-right shrink-0">
+                  {item.name}
+                </div>
+                <div className="flex-1 flex items-center h-9">
+                  <div className="w-1/2 flex justify-end pr-1">
+                    {!isPositive && (
+                      <div
+                        className="h-7 rounded-l-md transition-all duration-500 ease-out flex items-center justify-end pr-2"
+                        style={{
+                          width: `${barWidth}%`,
+                          backgroundColor: "hsl(0, 84%, 60%)",
+                          minWidth: item.value !== 0 ? "40px" : "0",
+                        }}
+                      >
+                        <span className="text-xs font-semibold text-white whitespace-nowrap">
+                          {formatCompact(item.value)}
+                        </span>
                       </div>
-                      <div className="text-xs text-muted-foreground mt-1">
-                        {Number(period.nb_transactions).toLocaleString("fr-FR")}{" "}
-                        transactions
+                    )}
+                  </div>
+                  <div className="w-0.5 h-9 bg-gray-300 shrink-0" />
+                  <div className="w-1/2 flex justify-start pl-1">
+                    {isPositive && (
+                      <div
+                        className="h-7 rounded-r-md transition-all duration-500 ease-out flex items-center pl-2"
+                        style={{
+                          width: `${barWidth}%`,
+                          backgroundColor: "hsl(221, 83%, 53%)",
+                          minWidth: item.value !== 0 ? "40px" : "0",
+                        }}
+                      >
+                        <span className="text-xs font-semibold text-white whitespace-nowrap">
+                          {formatCompact(item.value)}
+                        </span>
                       </div>
-                      <div className="flex gap-2 mt-2">
-                        <Badge
-                          variant="outline"
-                          className="text-xs text-red-600"
-                        >
-                          C: {formatCurrency(period.charges)}
-                        </Badge>
-                        <Badge
-                          variant="outline"
-                          className="text-xs text-green-600"
-                        >
-                          P: {formatCurrency(period.produits)}
-                        </Badge>
-                      </div>
-                      <div className="flex items-center gap-2 mt-2">
-                        <Badge
-                          variant={
-                            period.status === "COMPLETED"
-                              ? "default"
-                              : "secondary"
-                          }
-                        >
-                          {period.status}
-                        </Badge>
-                        {period.produits - period.charges >= 0 ? (
-                          <TrendingUp className="w-4 h-4 text-green-600" />
-                        ) : (
-                          <TrendingDown className="w-4 h-4 text-red-600" />
-                        )}
-                      </div>
-                    </div>
-                  </ContextMenuTrigger>
-                  <ContextMenuContent>
-                    <ContextMenuItem
-                      onClick={() => handleDownloadExcel(period)}
-                    >
-                      <Download className="w-4 h-4 mr-2" /> Télécharger Excel
-                    </ContextMenuItem>
-                    <ContextMenuItem
-                      onClick={() => handleHidePeriod(period.id || "")}
-                    >
-                      <EyeOff className="w-4 h-4 mr-2" />
-                      {hiddenPeriods.has(period.id || "")
-                        ? "Afficher"
-                        : "Masquer"}
-                    </ContextMenuItem>
-                    <ContextMenuSeparator />
-                    <ContextMenuItem
-                      onClick={() => handleDeletePeriod(period)}
-                      className="text-red-600 focus:text-red-600"
-                    >
-                      <Trash2 className="w-4 h-4 mr-2" /> Supprimer
-                    </ContextMenuItem>
-                  </ContextMenuContent>
-                </ContextMenu>
-              ))}
+                    )}
+                  </div>
+                </div>
+                <div className="w-20 text-sm font-medium text-right shrink-0">
+                  {item.percentage.toFixed(1)}%
+                </div>
+              </div>
+            );
+          })}
+          <div className="flex items-center gap-4 mt-6 pt-4 border-t">
+            <div className="w-44" />
+            <div className="flex-1 flex items-center text-xs text-muted-foreground">
+              <span className="w-1/2 text-right pr-4">← Négatif</span>
+              <div className="w-0.5 h-4 bg-gray-300" />
+              <span className="w-1/2 text-left pl-4">Positif →</span>
             </div>
-          </CardContent>
-        </Card>
+            <div className="w-20 text-xs text-muted-foreground text-right">
+              % du CA
+            </div>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+
+  // Composant Evolution CA
+  const EvolutionCA = () => (
+    <Card>
+      <CardHeader>
+        <CardTitle>Évolution du Chiffre d&apos;Affaires</CardTitle>
+        <CardDescription>
+          Comparaison {yearN} vs {yearN1} - par {getXAxisLabel().toLowerCase()}
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <ChartContainer config={chartConfigCA} className="h-[400px] w-full">
+          <BarChart
+            data={visibleChartData}
+            margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
+          >
+            <CartesianGrid strokeDasharray="3 3" vertical={false} />
+            <XAxis
+              dataKey="label"
+              tickLine={false}
+              axisLine={false}
+              fontSize={12}
+            />
+            <YAxis
+              tickLine={false}
+              axisLine={false}
+              tickFormatter={(value) => `${(value / 1000000).toFixed(0)}M`}
+              fontSize={12}
+            />
+            <ChartTooltip
+              content={
+                <ChartTooltipContent
+                  formatter={(value, name) => [
+                    formatCurrency(value as number),
+                    name === "chiffreAffaires" ? `CA ${yearN}` : `CA ${yearN1}`,
+                  ]}
+                />
+              }
+            />
+            <Bar
+              dataKey="chiffreAffairesN1"
+              name={`CA ${yearN1}`}
+              fill="hsl(221, 83%, 73%)"
+              barSize={32}
+              radius={[4, 4, 0, 0]}
+            />
+            <Bar
+              dataKey="chiffreAffaires"
+              name={`CA ${yearN}`}
+              fill="hsl(221, 83%, 53%)"
+              barSize={32}
+              radius={[4, 4, 0, 0]}
+            />
+          </BarChart>
+        </ChartContainer>
+      </CardContent>
+    </Card>
+  );
+
+  // Composant Evolution Trésorerie
+  const EvolutionTresorerie = () => (
+    <Card>
+      <CardHeader>
+        <CardTitle>Évolution de la Trésorerie</CardTitle>
+        <CardDescription>
+          Solde cumulé {yearN} vs {yearN1} - par {getXAxisLabel().toLowerCase()}
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <ChartContainer
+          config={chartConfigTresorerie}
+          className="h-[400px] w-full"
+        >
+          <LineChart
+            data={visibleChartData}
+            margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
+          >
+            <CartesianGrid strokeDasharray="3 3" vertical={false} />
+            <XAxis
+              dataKey="label"
+              tickLine={false}
+              axisLine={false}
+              fontSize={12}
+            />
+            <YAxis
+              tickLine={false}
+              axisLine={false}
+              tickFormatter={(value) => `${(value / 1000000).toFixed(0)}M`}
+              fontSize={12}
+            />
+            <ChartTooltip
+              content={
+                <ChartTooltipContent
+                  formatter={(value, name) => [
+                    formatCurrency(value as number),
+                    name === "soldeTresorerie"
+                      ? `Trésorerie ${yearN}`
+                      : `Trésorerie ${yearN1}`,
+                  ]}
+                />
+              }
+            />
+            <Line
+              type="monotone"
+              dataKey="soldeTresorerieN1"
+              name={`Trésorerie ${yearN1}`}
+              stroke="hsl(174, 72%, 66%)"
+              strokeWidth={2}
+              dot={{ r: 3 }}
+              strokeDasharray="5 5"
+            />
+            <Line
+              type="monotone"
+              dataKey="soldeTresorerie"
+              name={`Trésorerie ${yearN}`}
+              stroke="hsl(174, 72%, 46%)"
+              strokeWidth={2}
+              dot={{ r: 4 }}
+            />
+          </LineChart>
+        </ChartContainer>
+      </CardContent>
+    </Card>
+  );
+
+  // Contenu selon l'onglet actif
+  const renderTabContent = () => {
+    switch (activeTab) {
+      case "synthese":
+        return (
+          <div className="space-y-6">
+            {/* KPIs */}
+            <div className="grid grid-cols-3 gap-4">
+              <Card>
+                <CardHeader className="pb-2">
+                  <div className="flex items-center justify-between">
+                    <CardDescription className="flex items-center gap-1 text-xs">
+                      <DollarSign className="w-4 h-4 text-blue-600" />
+                      CA
+                    </CardDescription>
+                    <VariationBadge
+                      value={data.indicateurs.variations.chiffreAffaires}
+                    />
+                  </div>
+                </CardHeader>
+                <CardContent className="pt-0">
+                  <div className="text-xl font-bold text-blue-600">
+                    {formatCurrency(data.indicateurs.anneeN.chiffreAffaires)}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    {yearN1}:{" "}
+                    {formatCurrency(data.indicateurs.anneeN1.chiffreAffaires)}
+                  </p>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="pb-2">
+                  <div className="flex items-center justify-between">
+                    <CardDescription className="flex items-center gap-1 text-xs">
+                      <Users className="w-4 h-4 text-orange-600" />
+                      Masse Salariale
+                    </CardDescription>
+                    <VariationBadge
+                      value={data.indicateurs.variations.masseSalariale}
+                    />
+                  </div>
+                </CardHeader>
+                <CardContent className="pt-0">
+                  <div className="text-xl font-bold text-orange-600">
+                    {formatCurrency(data.indicateurs.anneeN.masseSalariale)}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    {yearN1}:{" "}
+                    {formatCurrency(data.indicateurs.anneeN1.masseSalariale)}
+                  </p>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="pb-2">
+                  <div className="flex items-center justify-between">
+                    <CardDescription className="flex items-center gap-1 text-xs">
+                      <Activity className="w-4 h-4 text-purple-600" />
+                      Résultat Exploitation
+                    </CardDescription>
+                    <VariationBadge
+                      value={data.indicateurs.variations.resultatExploitation}
+                    />
+                  </div>
+                </CardHeader>
+                <CardContent className="pt-0">
+                  <div
+                    className={`text-xl font-bold ${
+                      data.indicateurs.anneeN.resultatExploitation >= 0
+                        ? "text-purple-600"
+                        : "text-red-600"
+                    }`}
+                  >
+                    {formatCurrency(
+                      data.indicateurs.anneeN.resultatExploitation
+                    )}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    {yearN1}:{" "}
+                    {formatCurrency(
+                      data.indicateurs.anneeN1.resultatExploitation
+                    )}
+                  </p>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="pb-2">
+                  <div className="flex items-center justify-between">
+                    <CardDescription className="flex items-center gap-1 text-xs">
+                      <PiggyBank className="w-4 h-4 text-green-600" />
+                      Résultat Net
+                    </CardDescription>
+                    <VariationBadge
+                      value={data.indicateurs.variations.resultatNet}
+                    />
+                  </div>
+                </CardHeader>
+                <CardContent className="pt-0">
+                  <div
+                    className={`text-xl font-bold ${
+                      data.indicateurs.anneeN.resultatNet >= 0
+                        ? "text-green-600"
+                        : "text-red-600"
+                    }`}
+                  >
+                    {formatCurrency(data.indicateurs.anneeN.resultatNet)}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    {yearN1}:{" "}
+                    {formatCurrency(data.indicateurs.anneeN1.resultatNet)}
+                  </p>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="pb-2">
+                  <div className="flex items-center justify-between">
+                    <CardDescription className="flex items-center gap-1 text-xs">
+                      <Wallet className="w-4 h-4 text-cyan-600" />
+                      Trésorerie
+                    </CardDescription>
+                    <VariationBadge
+                      value={data.indicateurs.variations.soldeTresorerie}
+                    />
+                  </div>
+                </CardHeader>
+                <CardContent className="pt-0">
+                  <div
+                    className={`text-xl font-bold ${
+                      data.indicateurs.anneeN.soldeTresorerie >= 0
+                        ? "text-cyan-600"
+                        : "text-red-600"
+                    }`}
+                  >
+                    {formatCurrency(data.indicateurs.anneeN.soldeTresorerie)}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    {yearN1}:{" "}
+                    {formatCurrency(data.indicateurs.anneeN1.soldeTresorerie)}
+                  </p>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="pb-2">
+                  <div className="flex items-center justify-between">
+                    <CardDescription className="flex items-center gap-1 text-xs">
+                      <ShoppingCart className="w-4 h-4 text-indigo-600" />
+                      Marge Commerciale
+                    </CardDescription>
+                    <VariationBadge
+                      value={data.indicateurs.variations.margeCommerciale}
+                    />
+                  </div>
+                </CardHeader>
+                <CardContent className="pt-0">
+                  <div
+                    className={`text-xl font-bold ${
+                      data.indicateurs.anneeN.margeCommerciale >= 0
+                        ? "text-indigo-600"
+                        : "text-red-600"
+                    }`}
+                  >
+                    {formatCurrency(data.indicateurs.anneeN.margeCommerciale)}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    {yearN1}:{" "}
+                    {formatCurrency(data.indicateurs.anneeN1.margeCommerciale)}
+                  </p>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Evolution Trésorerie */}
+            <EvolutionTresorerie />
+
+            {/* Tunnel de rentabilité */}
+            <TunnelRentabilite />
+
+            {/* Périodes déclarées */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Périodes déclarées</CardTitle>
+                <CardDescription>Clic droit pour les actions</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="flex flex-wrap gap-3 max-h-[300px] overflow-y-auto">
+                  {data.periods.map((period) => (
+                    <ContextMenu key={period.batch_id}>
+                      <ContextMenuTrigger>
+                        <div
+                          className={`p-3 border rounded-lg cursor-pointer transition-all hover:shadow-md ${
+                            hiddenPeriods.has(period.id || "")
+                              ? "opacity-40 bg-muted"
+                              : "bg-card hover:bg-accent"
+                          }`}
+                        >
+                          <div className="font-medium text-sm">
+                            {formatPeriodLabel(
+                              period.periodStart,
+                              period.periodEnd
+                            )}
+                          </div>
+                          <div className="text-xs text-muted-foreground mt-1">
+                            {Number(period.nb_transactions).toLocaleString(
+                              "fr-FR"
+                            )}{" "}
+                            transactions
+                          </div>
+                          <div className="flex gap-2 mt-2">
+                            <Badge
+                              variant="outline"
+                              className="text-xs text-red-600"
+                            >
+                              C: {formatCurrency(period.charges)}
+                            </Badge>
+                            <Badge
+                              variant="outline"
+                              className="text-xs text-green-600"
+                            >
+                              P: {formatCurrency(period.produits)}
+                            </Badge>
+                          </div>
+                          <div className="flex items-center gap-2 mt-2">
+                            <Badge
+                              variant={
+                                period.status === "COMPLETED"
+                                  ? "default"
+                                  : "secondary"
+                              }
+                            >
+                              {period.status}
+                            </Badge>
+                            {period.produits - period.charges >= 0 ? (
+                              <TrendingUp className="w-4 h-4 text-green-600" />
+                            ) : (
+                              <TrendingDown className="w-4 h-4 text-red-600" />
+                            )}
+                          </div>
+                        </div>
+                      </ContextMenuTrigger>
+                      <ContextMenuContent>
+                        <ContextMenuItem
+                          onClick={() => handleDownloadExcel(period)}
+                        >
+                          <Download className="w-4 h-4 mr-2" /> Télécharger
+                          Excel
+                        </ContextMenuItem>
+                        <ContextMenuItem
+                          onClick={() => handleHidePeriod(period.id || "")}
+                        >
+                          <EyeOff className="w-4 h-4 mr-2" />
+                          {hiddenPeriods.has(period.id || "")
+                            ? "Afficher"
+                            : "Masquer"}
+                        </ContextMenuItem>
+                        <ContextMenuSeparator />
+                        <ContextMenuItem
+                          onClick={() => handleDeletePeriod(period)}
+                          className="text-red-600 focus:text-red-600"
+                        >
+                          <Trash2 className="w-4 h-4 mr-2" /> Supprimer
+                        </ContextMenuItem>
+                      </ContextMenuContent>
+                    </ContextMenu>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        );
+
+      case "chiffre-affaires":
+        return (
+          <div className="space-y-6">
+            {/* KPI CA en haut */}
+            <div className="grid grid-cols-2 gap-4">
+              <Card>
+                <CardHeader className="pb-2">
+                  <div className="flex items-center justify-between">
+                    <CardDescription className="flex items-center gap-1 text-xs">
+                      <DollarSign className="w-4 h-4 text-blue-600" />
+                      Chiffre d&apos;Affaires {yearN}
+                    </CardDescription>
+                    <VariationBadge
+                      value={data.indicateurs.variations.chiffreAffaires}
+                    />
+                  </div>
+                </CardHeader>
+                <CardContent className="pt-0">
+                  <div className="text-2xl font-bold text-blue-600">
+                    {formatCurrency(data.indicateurs.anneeN.chiffreAffaires)}
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardDescription className="flex items-center gap-1 text-xs">
+                    <DollarSign className="w-4 h-4 text-blue-400" />
+                    Chiffre d&apos;Affaires {yearN1}
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="pt-0">
+                  <div className="text-2xl font-bold text-blue-400">
+                    {formatCurrency(data.indicateurs.anneeN1.chiffreAffaires)}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Graphique Evolution CA */}
+            <EvolutionCA />
+          </div>
+        );
+
+      case "resultat":
+        return (
+          <div className="space-y-6">
+            {/* KPIs Résultat */}
+            <div className="grid grid-cols-4 gap-4">
+              <Card>
+                <CardHeader className="pb-2">
+                  <div className="flex items-center justify-between">
+                    <CardDescription className="flex items-center gap-1 text-xs">
+                      <Activity className="w-4 h-4 text-purple-600" />
+                      Rex
+                    </CardDescription>
+                    <VariationBadge
+                      value={data.indicateurs.variations.resultatExploitation}
+                    />
+                  </div>
+                </CardHeader>
+                <CardContent className="pt-0">
+                  <div
+                    className={`text-xl font-bold ${
+                      data.indicateurs.anneeN.resultatExploitation >= 0
+                        ? "text-purple-600"
+                        : "text-red-600"
+                    }`}
+                  >
+                    {formatCurrency(
+                      data.indicateurs.anneeN.resultatExploitation
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardDescription className="flex items-center gap-1 text-xs">
+                    <Receipt className="w-4 h-4 text-amber-600" />
+                    Résultat Financier
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="pt-0">
+                  <div
+                    className={`text-xl font-bold ${
+                      data.indicateurs.anneeN.resultatFinancier >= 0
+                        ? "text-amber-600"
+                        : "text-red-600"
+                    }`}
+                  >
+                    {formatCurrency(data.indicateurs.anneeN.resultatFinancier)}
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardDescription className="flex items-center gap-1 text-xs">
+                    <BarChart3 className="w-4 h-4 text-slate-600" />
+                    Résultat HAO
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="pt-0">
+                  <div
+                    className={`text-xl font-bold ${
+                      data.indicateurs.anneeN.resultatHAO >= 0
+                        ? "text-slate-600"
+                        : "text-red-600"
+                    }`}
+                  >
+                    {formatCurrency(data.indicateurs.anneeN.resultatHAO)}
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="pb-2">
+                  <div className="flex items-center justify-between">
+                    <CardDescription className="flex items-center gap-1 text-xs">
+                      <PiggyBank className="w-4 h-4 text-green-600" />
+                      Résultat Net
+                    </CardDescription>
+                    <VariationBadge
+                      value={data.indicateurs.variations.resultatNet}
+                    />
+                  </div>
+                </CardHeader>
+                <CardContent className="pt-0">
+                  <div
+                    className={`text-xl font-bold ${
+                      data.indicateurs.anneeN.resultatNet >= 0
+                        ? "text-green-600"
+                        : "text-red-600"
+                    }`}
+                  >
+                    {formatCurrency(data.indicateurs.anneeN.resultatNet)}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Tunnel de rentabilité */}
+            <TunnelRentabilite />
+          </div>
+        );
+
+      default:
+        return null;
+    }
+  };
+
+  return (
+    <div className="flex h-full">
+      {/* Sidebar Navigation */}
+      <div className="w-64 border-r bg-muted/30 p-4 space-y-2 shrink-0">
+        <div className="mb-6">
+          <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide">
+            Navigation
+          </h3>
+        </div>
+        {NAV_ITEMS.map((item) => {
+          const Icon = item.icon;
+          const isExpanded = expandedNav.has(item.id);
+          const isActive = activeTab === item.id;
+
+          return (
+            <div key={item.id}>
+              <button
+                onClick={() => {
+                  setActiveTab(item.id);
+                  toggleNavExpand(item.id);
+                }}
+                className={cn(
+                  "w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm transition-colors",
+                  isActive
+                    ? "bg-primary text-primary-foreground"
+                    : "hover:bg-muted"
+                )}
+              >
+                <div className="flex items-center gap-2">
+                  <Icon className="w-4 h-4" />
+                  <span className="font-medium">{item.label}</span>
+                </div>
+                {item.subItems && (
+                  <ChevronDown
+                    className={cn(
+                      "w-4 h-4 transition-transform",
+                      isExpanded && "rotate-180"
+                    )}
+                  />
+                )}
+              </button>
+              {item.subItems && isExpanded && (
+                <div className="ml-6 mt-1 space-y-1">
+                  {item.subItems.map((subItem, idx) => (
+                    <div
+                      key={idx}
+                      className="px-3 py-1.5 text-xs text-muted-foreground"
+                    >
+                      {subItem}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Main Content */}
+      <div className="flex-1 p-6 overflow-auto">
+        {/* Header */}
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h2 className="text-2xl font-bold">{data.client.name}</h2>
+            <p className="text-muted-foreground">
+              Reporting comptable - {getPeriodLabel()}
+            </p>
+          </div>
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-1 bg-muted rounded-lg p-1">
+              <Button
+                variant={periodType === "year" ? "default" : "ghost"}
+                size="sm"
+                onClick={() => setPeriodType("year")}
+                className="gap-1"
+              >
+                <Calendar className="w-4 h-4" />
+                Année
+              </Button>
+              <Button
+                variant={periodType === "month" ? "default" : "ghost"}
+                size="sm"
+                onClick={() => setPeriodType("month")}
+                className="gap-1"
+              >
+                <CalendarDays className="w-4 h-4" />
+                Mois
+              </Button>
+              <Button
+                variant={periodType === "ytd" ? "default" : "ghost"}
+                size="sm"
+                onClick={() => setPeriodType("ytd")}
+                className="gap-1"
+              >
+                <CalendarRange className="w-4 h-4" />
+                YTD
+              </Button>
+            </div>
+
+            {(periodType === "month" || periodType === "ytd") && (
+              <Select value={selectedMonth} onValueChange={setSelectedMonth}>
+                <SelectTrigger className="w-[140px]">
+                  <SelectValue placeholder="Mois" />
+                </SelectTrigger>
+                <SelectContent>
+                  {MONTHS.map((month) => (
+                    <SelectItem key={month.value} value={month.value}>
+                      {month.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => handleYearChange("prev")}
+              disabled={
+                data.availableYears.indexOf(year) >=
+                data.availableYears.length - 1
+              }
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </Button>
+            <span className="text-xl font-semibold min-w-[80px] text-center">
+              {year}
+            </span>
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => handleYearChange("next")}
+              disabled={data.availableYears.indexOf(year) <= 0}
+            >
+              <ChevronRight className="w-4 h-4" />
+            </Button>
+          </div>
+        </div>
+
+        {/* Tab Content */}
+        {renderTabContent()}
       </div>
     </div>
   );
