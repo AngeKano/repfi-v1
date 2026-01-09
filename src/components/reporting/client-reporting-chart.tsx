@@ -213,7 +213,7 @@ const INITIAL_TUNNEL_METRICS: TunnelMetric[] = [
   },
   {
     id: "marge",
-    label: "Marge Brute",
+    label: "Marge Commerciale",
     key: "margeCommerciale",
     visible: true,
     order: 1,
