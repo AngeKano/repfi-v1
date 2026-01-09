@@ -671,7 +671,7 @@ export default function ClientReportingChart({
                         }}
                       >
                         <span className="text-xs font-semibold text-white whitespace-nowrap">
-                          {formatCompact(item.value)}
+                          {formatCompactOnly(item.value)}
                         </span>
                       </div>
                     )}
@@ -688,7 +688,7 @@ export default function ClientReportingChart({
                         }}
                       >
                         <span className="text-xs font-semibold text-white whitespace-nowrap">
-                          {formatCompact(item.value)}
+                          {formatCompactOnly(item.value)}
                         </span>
                       </div>
                     )}
