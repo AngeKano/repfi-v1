@@ -436,6 +436,15 @@ export default function ClientReportingChart({
     return value.toFixed(0);
   };
 
+  const formatCompactOnly = (value: number): string => {
+    const absValue = Math.abs(value);
+
+    if (absValue >= 1000) {
+      return `${(value / 1000).toFixed(0)}K`;
+    }
+    return value.toFixed(0);
+  };
+
   const formatVariation = (value: number): string => {
     const sign = value >= 0 ? "+" : "";
     return `${sign}${value.toFixed(1)}%`;
@@ -739,7 +748,7 @@ export default function ClientReportingChart({
               content={
                 <ChartTooltipContent
                   formatter={(value, name) => [
-                    formatCompact(value as number),
+                    formatCompactOnly(value as number),
                     name === "chiffreAffaires" ? `CA ${yearN}` : `CA ${yearN1}`,
                   ]}
                 />
@@ -800,7 +809,7 @@ export default function ClientReportingChart({
               content={
                 <ChartTooltipContent
                   formatter={(value, name) => [
-                    formatCompact(value as number),
+                    formatCompactOnly(value as number),
                     name === "soldeTresorerie"
                       ? `Trésorerie ${yearN}`
                       : `Trésorerie ${yearN1}`,
@@ -853,11 +862,13 @@ export default function ClientReportingChart({
                 </CardHeader>
                 <CardContent className="pt-0">
                   <div className="text-xl font-bold text-blue-600">
-                    {formatCompact(data.indicateurs.anneeN.chiffreAffaires)}
+                    {formatCompactOnly(data.indicateurs.anneeN.chiffreAffaires)}
                   </div>
                   <p className="text-xs text-muted-foreground">
                     {yearN1}:{" "}
-                    {formatCompact(data.indicateurs.anneeN1.chiffreAffaires)}
+                    {formatCompactOnly(
+                      data.indicateurs.anneeN1.chiffreAffaires
+                    )}
                   </p>
                 </CardContent>
               </Card>
@@ -876,11 +887,11 @@ export default function ClientReportingChart({
                 </CardHeader>
                 <CardContent className="pt-0">
                   <div className="text-xl font-bold text-orange-600">
-                    {formatCompact(data.indicateurs.anneeN.masseSalariale)}
+                    {formatCompactOnly(data.indicateurs.anneeN.masseSalariale)}
                   </div>
                   <p className="text-xs text-muted-foreground">
                     {yearN1}:{" "}
-                    {formatCompact(data.indicateurs.anneeN1.masseSalariale)}
+                    {formatCompactOnly(data.indicateurs.anneeN1.masseSalariale)}
                   </p>
                 </CardContent>
               </Card>
@@ -905,13 +916,13 @@ export default function ClientReportingChart({
                         : "text-red-600"
                     }`}
                   >
-                    {formatCompact(
+                    {formatCompactOnly(
                       data.indicateurs.anneeN.resultatExploitation
                     )}
                   </div>
                   <p className="text-xs text-muted-foreground">
                     {yearN1}:{" "}
-                    {formatCompact(
+                    {formatCompactOnly(
                       data.indicateurs.anneeN1.resultatExploitation
                     )}
                   </p>
@@ -938,11 +949,11 @@ export default function ClientReportingChart({
                         : "text-red-600"
                     }`}
                   >
-                    {formatCompact(data.indicateurs.anneeN.resultatNet)}
+                    {formatCompactOnly(data.indicateurs.anneeN.resultatNet)}
                   </div>
                   <p className="text-xs text-muted-foreground">
                     {yearN1}:{" "}
-                    {formatCompact(data.indicateurs.anneeN1.resultatNet)}
+                    {formatCompactOnly(data.indicateurs.anneeN1.resultatNet)}
                   </p>
                 </CardContent>
               </Card>
@@ -967,11 +978,13 @@ export default function ClientReportingChart({
                         : "text-red-600"
                     }`}
                   >
-                    {formatCompact(data.indicateurs.anneeN.soldeTresorerie)}
+                    {formatCompactOnly(data.indicateurs.anneeN.soldeTresorerie)}
                   </div>
                   <p className="text-xs text-muted-foreground">
                     {yearN1}:{" "}
-                    {formatCompact(data.indicateurs.anneeN1.soldeTresorerie)}
+                    {formatCompactOnly(
+                      data.indicateurs.anneeN1.soldeTresorerie
+                    )}
                   </p>
                 </CardContent>
               </Card>
@@ -996,11 +1009,15 @@ export default function ClientReportingChart({
                         : "text-red-600"
                     }`}
                   >
-                    {formatCompact(data.indicateurs.anneeN.margeCommerciale)}
+                    {formatCompactOnly(
+                      data.indicateurs.anneeN.margeCommerciale
+                    )}
                   </div>
                   <p className="text-xs text-muted-foreground">
                     {yearN1}:{" "}
-                    {formatCompact(data.indicateurs.anneeN1.margeCommerciale)}
+                    {formatCompactOnly(
+                      data.indicateurs.anneeN1.margeCommerciale
+                    )}
                   </p>
                 </CardContent>
               </Card>
@@ -1047,13 +1064,13 @@ export default function ClientReportingChart({
                               variant="outline"
                               className="text-xs text-red-600"
                             >
-                              C: {formatCompact(period.charges)}
+                              C: {formatCompactOnly(period.charges)}
                             </Badge>
                             <Badge
                               variant="outline"
                               className="text-xs text-green-600"
                             >
-                              P: {formatCompact(period.produits)}
+                              P: {formatCompactOnly(period.produits)}
                             </Badge>
                           </div>
                           <div className="flex items-center gap-2 mt-2">
@@ -1124,7 +1141,7 @@ export default function ClientReportingChart({
                 </CardHeader>
                 <CardContent className="pt-0">
                   <div className="text-2xl font-bold text-blue-600">
-                    {formatCompact(data.indicateurs.anneeN.chiffreAffaires)}
+                    {formatCompactOnly(data.indicateurs.anneeN.chiffreAffaires)}
                   </div>
                 </CardContent>
               </Card>
@@ -1138,7 +1155,9 @@ export default function ClientReportingChart({
                 </CardHeader>
                 <CardContent className="pt-0">
                   <div className="text-2xl font-bold text-blue-400">
-                    {formatCompact(data.indicateurs.anneeN1.chiffreAffaires)}
+                    {formatCompactOnly(
+                      data.indicateurs.anneeN1.chiffreAffaires
+                    )}
                   </div>
                 </CardContent>
               </Card>
@@ -1174,7 +1193,7 @@ export default function ClientReportingChart({
                         : "text-red-600"
                     }`}
                   >
-                    {formatCompact(
+                    {formatCompactOnly(
                       data.indicateurs.anneeN.resultatExploitation
                     )}
                   </div>
@@ -1196,7 +1215,9 @@ export default function ClientReportingChart({
                         : "text-red-600"
                     }`}
                   >
-                    {formatCompact(data.indicateurs.anneeN.resultatFinancier)}
+                    {formatCompactOnly(
+                      data.indicateurs.anneeN.resultatFinancier
+                    )}
                   </div>
                 </CardContent>
               </Card>
@@ -1216,7 +1237,7 @@ export default function ClientReportingChart({
                         : "text-red-600"
                     }`}
                   >
-                    {formatCompact(data.indicateurs.anneeN.resultatHAO)}
+                    {formatCompactOnly(data.indicateurs.anneeN.resultatHAO)}
                   </div>
                 </CardContent>
               </Card>
@@ -1241,7 +1262,7 @@ export default function ClientReportingChart({
                         : "text-red-600"
                     }`}
                   >
-                    {formatCompact(data.indicateurs.anneeN.resultatNet)}
+                    {formatCompactOnly(data.indicateurs.anneeN.resultatNet)}
                   </div>
                 </CardContent>
               </Card>
@@ -1324,9 +1345,7 @@ export default function ClientReportingChart({
             <p className="text-muted-foreground">
               Reporting comptable - {getPeriodLabel()}
             </p>
-            <p>
-              Devise : K FCFA
-            </p>
+            <p>Devise : K FCFA</p>
           </div>
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-1 bg-muted rounded-lg p-1">
