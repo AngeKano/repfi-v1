@@ -64,7 +64,6 @@ import {
   CalendarDays,
   CalendarRange,
   Receipt,
-  CreditCard,
   BarChart3,
   Settings2,
   Eye,
@@ -740,7 +739,7 @@ export default function ClientReportingChart({
               content={
                 <ChartTooltipContent
                   formatter={(value, name) => [
-                    formatCurrency(value as number),
+                    formatCompact(value as number),
                     name === "chiffreAffaires" ? `CA ${yearN}` : `CA ${yearN1}`,
                   ]}
                 />
@@ -801,7 +800,7 @@ export default function ClientReportingChart({
               content={
                 <ChartTooltipContent
                   formatter={(value, name) => [
-                    formatCurrency(value as number),
+                    formatCompact(value as number),
                     name === "soldeTresorerie"
                       ? `Trésorerie ${yearN}`
                       : `Trésorerie ${yearN1}`,
@@ -854,11 +853,11 @@ export default function ClientReportingChart({
                 </CardHeader>
                 <CardContent className="pt-0">
                   <div className="text-xl font-bold text-blue-600">
-                    {formatCurrency(data.indicateurs.anneeN.chiffreAffaires)}
+                    {formatCompact(data.indicateurs.anneeN.chiffreAffaires)}
                   </div>
                   <p className="text-xs text-muted-foreground">
                     {yearN1}:{" "}
-                    {formatCurrency(data.indicateurs.anneeN1.chiffreAffaires)}
+                    {formatCompact(data.indicateurs.anneeN1.chiffreAffaires)}
                   </p>
                 </CardContent>
               </Card>
@@ -877,11 +876,11 @@ export default function ClientReportingChart({
                 </CardHeader>
                 <CardContent className="pt-0">
                   <div className="text-xl font-bold text-orange-600">
-                    {formatCurrency(data.indicateurs.anneeN.masseSalariale)}
+                    {formatCompact(data.indicateurs.anneeN.masseSalariale)}
                   </div>
                   <p className="text-xs text-muted-foreground">
                     {yearN1}:{" "}
-                    {formatCurrency(data.indicateurs.anneeN1.masseSalariale)}
+                    {formatCompact(data.indicateurs.anneeN1.masseSalariale)}
                   </p>
                 </CardContent>
               </Card>
@@ -906,13 +905,13 @@ export default function ClientReportingChart({
                         : "text-red-600"
                     }`}
                   >
-                    {formatCurrency(
+                    {formatCompact(
                       data.indicateurs.anneeN.resultatExploitation
                     )}
                   </div>
                   <p className="text-xs text-muted-foreground">
                     {yearN1}:{" "}
-                    {formatCurrency(
+                    {formatCompact(
                       data.indicateurs.anneeN1.resultatExploitation
                     )}
                   </p>
@@ -939,11 +938,11 @@ export default function ClientReportingChart({
                         : "text-red-600"
                     }`}
                   >
-                    {formatCurrency(data.indicateurs.anneeN.resultatNet)}
+                    {formatCompact(data.indicateurs.anneeN.resultatNet)}
                   </div>
                   <p className="text-xs text-muted-foreground">
                     {yearN1}:{" "}
-                    {formatCurrency(data.indicateurs.anneeN1.resultatNet)}
+                    {formatCompact(data.indicateurs.anneeN1.resultatNet)}
                   </p>
                 </CardContent>
               </Card>
@@ -968,11 +967,11 @@ export default function ClientReportingChart({
                         : "text-red-600"
                     }`}
                   >
-                    {formatCurrency(data.indicateurs.anneeN.soldeTresorerie)}
+                    {formatCompact(data.indicateurs.anneeN.soldeTresorerie)}
                   </div>
                   <p className="text-xs text-muted-foreground">
                     {yearN1}:{" "}
-                    {formatCurrency(data.indicateurs.anneeN1.soldeTresorerie)}
+                    {formatCompact(data.indicateurs.anneeN1.soldeTresorerie)}
                   </p>
                 </CardContent>
               </Card>
@@ -997,11 +996,11 @@ export default function ClientReportingChart({
                         : "text-red-600"
                     }`}
                   >
-                    {formatCurrency(data.indicateurs.anneeN.margeCommerciale)}
+                    {formatCompact(data.indicateurs.anneeN.margeCommerciale)}
                   </div>
                   <p className="text-xs text-muted-foreground">
                     {yearN1}:{" "}
-                    {formatCurrency(data.indicateurs.anneeN1.margeCommerciale)}
+                    {formatCompact(data.indicateurs.anneeN1.margeCommerciale)}
                   </p>
                 </CardContent>
               </Card>
@@ -1048,13 +1047,13 @@ export default function ClientReportingChart({
                               variant="outline"
                               className="text-xs text-red-600"
                             >
-                              C: {formatCurrency(period.charges)}
+                              C: {formatCompact(period.charges)}
                             </Badge>
                             <Badge
                               variant="outline"
                               className="text-xs text-green-600"
                             >
-                              P: {formatCurrency(period.produits)}
+                              P: {formatCompact(period.produits)}
                             </Badge>
                           </div>
                           <div className="flex items-center gap-2 mt-2">
@@ -1125,7 +1124,7 @@ export default function ClientReportingChart({
                 </CardHeader>
                 <CardContent className="pt-0">
                   <div className="text-2xl font-bold text-blue-600">
-                    {formatCurrency(data.indicateurs.anneeN.chiffreAffaires)}
+                    {formatCompact(data.indicateurs.anneeN.chiffreAffaires)}
                   </div>
                 </CardContent>
               </Card>
@@ -1139,7 +1138,7 @@ export default function ClientReportingChart({
                 </CardHeader>
                 <CardContent className="pt-0">
                   <div className="text-2xl font-bold text-blue-400">
-                    {formatCurrency(data.indicateurs.anneeN1.chiffreAffaires)}
+                    {formatCompact(data.indicateurs.anneeN1.chiffreAffaires)}
                   </div>
                 </CardContent>
               </Card>
@@ -1175,7 +1174,7 @@ export default function ClientReportingChart({
                         : "text-red-600"
                     }`}
                   >
-                    {formatCurrency(
+                    {formatCompact(
                       data.indicateurs.anneeN.resultatExploitation
                     )}
                   </div>
@@ -1197,7 +1196,7 @@ export default function ClientReportingChart({
                         : "text-red-600"
                     }`}
                   >
-                    {formatCurrency(data.indicateurs.anneeN.resultatFinancier)}
+                    {formatCompact(data.indicateurs.anneeN.resultatFinancier)}
                   </div>
                 </CardContent>
               </Card>
@@ -1217,7 +1216,7 @@ export default function ClientReportingChart({
                         : "text-red-600"
                     }`}
                   >
-                    {formatCurrency(data.indicateurs.anneeN.resultatHAO)}
+                    {formatCompact(data.indicateurs.anneeN.resultatHAO)}
                   </div>
                 </CardContent>
               </Card>
@@ -1242,7 +1241,7 @@ export default function ClientReportingChart({
                         : "text-red-600"
                     }`}
                   >
-                    {formatCurrency(data.indicateurs.anneeN.resultatNet)}
+                    {formatCompact(data.indicateurs.anneeN.resultatNet)}
                   </div>
                 </CardContent>
               </Card>
@@ -1324,6 +1323,9 @@ export default function ClientReportingChart({
             <h2 className="text-2xl font-bold">{data.client.name}</h2>
             <p className="text-muted-foreground">
               Reporting comptable - {getPeriodLabel()}
+            </p>
+            <p>
+              Devise : K FCFA
             </p>
           </div>
           <div className="flex items-center gap-4">
