@@ -179,26 +179,28 @@ const NAV_ITEMS: NavItem[] = [
     label: "Synthèse financière",
     icon: LayoutDashboard,
     subItems: [
-      "CA",
-      "Masse Salariale",
-      "Résultat d'exploitation",
-      "Résultat net",
-      "Trésorerie",
-      "Évolution trésorerie",
-      "Tunnel de rentabilité",
+      // "CA",
+      // "Masse Salariale",
+      // "Résultat d'exploitation",
+      // "Résultat net",
+      // "Trésorerie",
+      // "Évolution trésorerie",
+      // "Tunnel de rentabilité",
     ],
   },
   {
     id: "chiffre-affaires",
     label: "Chiffre d'affaires",
     icon: LineChartIcon,
-    subItems: ["Évolution du CA"],
+    // subItems: ["Évolution du CA"],
+    subItems: [],
   },
   {
     id: "resultat",
     label: "Résultat",
     icon: PieChart,
-    subItems: ["Tunnel de rentabilité"],
+    // subItems: ["Tunnel de rentabilité"],
+    subItems: [],
   },
 ];
 
@@ -440,9 +442,14 @@ export default function ClientReportingChart({
     const absValue = Math.abs(value);
 
     if (absValue >= 1000) {
-      return `${(value / 1000).toFixed(0)}K`;
+      // Ajoute des espaces pour les milliers avant d'ajouter le "K"
+      const formatted = Math.round(value / 1000)
+        .toLocaleString("fr-FR")
+        .replace(/\u00A0/g, " ");
+      return `${formatted}K`;
     }
-    return value.toFixed(0);
+    // Ajoute simplement l'espace pour les milliers si nécessaire
+    return value.toLocaleString("fr-FR").replace(/\u00A0/g, " ");
   };
 
   const formatVariation = (value: number): string => {
