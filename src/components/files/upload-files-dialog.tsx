@@ -188,7 +188,7 @@ export default function UploadFilesDialog({
             <Input
               type="file"
               multiple
-              accept=".png,.jpeg,.jpg,.webp,.pdf,.doc,.docx,.xls,.xlsx,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/pdf,image/png,image/jpeg,image/jpg,image/webp"
+              accept=".png,.jpeg,.jpg,.webp,.pdf,.doc,.docx,.xls,.xlsx,.mae,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/pdf,image/png,image/jpeg,image/jpg,image/webp"
               onChange={(e) => handleFiles(e.target.files)}
               className="hidden"
               id="file-input"
