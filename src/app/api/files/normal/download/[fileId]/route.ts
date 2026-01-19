@@ -47,7 +47,7 @@ export async function GET(
 
     return new NextResponse(stream, {
       headers: {
-        "Content-Type": file.fileType || "application/octet-stream",
+        "Content-Type": file.mimeType || "application/octet-stream",
         "Content-Disposition": `attachment; filename="${encodeURIComponent(file.fileName)}"`,
       },
     });
