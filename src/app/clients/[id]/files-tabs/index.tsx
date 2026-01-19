@@ -250,7 +250,6 @@ const FilesTabs: React.FC<FilesTabsProps> = ({ clientId }) => {
                       >
                         {file.status === "EN_COURS" ? "En cours" : file.status}
                       </Badge>
-                      {file.status === "SUCCES" && (
                         <Button
                           variant="outline"
                           size="sm"
@@ -258,7 +257,6 @@ const FilesTabs: React.FC<FilesTabsProps> = ({ clientId }) => {
                         >
                           <Download className="w-4 h-4" />
                         </Button>
-                      )}
                       <Button
                         size="sm"
                         variant="ghost"
