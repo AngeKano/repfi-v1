@@ -44,7 +44,7 @@ export default function UploadFilesDialog({
   const [error, setError] = useState("");
   const [dragActive, setDragActive] = useState(false);
 
-  const MAX_FILE_SIZE = 2 * 1024 * 1024; // 2MB
+  const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
   const MAX_FILES = 10;
 
   const handleFiles = (newFiles: FileList | null) => {
@@ -66,7 +66,7 @@ export default function UploadFilesDialog({
         validFiles.push({
           file,
           id: Math.random().toString(36),
-          error: "Fichier trop volumineux (max 2MB)",
+          error: "Fichier trop volumineux (max 10MB)",
         });
         return;
       }
@@ -183,7 +183,7 @@ export default function UploadFilesDialog({
               Glissez-déposez vos fichiers Excel ici
             </p>
             <p className="text-sm text-gray-500 mb-4">
-              ou cliquez pour sélectionner (max 10 fichiers, 2MB chacun)
+              ou cliquez pour sélectionner (max 10 fichiers, 10MB chacun)
             </p>
             <Input
               type="file"
