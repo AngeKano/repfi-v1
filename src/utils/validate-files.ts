@@ -1,35 +1,34 @@
-// Accepte images (jpeg/jpg/png/webp), pdf, word, excel et formats apparentés
+// Accepte images (jpeg/jpg/png/webp), pdf, word, excel, mae et formats apparentés
 export const isValidFile = (file: File) => {
+  // Basé sur l'attribut accept
+  // .png,.jpeg,.jpg,.webp,.pdf,.doc,.docx,.xls,.xlsx,.mae,
+  // application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,
+  // application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,
+  // application/pdf,image/png,image/jpeg,image/jpg,image/webp
+
   const validMimeTypes = [
-    // Images
+    "application/msword",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "application/vnd.ms-excel",
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    "application/pdf",
     "image/png",
     "image/jpeg",
     "image/jpg",
     "image/webp",
-    // PDF
-    "application/pdf",
-    // Word
-    "application/msword",
-    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-    // Excel
-    "application/vnd.ms-excel",
-    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
   ];
 
   const validExtensions = [
-    // Images
     ".png",
     ".jpeg",
     ".jpg",
     ".webp",
-    // PDF
     ".pdf",
-    // Word
     ".doc",
     ".docx",
-    // Excel
     ".xls",
     ".xlsx",
+    ".mae",
   ];
 
   const fileNameLower = file.name.toLowerCase();
