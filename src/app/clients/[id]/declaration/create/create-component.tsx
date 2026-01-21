@@ -37,6 +37,7 @@ import {
 // - PLAN_TIERS: Plan des tiers
 // - CODE_JOURNAL: Codes journaux
 // ============================================================
+
 const REQUIRED_FILE_TYPES = [
   { type: "GRAND_LIVRE", label: "Grand Livre Comptable" },
   { type: "PLAN_COMPTES", label: "Plan Comptable" },
