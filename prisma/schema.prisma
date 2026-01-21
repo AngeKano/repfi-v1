@@ -7,310 +7,308 @@ datasource db {
   provider = "postgresql"
 }
 
+model Company {
+  id             String          @id @default(cuid())
+  name           String
+  denomination   String?
+  description    String?
+  companyType    CompanyType
+  email          String          @unique
+  phone          String?
+  website        String?
+  packType       PackType        @default(SIMPLE)
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  clients        Client[]
+  socialNetworks SocialNetwork[]
+  members        User[]
 
-  model Company {
-    id             String          @id @default(cuid())
-    name           String
-    denomination   String?
-    description    String?
-    companyType    CompanyType
-    email          String          @unique
-    phone          String?
-    website        String?
-    packType       PackType        @default(SIMPLE)
-    createdAt      DateTime        @default(now())
-    updatedAt      DateTime        @updatedAt
-    clients        Client[]
-    socialNetworks SocialNetwork[]
-    members        User[]
-  
-    @@index([email])
-    @@index([packType])
-    @@map("companies")
-  }
-  
-  model User {
-    id                String             @id @default(cuid())
-    email             String             @unique
-    password          String
-    firstName         String?
-    lastName          String?
-    isActive          Boolean            @default(true)
-    companyId         String
-    role              UserRole           @default(USER)
-    createdAt         DateTime           @default(now())
-    updatedAt         DateTime           @updatedAt
-    lastLoginAt       DateTime?
-    clientAssignments ClientAssignment[]
-    createdClients    Client[]           @relation("ClientCreator")
-    modifiedClients   Client[]           @relation("ClientModifier")
-    comptableFiles    ComptableFile[]    @relation("ComptableFileUploader")
-    folders           Folder[]           @relation("FolderCreator")
-    normalFiles       NormalFile[]       @relation("NormalFileUploader")
-    company           Company            @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  
-    @@index([email])
-    @@index([companyId])
-    @@index([role])
-    @@index([isActive])
-    @@map("users")
-  }
-  
-  model Client {
-    id               String             @id @default(cuid())
-    name             String
-    denomination     String?
-    description      String?
-    companyType      CompanyType
-    email            String
-    phone            String?
-    website          String?
-    companyId        String
-    isSelfEntity     Boolean            @default(false)
-    createdById      String
-    modifiedById     String?
-    createdAt        DateTime           @default(now())
-    updatedAt        DateTime           @updatedAt
-    assignments      ClientAssignment[]
-    company          Company            @relation(fields: [companyId], references: [id], onDelete: Cascade)
-    createdBy        User               @relation("ClientCreator", fields: [createdById], references: [id])
-    modifiedBy       User?              @relation("ClientModifier", fields: [modifiedById], references: [id])
-    comptableFiles   ComptableFile[]
-    comptablePeriods ComptablePeriod[]
-    folders          Folder[]
-    normalFiles      NormalFile[]
-    socialNetworks   SocialNetwork[]
-  
-    @@index([companyId])
-    @@index([isSelfEntity])
-    @@index([createdById])
-    @@map("clients")
-  }
-  
-  model ClientAssignment {
-    id         String   @id @default(cuid())
-    userId     String
-    clientId   String
-    role       UserRole @default(USER)
-    assignedAt DateTime @default(now())
-    client     Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
-    user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
-    @@unique([userId, clientId])
-    @@index([userId])
-    @@index([clientId])
-    @@index([role])
-    @@map("client_assignments")
-  }
-  
-  model Folder {
-    id          String       @id @default(cuid())
-    name        String
-    clientId    String
-    parentId    String?
-    createdById String
-    createdAt   DateTime     @default(now())
-    updatedAt   DateTime     @updatedAt
-    client      Client       @relation(fields: [clientId], references: [id], onDelete: Cascade)
-    createdBy   User         @relation("FolderCreator", fields: [createdById], references: [id])
-    parent      Folder?      @relation("FolderHierarchy", fields: [parentId], references: [id], onDelete: Cascade)
-    children    Folder[]     @relation("FolderHierarchy")
-    files       NormalFile[]
-  
-    @@index([clientId])
-    @@index([parentId])
-    @@map("folders")
-  }
-  
-  model SocialNetwork {
-    id        String            @id @default(cuid())
-    type      SocialNetworkType
-    url       String
-    companyId String?
-    clientId  String?
-    createdAt DateTime          @default(now())
-    client    Client?           @relation(fields: [clientId], references: [id], onDelete: Cascade)
-    company   Company?          @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  
-    @@index([companyId])
-    @@index([clientId])
-    @@map("social_networks")
-  }
-  
-  model NormalFile {
-    id           String    @id @default(cuid())
-    fileName     String
-    s3Key        String    @unique
-    s3Url        String
-    fileSize     Int
-    mimeType     String
-    clientId     String
-    folderId     String?
-    uploadedById String
-    uploadedAt   DateTime  @default(now())
-    deletedAt    DateTime?
-    client       Client    @relation(fields: [clientId], references: [id], onDelete: Cascade)
-    folder       Folder?   @relation(fields: [folderId], references: [id])
-    uploadedBy   User      @relation("NormalFileUploader", fields: [uploadedById], references: [id])
-  
-    @@index([clientId])
-    @@index([folderId])
-    @@index([uploadedById])
-    @@index([deletedAt])
-    @@map("normal_files")
-  }
-  
-  model ComptableFile {
-    id               String           @id @default(cuid())
-    fileName         String
-    fileType         FileType
-    fileYear         Int
-    s3Key            String           @unique
-    s3Url            String
-    fileSize         Int
-    mimeType         String
-    checksum         String?
-    status           FileStatus       @default(EN_COURS)
-    errorMessage     String?
-    processingStatus ProcessingStatus @default(PENDING)
-    batchId          String
-    periodStart      DateTime
-    periodEnd        DateTime
-    clientId         String
-    uploadedById     String
-    uploadedAt       DateTime         @default(now())
-    processedAt      DateTime?
-    comptablePeriod  ComptablePeriod  @relation(fields: [batchId], references: [batchId], onDelete: Cascade)
-    client           Client           @relation(fields: [clientId], references: [id], onDelete: Cascade)
-    uploadedBy       User             @relation("ComptableFileUploader", fields: [uploadedById], references: [id])
-  
-    @@index([clientId])
-    @@index([uploadedById])
-    @@index([fileType])
-    @@index([fileYear])
-    @@index([status])
-    @@index([batchId])
-    @@index([processingStatus])
-    @@map("comptable_files")
-  }
-  
-  model NormalFileHistory {
-    id         String   @id @default(cuid())
-    fileId     String
-    fileName   String
-    action     String
-    details    String?
-    userId     String
-    userEmail  String
-    occurredAt DateTime @default(now())
-  
-    @@index([fileId])
-    @@index([userId])
-    @@index([action])
-    @@index([occurredAt])
-    @@map("normal_file_history")
-  }
-  
-  model ComptableFileHistory {
-    id         String   @id @default(cuid())
-    fileId     String
-    fileName   String
-    action     String
-    details    String?
-    userId     String
-    userEmail  String
-    occurredAt DateTime @default(now())
-  
-    @@index([fileId])
-    @@index([userId])
-    @@index([action])
-    @@index([occurredAt])
-    @@map("comptable_file_history")
-  }
-  
-  model FileTypePattern {
-    id        String   @id @default(cuid())
-    fileType  FileType
-    pattern   String
-    priority  Int      @default(0)
-    createdAt DateTime @default(now())
-  
-    @@index([fileType])
-    @@index([priority])
-    @@map("file_type_patterns")
-  }
-  
-  model ComptablePeriod {
-    id          String           @id @default(cuid())
-    clientId    String
-    periodStart DateTime
-    periodEnd   DateTime
-    year        Int
-    batchId     String           @unique
-    status      ProcessingStatus @default(PENDING)
-    createdAt   DateTime         @default(now())
-    processedAt DateTime?
-    excelFileUrl  String?          // URL S3 du fichier Excel généré
-    files       ComptableFile[]
-    client      Client           @relation(fields: [clientId], references: [id], onDelete: Cascade)
-  
-    @@unique([clientId, periodStart, periodEnd])
-    @@index([clientId])
-    @@index([status])
-    @@map("comptable_periods")
-  }
-  
-  enum PackType {
-    ENTREPRISE
-    SIMPLE
-  }
-  
-  enum UserRole {
-    ADMIN_ROOT
-    ADMIN
-    USER
-  }
-  
-  enum CompanyType {
-    TECHNOLOGIE
-    FINANCE
-    SANTE
-    EDUCATION
-    COMMERCE
-    INDUSTRIE
-    AGRICULTURE
-    IMMOBILIER
-    TRANSPORT
-    ENERGIE
-    TELECOMMUNICATION
-    TOURISME
-  }
-  
-  enum FileType {
-    GRAND_LIVRE_COMPTES
-    GRAND_LIVRE_TIERS
-    PLAN_COMPTES
-    PLAN_TIERS
-    CODE_JOURNAL
-  }
-  
-  enum ProcessingStatus {
-    PENDING
-    VALIDATING
-    PROCESSING
-    COMPLETED
-    FAILED
-  }
-  
-  enum FileStatus {
-    EN_COURS
-    SUCCES
-    ERROR
-  }
-  
-  enum SocialNetworkType {
-    FACEBOOK
-    LINKEDIN
-    TWITTER
-  }
-  
+  @@index([email])
+  @@index([packType])
+  @@map("companies")
+}
+
+model User {
+  id                String             @id @default(cuid())
+  email             String             @unique
+  password          String
+  firstName         String?
+  lastName          String?
+  isActive          Boolean            @default(true)
+  companyId         String
+  role              UserRole           @default(USER)
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  lastLoginAt       DateTime?
+  clientAssignments ClientAssignment[]
+  createdClients    Client[]           @relation("ClientCreator")
+  modifiedClients   Client[]           @relation("ClientModifier")
+  comptableFiles    ComptableFile[]    @relation("ComptableFileUploader")
+  folders           Folder[]           @relation("FolderCreator")
+  normalFiles       NormalFile[]       @relation("NormalFileUploader")
+  company           Company            @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([email])
+  @@index([companyId])
+  @@index([role])
+  @@index([isActive])
+  @@map("users")
+}
+
+model Client {
+  id               String             @id @default(cuid())
+  name             String
+  denomination     String?
+  description      String?
+  companyType      CompanyType
+  email            String
+  phone            String?
+  website          String?
+  companyId        String
+  isSelfEntity     Boolean            @default(false)
+  createdById      String
+  modifiedById     String?
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+  assignments      ClientAssignment[]
+  company          Company            @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  createdBy        User               @relation("ClientCreator", fields: [createdById], references: [id])
+  modifiedBy       User?              @relation("ClientModifier", fields: [modifiedById], references: [id])
+  comptableFiles   ComptableFile[]
+  comptablePeriods ComptablePeriod[]
+  folders          Folder[]
+  normalFiles      NormalFile[]
+  socialNetworks   SocialNetwork[]
+
+  @@index([companyId])
+  @@index([isSelfEntity])
+  @@index([createdById])
+  @@map("clients")
+}
+
+model ClientAssignment {
+  id         String   @id @default(cuid())
+  userId     String
+  clientId   String
+  role       UserRole @default(USER)
+  assignedAt DateTime @default(now())
+  client     Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, clientId])
+  @@index([userId])
+  @@index([clientId])
+  @@index([role])
+  @@map("client_assignments")
+}
+
+model Folder {
+  id          String       @id @default(cuid())
+  name        String
+  clientId    String
+  parentId    String?
+  createdById String
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  client      Client       @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  createdBy   User         @relation("FolderCreator", fields: [createdById], references: [id])
+  parent      Folder?      @relation("FolderHierarchy", fields: [parentId], references: [id], onDelete: Cascade)
+  children    Folder[]     @relation("FolderHierarchy")
+  files       NormalFile[]
+
+  @@index([clientId])
+  @@index([parentId])
+  @@map("folders")
+}
+
+model SocialNetwork {
+  id        String            @id @default(cuid())
+  type      SocialNetworkType
+  url       String
+  companyId String?
+  clientId  String?
+  createdAt DateTime          @default(now())
+  client    Client?           @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  company   Company?          @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([companyId])
+  @@index([clientId])
+  @@map("social_networks")
+}
+
+model NormalFile {
+  id           String    @id @default(cuid())
+  fileName     String
+  s3Key        String    @unique
+  s3Url        String
+  fileSize     Int
+  mimeType     String
+  clientId     String
+  folderId     String?
+  uploadedById String
+  uploadedAt   DateTime  @default(now())
+  deletedAt    DateTime?
+  client       Client    @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  folder       Folder?   @relation(fields: [folderId], references: [id])
+  uploadedBy   User      @relation("NormalFileUploader", fields: [uploadedById], references: [id])
+
+  @@index([clientId])
+  @@index([folderId])
+  @@index([uploadedById])
+  @@index([deletedAt])
+  @@map("normal_files")
+}
+
+model ComptableFile {
+  id               String           @id @default(cuid())
+  fileName         String
+  fileType         FileType
+  fileYear         Int
+  s3Key            String           @unique
+  s3Url            String
+  fileSize         Int
+  mimeType         String
+  checksum         String?
+  status           FileStatus       @default(EN_COURS)
+  errorMessage     String?
+  processingStatus ProcessingStatus @default(PENDING)
+  batchId          String
+  periodStart      DateTime
+  periodEnd        DateTime
+  clientId         String
+  uploadedById     String
+  uploadedAt       DateTime         @default(now())
+  processedAt      DateTime?
+  comptablePeriod  ComptablePeriod  @relation(fields: [batchId], references: [batchId], onDelete: Cascade)
+  client           Client           @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  uploadedBy       User             @relation("ComptableFileUploader", fields: [uploadedById], references: [id])
+
+  @@index([clientId])
+  @@index([uploadedById])
+  @@index([fileType])
+  @@index([fileYear])
+  @@index([status])
+  @@index([batchId])
+  @@index([processingStatus])
+  @@map("comptable_files")
+}
+
+model NormalFileHistory {
+  id         String   @id @default(cuid())
+  fileId     String
+  fileName   String
+  action     String
+  details    String?
+  userId     String
+  userEmail  String
+  occurredAt DateTime @default(now())
+
+  @@index([fileId])
+  @@index([userId])
+  @@index([action])
+  @@index([occurredAt])
+  @@map("normal_file_history")
+}
+
+model ComptableFileHistory {
+  id         String   @id @default(cuid())
+  fileId     String
+  fileName   String
+  action     String
+  details    String?
+  userId     String
+  userEmail  String
+  occurredAt DateTime @default(now())
+
+  @@index([fileId])
+  @@index([userId])
+  @@index([action])
+  @@index([occurredAt])
+  @@map("comptable_file_history")
+}
+
+model FileTypePattern {
+  id        String   @id @default(cuid())
+  fileType  FileType
+  pattern   String
+  priority  Int      @default(0)
+  createdAt DateTime @default(now())
+
+  @@index([fileType])
+  @@index([priority])
+  @@map("file_type_patterns")
+}
+
+model ComptablePeriod {
+  id           String           @id @default(cuid())
+  clientId     String
+  periodStart  DateTime
+  periodEnd    DateTime
+  year         Int
+  batchId      String           @unique
+  status       ProcessingStatus @default(PENDING)
+  createdAt    DateTime         @default(now())
+  processedAt  DateTime?
+  excelFileUrl String?
+  files        ComptableFile[]
+  client       Client           @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@unique([clientId, periodStart, periodEnd])
+  @@index([clientId])
+  @@index([status])
+  @@map("comptable_periods")
+}
+
+enum PackType {
+  ENTREPRISE
+  SIMPLE
+}
+
+enum UserRole {
+  ADMIN_ROOT
+  ADMIN
+  USER
+}
+
+enum CompanyType {
+  TECHNOLOGIE
+  FINANCE
+  SANTE
+  EDUCATION
+  COMMERCE
+  INDUSTRIE
+  AGRICULTURE
+  IMMOBILIER
+  TRANSPORT
+  ENERGIE
+  TELECOMMUNICATION
+  TOURISME
+}
+
+enum FileType {
+  GRAND_LIVRE_COMPTES
+  GRAND_LIVRE_TIERS
+  PLAN_COMPTES
+  PLAN_TIERS
+  CODE_JOURNAL
+}
+
+enum ProcessingStatus {
+  PENDING
+  VALIDATING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+enum FileStatus {
+  EN_COURS
+  SUCCES
+  ERROR
+}
+
+enum SocialNetworkType {
+  FACEBOOK
+  LINKEDIN
+  TWITTER
+}

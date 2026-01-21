@@ -30,13 +30,22 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
+// ============================================================
+// FORMAT 4 FICHIERS (v3.0)
+// - GRAND_LIVRE: Fichier unifié (comptes + tiers + factures)
+// - PLAN_COMPTES: Plan comptable
+// - PLAN_TIERS: Plan des tiers
+// - CODE_JOURNAL: Codes journaux
+// ============================================================
 const REQUIRED_FILE_TYPES = [
-  { type: "GRAND_LIVRE_COMPTES", label: "Grand Livre des Comptes" },
-  { type: "GRAND_LIVRE_TIERS", label: "Grand Livre des Tiers" },
+  { type: "GRAND_LIVRE", label: "Grand Livre Comptable" },
   { type: "PLAN_COMPTES", label: "Plan Comptable" },
   { type: "PLAN_TIERS", label: "Plan des Tiers" },
   { type: "CODE_JOURNAL", label: "Code Journal" },
 ];
+
+const MAX_FILE_SIZE = 10 * 1024 * 1024;
+const MAX_FILES = 4; // Changé de 5 à 4
 
 function FileTypeSelect({
   value,
@@ -81,9 +90,6 @@ interface Period {
   periodStart: string;
   periodEnd: string;
 }
-
-const MAX_FILE_SIZE = 10 * 1024 * 1024;
-const MAX_FILES = 5;
 
 export default function DeclarationComptable({
   session,
@@ -154,7 +160,6 @@ export default function DeclarationComptable({
         const start = new Date(period.periodStart);
         const end = new Date(period.periodEnd);
 
-        // Ajouter chaque jour de la période aux dates désactivées
         const current = new Date(start);
         while (current <= end) {
           disabledDates.push(new Date(current));
@@ -178,7 +183,6 @@ export default function DeclarationComptable({
       return;
     }
 
-    // Vérifier que les deux dates sont dans la même année
     if (range.from && range.to) {
       if (range.from.getFullYear() !== range.to.getFullYear()) {
         toast.error("La période doit être dans la même année");
@@ -195,7 +199,6 @@ export default function DeclarationComptable({
     const yearStart = new Date(selectedYear, 0, 1);
     const yearEnd = new Date(selectedYear, 11, 31);
 
-    // Vérifier si l'année complète chevauche une période existante
     const hasOverlap = existingPeriods.some((period) => {
       const pStart = new Date(period.periodStart);
       const pEnd = new Date(period.periodEnd);
@@ -235,18 +238,22 @@ export default function DeclarationComptable({
     );
   };
 
+  // Détection du type de fichier basée sur le nom
   const detectFileType = (fileName: string): string | undefined => {
     const normalizedName = fileName
       .toLowerCase()
       .replace(/[0-9_\-\.]/g, " ")
       .trim();
 
-    const keywords = {
-      GRAND_LIVRE_COMPTES: ["grand", "livre", "compte", "glcompte"],
-      GRAND_LIVRE_TIERS: ["grand", "livre", "tiers", "gltiers"],
-      PLAN_COMPTES: ["plan", "compte", "plancompte"],
+    // Mots-clés pour la détection (format v3.0)
+    const keywords: Record<string, string[]> = {
+      GRAND_LIVRE: [
+        "grand", "livre", "comptable", "grandlivre", 
+        "gl", "glcompte", "gltiers"  // Inclut les anciens noms pour compatibilité
+      ],
+      PLAN_COMPTES: ["plan", "compte", "plancompte", "plancomptable"],
       PLAN_TIERS: ["plan", "tiers", "plantiers"],
-      CODE_JOURNAL: ["code", "journal", "codejournal"],
+      CODE_JOURNAL: ["code", "journal", "codejournal", "journaux"],
     };
 
     const matchesType = (words: string[]): number => {
@@ -257,19 +264,10 @@ export default function DeclarationComptable({
       return score;
     };
 
-    const scores = [
-      {
-        type: "GRAND_LIVRE_COMPTES",
-        score: matchesType(keywords.GRAND_LIVRE_COMPTES),
-      },
-      {
-        type: "GRAND_LIVRE_TIERS",
-        score: matchesType(keywords.GRAND_LIVRE_TIERS),
-      },
-      { type: "PLAN_COMPTES", score: matchesType(keywords.PLAN_COMPTES) },
-      { type: "PLAN_TIERS", score: matchesType(keywords.PLAN_TIERS) },
-      { type: "CODE_JOURNAL", score: matchesType(keywords.CODE_JOURNAL) },
-    ];
+    const scores = Object.entries(keywords).map(([type, words]) => ({
+      type,
+      score: matchesType(words),
+    }));
 
     const bestMatch = scores.reduce((prev, current) =>
       current.score > prev.score ? current : prev
@@ -286,7 +284,7 @@ export default function DeclarationComptable({
     const availableSlots = MAX_FILES - currentCount;
 
     if (availableSlots <= 0) {
-      toast.error("Vous ne pouvez pas ajouter plus de 5 fichiers.");
+      toast.error(`Vous ne pouvez pas ajouter plus de ${MAX_FILES} fichiers.`);
       return;
     }
 
@@ -339,7 +337,7 @@ export default function DeclarationComptable({
     setDragActive(false);
 
     if (filesCount >= MAX_FILES) {
-      toast.error("Vous ne pouvez pas ajouter plus de 5 fichiers.");
+      toast.error(`Vous ne pouvez pas ajouter plus de ${MAX_FILES} fichiers.`);
       return;
     }
     handleFiles(e.dataTransfer.files);
@@ -354,7 +352,7 @@ export default function DeclarationComptable({
   };
 
   const allFilesValid = () => {
-    if (filesCount !== 5) return false;
+    if (filesCount !== MAX_FILES) return false;
 
     const types = files.map((f) => f.fileType);
     const requiredTypes = REQUIRED_FILE_TYPES.map((t) => t.type);
@@ -373,7 +371,7 @@ export default function DeclarationComptable({
 
     if (!allFilesValid()) {
       toast.error(
-        "Veuillez sélectionner les 5 fichiers obligatoires avec des types valides"
+        `Veuillez sélectionner les ${MAX_FILES} fichiers obligatoires avec des types valides`
       );
       return;
     }
@@ -405,9 +403,9 @@ export default function DeclarationComptable({
       setUploadResult(data);
       toast.success(
         `Fichiers uploadés - Période: ${new Date(
-          data.period.periodStart
+          data.period.start
         ).toLocaleDateString("fr-FR")} au ${new Date(
-          data.period.periodEnd
+          data.period.end
         ).toLocaleDateString("fr-FR")}`
       );
     } catch (error: any) {
@@ -467,7 +465,7 @@ export default function DeclarationComptable({
               const year = Number(value);
               setSelectedYear(year);
               setDateRange(undefined);
-              setCalendarMonth(new Date(year, 0)); // <- Ajouter cette ligne
+              setCalendarMonth(new Date(year, 0));
             }}
           >
             <SelectTrigger className="w-[120px]" aria-label="Année">
@@ -560,6 +558,16 @@ export default function DeclarationComptable({
       </div>
 
       <Card className="p-6 w-full">
+        {/* Info Format v3.0 */}
+        <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+          <p className="text-sm font-medium text-blue-800">
+            📋 Format v3.0 - 4 fichiers requis
+          </p>
+          <p className="text-xs text-blue-600 mt-1">
+            Le Grand Livre Comptable unifié remplace les anciens fichiers GL Comptes et GL Tiers
+          </p>
+        </div>
+
         {/* Drag & Drop Zone */}
         <div
           className={`flex flex-col items-center justify-center border-2 border-dashed rounded-lg p-8 text-center transition-colors mb-6 ${
@@ -577,7 +585,7 @@ export default function DeclarationComptable({
         >
           <Upload className="w-12 h-12 text-gray-400 mx-auto mb-4" />
           <p className="text-lg font-medium mb-2">
-            Glissez-déposez vos 5 fichiers Excel ici
+            Glissez-déposez vos {MAX_FILES} fichiers Excel ici
           </p>
           <p className="text-sm text-gray-500 mb-4">
             ou cliquez pour sélectionner (max 10MB chacun)
@@ -602,7 +610,7 @@ export default function DeclarationComptable({
             >
               <span>
                 {hasMaxFiles
-                  ? "Maximum 5 fichiers atteints"
+                  ? `Maximum ${MAX_FILES} fichiers atteints`
                   : "Sélectionner des fichiers"}
               </span>
             </Button>
@@ -610,7 +618,7 @@ export default function DeclarationComptable({
           {hasMaxFiles && (
             <div className="mt-2 text-sm text-gray-500 flex items-center gap-1">
               <AlertCircle className="w-4 h-4 text-yellow-500" />
-              Vous avez atteint la limite de 5 fichiers.
+              Vous avez atteint la limite de {MAX_FILES} fichiers.
             </div>
           )}
         </div>
@@ -654,6 +662,9 @@ export default function DeclarationComptable({
               <p>
                 <strong>Batch ID:</strong> {uploadResult.batchId}
               </p>
+              <p>
+                <strong>Format:</strong> {uploadResult.fileFormat?.version || "v3.0"}
+              </p>
             </div>
           </div>
         )}
@@ -661,7 +672,7 @@ export default function DeclarationComptable({
         {/* Files List */}
         {filesCount > 0 && (
           <div className="space-y-3 mb-6">
-            <Label>Fichiers sélectionnés ({filesCount}/5 requis)</Label>
+            <Label>Fichiers sélectionnés ({filesCount}/{MAX_FILES} requis)</Label>
             {files.map((uploadFile) => (
               <div
                 key={uploadFile.id}
