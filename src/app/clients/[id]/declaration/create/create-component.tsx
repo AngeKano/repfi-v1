@@ -248,10 +248,10 @@ export default function DeclarationComptable({
     // Mots-clés pour la détection (format v3.0)
     const keywords: Record<string, string[]> = {
       GRAND_LIVRE: [
-        "grand", "livre", "comptable", "grandlivre", 
+        "grand", "livre", "compte", "grandlivre", 
         "gl", "glcompte", "gltiers"  // Inclut les anciens noms pour compatibilité
       ],
-      PLAN_COMPTES: ["plan", "compte", "plancompte", "plancomptable"],
+      PLAN_COMPTES: ["plan", "compte", "plancompte", "plancomptable", "comptable"],
       PLAN_TIERS: ["plan", "tiers", "plantiers"],
       CODE_JOURNAL: ["code", "journal", "codejournal", "journaux"],
     };
