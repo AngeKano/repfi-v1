@@ -28,13 +28,27 @@ const uploadComptableSchema = z.object({
   periodEnd: z.string(),
 });
 
+// ============================================================
+// FORMAT 4 FICHIERS (v3.0)
+// - GRAND_LIVRE: Fichier unifié (remplace GRAND_LIVRE_COMPTES + GRAND_LIVRE_TIERS)
+// - PLAN_COMPTES: Plan comptable
+// - PLAN_TIERS: Plan des tiers (clients/fournisseurs)
+// - CODE_JOURNAL: Codes journaux
+// ============================================================
 const REQUIRED_FILE_TYPES = [
-  FileType.GRAND_LIVRE_COMPTES,
-  FileType.GRAND_LIVRE_TIERS,
+  FileType.GRAND_LIVRE,      // Nouveau: fichier unifié
   FileType.PLAN_COMPTES,
   FileType.PLAN_TIERS,
   FileType.CODE_JOURNAL,
 ];
+
+// Labels pour les messages d'erreur
+const FILE_TYPE_LABELS: Record<string, string> = {
+  [FileType.GRAND_LIVRE]: "Grand Livre Comptable",
+  [FileType.PLAN_COMPTES]: "Plan Comptable",
+  [FileType.PLAN_TIERS]: "Plan Tiers",
+  [FileType.CODE_JOURNAL]: "Codes Journaux",
+};
 
 function formatDateYYYYMMDD(date: Date): string {
   const year = date.getFullYear();
@@ -72,7 +86,8 @@ async function createBackupIfNeeded(s3Prefix: string): Promise<void> {
         if (
           obj.Key &&
           !obj.Key.includes("backup/") &&
-          !obj.Key.includes("success/")
+          !obj.Key.includes("success/") &&
+          !obj.Key.includes("EXCEL/")
         ) {
           const fileName = obj.Key.split("/").pop();
           await s3Client.send(
@@ -102,17 +117,31 @@ export async function POST(req: NextRequest) {
     const periodStartStr = formData.get("periodStart") as string;
     const periodEndStr = formData.get("periodEnd") as string;
 
-    // Récupérer les 5 fichiers
+    // Récupérer les 4 fichiers requis
     const files: { file: File; fileType: FileType }[] = [];
+    const missingFiles: string[] = [];
+
     for (const fileType of REQUIRED_FILE_TYPES) {
       const file = formData.get(fileType) as File;
       if (!file) {
-        return NextResponse.json(
-          { error: `Fichier manquant: ${fileType}` },
-          { status: 400 }
-        );
+        missingFiles.push(FILE_TYPE_LABELS[fileType] || fileType);
+      } else {
+        files.push({ file, fileType });
       }
-      files.push({ file, fileType });
+    }
+
+    if (missingFiles.length > 0) {
+      return NextResponse.json(
+        { 
+          error: `Fichier(s) manquant(s): ${missingFiles.join(", ")}`,
+          missingFiles,
+          requiredFiles: REQUIRED_FILE_TYPES.map(ft => ({
+            type: ft,
+            label: FILE_TYPE_LABELS[ft] || ft
+          }))
+        },
+        { status: 400 }
+      );
     }
 
     // Validation du schéma
@@ -160,10 +189,12 @@ export async function POST(req: NextRequest) {
       "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     ];
 
-    for (const { file } of files) {
+    for (const { file, fileType } of files) {
       if (!validExcelTypes.includes(file.type)) {
         return NextResponse.json(
-          { error: `Le fichier ${file.name} doit être un fichier Excel` },
+          { 
+            error: `Le fichier "${FILE_TYPE_LABELS[fileType]}" (${file.name}) doit être un fichier Excel (.xls ou .xlsx)` 
+          },
           { status: 400 }
         );
       }
@@ -216,7 +247,7 @@ export async function POST(req: NextRequest) {
     // Définir le préfixe S3
     const clientName = client.name.replace(/\s+/g, "_").replace(/[^\w\-]/g, "");
 
-    // On récupère la company liée au client (déjà vérifié plus haut que client est valide)
+    // Récupérer la company
     const company = await prisma.company.findUnique({
       where: { id: client.companyId },
       select: { name: true, id: true },
@@ -237,9 +268,6 @@ export async function POST(req: NextRequest) {
     // Créer un backup si des fichiers existent déjà
     await createBackupIfNeeded(s3Prefix);
 
-    // Uploader les fichiers sur S3
-    const uploadedFiles: any[] = [];
-
     // Créer l'enregistrement de la période
     const comptablePeriod = await prisma.comptablePeriod.create({
       data: {
@@ -251,6 +279,9 @@ export async function POST(req: NextRequest) {
         status: ProcessingStatus.PENDING,
       },
     });
+
+    // Uploader les fichiers sur S3
+    const uploadedFiles: any[] = [];
 
     for (const { file, fileType } of files) {
       const fileBuffer = await file.arrayBuffer();
@@ -295,7 +326,10 @@ export async function POST(req: NextRequest) {
         },
       });
 
-      uploadedFiles.push(fileRecord);
+      uploadedFiles.push({
+        ...fileRecord,
+        label: FILE_TYPE_LABELS[fileType] || fileType,
+      });
 
       // Créer l'historique
       await prisma.comptableFileHistory.create({
@@ -303,7 +337,7 @@ export async function POST(req: NextRequest) {
           fileId: fileRecord.id,
           fileName: fileName,
           action: "UPLOAD_COMPTABLE",
-          details: `Fichier comptable uploadé - Période: ${formatDateYYYYMMDD(
+          details: `Fichier comptable uploadé (${FILE_TYPE_LABELS[fileType]}) - Période: ${formatDateYYYYMMDD(
             periodStart
           )} au ${formatDateYYYYMMDD(periodEnd)}`,
           userId: session.user.id,
@@ -317,6 +351,7 @@ export async function POST(req: NextRequest) {
         message: "Fichiers comptables uploadés avec succès",
         batchId,
         period: {
+          id: comptablePeriod.id,
           start: periodStart.toISOString(),
           end: periodEnd.toISOString(),
           year,
@@ -324,6 +359,15 @@ export async function POST(req: NextRequest) {
         s3Prefix,
         files: uploadedFiles,
         comptablePeriod,
+        // Info pour le frontend
+        fileFormat: {
+          version: "3.0",
+          description: "Format 4 fichiers avec Grand Livre unifié",
+          requiredFiles: REQUIRED_FILE_TYPES.map(ft => ({
+            type: ft,
+            label: FILE_TYPE_LABELS[ft]
+          }))
+        }
       },
       { status: 201 }
     );
