@@ -125,9 +125,9 @@ export async function POST(req: NextRequest) {
       where: { batchId },
     });
 
-    if (files.length !== 5) {
+    if (files.length !== 4) {
       return NextResponse.json(
-        { error: `Fichiers invalides: ${files.length}/5` },
+        { error: `Fichiers invalides: ${files.length}/4` },
         { status: 400 }
       );
     }
