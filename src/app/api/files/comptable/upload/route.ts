@@ -267,10 +267,22 @@ export async function POST(req: NextRequest) {
 
     // Créer un backup si des fichiers existent déjà
     await createBackupIfNeeded(s3Prefix);
-
-    // Créer l'enregistrement de la période
-    const comptablePeriod = await prisma.comptablePeriod.create({
-      data: {
+    
+    // Créer ou mettre à jour l'enregistrement de la période
+    const comptablePeriod = await prisma.comptablePeriod.upsert({
+      where: {
+        clientId_periodStart_periodEnd: {
+          clientId: data.clientId,
+          periodStart: periodStart,
+          periodEnd: periodEnd,
+        },
+      },
+      update: {
+        batchId,
+        status: ProcessingStatus.PENDING,
+        year,
+      },
+      create: {
         clientId: data.clientId,
         periodStart: periodStart,
         periodEnd: periodEnd,
