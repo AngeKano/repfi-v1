@@ -247,6 +247,7 @@ model ComptablePeriod {
   year         Int
   batchId      String           @unique
   status       ProcessingStatus @default(PENDING)
+  progress     Int              @default(0)
   createdAt    DateTime         @default(now())
   processedAt  DateTime?
   excelFileUrl String?
