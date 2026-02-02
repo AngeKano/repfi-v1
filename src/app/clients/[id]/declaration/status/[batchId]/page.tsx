@@ -5,6 +5,8 @@ import StatusComponents from "./status";
 import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
+import { checkPermissionSync } from "@/lib/permissions/middleware";
+import { FICHIERS_ACTIONS } from "@/lib/permissions/actions";
 import { prisma } from "@/lib/prisma";
 
 export default async function StatusPage({
@@ -18,8 +20,9 @@ export default async function StatusPage({
     redirect("/auth/signin");
   }
 
-  // Vérifier permissions (admin uniquement)
-  if (session.user.role === "USER") {
+  // Verifier permissions via RBAC
+  const canViewFiles = checkPermissionSync(session.user.role, FICHIERS_ACTIONS.VOIR);
+  if (!canViewFiles) {
     redirect("/clients");
   }
 

@@ -20,6 +20,8 @@ export default async function DashboardPage() {
   const canViewAllClients = checkPermissionSync(session.user.role, CLIENTS_ACTIONS.VOIR_TOUS);
   const canViewMembers = checkPermissionSync(session.user.role, MEMBRES_ACTIONS.VOIR);
   const canViewFiles = checkPermissionSync(session.user.role, FICHIERS_ACTIONS.VOIR);
+  const canCreateClient = checkPermissionSync(session.user.role, CLIENTS_ACTIONS.CREER)
+    && session.user.companyPackType === "ENTREPRISE";
 
   // Recuperer les stats
   let clientsCount = 0;
@@ -154,6 +156,8 @@ export default async function DashboardPage() {
       stats={stats}
       recentClients={recentClients}
       recentFiles={recentFiles}
+      canViewMembers={canViewMembers}
+      canCreateClient={canCreateClient}
     />
   );
 }

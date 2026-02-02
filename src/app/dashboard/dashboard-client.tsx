@@ -19,6 +19,7 @@ import {
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
+import { getRoleLabel, getRoleBadgeVariant } from "@/lib/permissions/role-utils";
 
 interface DashboardClientProps {
   session: any;
@@ -29,6 +30,8 @@ interface DashboardClientProps {
   };
   recentClients: any[];
   recentFiles: any[];
+  canViewMembers: boolean;
+  canCreateClient: boolean;
 }
 
 export default function DashboardClient({
@@ -36,6 +39,8 @@ export default function DashboardClient({
   stats,
   recentClients,
   recentFiles,
+  canViewMembers,
+  canCreateClient,
 }: DashboardClientProps) {
   const router = useRouter();
 
@@ -44,27 +49,18 @@ export default function DashboardClient({
     router.push("/auth/signin");
   };
 
-  const getRoleBadge = (role: string) => {
-    const variants: Record<string, { variant: any; label: string }> = {
-      ADMIN_ROOT: { variant: "destructive", label: "Admin Root" },
-      ADMIN: { variant: "default", label: "Admin" },
-      USER: { variant: "secondary", label: "Utilisateur" },
-    };
-    return variants[role] || variants.USER;
-  };
-
   const handleDownload = async (fileId: string, fileName: string) => {
     try {
-      // Appeler l'API pour obtenir l'URL signée
+      // Appeler l'API pour obtenir l'URL signee
       const response = await fetch(`/api/files/download/normal/${fileId}`);
 
       if (!response.ok) {
-        throw new Error("Erreur lors du téléchargement");
+        throw new Error("Erreur lors du telechargement");
       }
 
       const data = await response.json();
 
-      // Télécharger le fichier avec l'URL signée
+      // Telecharger le fichier avec l'URL signee
       const link = document.createElement("a");
       link.href = data.url;
       link.download = fileName;
@@ -73,14 +69,15 @@ export default function DashboardClient({
       link.click();
       document.body.removeChild(link);
 
-      toast.success("Téléchargement démarré");
+      toast.success("Telechargement demarre");
     } catch (error) {
-      console.error("Erreur téléchargement:", error);
-      toast.error("Erreur lors du téléchargement du fichier");
+      console.error("Erreur telechargement:", error);
+      toast.error("Erreur lors du telechargement du fichier");
     }
   };
 
-  const roleInfo = getRoleBadge(session.user.role);
+  const roleLabel = getRoleLabel(session.user.role);
+  const roleBadgeVariant = getRoleBadgeVariant(session.user.role);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -105,8 +102,8 @@ export default function DashboardClient({
                 <p className="text-sm font-medium text-gray-900">
                   {session.user.name || session.user.email}
                 </p>
-                <Badge variant={roleInfo.variant} className="text-xs">
-                  {roleInfo.label}
+                <Badge variant={roleBadgeVariant as any} className="text-xs">
+                  {roleLabel}
                 </Badge>
               </div>
 
@@ -135,10 +132,9 @@ export default function DashboardClient({
             {session.user.firstName
               ? session.user.firstName
               : session.user.name}{" "}
-            👋
           </h2>
           <p className="text-gray-600">
-            Voici un aperçu de votre activité comptable
+            Voici un apercu de votre activite comptable
           </p>
         </div>
 
@@ -174,8 +170,7 @@ export default function DashboardClient({
             </p>
           </Card>
 
-          {(session.user.role === "ADMIN_ROOT" ||
-            session.user.role === "ADMIN") && (
+          {canViewMembers && (
             <Card className="p-6">
               <div className="flex items-center justify-between mb-4">
                 <div className="p-3 bg-green-100 rounded-lg">
@@ -200,16 +195,14 @@ export default function DashboardClient({
               Actions rapides
             </h3>
             <div className="space-y-3">
-              {(session.user.role === "ADMIN_ROOT" ||
-                session.user.role === "ADMIN") &&
-                session.user.companyPackType === "ENTREPRISE" && (
-                  <Link href="/clients/new">
-                    <Button className="w-full justify-start" variant="outline">
-                      <Plus className="w-4 h-4 mr-2" />
-                      Créer un nouveau client
-                    </Button>
-                  </Link>
-                )}
+              {canCreateClient && (
+                <Link href="/clients/new">
+                  <Button className="w-full justify-start" variant="outline">
+                    <Plus className="w-4 h-4 mr-2" />
+                    Creer un nouveau client
+                  </Button>
+                </Link>
+              )}
 
               <Link href="/clients">
                 <Button className="w-full justify-start" variant="outline">
@@ -218,12 +211,11 @@ export default function DashboardClient({
                 </Button>
               </Link>
 
-              {(session.user.role === "ADMIN_ROOT" ||
-                session.user.role === "ADMIN") && (
+              {canViewMembers && (
                 <Link href="/users">
                   <Button className="w-full justify-start" variant="outline">
                     <Users className="w-4 h-4 mr-2" />
-                    Gérer les membres
+                    Gerer les membres
                   </Button>
                 </Link>
               )}
@@ -244,8 +236,8 @@ export default function DashboardClient({
                 <Badge variant="outline">{session.user.companyPackType}</Badge>
               </div>
               <div>
-                <p className="text-sm text-gray-500">Votre rôle</p>
-                <Badge variant={roleInfo.variant}>{roleInfo.label}</Badge>
+                <p className="text-sm text-gray-500">Votre role</p>
+                <Badge variant={roleBadgeVariant as any}>{roleLabel}</Badge>
               </div>
             </div>
           </Card>
@@ -255,7 +247,7 @@ export default function DashboardClient({
         <Card className="p-6 mb-8">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-lg font-semibold text-gray-900">
-              Clients récents
+              Clients recents
             </h3>
             <Link href="/clients">
               <Button variant="ghost" size="sm">
@@ -312,13 +304,8 @@ export default function DashboardClient({
         <Card className="p-6">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-lg font-semibold text-gray-900">
-              Fichiers récents
+              Fichiers recents
             </h3>
-            {/* <Link href="/files">
-              <Button variant="ghost" size="sm">
-                Voir tout
-              </Button>
-            </Link> */}
           </div>
 
           {recentFiles.length === 0 ? (

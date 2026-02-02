@@ -29,25 +29,28 @@ import { toast } from "sonner";
 import FilesTabs from "./files-tabs";
 import DeclarationTabs from "./declaration/declaration-tabs";
 import ClientReportingChart from "@/components/reporting/client-reporting-chart";
+import { getRoleLabel, getRoleBadgeVariant } from "@/lib/permissions/role-utils";
 
 interface ClientDetailsClientProps {
   session: any;
   initialClient: any;
+  canEdit: boolean;
+  canDelete: boolean;
+  canAssignMembers: boolean;
 }
 
 export default function ClientDetailsClient({
   session,
   initialClient,
+  canEdit,
+  canDelete,
+  canAssignMembers,
 }: ClientDetailsClientProps) {
   const router = useRouter();
   const [client, setClient] = useState(initialClient);
   const [loading, setLoading] = useState(false);
 
   const [error, setError] = useState("");
-
-  const canEdit =
-    session.user.role === "ADMIN_ROOT" || session.user.role === "ADMIN";
-  const canDelete = session.user.role === "ADMIN_ROOT";
 
   const handleDelete = async () => {
     if (!confirm("Êtes-vous sûr de vouloir supprimer ce client ?")) {
@@ -417,12 +420,12 @@ export default function ClientDetailsClient({
               <TabsContent value="members">
                 <Card className="p-6">
                   <div className="flex items-center justify-between mb-4">
-                    <h2 className="text-lg font-semibold">Membres assignés</h2>
-                    {canEdit && (
+                    <h2 className="text-lg font-semibold">Membres assignes</h2>
+                    {canAssignMembers && (
                       <Link href={`/clients/${client.id}/assign`}>
                         <Button size="sm">
                           <UserPlus className="w-4 h-4 mr-2" />
-                          Gérer les membres
+                          Gerer les membres
                         </Button>
                       </Link>
                     )}
@@ -454,15 +457,17 @@ export default function ClientDetailsClient({
                               </p>
                             </div>
                           </div>
-                          <Badge>{member.role}</Badge>
+                          <Badge variant={getRoleBadgeVariant(member.role) as any}>
+                            {getRoleLabel(member.role)}
+                          </Badge>
                         </div>
                       ))}
                     </div>
                   ) : (
                     <div className="text-center py-12">
                       <Users className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-                      <p className="text-gray-500">Aucun membre assigné</p>
-                      {canEdit && (
+                      <p className="text-gray-500">Aucun membre assigne</p>
+                      {canAssignMembers && (
                         <Link href={`/clients/${client.id}/assign`}>
                           <Button variant="outline" className="mt-4">
                             <UserPlus className="w-4 h-4 mr-2" />

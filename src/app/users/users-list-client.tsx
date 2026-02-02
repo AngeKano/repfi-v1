@@ -8,13 +8,6 @@ import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
   Users,
   Search,
   Plus,
@@ -26,8 +19,11 @@ import {
   Shield,
   ShieldAlert,
   User as UserIcon,
+  Briefcase,
+  Eye,
 } from "lucide-react";
 import Link from "next/link";
+import { getRoleLabel, getRoleBadgeVariant } from "@/lib/permissions/role-utils";
 
 interface UsersListClientProps {
   session: any;
@@ -40,6 +36,7 @@ interface UsersListClientProps {
   };
   initialSearch: string;
   initialRole: string;
+  canAddMember: boolean;
 }
 
 export default function UsersListClient({
@@ -48,17 +45,12 @@ export default function UsersListClient({
   pagination,
   initialSearch,
   initialRole,
+  canAddMember,
 }: UsersListClientProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [search, setSearch] = useState(initialSearch);
   const [role, setRole] = useState(initialRole);
-
-  const canAddMember =
-    session.user.role === "ADMIN_ROOT" || session.user.role === "ADMIN";
-  // NEW
-  // &&
-  // session.user.companyPackType === "ENTREPRISE";
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -83,22 +75,21 @@ export default function UsersListClient({
     router.push(`/users?${params.toString()}`);
   };
 
+  // Icone dynamique selon le role
   const getRoleIcon = (userRole: string) => {
-    if (userRole === "ADMIN_ROOT") return <ShieldAlert className="w-4 h-4" />;
-    if (userRole === "ADMIN") return <Shield className="w-4 h-4" />;
-    return <UserIcon className="w-4 h-4" />;
-  };
-
-  const getRoleLabel = (userRole: string) => {
-    if (userRole === "ADMIN_ROOT") return "Admin Root";
-    if (userRole === "ADMIN") return "Admin";
-    return "Utilisateur";
-  };
-
-  const getRoleBadgeVariant = (userRole: string) => {
-    if (userRole === "ADMIN_ROOT") return "destructive";
-    if (userRole === "ADMIN") return "default";
-    return "secondary";
+    switch (userRole) {
+      case "ADMIN_ROOT":
+        return <ShieldAlert className="w-4 h-4" />;
+      case "ADMIN_CF":
+      case "ADMIN":
+        return <Shield className="w-4 h-4" />;
+      case "ADMIN_PARTENAIRE":
+        return <Briefcase className="w-4 h-4" />;
+      case "VIEWER":
+        return <Eye className="w-4 h-4" />;
+      default:
+        return <UserIcon className="w-4 h-4" />;
+    }
   };
 
   return (
@@ -149,18 +140,6 @@ export default function UsersListClient({
                 />
               </div>
 
-              {/* <Select value={role} onValueChange={setRole}>
-                <SelectTrigger className="w-40">
-                  <SelectValue placeholder="Rôle" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Tous les rôles</SelectItem>
-                  <SelectItem value="ADMIN_ROOT">Admin Root</SelectItem>
-                  <SelectItem value="ADMIN">Admin</SelectItem>
-                  <SelectItem value="USER">Utilisateur</SelectItem>
-                </SelectContent>
-              </Select> */}
-
               <Button type="submit">Rechercher</Button>
             </div>
           </form>
@@ -171,11 +150,11 @@ export default function UsersListClient({
           <Card className="p-12 text-center">
             <Users className="w-16 h-16 text-gray-300 mx-auto mb-4" />
             <h3 className="text-lg font-semibold text-gray-900 mb-2">
-              Aucun membre trouvé
+              Aucun membre trouve
             </h3>
             <p className="text-gray-600 mb-6">
               {search || role
-                ? "Essayez de modifier vos critères de recherche"
+                ? "Essayez de modifier vos criteres de recherche"
                 : "Commencez par ajouter votre premier membre"}
             </p>
             {canAddMember && (
@@ -208,7 +187,7 @@ export default function UsersListClient({
                               : user.email}
                           </h3>
                           {!user.isActive && (
-                            <Badge variant="destructive">Désactivé</Badge>
+                            <Badge variant="destructive">Desactive</Badge>
                           )}
                         </div>
 
@@ -247,12 +226,12 @@ export default function UsersListClient({
 
                     <div className="text-right text-sm text-gray-500">
                       <p>
-                        Créé le{" "}
+                        Cree le{" "}
                         {new Date(user.createdAt).toLocaleDateString("fr-FR")}
                       </p>
                       {user.lastLoginAt && (
                         <p className="mt-1">
-                          Dernière connexion :{" "}
+                          Derniere connexion :{" "}
                           {new Date(user.lastLoginAt).toLocaleDateString(
                             "fr-FR"
                           )}
@@ -280,7 +259,7 @@ export default function UsersListClient({
                 disabled={pagination.page === 1}
               >
                 <ChevronLeft className="w-4 h-4 mr-1" />
-                Précédent
+                Precedent
               </Button>
 
               <Button

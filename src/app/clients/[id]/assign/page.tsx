@@ -2,6 +2,8 @@
 import { getServerSession } from "next-auth";
 import { authOptions } from "../../../api/auth/[...nextauth]/route";
 import { redirect } from "next/navigation";
+import { checkPermissionSync } from "@/lib/permissions/middleware";
+import { CLIENTS_ACTIONS } from "@/lib/permissions/actions";
 
 import ClientAssignmentClient from "./client-assignment-client";
 
@@ -18,8 +20,9 @@ export default async function ClientAssignmentPage({
     redirect("/auth/signin");
   }
 
-  // Vérifier permissions (admin uniquement)
-  if (session.user.role === "USER") {
+  // Verifier permissions via RBAC
+  const canAssignMembers = checkPermissionSync(session.user.role, CLIENTS_ACTIONS.ASSIGNER_MEMBRE);
+  if (!canAssignMembers) {
     redirect("/clients");
   }
 

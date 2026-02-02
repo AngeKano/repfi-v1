@@ -2,6 +2,8 @@
 import { getServerSession } from "next-auth";
 import { authOptions } from "../../api/auth/[...nextauth]/route";
 import { redirect } from "next/navigation";
+import { checkPermissionSync } from "@/lib/permissions/middleware";
+import { CLIENTS_ACTIONS } from "@/lib/permissions/actions";
 
 import ClientDetailsClient from "./client-details-client";
 
@@ -105,13 +107,19 @@ export default async function ClientDetailsPage({
     },
   });
 
-  // Client non trouvé
+  // Client non trouve
   if (!client) {
     redirect("/clients");
   }
 
-  // Si USER, vérifier qu'il est assigné
-  if (session.user.role === "USER") {
+  // Verifier les permissions RBAC
+  const canViewAllClients = checkPermissionSync(session.user.role, CLIENTS_ACTIONS.VOIR_TOUS);
+  const canEdit = checkPermissionSync(session.user.role, CLIENTS_ACTIONS.MODIFIER);
+  const canDelete = checkPermissionSync(session.user.role, CLIENTS_ACTIONS.DESACTIVER);
+  const canAssignMembers = checkPermissionSync(session.user.role, CLIENTS_ACTIONS.ASSIGNER_MEMBRE);
+
+  // Si l'utilisateur ne peut pas voir tous les clients, verifier qu'il est assigne
+  if (!canViewAllClients) {
     const assignment = await prisma.clientAssignment.findFirst({
       where: {
         clientId: id,
@@ -136,5 +144,13 @@ export default async function ClientDetailsPage({
     },
   };
 
-  return <ClientDetailsClient session={session} initialClient={clientData} />;
+  return (
+    <ClientDetailsClient
+      session={session}
+      initialClient={clientData}
+      canEdit={canEdit}
+      canDelete={canDelete}
+      canAssignMembers={canAssignMembers}
+    />
+  );
 }
