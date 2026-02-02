@@ -40,20 +40,34 @@ import {
   Mail,
   Calendar,
   Clock,
+  Briefcase,
+  Eye,
 } from "lucide-react";
 import Link from "next/link";
+import { getRoleLabel, getRoleBadgeVariant } from "@/lib/permissions/role-utils";
+
+interface RoleOption {
+  value: string;
+  label: string;
+}
 
 interface UserDetailsClientProps {
   session: any;
   user: any;
-  isAdmin: boolean;
+  canEdit: boolean;
+  canDeactivate: boolean;
+  canChangeRole: boolean;
+  availableRoles: RoleOption[];
   isSelf: boolean;
 }
 
 export default function UserDetailsClient({
   session,
   user,
-  isAdmin,
+  canEdit,
+  canDeactivate,
+  canChangeRole,
+  availableRoles,
   isSelf,
 }: UserDetailsClientProps) {
   const router = useRouter();
@@ -76,13 +90,22 @@ export default function UserDetailsClient({
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
 
-  const canEdit = isAdmin || isSelf;
-  const canDeactivate =
-    isAdmin && !isSelf && user.role !== "ADMIN_ROOT";
-  const canChangeRole =
-    isAdmin &&
-    session.user.role === "ADMIN_ROOT" &&
-    user.role !== "ADMIN_ROOT";
+  // Icone dynamique selon le role
+  const getRoleIcon = (userRole: string) => {
+    switch (userRole) {
+      case "ADMIN_ROOT":
+        return <ShieldAlert className="w-5 h-5" />;
+      case "ADMIN_CF":
+      case "ADMIN":
+        return <Shield className="w-5 h-5" />;
+      case "ADMIN_PARTENAIRE":
+        return <Briefcase className="w-5 h-5" />;
+      case "VIEWER":
+        return <Eye className="w-5 h-5" />;
+      default:
+        return <UserIcon className="w-5 h-5" />;
+    }
+  };
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -98,7 +121,7 @@ export default function UserDetailsClient({
     }
 
     if (password && password.length < 8) {
-      setError("Le mot de passe doit contenir au moins 8 caractères");
+      setError("Le mot de passe doit contenir au moins 8 caracteres");
       setLoading(false);
       return;
     }
@@ -109,9 +132,13 @@ export default function UserDetailsClient({
       lastName: lastName || null,
     };
 
-    // Admin peut changer le rôle et le statut
-    if (isAdmin) {
+    // Peut changer le role si autorise
+    if (canChangeRole) {
       data.role = role;
+    }
+
+    // Peut changer le statut si peut editer et n'est pas soi-meme
+    if (canEdit && !isSelf) {
       data.isActive = isActive;
     }
 
@@ -133,12 +160,12 @@ export default function UserDetailsClient({
         throw new Error(result.error || "Erreur lors de la modification");
       }
 
-      setSuccess("Modifications enregistrées avec succès");
+      setSuccess("Modifications enregistrees avec succes");
       setEditMode(false);
       setPassword("");
       setConfirmPassword("");
 
-      // Rafraîchir après 1s
+      // Rafraichir apres 1s
       setTimeout(() => {
         router.refresh();
       }, 1000);
@@ -161,13 +188,13 @@ export default function UserDetailsClient({
       const result = await response.json();
 
       if (!response.ok) {
-        throw new Error(result.error || "Erreur lors de la désactivation");
+        throw new Error(result.error || "Erreur lors de la desactivation");
       }
 
-      setSuccess("Membre désactivé avec succès");
+      setSuccess("Membre desactive avec succes");
       setDeactivateDialogOpen(false);
 
-      // Rediriger après 1s
+      // Rediriger apres 1s
       setTimeout(() => {
         router.push("/users");
       }, 1000);
@@ -187,24 +214,6 @@ export default function UserDetailsClient({
     setPassword("");
     setConfirmPassword("");
     setError("");
-  };
-
-  const getRoleIcon = (userRole: string) => {
-    if (userRole === "ADMIN_ROOT") return <ShieldAlert className="w-5 h-5" />;
-    if (userRole === "ADMIN") return <Shield className="w-5 h-5" />;
-    return <UserIcon className="w-5 h-5" />;
-  };
-
-  const getRoleLabel = (userRole: string) => {
-    if (userRole === "ADMIN_ROOT") return "Admin Root";
-    if (userRole === "ADMIN") return "Admin";
-    return "Utilisateur";
-  };
-
-  const getRoleBadgeVariant = (userRole: string) => {
-    if (userRole === "ADMIN_ROOT") return "destructive";
-    if (userRole === "ADMIN") return "default";
-    return "secondary";
   };
 
   return (
@@ -243,7 +252,7 @@ export default function UserDetailsClient({
                   onClick={() => setDeactivateDialogOpen(true)}
                 >
                   <Trash2 className="w-4 h-4 mr-2" />
-                  Désactiver
+                  Desactiver
                 </Button>
               )}
             </div>
@@ -273,7 +282,7 @@ export default function UserDetailsClient({
           <Alert variant="destructive" className="mb-6">
             <AlertTriangle className="w-4 h-4" />
             <AlertDescription>
-              Ce membre est désactivé et ne peut plus se connecter.
+              Ce membre est desactive et ne peut plus se connecter.
             </AlertDescription>
           </Alert>
         )}
@@ -296,7 +305,7 @@ export default function UserDetailsClient({
                       {getRoleLabel(user.role)}
                     </Badge>
                     {!user.isActive && (
-                      <Badge variant="destructive">Désactivé</Badge>
+                      <Badge variant="destructive">Desactive</Badge>
                     )}
                   </div>
                   <p className="text-sm text-gray-500">
@@ -332,7 +341,7 @@ export default function UserDetailsClient({
                   <div className="flex items-center gap-3 text-gray-700">
                     <Calendar className="w-5 h-5 text-gray-400" />
                     <div>
-                      <p className="text-sm text-gray-500">Créé le</p>
+                      <p className="text-sm text-gray-500">Cree le</p>
                       <p className="font-medium">
                         {new Date(user.createdAt).toLocaleDateString("fr-FR")}
                       </p>
@@ -344,7 +353,7 @@ export default function UserDetailsClient({
                       <Clock className="w-5 h-5 text-gray-400" />
                       <div>
                         <p className="text-sm text-gray-500">
-                          Dernière connexion
+                          Derniere connexion
                         </p>
                         <p className="font-medium">
                           {new Date(user.lastLoginAt).toLocaleDateString(
@@ -374,7 +383,7 @@ export default function UserDetailsClient({
 
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label htmlFor="firstName">Prénom</Label>
+                      <Label htmlFor="firstName">Prenom</Label>
                       <Input
                         id="firstName"
                         value={firstName}
@@ -394,9 +403,9 @@ export default function UserDetailsClient({
                     </div>
                   </div>
 
-                  {canChangeRole && (
+                  {canChangeRole && availableRoles.length > 0 && (
                     <div className="space-y-2">
-                      <Label htmlFor="role">Rôle</Label>
+                      <Label htmlFor="role">Role</Label>
                       <Select
                         value={role}
                         onValueChange={setRole}
@@ -406,16 +415,23 @@ export default function UserDetailsClient({
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="USER">Utilisateur</SelectItem>
-                          <SelectItem value="ADMIN">Administrateur</SelectItem>
+                          {availableRoles.map((roleOption) => (
+                            <SelectItem
+                              key={roleOption.value}
+                              value={roleOption.value}
+                            >
+                              {roleOption.label}
+                            </SelectItem>
+                          ))}
                         </SelectContent>
                       </Select>
                     </div>
                   )}
 
-                  {isAdmin && (
+                  {canEdit && !isSelf && (
                     <div className="flex items-center gap-2">
                       <input
+                        title="Checkbox"
                         type="checkbox"
                         id="isActive"
                         checked={isActive}
@@ -503,7 +519,7 @@ export default function UserDetailsClient({
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2 text-gray-600">
                     <Building2 className="w-4 h-4" />
-                    <span className="text-sm">Clients assignés</span>
+                    <span className="text-sm">Clients assignes</span>
                   </div>
                   <span className="font-semibold">
                     {user._count.clientAssignments}
@@ -513,7 +529,7 @@ export default function UserDetailsClient({
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2 text-gray-600">
                     <FileText className="w-4 h-4" />
-                    <span className="text-sm">Fichiers uploadés</span>
+                    <span className="text-sm">Fichiers uploades</span>
                   </div>
                   <span className="font-semibold">
                     {user._count.uploadedFiles}
@@ -526,7 +542,7 @@ export default function UserDetailsClient({
             {user.clientAssignments && user.clientAssignments.length > 0 && (
               <Card className="p-6">
                 <h3 className="font-semibold mb-4">
-                  Clients assignés ({user.clientAssignments.length})
+                  Clients assignes ({user.clientAssignments.length})
                 </h3>
                 <div className="space-y-2">
                   {user.clientAssignments.slice(0, 5).map((client: any) => (
@@ -559,10 +575,10 @@ export default function UserDetailsClient({
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2 text-red-600">
                 <AlertTriangle className="w-5 h-5" />
-                Désactiver ce membre ?
+                Desactiver ce membre ?
               </DialogTitle>
               <DialogDescription>
-                Voulez-vous vraiment désactiver{" "}
+                Voulez-vous vraiment desactiver{" "}
                 <strong>
                   {user.firstName && user.lastName
                     ? `${user.firstName} ${user.lastName}`
@@ -574,8 +590,8 @@ export default function UserDetailsClient({
 
             <div className="bg-red-50 border border-red-200 rounded-lg p-4 my-4">
               <p className="text-sm text-red-800">
-                <strong>Attention :</strong> Ce membre perdra l'accès à tous ses
-                clients assignés.
+                <strong>Attention :</strong> Ce membre perdra l'acces a tous ses
+                clients assignes.
               </p>
             </div>
 
@@ -595,12 +611,12 @@ export default function UserDetailsClient({
                 {deactivating ? (
                   <>
                     <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
-                    Désactivation...
+                    Desactivation...
                   </>
                 ) : (
                   <>
                     <Trash2 className="w-4 h-4 mr-2" />
-                    Oui, désactiver
+                    Oui, desactiver
                   </>
                 )}
               </Button>

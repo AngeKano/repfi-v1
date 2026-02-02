@@ -2,6 +2,9 @@
 import { getServerSession } from "next-auth";
 import { authOptions } from "../../api/auth/[...nextauth]/route";
 import { redirect } from "next/navigation";
+import { checkPermissionSync, getMappedRole } from "@/lib/permissions/middleware";
+import { MEMBRES_ACTIONS } from "@/lib/permissions/actions";
+import { ROLES, canManageRole } from "@/lib/permissions/roles";
 
 import UserDetailsClient from "./user-details-client";
 
@@ -20,12 +23,15 @@ export default async function UserDetailsPage({
 
   const { id } = await params;
 
-  // Vérifier l'accès
-  const isAdmin =
-    session.user.role === "ADMIN_ROOT" || session.user.role === "ADMIN";
+  // Verifier les permissions via RBAC
   const isSelf = id === session.user.id;
+  const canViewMembers = checkPermissionSync(session.user.role, MEMBRES_ACTIONS.VOIR);
+  const canEditMembers = checkPermissionSync(session.user.role, MEMBRES_ACTIONS.MODIFIER);
+  const canDeactivateMembers = checkPermissionSync(session.user.role, MEMBRES_ACTIONS.DESACTIVER);
+  const canCreateMembers = checkPermissionSync(session.user.role, MEMBRES_ACTIONS.CREER);
 
-  if (!isAdmin && !isSelf) {
+  // L'utilisateur peut voir s'il a la permission ou si c'est lui-meme
+  if (!canViewMembers && !isSelf) {
     redirect("/users");
   }
 
@@ -74,6 +80,27 @@ export default async function UserDetailsPage({
   // Retirer le mot de passe
   const { password, ...userWithoutPassword } = user;
 
+  // Determiner les roles disponibles pour la modification
+  const currentUserRole = getMappedRole(session.user.role);
+  const targetUserRole = getMappedRole(user.role);
+
+  // Peut editer si: a la permission ET (est admin OU c'est soi-meme)
+  const canEdit = (canEditMembers || isSelf);
+
+  // Peut desactiver si: a la permission ET n'est pas soi-meme ET l'utilisateur n'est pas ADMIN_ROOT
+  const canDeactivate = canDeactivateMembers && !isSelf && user.role !== "ADMIN_ROOT";
+
+  // Peut changer le role si: peut creer des membres ET peut gerer le role cible
+  const canChangeRole = canCreateMembers && canManageRole(currentUserRole, targetUserRole);
+
+  // Roles disponibles: seulement ceux que l'utilisateur peut gerer
+  const availableRoles = Object.values(ROLES)
+    .filter((role) => canManageRole(currentUserRole, role.id))
+    .map((role) => ({
+      value: role.id,
+      label: role.title,
+    }));
+
   return (
     <UserDetailsClient
       session={session}
@@ -84,7 +111,10 @@ export default async function UserDetailsPage({
           assignedAt: a.assignedAt,
         })),
       }}
-      isAdmin={isAdmin}
+      canEdit={canEdit}
+      canDeactivate={canDeactivate}
+      canChangeRole={canChangeRole}
+      availableRoles={availableRoles}
       isSelf={isSelf}
     />
   );

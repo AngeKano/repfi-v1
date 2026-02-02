@@ -2,6 +2,8 @@
 import { getServerSession } from "next-auth";
 import { authOptions } from "../api/auth/[...nextauth]/route";
 import { redirect } from "next/navigation";
+import { checkPermissionSync } from "@/lib/permissions/middleware";
+import { MEMBRES_ACTIONS } from "@/lib/permissions/actions";
 
 import UsersListClient from "./users-list-client";
 
@@ -78,6 +80,9 @@ export default async function UsersPage({
     totalPages: Math.ceil(total / limit),
   };
 
+  // Calculer les permissions
+  const canAddMember = checkPermissionSync(session.user.role, MEMBRES_ACTIONS.CREER);
+
   return (
     <UsersListClient
       session={session}
@@ -85,6 +90,7 @@ export default async function UsersPage({
       pagination={pagination}
       initialSearch={search}
       initialRole={role}
+      canAddMember={canAddMember}
     />
   );
 }

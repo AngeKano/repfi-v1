@@ -1,7 +1,9 @@
-// app/clients/[id]/assign/page.tsx
+// app/clients/[id]/declaration/create/page.tsx
 import { getServerSession } from "next-auth";
 import { authOptions } from "../../../../api/auth/[...nextauth]/route";
 import { redirect } from "next/navigation";
+import { checkPermissionSync } from "@/lib/permissions/middleware";
+import { FICHIERS_ACTIONS } from "@/lib/permissions/actions";
 import { Button } from "@/components/ui/button";
 
 import DeclarationComptable from "./create-component";
@@ -21,8 +23,9 @@ export default async function DeclarationComptablePage({
     redirect("/auth/signin");
   }
 
-  // Vérifier permissions (admin uniquement)
-  if (session.user.role === "USER") {
+  // Verifier permissions via RBAC
+  const canUploadFiles = checkPermissionSync(session.user.role, FICHIERS_ACTIONS.CHARGER);
+  if (!canUploadFiles) {
     redirect("/clients");
   }
 
