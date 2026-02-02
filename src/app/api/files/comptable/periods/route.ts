@@ -1,21 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-
-import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import { prisma } from "@/lib/prisma";
+import { requirePermission, FICHIERS_ACTIONS } from "@/lib/permissions";
 
 export async function GET(req: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user) {
-      return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
+    // Vérifier la permission de voir les fichiers
+    const permissionResult = await requirePermission(FICHIERS_ACTIONS.VOIR);
+    if (permissionResult instanceof NextResponse) {
+      return permissionResult;
     }
+    const { user } = permissionResult;
+
     const { searchParams } = new URL(req.url);
     const clientId = searchParams.get("clientId");
     const periods = await prisma.comptablePeriod.findMany({
       where: {
         client: {
-          companyId: session.user.companyId,
+          companyId: user.companyId,
         },
         ...(clientId && { clientId }),
       },

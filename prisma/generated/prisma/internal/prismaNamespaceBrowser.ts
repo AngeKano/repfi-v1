@@ -260,6 +260,7 @@ export const ComptablePeriodScalarFieldEnum = {
   year: 'year',
   batchId: 'batchId',
   status: 'status',
+  progress: 'progress',
   createdAt: 'createdAt',
   processedAt: 'processedAt',
   excelFileUrl: 'excelFileUrl'

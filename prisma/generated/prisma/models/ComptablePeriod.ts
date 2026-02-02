@@ -28,10 +28,12 @@ export type AggregateComptablePeriod = {
 
 export type ComptablePeriodAvgAggregateOutputType = {
   year: number | null
+  progress: number | null
 }
 
 export type ComptablePeriodSumAggregateOutputType = {
   year: number | null
+  progress: number | null
 }
 
 export type ComptablePeriodMinAggregateOutputType = {
@@ -42,6 +44,7 @@ export type ComptablePeriodMinAggregateOutputType = {
   year: number | null
   batchId: string | null
   status: $Enums.ProcessingStatus | null
+  progress: number | null
   createdAt: Date | null
   processedAt: Date | null
   excelFileUrl: string | null
@@ -55,6 +58,7 @@ export type ComptablePeriodMaxAggregateOutputType = {
   year: number | null
   batchId: string | null
   status: $Enums.ProcessingStatus | null
+  progress: number | null
   createdAt: Date | null
   processedAt: Date | null
   excelFileUrl: string | null
@@ -68,6 +72,7 @@ export type ComptablePeriodCountAggregateOutputType = {
   year: number
   batchId: number
   status: number
+  progress: number
   createdAt: number
   processedAt: number
   excelFileUrl: number
@@ -77,10 +82,12 @@ export type ComptablePeriodCountAggregateOutputType = {
 
 export type ComptablePeriodAvgAggregateInputType = {
   year?: true
+  progress?: true
 }
 
 export type ComptablePeriodSumAggregateInputType = {
   year?: true
+  progress?: true
 }
 
 export type ComptablePeriodMinAggregateInputType = {
@@ -91,6 +98,7 @@ export type ComptablePeriodMinAggregateInputType = {
   year?: true
   batchId?: true
   status?: true
+  progress?: true
   createdAt?: true
   processedAt?: true
   excelFileUrl?: true
@@ -104,6 +112,7 @@ export type ComptablePeriodMaxAggregateInputType = {
   year?: true
   batchId?: true
   status?: true
+  progress?: true
   createdAt?: true
   processedAt?: true
   excelFileUrl?: true
@@ -117,6 +126,7 @@ export type ComptablePeriodCountAggregateInputType = {
   year?: true
   batchId?: true
   status?: true
+  progress?: true
   createdAt?: true
   processedAt?: true
   excelFileUrl?: true
@@ -217,6 +227,7 @@ export type ComptablePeriodGroupByOutputType = {
   year: number
   batchId: string
   status: $Enums.ProcessingStatus
+  progress: number
   createdAt: Date
   processedAt: Date | null
   excelFileUrl: string | null
@@ -253,6 +264,7 @@ export type ComptablePeriodWhereInput = {
   year?: Prisma.IntFilter<"ComptablePeriod"> | number
   batchId?: Prisma.StringFilter<"ComptablePeriod"> | string
   status?: Prisma.EnumProcessingStatusFilter<"ComptablePeriod"> | $Enums.ProcessingStatus
+  progress?: Prisma.IntFilter<"ComptablePeriod"> | number
   createdAt?: Prisma.DateTimeFilter<"ComptablePeriod"> | Date | string
   processedAt?: Prisma.DateTimeNullableFilter<"ComptablePeriod"> | Date | string | null
   excelFileUrl?: Prisma.StringNullableFilter<"ComptablePeriod"> | string | null
@@ -268,6 +280,7 @@ export type ComptablePeriodOrderByWithRelationInput = {
   year?: Prisma.SortOrder
   batchId?: Prisma.SortOrder
   status?: Prisma.SortOrder
+  progress?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   processedAt?: Prisma.SortOrderInput | Prisma.SortOrder
   excelFileUrl?: Prisma.SortOrderInput | Prisma.SortOrder
@@ -287,6 +300,7 @@ export type ComptablePeriodWhereUniqueInput = Prisma.AtLeast<{
   periodEnd?: Prisma.DateTimeFilter<"ComptablePeriod"> | Date | string
   year?: Prisma.IntFilter<"ComptablePeriod"> | number
   status?: Prisma.EnumProcessingStatusFilter<"ComptablePeriod"> | $Enums.ProcessingStatus
+  progress?: Prisma.IntFilter<"ComptablePeriod"> | number
   createdAt?: Prisma.DateTimeFilter<"ComptablePeriod"> | Date | string
   processedAt?: Prisma.DateTimeNullableFilter<"ComptablePeriod"> | Date | string | null
   excelFileUrl?: Prisma.StringNullableFilter<"ComptablePeriod"> | string | null
@@ -302,6 +316,7 @@ export type ComptablePeriodOrderByWithAggregationInput = {
   year?: Prisma.SortOrder
   batchId?: Prisma.SortOrder
   status?: Prisma.SortOrder
+  progress?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   processedAt?: Prisma.SortOrderInput | Prisma.SortOrder
   excelFileUrl?: Prisma.SortOrderInput | Prisma.SortOrder
@@ -323,6 +338,7 @@ export type ComptablePeriodScalarWhereWithAggregatesInput = {
   year?: Prisma.IntWithAggregatesFilter<"ComptablePeriod"> | number
   batchId?: Prisma.StringWithAggregatesFilter<"ComptablePeriod"> | string
   status?: Prisma.EnumProcessingStatusWithAggregatesFilter<"ComptablePeriod"> | $Enums.ProcessingStatus
+  progress?: Prisma.IntWithAggregatesFilter<"ComptablePeriod"> | number
   createdAt?: Prisma.DateTimeWithAggregatesFilter<"ComptablePeriod"> | Date | string
   processedAt?: Prisma.DateTimeNullableWithAggregatesFilter<"ComptablePeriod"> | Date | string | null
   excelFileUrl?: Prisma.StringNullableWithAggregatesFilter<"ComptablePeriod"> | string | null
@@ -335,6 +351,7 @@ export type ComptablePeriodCreateInput = {
   year: number
   batchId: string
   status?: $Enums.ProcessingStatus
+  progress?: number
   createdAt?: Date | string
   processedAt?: Date | string | null
   excelFileUrl?: string | null
@@ -350,6 +367,7 @@ export type ComptablePeriodUncheckedCreateInput = {
   year: number
   batchId: string
   status?: $Enums.ProcessingStatus
+  progress?: number
   createdAt?: Date | string
   processedAt?: Date | string | null
   excelFileUrl?: string | null
@@ -363,6 +381,7 @@ export type ComptablePeriodUpdateInput = {
   year?: Prisma.IntFieldUpdateOperationsInput | number
   batchId?: Prisma.StringFieldUpdateOperationsInput | string
   status?: Prisma.EnumProcessingStatusFieldUpdateOperationsInput | $Enums.ProcessingStatus
+  progress?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   processedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   excelFileUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -378,6 +397,7 @@ export type ComptablePeriodUncheckedUpdateInput = {
   year?: Prisma.IntFieldUpdateOperationsInput | number
   batchId?: Prisma.StringFieldUpdateOperationsInput | string
   status?: Prisma.EnumProcessingStatusFieldUpdateOperationsInput | $Enums.ProcessingStatus
+  progress?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   processedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   excelFileUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -392,6 +412,7 @@ export type ComptablePeriodCreateManyInput = {
   year: number
   batchId: string
   status?: $Enums.ProcessingStatus
+  progress?: number
   createdAt?: Date | string
   processedAt?: Date | string | null
   excelFileUrl?: string | null
@@ -404,6 +425,7 @@ export type ComptablePeriodUpdateManyMutationInput = {
   year?: Prisma.IntFieldUpdateOperationsInput | number
   batchId?: Prisma.StringFieldUpdateOperationsInput | string
   status?: Prisma.EnumProcessingStatusFieldUpdateOperationsInput | $Enums.ProcessingStatus
+  progress?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   processedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   excelFileUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -417,6 +439,7 @@ export type ComptablePeriodUncheckedUpdateManyInput = {
   year?: Prisma.IntFieldUpdateOperationsInput | number
   batchId?: Prisma.StringFieldUpdateOperationsInput | string
   status?: Prisma.EnumProcessingStatusFieldUpdateOperationsInput | $Enums.ProcessingStatus
+  progress?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   processedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   excelFileUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -451,6 +474,7 @@ export type ComptablePeriodCountOrderByAggregateInput = {
   year?: Prisma.SortOrder
   batchId?: Prisma.SortOrder
   status?: Prisma.SortOrder
+  progress?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   processedAt?: Prisma.SortOrder
   excelFileUrl?: Prisma.SortOrder
@@ -458,6 +482,7 @@ export type ComptablePeriodCountOrderByAggregateInput = {
 
 export type ComptablePeriodAvgOrderByAggregateInput = {
   year?: Prisma.SortOrder
+  progress?: Prisma.SortOrder
 }
 
 export type ComptablePeriodMaxOrderByAggregateInput = {
@@ -468,6 +493,7 @@ export type ComptablePeriodMaxOrderByAggregateInput = {
   year?: Prisma.SortOrder
   batchId?: Prisma.SortOrder
   status?: Prisma.SortOrder
+  progress?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   processedAt?: Prisma.SortOrder
   excelFileUrl?: Prisma.SortOrder
@@ -481,6 +507,7 @@ export type ComptablePeriodMinOrderByAggregateInput = {
   year?: Prisma.SortOrder
   batchId?: Prisma.SortOrder
   status?: Prisma.SortOrder
+  progress?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   processedAt?: Prisma.SortOrder
   excelFileUrl?: Prisma.SortOrder
@@ -488,6 +515,7 @@ export type ComptablePeriodMinOrderByAggregateInput = {
 
 export type ComptablePeriodSumOrderByAggregateInput = {
   year?: Prisma.SortOrder
+  progress?: Prisma.SortOrder
 }
 
 export type ComptablePeriodCreateNestedManyWithoutClientInput = {
@@ -553,6 +581,7 @@ export type ComptablePeriodCreateWithoutClientInput = {
   year: number
   batchId: string
   status?: $Enums.ProcessingStatus
+  progress?: number
   createdAt?: Date | string
   processedAt?: Date | string | null
   excelFileUrl?: string | null
@@ -566,6 +595,7 @@ export type ComptablePeriodUncheckedCreateWithoutClientInput = {
   year: number
   batchId: string
   status?: $Enums.ProcessingStatus
+  progress?: number
   createdAt?: Date | string
   processedAt?: Date | string | null
   excelFileUrl?: string | null
@@ -609,6 +639,7 @@ export type ComptablePeriodScalarWhereInput = {
   year?: Prisma.IntFilter<"ComptablePeriod"> | number
   batchId?: Prisma.StringFilter<"ComptablePeriod"> | string
   status?: Prisma.EnumProcessingStatusFilter<"ComptablePeriod"> | $Enums.ProcessingStatus
+  progress?: Prisma.IntFilter<"ComptablePeriod"> | number
   createdAt?: Prisma.DateTimeFilter<"ComptablePeriod"> | Date | string
   processedAt?: Prisma.DateTimeNullableFilter<"ComptablePeriod"> | Date | string | null
   excelFileUrl?: Prisma.StringNullableFilter<"ComptablePeriod"> | string | null
@@ -621,6 +652,7 @@ export type ComptablePeriodCreateWithoutFilesInput = {
   year: number
   batchId: string
   status?: $Enums.ProcessingStatus
+  progress?: number
   createdAt?: Date | string
   processedAt?: Date | string | null
   excelFileUrl?: string | null
@@ -635,6 +667,7 @@ export type ComptablePeriodUncheckedCreateWithoutFilesInput = {
   year: number
   batchId: string
   status?: $Enums.ProcessingStatus
+  progress?: number
   createdAt?: Date | string
   processedAt?: Date | string | null
   excelFileUrl?: string | null
@@ -663,6 +696,7 @@ export type ComptablePeriodUpdateWithoutFilesInput = {
   year?: Prisma.IntFieldUpdateOperationsInput | number
   batchId?: Prisma.StringFieldUpdateOperationsInput | string
   status?: Prisma.EnumProcessingStatusFieldUpdateOperationsInput | $Enums.ProcessingStatus
+  progress?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   processedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   excelFileUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -677,6 +711,7 @@ export type ComptablePeriodUncheckedUpdateWithoutFilesInput = {
   year?: Prisma.IntFieldUpdateOperationsInput | number
   batchId?: Prisma.StringFieldUpdateOperationsInput | string
   status?: Prisma.EnumProcessingStatusFieldUpdateOperationsInput | $Enums.ProcessingStatus
+  progress?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   processedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   excelFileUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -689,6 +724,7 @@ export type ComptablePeriodCreateManyClientInput = {
   year: number
   batchId: string
   status?: $Enums.ProcessingStatus
+  progress?: number
   createdAt?: Date | string
   processedAt?: Date | string | null
   excelFileUrl?: string | null
@@ -701,6 +737,7 @@ export type ComptablePeriodUpdateWithoutClientInput = {
   year?: Prisma.IntFieldUpdateOperationsInput | number
   batchId?: Prisma.StringFieldUpdateOperationsInput | string
   status?: Prisma.EnumProcessingStatusFieldUpdateOperationsInput | $Enums.ProcessingStatus
+  progress?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   processedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   excelFileUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -714,6 +751,7 @@ export type ComptablePeriodUncheckedUpdateWithoutClientInput = {
   year?: Prisma.IntFieldUpdateOperationsInput | number
   batchId?: Prisma.StringFieldUpdateOperationsInput | string
   status?: Prisma.EnumProcessingStatusFieldUpdateOperationsInput | $Enums.ProcessingStatus
+  progress?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   processedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   excelFileUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -727,6 +765,7 @@ export type ComptablePeriodUncheckedUpdateManyWithoutClientInput = {
   year?: Prisma.IntFieldUpdateOperationsInput | number
   batchId?: Prisma.StringFieldUpdateOperationsInput | string
   status?: Prisma.EnumProcessingStatusFieldUpdateOperationsInput | $Enums.ProcessingStatus
+  progress?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   processedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   excelFileUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -771,6 +810,7 @@ export type ComptablePeriodSelect<ExtArgs extends runtime.Types.Extensions.Inter
   year?: boolean
   batchId?: boolean
   status?: boolean
+  progress?: boolean
   createdAt?: boolean
   processedAt?: boolean
   excelFileUrl?: boolean
@@ -787,6 +827,7 @@ export type ComptablePeriodSelectCreateManyAndReturn<ExtArgs extends runtime.Typ
   year?: boolean
   batchId?: boolean
   status?: boolean
+  progress?: boolean
   createdAt?: boolean
   processedAt?: boolean
   excelFileUrl?: boolean
@@ -801,6 +842,7 @@ export type ComptablePeriodSelectUpdateManyAndReturn<ExtArgs extends runtime.Typ
   year?: boolean
   batchId?: boolean
   status?: boolean
+  progress?: boolean
   createdAt?: boolean
   processedAt?: boolean
   excelFileUrl?: boolean
@@ -815,12 +857,13 @@ export type ComptablePeriodSelectScalar = {
   year?: boolean
   batchId?: boolean
   status?: boolean
+  progress?: boolean
   createdAt?: boolean
   processedAt?: boolean
   excelFileUrl?: boolean
 }
 
-export type ComptablePeriodOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "clientId" | "periodStart" | "periodEnd" | "year" | "batchId" | "status" | "createdAt" | "processedAt" | "excelFileUrl", ExtArgs["result"]["comptablePeriod"]>
+export type ComptablePeriodOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "clientId" | "periodStart" | "periodEnd" | "year" | "batchId" | "status" | "progress" | "createdAt" | "processedAt" | "excelFileUrl", ExtArgs["result"]["comptablePeriod"]>
 export type ComptablePeriodInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   files?: boolean | Prisma.ComptablePeriod$filesArgs<ExtArgs>
   client?: boolean | Prisma.ClientDefaultArgs<ExtArgs>
@@ -847,6 +890,7 @@ export type $ComptablePeriodPayload<ExtArgs extends runtime.Types.Extensions.Int
     year: number
     batchId: string
     status: $Enums.ProcessingStatus
+    progress: number
     createdAt: Date
     processedAt: Date | null
     excelFileUrl: string | null
@@ -1282,6 +1326,7 @@ export interface ComptablePeriodFieldRefs {
   readonly year: Prisma.FieldRef<"ComptablePeriod", 'Int'>
   readonly batchId: Prisma.FieldRef<"ComptablePeriod", 'String'>
   readonly status: Prisma.FieldRef<"ComptablePeriod", 'ProcessingStatus'>
+  readonly progress: Prisma.FieldRef<"ComptablePeriod", 'Int'>
   readonly createdAt: Prisma.FieldRef<"ComptablePeriod", 'DateTime'>
   readonly processedAt: Prisma.FieldRef<"ComptablePeriod", 'DateTime'>
   readonly excelFileUrl: Prisma.FieldRef<"ComptablePeriod", 'String'>

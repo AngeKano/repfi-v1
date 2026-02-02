@@ -9,9 +9,14 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "../auth/[...nextauth]/route";
 import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
-
 import { z } from "zod";
-import { prisma } from '@/lib/prisma'
+import { prisma } from "@/lib/prisma";
+import {
+  requirePermission,
+  checkPermissionSync,
+  getMappedRole,
+  CLIENTS_ACTIONS,
+} from "@/lib/permissions";
 
 // Schéma de validation pour la création
 const createClientSchema = z.object({
@@ -89,13 +94,20 @@ export async function GET(req: NextRequest) {
     const skip = (page - 1) * limit;
 
     // Construction du where selon le rôle
-    let whereClause: any = {
+    const whereClause: Record<string, unknown> = {
       companyId: session.user.companyId,
-      deletedAt: null, // ✅ Ajouter filtre pour exclure les supprimés
+      deletedAt: null,
     };
 
-    // Si USER, filtrer par assignments
-    if (session.user.role === "USER") {
+    // Vérifier si l'utilisateur peut voir tous les clients
+    const userRole = getMappedRole(session.user.role);
+    const canSeeAllClients = checkPermissionSync(
+      userRole,
+      CLIENTS_ACTIONS.VOIR_TOUS
+    );
+
+    // Si l'utilisateur ne peut pas voir tous les clients, filtrer par assignments
+    if (!canSeeAllClients) {
       const assignments = await prisma.clientAssignment.findMany({
         where: { userId: session.user.id },
         select: { clientId: true },
@@ -153,9 +165,10 @@ export async function GET(req: NextRequest) {
       },
     });
 
-    // Pour chaque client, récupérer les membres assignés (si admin)
+    // Pour chaque client, récupérer les membres assignés (si permission de voir les membres)
     let clientsWithMembers = clients;
-    if (session.user.role === "ADMIN_ROOT" || session.user.role === "ADMIN") {
+    const canSeeMembers = checkPermissionSync(userRole, "membres:voir");
+    if (canSeeMembers) {
       clientsWithMembers = await Promise.all(
         clients.map(async (client) => {
           const assignments = await prisma.clientAssignment.findMany({
@@ -206,19 +219,14 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user) {
-      return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
+    // Vérifier la permission de créer un client
+    const permissionResult = await requirePermission(CLIENTS_ACTIONS.CREER);
+    if (permissionResult instanceof NextResponse) {
+      return permissionResult;
     }
+    const { user } = permissionResult;
 
-    if (session.user.role === "USER") {
-      return NextResponse.json(
-        { error: "Permissions insuffisantes" },
-        { status: 403 }
-      );
-    }
-
-    if (session.user.companyPackType !== "ENTREPRISE") {
+    if (user.companyPackType !== "ENTREPRISE") {
       return NextResponse.json(
         {
           error: "Cette fonctionnalité nécessite le pack ENTREPRISE",
@@ -233,7 +241,7 @@ export async function POST(req: NextRequest) {
     const existingClient = await prisma.client.findFirst({
       where: {
         email: data.email,
-        companyId: session.user.companyId,
+        companyId: user.companyId,
       },
     });
 
@@ -253,13 +261,13 @@ export async function POST(req: NextRequest) {
         companyType: data.companyType,
         denomination: data.denomination,
         description: data.description,
-        companyId: session.user.companyId,
-        createdById: session.user.id,
+        companyId: user.companyId,
+        createdById: user.id,
         isSelfEntity: false,
       },
     });
 
-    await createClientS3Folder(session.user.companyId, client.id);
+    await createClientS3Folder(user.companyId, client.id);
 
     if (data.socialNetworks && data.socialNetworks.length > 0) {
       await prisma.socialNetwork.createMany({
