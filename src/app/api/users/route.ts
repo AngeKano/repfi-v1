@@ -164,7 +164,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Empêcher la création d'ADMIN_ROOT
-    if (data.role === "ADMIN_ROOT" || targetRole === RoleId.ADMIN_ROOT) {
+    if (targetRole === RoleId.ADMIN_ROOT) {
       return NextResponse.json(
         { error: "Impossible de créer un administrateur root" },
         { status: 403 }
