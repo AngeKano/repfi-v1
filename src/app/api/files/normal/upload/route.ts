@@ -1,11 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
 import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
 import { z } from "zod";
-import { authOptions } from "../../../auth/[...nextauth]/route";
-
-// Instantiate Prisma client
 import { prisma } from "@/lib/prisma";
+import { requirePermission, FICHIERS_ACTIONS } from "@/lib/permissions";
 // Instantiate S3 client
 const s3Client = new S3Client({
   region: process.env.AWS_REGION!,
@@ -22,10 +19,12 @@ const uploadSchema = z.object({
 
 export async function POST(req: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user) {
-      return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
+    // Vérifier la permission de charger des fichiers
+    const permissionResult = await requirePermission(FICHIERS_ACTIONS.CHARGER);
+    if (permissionResult instanceof NextResponse) {
+      return permissionResult;
     }
+    const { user } = permissionResult;
 
     const formData = await req.formData();
     const file = formData.get("file") as File;
@@ -44,7 +43,7 @@ export async function POST(req: NextRequest) {
     const client = await prisma.client.findFirst({
       where: {
         id: data.clientId,
-        companyId: session.user.companyId,
+        companyId: user.companyId,
       },
     });
 
@@ -107,8 +106,7 @@ export async function POST(req: NextRequest) {
         mimeType: file.type,
         clientId: data.clientId,
         folderId: folderId || null,
-        uploadedById: session.user.id,
-        // status handled by model default (EN_COURS)
+        uploadedById: user.id,
       },
     });
 
@@ -136,8 +134,8 @@ export async function POST(req: NextRequest) {
           fileName: file.name,
           action: "UPLOAD",
           details: "Fichier normal uploadé avec succès",
-          userId: session.user.id,
-          userEmail: session.user.email ?? "",
+          userId: user.id,
+          userEmail: user.email ?? "",
         },
       });
     } catch (s3Error) {

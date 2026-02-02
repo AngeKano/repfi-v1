@@ -8,11 +8,28 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "../auth/[...nextauth]/route";
-
 import { z } from "zod";
 import bcrypt from "bcryptjs";
-
 import { prisma } from "@/lib/prisma";
+import {
+  requirePermission,
+  getMappedRole,
+  canManageRole,
+  RoleId,
+  MEMBRES_ACTIONS,
+} from "@/lib/permissions";
+
+// Liste des rôles disponibles pour la création
+const availableRoles = [
+  "ADMIN_CF",
+  "ADMIN_PARTENAIRE",
+  "LOADER",
+  "LOADER_PLUS",
+  "VIEWER",
+  // Legacy roles pour compatibilité
+  "ADMIN",
+  "USER",
+] as const;
 
 // Schéma de validation pour la création
 const createUserSchema = z.object({
@@ -22,7 +39,7 @@ const createUserSchema = z.object({
     .min(8, "Le mot de passe doit contenir au moins 8 caractères"),
   firstName: z.string().min(2).max(100).optional(),
   lastName: z.string().min(2).max(100).optional(),
-  role: z.enum(["ADMIN", "USER"]).default("USER"),
+  role: z.enum(availableRoles).default("LOADER"),
 });
 
 /**
@@ -31,11 +48,12 @@ const createUserSchema = z.object({
  */
 export async function GET(req: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
-
-    if (!session?.user) {
-      return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
+    // Vérifier la permission de voir les membres
+    const permissionResult = await requirePermission(MEMBRES_ACTIONS.VOIR);
+    if (permissionResult instanceof NextResponse) {
+      return permissionResult;
     }
+    const { user } = permissionResult;
 
     const { searchParams } = new URL(req.url);
     const page = parseInt(searchParams.get("page") || "1");
@@ -47,8 +65,8 @@ export async function GET(req: NextRequest) {
     const skip = (page - 1) * limit;
 
     // Construction du where
-    let whereClause: any = {
-      companyId: session.user.companyId,
+    const whereClause: Record<string, unknown> = {
+      companyId: user.companyId,
     };
 
     // Filtres
@@ -120,37 +138,35 @@ export async function GET(req: NextRequest) {
  */
 export async function POST(req: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
-
-    if (!session?.user) {
-      return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
+    // Vérifier la permission de créer un membre
+    const permissionResult = await requirePermission(MEMBRES_ACTIONS.CREER);
+    if (permissionResult instanceof NextResponse) {
+      return permissionResult;
     }
-
-    // Seuls les admins peuvent créer des utilisateurs
-    if (session.user.role !== "ADMIN_ROOT" && session.user.role !== "ADMIN") {
-      return NextResponse.json(
-        { error: "Permissions insuffisantes" },
-        { status: 403 }
-      );
-    }
-    // NEW
-    // Vérifier le pack ENTREPRISE pour ajouter des membres
-    // if (session.user.companyPackType !== 'ENTREPRISE') {
-    //   return NextResponse.json(
-    //     {
-    //       error: 'Cette fonctionnalité nécessite le pack ENTREPRISE',
-    //     },
-    //     { status: 403 }
-    //   );
-    // }
+    const { user } = permissionResult;
 
     const body = await req.json();
     const data = createUserSchema.parse(body);
 
-    // ADMIN ne peut pas créer d'ADMIN_ROOT
-    if (session.user.role === "ADMIN" && data.role === "ADMIN") {
+    // Vérifier que l'utilisateur peut créer un membre avec ce rôle
+    const creatorRole = getMappedRole(user.role);
+    const targetRole = getMappedRole(data.role);
+
+    // On ne peut créer que des rôles de niveau inférieur au sien
+    if (!canManageRole(creatorRole, targetRole)) {
       return NextResponse.json(
-        { error: "Vous ne pouvez pas créer un administrateur" },
+        {
+          error:
+            "Vous ne pouvez pas créer un membre avec un rôle supérieur ou égal au vôtre",
+        },
+        { status: 403 }
+      );
+    }
+
+    // Empêcher la création d'ADMIN_ROOT
+    if (data.role === "ADMIN_ROOT" || targetRole === RoleId.ADMIN_ROOT) {
+      return NextResponse.json(
+        { error: "Impossible de créer un administrateur root" },
         { status: 403 }
       );
     }
@@ -171,14 +187,14 @@ export async function POST(req: NextRequest) {
     const hashedPassword = await bcrypt.hash(data.password, 10);
 
     // Créer l'utilisateur
-    const user = await prisma.user.create({
+    const newUser = await prisma.user.create({
       data: {
         email: data.email,
         password: hashedPassword,
         firstName: data.firstName,
         lastName: data.lastName,
         role: data.role,
-        companyId: session.user.companyId,
+        companyId: user.companyId,
         isActive: true,
       },
       select: {
@@ -195,7 +211,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(
       {
         message: "Membre ajouté avec succès",
-        user,
+        user: newUser,
       },
       { status: 201 }
     );

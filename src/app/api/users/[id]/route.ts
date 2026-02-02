@@ -12,6 +12,26 @@ import { authOptions } from "../../auth/[...nextauth]/route";
 import { z } from "zod";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
+import {
+  requirePermission,
+  checkPermissionSync,
+  getMappedRole,
+  canManageRole,
+  RoleId,
+  MEMBRES_ACTIONS,
+} from "@/lib/permissions";
+
+// Liste des rôles disponibles pour la mise à jour
+const availableRoles = [
+  "ADMIN_CF",
+  "ADMIN_PARTENAIRE",
+  "LOADER",
+  "LOADER_PLUS",
+  "VIEWER",
+  // Legacy roles pour compatibilité
+  "ADMIN",
+  "USER",
+] as const;
 
 // Schéma de validation pour la mise à jour
 const updateUserSchema = z.object({
@@ -19,7 +39,7 @@ const updateUserSchema = z.object({
   password: z.string().min(8).optional(),
   firstName: z.string().min(2).max(100).optional().nullable(),
   lastName: z.string().min(2).max(100).optional().nullable(),
-  role: z.enum(["ADMIN", "USER"]).optional(),
+  role: z.enum(availableRoles).optional(),
   isActive: z.boolean().optional(),
 });
 
@@ -53,12 +73,15 @@ async function checkUserAccess(
     return { hasAccess: false, user: null, error: "Utilisateur non trouvé" };
   }
 
-  // Admin peut accéder à tous les membres de son entreprise
-  if (role === "ADMIN_ROOT" || role === "ADMIN") {
+  // Vérifier si l'utilisateur peut voir les membres
+  const mappedRole = getMappedRole(role);
+  const canSeeMembers = checkPermissionSync(mappedRole, MEMBRES_ACTIONS.VOIR);
+
+  if (canSeeMembers) {
     return { hasAccess: true, user, error: null };
   }
 
-  // USER peut uniquement voir son propre profil
+  // Sinon, peut uniquement voir son propre profil
   if (userId === sessionUserId) {
     return { hasAccess: true, user, error: null };
   }
@@ -152,22 +175,27 @@ export async function PATCH(
       return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
     }
 
-    // Vérifier les permissions
-    const isAdmin =
-      session.user.role === "ADMIN_ROOT" || session.user.role === "ADMIN";
-    const isSelf = id === session.user.id;
+    const sessionUser = session.user;
+    const sessionRole = getMappedRole(sessionUser.role);
+    const isSelf = id === sessionUser.id;
 
-    if (!isAdmin && !isSelf) {
+    // Vérifier les permissions de modification
+    const canModifyMembers = checkPermissionSync(
+      sessionRole,
+      MEMBRES_ACTIONS.MODIFIER
+    );
+
+    if (!canModifyMembers && !isSelf) {
       return NextResponse.json(
         { error: "Permissions insuffisantes" },
         { status: 403 }
       );
     }
 
-    const { hasAccess, user, error } = await checkUserAccess(
+    const { hasAccess, user: targetUser, error } = await checkUserAccess(
       id,
-      session.user.id,
-      session.user.role
+      sessionUser.id,
+      sessionUser.role
     );
 
     if (!hasAccess) {
@@ -180,8 +208,8 @@ export async function PATCH(
     const body = await req.json();
     const data = updateUserSchema.parse(body);
 
-    // USER ne peut modifier que son profil (pas le rôle ni isActive)
-    if (!isAdmin) {
+    // Si l'utilisateur n'a pas la permission de modifier, il ne peut modifier que son profil
+    if (!canModifyMembers) {
       if (data.role || data.isActive !== undefined) {
         return NextResponse.json(
           { error: "Vous ne pouvez pas modifier le rôle ou le statut" },
@@ -190,24 +218,47 @@ export async function PATCH(
       }
     }
 
-    // ADMIN ne peut pas modifier un ADMIN_ROOT
-    if (session.user.role === "ADMIN" && user?.role === "ADMIN_ROOT") {
+    // Vérifier la hiérarchie des rôles
+    const targetRole = getMappedRole(targetUser?.role || "");
+
+    // On ne peut pas modifier un utilisateur de niveau supérieur ou égal
+    if (
+      targetRole !== sessionRole &&
+      !canManageRole(sessionRole, targetRole)
+    ) {
       return NextResponse.json(
-        { error: "Vous ne pouvez pas modifier un administrateur root" },
+        {
+          error:
+            "Vous ne pouvez pas modifier un utilisateur avec un rôle supérieur ou égal au vôtre",
+        },
         { status: 403 }
       );
     }
 
-    // ADMIN ne peut pas promouvoir quelqu'un en ADMIN
-    if (session.user.role === "ADMIN" && data.role === "ADMIN") {
-      return NextResponse.json(
-        { error: "Vous ne pouvez pas créer un administrateur" },
-        { status: 403 }
-      );
+    // Empêcher la modification vers ADMIN_ROOT
+    if (data.role) {
+      const newRole = getMappedRole(data.role);
+      if (newRole === RoleId.ADMIN_ROOT) {
+        return NextResponse.json(
+          { error: "Impossible de promouvoir en administrateur root" },
+          { status: 403 }
+        );
+      }
+
+      // On ne peut pas promouvoir à un rôle supérieur ou égal au sien
+      if (!canManageRole(sessionRole, newRole)) {
+        return NextResponse.json(
+          {
+            error:
+              "Vous ne pouvez pas attribuer un rôle supérieur ou égal au vôtre",
+          },
+          { status: 403 }
+        );
+      }
     }
 
     // Vérifier si l'email existe déjà
-    if (data.email && data.email !== user?.email) {
+    if (data.email && data.email !== targetUser?.email) {
       const existingUser = await prisma.user.findUnique({
         where: { email: data.email },
       });
@@ -221,15 +272,15 @@ export async function PATCH(
     }
 
     // Préparer les données à mettre à jour
-    const updateData: any = {
+    const updateData: Record<string, unknown> = {
       email: data.email,
       firstName: data.firstName,
       lastName: data.lastName,
       updatedAt: new Date(),
     };
 
-    // Admins peuvent modifier le rôle et le statut
-    if (isAdmin) {
+    // Si permission de modifier, peut changer le rôle et le statut
+    if (canModifyMembers) {
       if (data.role !== undefined) updateData.role = data.role;
       if (data.isActive !== undefined) updateData.isActive = data.isActive;
     }
@@ -286,24 +337,18 @@ export async function DELETE(
 ) {
   try {
     const { id } = await params;
-    const session = await getServerSession(authOptions);
 
-    if (!session?.user) {
-      return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
+    // Vérifier la permission de désactiver un membre
+    const permissionResult = await requirePermission(MEMBRES_ACTIONS.DESACTIVER);
+    if (permissionResult instanceof NextResponse) {
+      return permissionResult;
     }
+    const { user: sessionUser } = permissionResult;
 
-    // Seuls les admins peuvent désactiver
-    if (session.user.role !== "ADMIN_ROOT" && session.user.role !== "ADMIN") {
-      return NextResponse.json(
-        { error: "Permissions insuffisantes" },
-        { status: 403 }
-      );
-    }
-
-    const { hasAccess, user, error } = await checkUserAccess(
+    const { hasAccess, user: targetUser, error } = await checkUserAccess(
       id,
-      session.user.id,
-      session.user.role
+      sessionUser.id,
+      sessionUser.role
     );
 
     if (!hasAccess) {
@@ -314,23 +359,30 @@ export async function DELETE(
     }
 
     // Ne peut pas se désactiver soi-même
-    if (id === session.user.id) {
+    if (id === sessionUser.id) {
       return NextResponse.json(
         { error: "Vous ne pouvez pas vous désactiver vous-même" },
         { status: 403 }
       );
     }
 
-    // ADMIN ne peut pas désactiver un ADMIN_ROOT
-    if (session.user.role === "ADMIN" && user?.role === "ADMIN_ROOT") {
+    // Vérifier la hiérarchie des rôles
+    const sessionRole = getMappedRole(sessionUser.role);
+    const targetRole = getMappedRole(targetUser?.role || "");
+
+    // On ne peut pas désactiver un utilisateur de niveau supérieur ou égal
+    if (!canManageRole(sessionRole, targetRole)) {
       return NextResponse.json(
-        { error: "Vous ne pouvez pas désactiver un administrateur root" },
+        {
+          error:
+            "Vous ne pouvez pas désactiver un utilisateur avec un rôle supérieur ou égal au vôtre",
+        },
         { status: 403 }
       );
     }
 
     // Ne peut pas désactiver un ADMIN_ROOT
-    if (user?.role === "ADMIN_ROOT") {
+    if (targetRole === RoleId.ADMIN_ROOT) {
       return NextResponse.json(
         { error: "Impossible de désactiver un administrateur root" },
         { status: 403 }

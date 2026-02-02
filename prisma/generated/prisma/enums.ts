@@ -19,6 +19,11 @@ export type PackType = (typeof PackType)[keyof typeof PackType]
 
 export const UserRole = {
   ADMIN_ROOT: 'ADMIN_ROOT',
+  ADMIN_CF: 'ADMIN_CF',
+  ADMIN_PARTENAIRE: 'ADMIN_PARTENAIRE',
+  LOADER: 'LOADER',
+  LOADER_PLUS: 'LOADER_PLUS',
+  VIEWER: 'VIEWER',
   ADMIN: 'ADMIN',
   USER: 'USER'
 } as const
@@ -47,6 +52,7 @@ export type CompanyType = (typeof CompanyType)[keyof typeof CompanyType]
 export const FileType = {
   GRAND_LIVRE_COMPTES: 'GRAND_LIVRE_COMPTES',
   GRAND_LIVRE_TIERS: 'GRAND_LIVRE_TIERS',
+  GRAND_LIVRE: 'GRAND_LIVRE',
   PLAN_COMPTES: 'PLAN_COMPTES',
   PLAN_TIERS: 'PLAN_TIERS',
   CODE_JOURNAL: 'CODE_JOURNAL'

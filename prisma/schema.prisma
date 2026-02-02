@@ -267,6 +267,11 @@ enum PackType {
 
 enum UserRole {
   ADMIN_ROOT
+  ADMIN_CF
+  ADMIN_PARTENAIRE
+  LOADER
+  LOADER_PLUS
+  VIEWER
   ADMIN
   USER
 }

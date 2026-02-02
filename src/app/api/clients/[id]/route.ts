@@ -9,10 +9,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "../../auth/[...nextauth]/route";
-
 import { z } from "zod";
-
 import { prisma } from "@/lib/prisma";
+import {
+  requirePermission,
+  checkPermissionSync,
+  getMappedRole,
+  CLIENTS_ACTIONS,
+} from "@/lib/permissions";
 
 // Schéma de validation pour la mise à jour
 const updateClientSchema = z.object({
@@ -52,6 +56,7 @@ const updateClientSchema = z.object({
 /**
  * Vérifier l'accès au client
  */
+
 async function checkClientAccess(
   clientId: string,
   userId: string,
@@ -72,12 +77,18 @@ async function checkClientAccess(
     return { hasAccess: false, client: null, error: "Client non trouvé" };
   }
 
-  // Admin peut accéder à tous les clients de son entreprise
-  if (role === "ADMIN_ROOT" || role === "ADMIN") {
+  // Vérifier si l'utilisateur peut voir tous les clients
+  const mappedRole = getMappedRole(role);
+  const canSeeAllClients = checkPermissionSync(
+    mappedRole,
+    CLIENTS_ACTIONS.VOIR_TOUS
+  );
+
+  if (canSeeAllClients) {
     return { hasAccess: true, client, error: null };
   }
 
-  // USER ne peut accéder qu'aux clients assignés
+  // Sinon, ne peut accéder qu'aux clients assignés
   const assignment = await prisma.clientAssignment.findFirst({
     where: {
       clientId,
@@ -213,25 +224,15 @@ export async function PATCH(
 ) {
   try {
     const { id } = await params;
-    const session = await getServerSession(authOptions);
 
-    if (!session?.user) {
-      return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
+    // Vérifier la permission de modifier un client
+    const permissionResult = await requirePermission(CLIENTS_ACTIONS.MODIFIER);
+    if (permissionResult instanceof NextResponse) {
+      return permissionResult;
     }
+    const { user } = permissionResult;
 
-    // Seuls les admins peuvent modifier
-    if (session.user.role === "USER") {
-      return NextResponse.json(
-        { error: "Permissions insuffisantes" },
-        { status: 403 }
-      );
-    }
-
-    const { hasAccess, error } = await checkClientAccess(
-      id,
-      session.user.id,
-      session.user.role
-    );
+    const { hasAccess, error } = await checkClientAccess(id, user.id, user.role);
 
     if (!hasAccess) {
       return NextResponse.json(
@@ -264,7 +265,7 @@ export async function PATCH(
       const existingClient = await prisma.client.findFirst({
         where: {
           email: data.email,
-          companyId: session.user.companyId,
+          companyId: user.companyId,
           id: { not: id },
         },
       });
@@ -351,26 +352,22 @@ export async function DELETE(
 ) {
   try {
     const { id } = await params;
-    const session = await getServerSession(authOptions);
 
-    if (!session?.user) {
-      return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
+    // Vérifier la permission de désactiver un client
+    const permissionResult = await requirePermission(
+      CLIENTS_ACTIONS.DESACTIVER
+    );
+    if (permissionResult instanceof NextResponse) {
+      return permissionResult;
     }
-
-    // Seuls ADMIN_ROOT peut supprimer
-    if (session.user.role !== "ADMIN_ROOT") {
-      return NextResponse.json(
-        { error: "Seul l'administrateur root peut supprimer des clients" },
-        { status: 403 }
-      );
-    }
+    const { user } = permissionResult;
 
     const clientId = id;
 
     const { hasAccess, error } = await checkClientAccess(
       clientId,
-      session.user.id,
-      session.user.role
+      user.id,
+      user.role
     );
 
     if (!hasAccess) {

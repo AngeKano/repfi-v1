@@ -1,6 +1,5 @@
 // app/api/files/comptable/upload/route.ts
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
 import {
   S3Client,
   PutObjectCommand,
@@ -9,10 +8,12 @@ import {
 } from "@aws-sdk/client-s3";
 import { z } from "zod";
 import { randomUUID } from "crypto";
-import { authOptions } from "@/app/api/auth/[...nextauth]/route";
-
 import { prisma } from "@/lib/prisma";
-import { FileType, ProcessingStatus } from "../../../../../../prisma/generated/prisma/enums";
+import {
+  FileType,
+  ProcessingStatus,
+} from "../../../../../../prisma/generated/prisma/enums";
+import { requirePermission, FICHIERS_ACTIONS } from "@/lib/permissions";
 
 const s3Client = new S3Client({
   region: process.env.AWS_REGION!,
@@ -107,10 +108,12 @@ async function createBackupIfNeeded(s3Prefix: string): Promise<void> {
 
 export async function POST(req: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user) {
-      return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
+    // Vérifier la permission de charger des fichiers
+    const permissionResult = await requirePermission(FICHIERS_ACTIONS.CHARGER);
+    if (permissionResult instanceof NextResponse) {
+      return permissionResult;
     }
+    const { user } = permissionResult;
 
     const formData = await req.formData();
     const clientId = formData.get("clientId") as string;
@@ -170,7 +173,7 @@ export async function POST(req: NextRequest) {
     const client = await prisma.client.findFirst({
       where: {
         id: data.clientId,
-        companyId: session.user.companyId,
+        companyId: user.companyId,
       },
       select: {
         id: true,
@@ -333,7 +336,7 @@ export async function POST(req: NextRequest) {
           periodStart: periodStart,
           periodEnd: periodEnd,
           clientId: data.clientId,
-          uploadedById: session.user.id,
+          uploadedById: user.id,
           processedAt: new Date(),
         },
       });
@@ -352,8 +355,8 @@ export async function POST(req: NextRequest) {
           details: `Fichier comptable uploadé (${FILE_TYPE_LABELS[fileType]}) - Période: ${formatDateYYYYMMDD(
             periodStart
           )} au ${formatDateYYYYMMDD(periodEnd)}`,
-          userId: session.user.id,
-          userEmail: session.user.email ?? "",
+          userId: user.id,
+          userEmail: user.email ?? "",
         },
       });
     }
