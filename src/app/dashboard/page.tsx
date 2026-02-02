@@ -2,6 +2,8 @@
 import { getServerSession } from "next-auth";
 import { authOptions } from "../api/auth/[...nextauth]/route";
 import { redirect } from "next/navigation";
+import { checkPermissionSync } from "@/lib/permissions/middleware";
+import { CLIENTS_ACTIONS, MEMBRES_ACTIONS, FICHIERS_ACTIONS } from "@/lib/permissions/actions";
 
 import DashboardClient from "./dashboard-client";
 
@@ -14,29 +16,38 @@ export default async function DashboardPage() {
     redirect("/auth/signin");
   }
 
-  // Récupérer les stats
+  // Verifier les permissions via le systeme RBAC
+  const canViewAllClients = checkPermissionSync(session.user.role, CLIENTS_ACTIONS.VOIR_TOUS);
+  const canViewMembers = checkPermissionSync(session.user.role, MEMBRES_ACTIONS.VOIR);
+  const canViewFiles = checkPermissionSync(session.user.role, FICHIERS_ACTIONS.VOIR);
+
+  // Recuperer les stats
   let clientsCount = 0;
   let filesCount = 0;
   let membersCount = 0;
 
-  if (session.user.role === "ADMIN_ROOT" || session.user.role === "ADMIN") {
-    // Admin voit tout
+  if (canViewAllClients) {
+    // L'utilisateur peut voir tous les clients
     clientsCount = await prisma.client.count({
       where: { companyId: session.user.companyId },
     });
 
-    filesCount = await prisma.normalFile.count({
-      where: {
-        client: { companyId: session.user.companyId },
-        deletedAt: null,
-      },
-    });
+    if (canViewFiles) {
+      filesCount = await prisma.normalFile.count({
+        where: {
+          client: { companyId: session.user.companyId },
+          deletedAt: null,
+        },
+      });
+    }
 
-    membersCount = await prisma.user.count({
-      where: { companyId: session.user.companyId },
-    });
+    if (canViewMembers) {
+      membersCount = await prisma.user.count({
+        where: { companyId: session.user.companyId },
+      });
+    }
   } else {
-    // User voit seulement ses clients
+    // L'utilisateur voit seulement ses clients assignes
     const assignments = await prisma.clientAssignment.findMany({
       where: { userId: session.user.id },
       include: { client: true },
@@ -44,17 +55,19 @@ export default async function DashboardPage() {
 
     clientsCount = assignments.length;
 
-    filesCount = await prisma.normalFile.count({
-      where: {
-        clientId: { in: assignments.map((a) => a.clientId) },
-        deletedAt: null,
-      },
-    });
+    if (canViewFiles) {
+      filesCount = await prisma.normalFile.count({
+        where: {
+          clientId: { in: assignments.map((a) => a.clientId) },
+          deletedAt: null,
+        },
+      });
+    }
   }
 
-  // Récupérer les clients récents
+  // Recuperer les clients recents
   let recentClients;
-  if (session.user.role === "ADMIN_ROOT" || session.user.role === "ADMIN") {
+  if (canViewAllClients) {
     recentClients = await prisma.client.findMany({
       where: { companyId: session.user.companyId },
       orderBy: { createdAt: "desc" },
@@ -89,42 +102,44 @@ export default async function DashboardPage() {
     recentClients = assignments.map((a) => a.client);
   }
 
-  // Récupérer les fichiers récents
-  let recentFiles;
-  if (session.user.role === "ADMIN_ROOT" || session.user.role === "ADMIN") {
-    recentFiles = await prisma.normalFile.findMany({
-      where: {
-        client: { companyId: session.user.companyId },
-        deletedAt: null,
-      },
-      orderBy: { uploadedAt: "desc" },
-      take: 5,
-      include: {
-        client: { select: { name: true } },
-        uploadedBy: {
-          select: { firstName: true, lastName: true, email: true },
+  // Recuperer les fichiers recents (seulement si l'utilisateur peut voir les fichiers)
+  let recentFiles: any[] = [];
+  if (canViewFiles) {
+    if (canViewAllClients) {
+      recentFiles = await prisma.normalFile.findMany({
+        where: {
+          client: { companyId: session.user.companyId },
+          deletedAt: null,
         },
-      },
-    });
-  } else {
-    const assignments = await prisma.clientAssignment.findMany({
-      where: { userId: session.user.id },
-    });
+        orderBy: { uploadedAt: "desc" },
+        take: 5,
+        include: {
+          client: { select: { name: true } },
+          uploadedBy: {
+            select: { firstName: true, lastName: true, email: true },
+          },
+        },
+      });
+    } else {
+      const assignments = await prisma.clientAssignment.findMany({
+        where: { userId: session.user.id },
+      });
 
-    recentFiles = await prisma.normalFile.findMany({
-      where: {
-        clientId: { in: assignments.map((a) => a.clientId) },
-        deletedAt: null,
-      },
-      orderBy: { uploadedAt: "desc" },
-      take: 5,
-      include: {
-        client: { select: { name: true } },
-        uploadedBy: {
-          select: { firstName: true, lastName: true, email: true },
+      recentFiles = await prisma.normalFile.findMany({
+        where: {
+          clientId: { in: assignments.map((a) => a.clientId) },
+          deletedAt: null,
         },
-      },
-    });
+        orderBy: { uploadedAt: "desc" },
+        take: 5,
+        include: {
+          client: { select: { name: true } },
+          uploadedBy: {
+            select: { firstName: true, lastName: true, email: true },
+          },
+        },
+      });
+    }
   }
 
   const stats = {

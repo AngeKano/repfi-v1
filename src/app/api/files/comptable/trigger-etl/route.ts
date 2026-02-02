@@ -3,6 +3,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { z } from "zod";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
+import { requirePermission } from "@/lib/permissions/middleware";
+import { FICHIERS_ACTIONS } from "@/lib/permissions/actions";
 
 import { prisma } from "@/lib/prisma";
 import { ProcessingStatus } from "../../../../../../prisma/generated/prisma/enums";
@@ -57,10 +59,12 @@ async function triggerAirflowDAG(
 
 export async function POST(req: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user) {
-      return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
+    // Verifier la permission de charger des fichiers (requis pour declencher l'ETL)
+    const permResult = await requirePermission(FICHIERS_ACTIONS.CHARGER);
+    if (permResult instanceof NextResponse) {
+      return permResult;
     }
+    const { user } = permResult;
 
     const body = await req.json();
     const { batchId } = triggerETLSchema.parse(body);
@@ -81,7 +85,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    if (comptablePeriod.client.companyId !== session.user.companyId) {
+    if (comptablePeriod.client.companyId !== user.companyId) {
       return NextResponse.json(
         { error: "Accès non autorisé" },
         { status: 403 }
@@ -177,8 +181,8 @@ export async function POST(req: NextRequest) {
           fileName: file.fileName,
           action: "ETL_TRIGGERED",
           details: `DAG Run: ${dagRunId}`,
-          userId: session.user.id,
-          userEmail: session.user.email ?? "",
+          userId: user.id,
+          userEmail: user.email ?? "",
         },
       });
     }
@@ -209,17 +213,19 @@ export async function POST(req: NextRequest) {
 
 export async function GET(req: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user) {
-      return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
+    // Verifier la permission de voir les fichiers
+    const permResult = await requirePermission(FICHIERS_ACTIONS.VOIR);
+    if (permResult instanceof NextResponse) {
+      return permResult;
     }
+    const { user } = permResult;
 
     const { searchParams } = new URL(req.url);
     const clientId = searchParams.get("clientId");
 
     const processingPeriods = await prisma.comptablePeriod.findMany({
       where: {
-        client: { companyId: session.user.companyId },
+        client: { companyId: user.companyId },
         ...(clientId && { clientId }),
         status: {
           in: [
