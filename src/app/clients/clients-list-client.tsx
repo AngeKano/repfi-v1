@@ -54,6 +54,7 @@ interface ClientsListClientProps {
   };
   initialSearch: string;
   initialType: string;
+  canCreateClient: boolean;
 }
 
 export default function ClientsListClient({
@@ -62,6 +63,7 @@ export default function ClientsListClient({
   pagination,
   initialSearch,
   initialType,
+  canCreateClient,
 }: ClientsListClientProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -69,10 +71,6 @@ export default function ClientsListClient({
   const [search, setSearch] = useState(initialSearch);
   const [companyType, setCompanyType] = useState(initialType);
   const [showFilters, setShowFilters] = useState(false);
-
-  const canCreateClient =
-    (session.user.role === "ADMIN_ROOT" || session.user.role === "ADMIN") &&
-    session.user.companyPackType === "ENTREPRISE";
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();

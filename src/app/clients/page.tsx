@@ -2,6 +2,8 @@
 import { getServerSession } from "next-auth";
 import { authOptions } from "../api/auth/[...nextauth]/route";
 import { redirect } from "next/navigation";
+import { checkPermissionSync } from "@/lib/permissions/middleware";
+import { CLIENTS_ACTIONS, MEMBRES_ACTIONS } from "@/lib/permissions/actions";
 
 import ClientsListClient from "./clients-list-client";
 
@@ -26,13 +28,19 @@ export default async function ClientsPage({
 
   const skip = (page - 1) * limit;
 
-  // ✅ Appeler Prisma directement (pas de fetch)
+  // Verifier les permissions via le systeme RBAC
+  const canViewAllClients = checkPermissionSync(session.user.role, CLIENTS_ACTIONS.VOIR_TOUS);
+  const canCreateClient = checkPermissionSync(session.user.role, CLIENTS_ACTIONS.CREER)
+    && session.user.companyPackType === "ENTREPRISE";
+  const canViewMembers = checkPermissionSync(session.user.role, MEMBRES_ACTIONS.VOIR);
+
+  // Appeler Prisma directement (pas de fetch)
   let whereClause: any = {
     companyId: session.user.companyId,
   };
 
-  // Si USER, filtrer par assignments
-  if (session.user.role === "USER") {
+  // Si l'utilisateur ne peut pas voir tous les clients, filtrer par assignments
+  if (!canViewAllClients) {
     const assignments = await prisma.clientAssignment.findMany({
       where: { userId: session.user.id },
       select: { clientId: true },
@@ -86,9 +94,9 @@ export default async function ClientsPage({
     }),
   ]);
 
-  // Récupérer membres assignés (si admin)
+  // Recuperer membres assignes (si l'utilisateur peut voir les membres)
   let clientsWithMembers = clients;
-  if (session.user.role === "ADMIN_ROOT" || session.user.role === "ADMIN") {
+  if (canViewMembers) {
     clientsWithMembers = await Promise.all(
       clients.map(async (client) => {
         const assignments = await prisma.clientAssignment.findMany({
@@ -128,6 +136,7 @@ export default async function ClientsPage({
       pagination={pagination}
       initialSearch={search}
       initialType={companyType}
+      canCreateClient={canCreateClient}
     />
   );
 }
