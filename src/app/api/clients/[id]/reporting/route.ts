@@ -78,6 +78,9 @@ interface IndicateursFinanciers {
   ebe: number;
   resultatFinancier: number;
   resultatHAO: number;
+  tauxRecouvrement: number;
+  caTTCTotal: number;
+  caEncaisseTTC: number;
 }
 
 interface DataPoint {
@@ -95,6 +98,10 @@ interface DataPoint {
   soldeTresorerieN1: number;
   margeCommerciale: number;
   margeCommercialeN1: number;
+  tauxRecouvrement: number;
+  tauxRecouvrementN1: number;
+  caTTCTotal: number;
+  caEncaisseTTC: number;
 }
 
 const RUBRIQUES_VIDES: RubriquesOHADA = {
@@ -331,6 +338,91 @@ async function recupererTresorerieParJour(
   return result;
 }
 
+// ============================================================================
+// RECOUVREMENT - Comptes clients (41*)
+// CA TTC Total = Somme des montants au débit des comptes 41*
+// CA Encaissé TTC = Somme des montants au crédit des comptes 41*
+// Taux de recouvrement = (CA Encaissé TTC / CA TTC Total) * 100
+// ============================================================================
+
+async function recupererRecouvrementParMois(
+  dbName: string,
+  batchIds: string[]
+): Promise<Map<string, { caTTCTotal: number; caEncaisseTTC: number }>> {
+  const result = new Map<string, { caTTCTotal: number; caEncaisseTTC: number }>();
+  if (batchIds.length === 0) return result;
+
+  const data = await clickhouseClient.query({
+    query: `
+      SELECT
+        substring(date_transaction, 4, 2) as period,
+        sum(CASE WHEN startsWith(compte, '41') THEN debit ELSE 0 END) as ca_ttc_total,
+        sum(CASE WHEN startsWith(compte, '41') THEN credit ELSE 0 END) as ca_encaisse_ttc
+      FROM ${dbName}.grand_livre
+      WHERE batch_id IN ({batchIds:Array(String)})
+      GROUP BY period
+      ORDER BY period
+    `,
+    query_params: { batchIds },
+    format: "JSONEachRow",
+  });
+
+  const rows = (await data.json()) as Array<{
+    period: string;
+    ca_ttc_total: string;
+    ca_encaisse_ttc: string;
+  }>;
+
+  for (const row of rows) {
+    result.set(row.period, {
+      caTTCTotal: parseFloat(row.ca_ttc_total) || 0,
+      caEncaisseTTC: parseFloat(row.ca_encaisse_ttc) || 0,
+    });
+  }
+
+  return result;
+}
+
+async function recupererRecouvrementParJour(
+  dbName: string,
+  batchIds: string[],
+  monthFilter: string
+): Promise<Map<string, { caTTCTotal: number; caEncaisseTTC: number }>> {
+  const result = new Map<string, { caTTCTotal: number; caEncaisseTTC: number }>();
+  if (batchIds.length === 0) return result;
+
+  const data = await clickhouseClient.query({
+    query: `
+      SELECT
+        substring(date_transaction, 1, 2) as period,
+        sum(CASE WHEN startsWith(compte, '41') THEN debit ELSE 0 END) as ca_ttc_total,
+        sum(CASE WHEN startsWith(compte, '41') THEN credit ELSE 0 END) as ca_encaisse_ttc
+      FROM ${dbName}.grand_livre
+      WHERE batch_id IN ({batchIds:Array(String)})
+        AND substring(date_transaction, 4, 2) = {monthFilter:String}
+      GROUP BY period
+      ORDER BY period
+    `,
+    query_params: { batchIds, monthFilter },
+    format: "JSONEachRow",
+  });
+
+  const rows = (await data.json()) as Array<{
+    period: string;
+    ca_ttc_total: string;
+    ca_encaisse_ttc: string;
+  }>;
+
+  for (const row of rows) {
+    result.set(row.period, {
+      caTTCTotal: parseFloat(row.ca_ttc_total) || 0,
+      caEncaisseTTC: parseFloat(row.ca_encaisse_ttc) || 0,
+    });
+  }
+
+  return result;
+}
+
 async function recupererFluxParMois(
   dbName: string,
   batchIds: string[]
@@ -495,10 +587,13 @@ function calculerSIG(rubriques: RubriquesOHADA): SoldesIntermediairesGestion {
 function calculerIndicateursPeriode(
   rubriquesParPeriode: Map<string, RubriquesOHADA>,
   tresorerieParPeriode: Map<string, number>,
+  recouvrementParPeriode: Map<string, { caTTCTotal: number; caEncaisseTTC: number }>,
   periodesToInclude: string[]
 ): IndicateursFinanciers {
   const rubriquesAgregees = { ...RUBRIQUES_VIDES };
   let tresorerieTotal = 0;
+  let caTTCTotalSum = 0;
+  let caEncaisseTTCSum = 0;
 
   for (const period of periodesToInclude) {
     const rubriques = rubriquesParPeriode.get(period);
@@ -510,9 +605,18 @@ function calculerIndicateursPeriode(
       }
     }
     tresorerieTotal += tresorerieParPeriode.get(period) || 0;
+
+    const recouvrement = recouvrementParPeriode.get(period);
+    if (recouvrement) {
+      caTTCTotalSum += recouvrement.caTTCTotal;
+      caEncaisseTTCSum += recouvrement.caEncaisseTTC;
+    }
   }
 
   const sig = calculerSIG(rubriquesAgregees);
+  const tauxRecouvrement = caTTCTotalSum !== 0
+    ? (caEncaisseTTCSum / caTTCTotalSum) * 100
+    : 0;
 
   return {
     chiffreAffaires: sig.XB,
@@ -525,6 +629,9 @@ function calculerIndicateursPeriode(
     ebe: sig.XD,
     resultatFinancier: sig.XF,
     resultatHAO: sig.XH,
+    tauxRecouvrement,
+    caTTCTotal: caTTCTotalSum,
+    caEncaisseTTC: caEncaisseTTCSum,
   };
 }
 
@@ -673,10 +780,24 @@ export async function GET(
         batchIds,
         selectedMonth
       );
+      const recouvrementParJourN = await recupererRecouvrementParJour(
+        dbName,
+        batchIds,
+        selectedMonth
+      );
+      const recouvrementParJourN1 = await recupererRecouvrementParJour(
+        dbName,
+        batchIdsN1,
+        selectedMonth
+      );
 
       let cumulativeBalanceN = 0;
       let cumulativeTresoN = 0;
       let cumulativeTresoN1 = 0;
+      let cumulativeCaTTCN = 0;
+      let cumulativeCaEncaisseN = 0;
+      let cumulativeCaTTCN1 = 0;
+      let cumulativeCaEncaisseN1 = 0;
 
       for (let d = 1; d <= maxDays; d++) {
         const dayStr = d.toString().padStart(2, "0");
@@ -705,6 +826,21 @@ export async function GET(
         const resultatN = fluxN.produits - fluxN.charges;
         cumulativeBalanceN += resultatN;
 
+        // Recouvrement
+        const recouvrementN = recouvrementParJourN.get(dayStr) || { caTTCTotal: 0, caEncaisseTTC: 0 };
+        const recouvrementN1Jour = recouvrementParJourN1.get(dayStr) || { caTTCTotal: 0, caEncaisseTTC: 0 };
+        cumulativeCaTTCN += recouvrementN.caTTCTotal;
+        cumulativeCaEncaisseN += recouvrementN.caEncaisseTTC;
+        cumulativeCaTTCN1 += recouvrementN1Jour.caTTCTotal;
+        cumulativeCaEncaisseN1 += recouvrementN1Jour.caEncaisseTTC;
+
+        const tauxRecouvrementN = cumulativeCaTTCN !== 0
+          ? (cumulativeCaEncaisseN / cumulativeCaTTCN) * 100
+          : 0;
+        const tauxRecouvrementN1 = cumulativeCaTTCN1 !== 0
+          ? (cumulativeCaEncaisseN1 / cumulativeCaTTCN1) * 100
+          : 0;
+
         chartData.push({
           label: `${d}`,
           period: `${year}${selectedMonth}${dayStr}`,
@@ -720,6 +856,10 @@ export async function GET(
           soldeTresorerieN1: cumulativeTresoN1,
           margeCommerciale: sigN.XA,
           margeCommercialeN1: sigN1.XA,
+          tauxRecouvrement: tauxRecouvrementN,
+          tauxRecouvrementN1: tauxRecouvrementN1,
+          caTTCTotal: cumulativeCaTTCN,
+          caEncaisseTTC: cumulativeCaEncaisseN,
         });
       }
 
@@ -729,11 +869,13 @@ export async function GET(
       const indicateursN = calculerIndicateursPeriode(
         rubriquesParJourN,
         tresorerieParJourN,
+        recouvrementParJourN,
         periodsToIncludeN
       );
       const indicateursN1 = calculerIndicateursPeriode(
         rubriquesParJourN1,
         tresorerieParJourN1,
+        recouvrementParJourN1,
         periodsToIncludeN1
       );
 
@@ -775,6 +917,7 @@ export async function GET(
           indicateursN.resultatHAO,
           indicateursN1.resultatHAO
         ),
+        tauxRecouvrement: indicateursN.tauxRecouvrement - indicateursN1.tauxRecouvrement,
       };
 
       const totals = chartData.reduce(
@@ -826,10 +969,16 @@ export async function GET(
       batchIdsN1
     );
     const fluxParMoisN = await recupererFluxParMois(dbName, batchIds);
+    const recouvrementParMoisN = await recupererRecouvrementParMois(dbName, batchIds);
+    const recouvrementParMoisN1 = await recupererRecouvrementParMois(dbName, batchIdsN1);
 
     let cumulativeBalance = 0;
     let cumulativeTresorerieN = 0;
     let cumulativeTresorerieN1 = 0;
+    let cumulativeCaTTCN = 0;
+    let cumulativeCaEncaisseN = 0;
+    let cumulativeCaTTCN1 = 0;
+    let cumulativeCaEncaisseN1 = 0;
 
     const endMonth =
       periodType === "ytd" && selectedMonth ? parseInt(selectedMonth) : 12;
@@ -861,6 +1010,21 @@ export async function GET(
       const resultat = fluxN.produits - fluxN.charges;
       cumulativeBalance += resultat;
 
+      // Recouvrement
+      const recouvrementN = recouvrementParMoisN.get(monthStr) || { caTTCTotal: 0, caEncaisseTTC: 0 };
+      const recouvrementN1Mois = recouvrementParMoisN1.get(monthStr) || { caTTCTotal: 0, caEncaisseTTC: 0 };
+      cumulativeCaTTCN += recouvrementN.caTTCTotal;
+      cumulativeCaEncaisseN += recouvrementN.caEncaisseTTC;
+      cumulativeCaTTCN1 += recouvrementN1Mois.caTTCTotal;
+      cumulativeCaEncaisseN1 += recouvrementN1Mois.caEncaisseTTC;
+
+      const tauxRecouvrementN = cumulativeCaTTCN !== 0
+        ? (cumulativeCaEncaisseN / cumulativeCaTTCN) * 100
+        : 0;
+      const tauxRecouvrementN1 = cumulativeCaTTCN1 !== 0
+        ? (cumulativeCaEncaisseN1 / cumulativeCaTTCN1) * 100
+        : 0;
+
       chartData.push({
         label: monthNames[m - 1],
         period: `${year}${monthStr}`,
@@ -876,6 +1040,10 @@ export async function GET(
         soldeTresorerieN1: cumulativeTresorerieN1,
         margeCommerciale: sigN.XA,
         margeCommercialeN1: sigN1.XA,
+        tauxRecouvrement: tauxRecouvrementN,
+        tauxRecouvrementN1: tauxRecouvrementN1,
+        caTTCTotal: cumulativeCaTTCN,
+        caEncaisseTTC: cumulativeCaEncaisseN,
       });
     }
 
@@ -890,11 +1058,13 @@ export async function GET(
     const indicateursN = calculerIndicateursPeriode(
       rubriquesParMoisN,
       tresorerieParMoisN,
+      recouvrementParMoisN,
       periodsToIncludeN
     );
     const indicateursN1 = calculerIndicateursPeriode(
       rubriquesParMoisN1,
       tresorerieParMoisN1,
+      recouvrementParMoisN1,
       periodsToIncludeN1
     );
 
@@ -936,6 +1106,7 @@ export async function GET(
         indicateursN.resultatHAO,
         indicateursN1.resultatHAO
       ),
+      tauxRecouvrement: indicateursN.tauxRecouvrement - indicateursN1.tauxRecouvrement,
     };
 
     const totals = chartData.reduce(

@@ -74,6 +74,7 @@ import {
   LineChartIcon,
   PieChart,
   ChevronDown,
+  Percent,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -93,6 +94,10 @@ interface DataPoint {
   soldeTresorerieN1: number;
   margeCommerciale: number;
   margeCommercialeN1: number;
+  tauxRecouvrement: number;
+  tauxRecouvrementN1: number;
+  caTTCTotal: number;
+  caEncaisseTTC: number;
 }
 
 interface Period {
@@ -118,6 +123,9 @@ interface IndicateursFinanciers {
   ebe: number;
   resultatFinancier: number;
   resultatHAO: number;
+  tauxRecouvrement: number;
+  caTTCTotal: number;
+  caEncaisseTTC: number;
 }
 
 interface Variations {
@@ -131,6 +139,7 @@ interface Variations {
   ebe: number;
   resultatFinancier: number;
   resultatHAO: number;
+  tauxRecouvrement: number;
 }
 
 interface ReportingData {
@@ -156,7 +165,7 @@ interface ReportingData {
 }
 
 type PeriodType = "year" | "month" | "ytd";
-type TabId = "synthese" | "chiffre-affaires" | "resultat";
+type TabId = "synthese" | "chiffre-affaires" | "resultat" | "recouvrement";
 
 interface TunnelMetric {
   id: string;
@@ -200,6 +209,12 @@ const NAV_ITEMS: NavItem[] = [
     label: "Résultat",
     icon: PieChart,
     // subItems: ["Tunnel de rentabilité"],
+    subItems: [],
+  },
+  {
+    id: "recouvrement",
+    label: "Recouvrement",
+    icon: Percent,
     subItems: [],
   },
 ];
@@ -269,6 +284,11 @@ const chartConfigCA: ChartConfig = {
 const chartConfigTresorerie: ChartConfig = {
   soldeTresorerie: { label: "Trésorerie N", color: "hsl(174, 72%, 46%)" },
   soldeTresorerieN1: { label: "Trésorerie N-1", color: "hsl(174, 72%, 66%)" },
+};
+
+const chartConfigRecouvrement: ChartConfig = {
+  tauxRecouvrement: { label: "Taux N", color: "hsl(262, 83%, 58%)" },
+  tauxRecouvrementN1: { label: "Taux N-1", color: "hsl(262, 83%, 78%)" },
 };
 
 const MONTHS = [
@@ -847,6 +867,73 @@ export default function ClientReportingChart({
     </Card>
   );
 
+  // Composant Evolution Taux de Recouvrement
+  const EvolutionRecouvrement = () => (
+    <Card>
+      <CardHeader>
+        <CardTitle>Évolution du Taux de Recouvrement</CardTitle>
+        <CardDescription>
+          Taux cumulé {yearN} vs {yearN1} - par {getXAxisLabel().toLowerCase()} - (CA Encaissé TTC / CA TTC Total) × 100
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <ChartContainer
+          config={chartConfigRecouvrement}
+          className="h-[400px] w-full"
+        >
+          <LineChart
+            data={visibleChartData}
+            margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
+          >
+            <CartesianGrid strokeDasharray="3 3" vertical={false} />
+            <XAxis
+              dataKey="label"
+              tickLine={false}
+              axisLine={false}
+              fontSize={12}
+            />
+            <YAxis
+              tickLine={false}
+              axisLine={false}
+              tickFormatter={(value) => `${value.toFixed(0)}%`}
+              fontSize={12}
+              domain={[0, 100]}
+            />
+            <ChartTooltip
+              content={
+                <ChartTooltipContent
+                  formatter={(value, name) => [
+                    `${(value as number).toFixed(1)}%`,
+                    name === "tauxRecouvrement"
+                      ? `Taux ${yearN}`
+                      : `Taux ${yearN1}`,
+                  ]}
+                />
+              }
+            />
+            <Line
+              type="monotone"
+              dataKey="tauxRecouvrementN1"
+              name={`Taux ${yearN1}`}
+              stroke="hsl(262, 83%, 78%)"
+              strokeWidth={2}
+              dot={{ r: 3 }}
+              strokeDasharray="5 5"
+            />
+            <Line
+              type="monotone"
+              dataKey="tauxRecouvrement"
+              name={`Taux ${yearN}`}
+              stroke="hsl(262, 83%, 58%)"
+              strokeWidth={2}
+              dot={{ r: 4 }}
+            />
+          </LineChart>
+        </ChartContainer>
+      </CardContent>
+    </Card>
+  );
+
   // Contenu selon l'onglet actif
   const renderTabContent = () => {
     switch (activeTab) {
@@ -1277,6 +1364,86 @@ export default function ClientReportingChart({
 
             {/* Tunnel de rentabilité */}
             <TunnelRentabilite />
+          </div>
+        );
+
+      case "recouvrement":
+        return (
+          <div className="space-y-6">
+            {/* KPIs Recouvrement */}
+            <div className="grid grid-cols-3 gap-4">
+              <Card>
+                <CardHeader className="pb-2">
+                  <div className="flex items-center justify-between">
+                    <CardDescription className="flex items-center gap-1 text-xs">
+                      <Percent className="w-4 h-4 text-violet-600" />
+                      Taux de Recouvrement
+                    </CardDescription>
+                    <Badge
+                      variant="outline"
+                      className={`text-xs ${
+                        data.indicateurs.variations.tauxRecouvrement >= 0
+                          ? "text-green-600 border-green-200"
+                          : "text-red-600 border-red-200"
+                      }`}
+                    >
+                      {data.indicateurs.variations.tauxRecouvrement >= 0 ? (
+                        <TrendingUp className="w-3 h-3 mr-1" />
+                      ) : (
+                        <TrendingDown className="w-3 h-3 mr-1" />
+                      )}
+                      {data.indicateurs.variations.tauxRecouvrement >= 0 ? "+" : ""}
+                      {data.indicateurs.variations.tauxRecouvrement.toFixed(1)} pts
+                    </Badge>
+                  </div>
+                </CardHeader>
+                <CardContent className="pt-0">
+                  <div className="text-2xl font-bold text-violet-600">
+                    {data.indicateurs.anneeN.tauxRecouvrement.toFixed(1)}%
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    {yearN1}: {data.indicateurs.anneeN1.tauxRecouvrement.toFixed(1)}%
+                  </p>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardDescription className="flex items-center gap-1 text-xs">
+                    <DollarSign className="w-4 h-4 text-blue-600" />
+                    CA TTC Total (Débit 41*)
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="pt-0">
+                  <div className="text-2xl font-bold text-blue-600">
+                    {formatCompactOnly(data.indicateurs.anneeN.caTTCTotal)}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Somme des débits comptes clients
+                  </p>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardDescription className="flex items-center gap-1 text-xs">
+                    <Wallet className="w-4 h-4 text-green-600" />
+                    CA Encaissé TTC (Crédit 41*)
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="pt-0">
+                  <div className="text-2xl font-bold text-green-600">
+                    {formatCompactOnly(data.indicateurs.anneeN.caEncaisseTTC)}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Somme des crédits comptes clients
+                  </p>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Graphique Evolution Taux de Recouvrement */}
+            <EvolutionRecouvrement />
           </div>
         );
 
