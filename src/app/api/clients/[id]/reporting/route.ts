@@ -423,6 +423,77 @@ async function recupererRecouvrementParJour(
   return result;
 }
 
+// ============================================================================
+// TOP 10 CLIENTS - Clients avec le plus fort impact sur le CA
+// ============================================================================
+
+interface TopClient {
+  numeroClient: string;
+  nomClient: string;
+  montantCA: number;
+  pourcentageCA: number;
+}
+
+async function recupererTop10Clients(
+  dbName: string,
+  batchIds: string[]
+): Promise<TopClient[]> {
+  if (batchIds.length === 0) return [];
+
+  // D'abord récupérer le CA total pour calculer les pourcentages
+  const totalQuery = await clickhouseClient.query({
+    query: `
+      SELECT sum(debit) as ca_total
+      FROM ${dbName}.grand_livre
+      WHERE batch_id IN ({batchIds:Array(String)})
+        AND startsWith(compte, '41')
+    `,
+    query_params: { batchIds },
+    format: "JSONEachRow",
+  });
+
+  const totalRows = (await totalQuery.json()) as Array<{ ca_total: string }>;
+  const caTotal = parseFloat(totalRows[0]?.ca_total) || 0;
+
+  if (caTotal === 0) return [];
+
+  // Récupérer le Top 10 des clients
+  const data = await clickhouseClient.query({
+    query: `
+      SELECT
+        n_tiers AS numero_client,
+        intitule_tiers AS nom_client,
+        sum(debit) AS ca_client
+      FROM ${dbName}.grand_livre
+      WHERE batch_id IN ({batchIds:Array(String)})
+        AND startsWith(compte, '41')
+        AND n_tiers != ''
+        AND intitule_tiers != ''
+      GROUP BY n_tiers, intitule_tiers
+      ORDER BY ca_client DESC
+      LIMIT 10
+    `,
+    query_params: { batchIds },
+    format: "JSONEachRow",
+  });
+
+  const rows = (await data.json()) as Array<{
+    numero_client: string;
+    nom_client: string;
+    ca_client: string;
+  }>;
+
+  return rows.map((row) => {
+    const montantCA = parseFloat(row.ca_client) || 0;
+    return {
+      numeroClient: row.numero_client,
+      nomClient: row.nom_client,
+      montantCA,
+      pourcentageCA: caTotal > 0 ? (montantCA / caTotal) * 100 : 0,
+    };
+  });
+}
+
 async function recupererFluxParMois(
   dbName: string,
   batchIds: string[]
@@ -437,7 +508,7 @@ async function recupererFluxParMois(
 
   const data = await clickhouseClient.query({
     query: `
-      SELECT 
+      SELECT
         substring(date_transaction, 4, 2) as period,
         sum(CASE WHEN startsWith(compte, '6') THEN debit - credit ELSE 0 END) as charges,
         sum(CASE WHEN startsWith(compte, '7') THEN credit - debit ELSE 0 END) as produits,
@@ -931,6 +1002,9 @@ export async function GET(
 
       const periods = await enrichirPeriodes(postgresPeriodsData, dbName);
 
+      // Top 10 clients par CA
+      const topClients = await recupererTop10Clients(dbName, batchIds);
+
       return NextResponse.json({
         client: { id: client.id, name: client.name },
         year,
@@ -949,6 +1023,7 @@ export async function GET(
           anneeN1: indicateursN1,
           variations,
         },
+        topClients,
       });
     }
 
@@ -1120,6 +1195,9 @@ export async function GET(
 
     const periods = await enrichirPeriodes(postgresPeriodsData, dbName);
 
+    // Top 10 clients par CA
+    const topClients = await recupererTop10Clients(dbName, batchIds);
+
     return NextResponse.json({
       client: { id: client.id, name: client.name },
       year,
@@ -1134,6 +1212,7 @@ export async function GET(
         resultat: totals.totalProduits - totals.totalCharges,
       },
       indicateurs: { anneeN: indicateursN, anneeN1: indicateursN1, variations },
+      topClients,
     });
   } catch (error) {
     console.error("Reporting API error:", error);
