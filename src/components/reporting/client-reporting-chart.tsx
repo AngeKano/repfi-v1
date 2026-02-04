@@ -339,33 +339,42 @@ export default function ClientReportingChart({
       caEncaisseTTC: number;
       tauxRecouvrement: number;
     };
-    availableMonths: Array<{
-      year: number;
-      month: number;
-      label: string;
-      value: string;
-    }>;
     periodRange: {
       start: { year: number; month: number; label: string };
       end: { year: number; month: number; label: string };
     };
   } | null>(null);
-  const [recouvrementEndPeriod, setRecouvrementEndPeriod] = useState<string>(() => {
+
+  // Sélecteurs mois et année pour le recouvrement (choix libre)
+  const [recouvrementMonth, setRecouvrementMonth] = useState<string>(() => {
     const now = new Date();
-    return `${now.getFullYear()}-${(now.getMonth() + 1).toString().padStart(2, "0")}`;
+    return (now.getMonth() + 1).toString().padStart(2, "0");
+  });
+  const [recouvrementYear, setRecouvrementYear] = useState<string>(() => {
+    return new Date().getFullYear().toString();
   });
   const [recouvrementLoading, setRecouvrementLoading] = useState(false);
+
+  // Générer la liste des années disponibles (5 ans en arrière, 2 ans en avant)
+  const recouvrementYearOptions = useMemo(() => {
+    const currentYear = new Date().getFullYear();
+    const years: string[] = [];
+    for (let y = currentYear + 2; y >= currentYear - 10; y--) {
+      years.push(y.toString());
+    }
+    return years;
+  }, []);
 
   useEffect(() => {
     fetchData();
   }, [clientId, year, periodType, selectedMonth]);
 
-  // Charger les données de recouvrement quand l'onglet est actif
+  // Charger les données de recouvrement quand l'onglet est actif ou quand le mois/année change
   useEffect(() => {
     if (activeTab === "recouvrement") {
       fetchRecouvrementData();
     }
-  }, [clientId, activeTab, recouvrementEndPeriod]);
+  }, [clientId, activeTab, recouvrementMonth, recouvrementYear]);
 
   const fetchData = async () => {
     setLoading(true);
@@ -389,7 +398,8 @@ export default function ClientReportingChart({
   const fetchRecouvrementData = async () => {
     setRecouvrementLoading(true);
     try {
-      const url = `/api/clients/${clientId}/reporting/recouvrement?endPeriod=${recouvrementEndPeriod}`;
+      const endPeriod = `${recouvrementYear}-${recouvrementMonth}`;
+      const url = `/api/clients/${clientId}/reporting/recouvrement?endPeriod=${endPeriod}`;
       const res = await fetch(url);
       if (!res.ok) throw new Error("Erreur API Recouvrement");
       const json = await res.json();
@@ -1386,16 +1396,31 @@ export default function ClientReportingChart({
                   <div className="flex items-center gap-2">
                     <Calendar className="w-4 h-4 text-muted-foreground" />
                     <Select
-                      value={recouvrementEndPeriod}
-                      onValueChange={setRecouvrementEndPeriod}
+                      value={recouvrementMonth}
+                      onValueChange={setRecouvrementMonth}
                     >
-                      <SelectTrigger className="w-[200px]">
-                        <SelectValue placeholder="Sélectionner un mois" />
+                      <SelectTrigger className="w-[140px]">
+                        <SelectValue placeholder="Mois" />
                       </SelectTrigger>
                       <SelectContent>
-                        {recouvrementData.availableMonths.map((month) => (
+                        {MONTHS.map((month) => (
                           <SelectItem key={month.value} value={month.value}>
                             {month.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Select
+                      value={recouvrementYear}
+                      onValueChange={setRecouvrementYear}
+                    >
+                      <SelectTrigger className="w-[100px]">
+                        <SelectValue placeholder="Année" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {recouvrementYearOptions.map((y) => (
+                          <SelectItem key={y} value={y}>
+                            {y}
                           </SelectItem>
                         ))}
                       </SelectContent>

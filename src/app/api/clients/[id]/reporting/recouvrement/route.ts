@@ -203,26 +203,13 @@ export async function GET(
         : 0,
     };
 
-    // Récupérer les années/mois disponibles pour le sélecteur
-    const availableMonths = allPeriods
-      .map((p) => {
-        const date = new Date(p.periodStart);
-        return {
-          year: date.getFullYear(),
-          month: date.getMonth() + 1,
-          label: `${MONTH_NAMES[date.getMonth()]} ${date.getFullYear()}`,
-          value: `${date.getFullYear()}-${(date.getMonth() + 1).toString().padStart(2, "0")}`
-        };
-      })
-      .filter((v, i, a) => a.findIndex((t) => t.value === v.value) === i)
-      .sort((a, b) => b.value.localeCompare(a.value));
-
     return NextResponse.json({
       client: { id: client.id, name: client.name },
       endPeriod: `${endYear}-${endMonth.toString().padStart(2, "0")}`,
+      endYear,
+      endMonth,
       chartData,
       totals,
-      availableMonths,
       periodRange: {
         start: last12Months[0],
         end: last12Months[last12Months.length - 1],
