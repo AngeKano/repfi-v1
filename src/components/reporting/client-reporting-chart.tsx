@@ -286,10 +286,6 @@ const chartConfigTresorerie: ChartConfig = {
   soldeTresorerieN1: { label: "Trésorerie N-1", color: "hsl(174, 72%, 66%)" },
 };
 
-const chartConfigRecouvrement: ChartConfig = {
-  tauxRecouvrement: { label: "Taux N", color: "hsl(262, 83%, 58%)" },
-  tauxRecouvrementN1: { label: "Taux N-1", color: "hsl(262, 83%, 78%)" },
-};
 
 const MONTHS = [
   { value: "01", label: "Janvier" },
@@ -325,9 +321,51 @@ export default function ClientReportingChart({
     new Set(["synthese"])
   );
 
+  // États spécifiques au recouvrement
+  const [recouvrementData, setRecouvrementData] = useState<{
+    chartData: Array<{
+      label: string;
+      period: string;
+      yearMonth: string;
+      caTTCTotal: number;
+      caEncaisseTTC: number;
+      tauxRecouvrement: number;
+      cumulativeCaTTC: number;
+      cumulativeCaEncaisse: number;
+      tauxRecouvrementCumule: number;
+    }>;
+    totals: {
+      caTTCTotal: number;
+      caEncaisseTTC: number;
+      tauxRecouvrement: number;
+    };
+    availableMonths: Array<{
+      year: number;
+      month: number;
+      label: string;
+      value: string;
+    }>;
+    periodRange: {
+      start: { year: number; month: number; label: string };
+      end: { year: number; month: number; label: string };
+    };
+  } | null>(null);
+  const [recouvrementEndPeriod, setRecouvrementEndPeriod] = useState<string>(() => {
+    const now = new Date();
+    return `${now.getFullYear()}-${(now.getMonth() + 1).toString().padStart(2, "0")}`;
+  });
+  const [recouvrementLoading, setRecouvrementLoading] = useState(false);
+
   useEffect(() => {
     fetchData();
   }, [clientId, year, periodType, selectedMonth]);
+
+  // Charger les données de recouvrement quand l'onglet est actif
+  useEffect(() => {
+    if (activeTab === "recouvrement") {
+      fetchRecouvrementData();
+    }
+  }, [clientId, activeTab, recouvrementEndPeriod]);
 
   const fetchData = async () => {
     setLoading(true);
@@ -345,6 +383,22 @@ export default function ClientReportingChart({
       toast.error("Erreur lors du chargement des données");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchRecouvrementData = async () => {
+    setRecouvrementLoading(true);
+    try {
+      const url = `/api/clients/${clientId}/reporting/recouvrement?endPeriod=${recouvrementEndPeriod}`;
+      const res = await fetch(url);
+      if (!res.ok) throw new Error("Erreur API Recouvrement");
+      const json = await res.json();
+      setRecouvrementData(json);
+    } catch (error) {
+      console.error("Fetch recouvrement error:", error);
+      toast.error("Erreur lors du chargement des données de recouvrement");
+    } finally {
+      setRecouvrementLoading(false);
     }
   };
 
@@ -867,73 +921,6 @@ export default function ClientReportingChart({
     </Card>
   );
 
-  // Composant Evolution Taux de Recouvrement
-  const EvolutionRecouvrement = () => (
-    <Card>
-      <CardHeader>
-        <CardTitle>Évolution du Taux de Recouvrement</CardTitle>
-        <CardDescription>
-          Taux cumulé {yearN} vs {yearN1} - par {getXAxisLabel().toLowerCase()} - (CA Encaissé TTC / CA TTC Total) × 100
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        <ChartContainer
-          config={chartConfigRecouvrement}
-          className="h-[400px] w-full"
-        >
-          <LineChart
-            data={visibleChartData}
-            margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
-          >
-            <CartesianGrid strokeDasharray="3 3" vertical={false} />
-            <XAxis
-              dataKey="label"
-              tickLine={false}
-              axisLine={false}
-              fontSize={12}
-            />
-            <YAxis
-              tickLine={false}
-              axisLine={false}
-              tickFormatter={(value) => `${value.toFixed(0)}%`}
-              fontSize={12}
-              domain={[0, 100]}
-            />
-            <ChartTooltip
-              content={
-                <ChartTooltipContent
-                  formatter={(value, name) => [
-                    `${(value as number).toFixed(1)}%`,
-                    name === "tauxRecouvrement"
-                      ? `Taux ${yearN}`
-                      : `Taux ${yearN1}`,
-                  ]}
-                />
-              }
-            />
-            <Line
-              type="monotone"
-              dataKey="tauxRecouvrementN1"
-              name={`Taux ${yearN1}`}
-              stroke="hsl(262, 83%, 78%)"
-              strokeWidth={2}
-              dot={{ r: 3 }}
-              strokeDasharray="5 5"
-            />
-            <Line
-              type="monotone"
-              dataKey="tauxRecouvrement"
-              name={`Taux ${yearN}`}
-              stroke="hsl(262, 83%, 58%)"
-              strokeWidth={2}
-              dot={{ r: 4 }}
-            />
-          </LineChart>
-        </ChartContainer>
-      </CardContent>
-    </Card>
-  );
-
   // Contenu selon l'onglet actif
   const renderTabContent = () => {
     switch (activeTab) {
@@ -1368,41 +1355,76 @@ export default function ClientReportingChart({
         );
 
       case "recouvrement":
+        if (recouvrementLoading) {
+          return (
+            <div className="flex items-center justify-center h-64">
+              <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+            </div>
+          );
+        }
+
+        if (!recouvrementData) {
+          return (
+            <div className="flex items-center justify-center h-64 text-muted-foreground">
+              Aucune donnée de recouvrement disponible
+            </div>
+          );
+        }
+
         return (
           <div className="space-y-6">
+            {/* Filtre de période */}
+            <Card>
+              <CardHeader className="pb-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="text-lg">Période d'analyse</CardTitle>
+                    <CardDescription>
+                      Sélectionnez le mois de fin pour afficher les 12 derniers mois
+                    </CardDescription>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Calendar className="w-4 h-4 text-muted-foreground" />
+                    <Select
+                      value={recouvrementEndPeriod}
+                      onValueChange={setRecouvrementEndPeriod}
+                    >
+                      <SelectTrigger className="w-[200px]">
+                        <SelectValue placeholder="Sélectionner un mois" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {recouvrementData.availableMonths.map((month) => (
+                          <SelectItem key={month.value} value={month.value}>
+                            {month.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="pt-0">
+                <p className="text-sm text-muted-foreground">
+                  Période affichée : <span className="font-medium text-foreground">{recouvrementData.periodRange.start.label}</span> → <span className="font-medium text-foreground">{recouvrementData.periodRange.end.label}</span>
+                </p>
+              </CardContent>
+            </Card>
+
             {/* KPIs Recouvrement */}
             <div className="grid grid-cols-3 gap-4">
               <Card>
                 <CardHeader className="pb-2">
-                  <div className="flex items-center justify-between">
-                    <CardDescription className="flex items-center gap-1 text-xs">
-                      <Percent className="w-4 h-4 text-violet-600" />
-                      Taux de Recouvrement
-                    </CardDescription>
-                    <Badge
-                      variant="outline"
-                      className={`text-xs ${
-                        data.indicateurs.variations.tauxRecouvrement >= 0
-                          ? "text-green-600 border-green-200"
-                          : "text-red-600 border-red-200"
-                      }`}
-                    >
-                      {data.indicateurs.variations.tauxRecouvrement >= 0 ? (
-                        <TrendingUp className="w-3 h-3 mr-1" />
-                      ) : (
-                        <TrendingDown className="w-3 h-3 mr-1" />
-                      )}
-                      {data.indicateurs.variations.tauxRecouvrement >= 0 ? "+" : ""}
-                      {data.indicateurs.variations.tauxRecouvrement.toFixed(1)} pts
-                    </Badge>
-                  </div>
+                  <CardDescription className="flex items-center gap-1 text-xs">
+                    <Percent className="w-4 h-4 text-violet-600" />
+                    Taux de Recouvrement (12 mois)
+                  </CardDescription>
                 </CardHeader>
                 <CardContent className="pt-0">
                   <div className="text-2xl font-bold text-violet-600">
-                    {data.indicateurs.anneeN.tauxRecouvrement.toFixed(1)}%
+                    {recouvrementData.totals.tauxRecouvrement.toFixed(1)}%
                   </div>
                   <p className="text-xs text-muted-foreground">
-                    {yearN1}: {data.indicateurs.anneeN1.tauxRecouvrement.toFixed(1)}%
+                    Sur la période sélectionnée
                   </p>
                 </CardContent>
               </Card>
@@ -1416,7 +1438,7 @@ export default function ClientReportingChart({
                 </CardHeader>
                 <CardContent className="pt-0">
                   <div className="text-2xl font-bold text-blue-600">
-                    {formatCompactOnly(data.indicateurs.anneeN.caTTCTotal)}
+                    {formatCompactOnly(recouvrementData.totals.caTTCTotal)}
                   </div>
                   <p className="text-xs text-muted-foreground">
                     Somme des débits comptes clients
@@ -1433,7 +1455,7 @@ export default function ClientReportingChart({
                 </CardHeader>
                 <CardContent className="pt-0">
                   <div className="text-2xl font-bold text-green-600">
-                    {formatCompactOnly(data.indicateurs.anneeN.caEncaisseTTC)}
+                    {formatCompactOnly(recouvrementData.totals.caEncaisseTTC)}
                   </div>
                   <p className="text-xs text-muted-foreground">
                     Somme des crédits comptes clients
@@ -1442,8 +1464,141 @@ export default function ClientReportingChart({
               </Card>
             </div>
 
-            {/* Graphique Evolution Taux de Recouvrement */}
-            <EvolutionRecouvrement />
+            {/* Graphique Evolution Taux de Recouvrement - 12 derniers mois */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Évolution du Taux de Recouvrement</CardTitle>
+                <CardDescription>
+                  12 derniers mois - (CA Encaissé TTC / CA TTC Total) × 100
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ChartContainer
+                  config={{
+                    tauxRecouvrement: { label: "Taux mensuel", color: "hsl(262, 83%, 58%)" },
+                    tauxRecouvrementCumule: { label: "Taux cumulé", color: "hsl(262, 83%, 78%)" },
+                  }}
+                  className="h-[400px] w-full"
+                >
+                  <LineChart
+                    data={recouvrementData.chartData}
+                    margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                    <XAxis
+                      dataKey="label"
+                      tickLine={false}
+                      axisLine={false}
+                      fontSize={11}
+                      angle={-45}
+                      textAnchor="end"
+                      height={60}
+                    />
+                    <YAxis
+                      tickLine={false}
+                      axisLine={false}
+                      tickFormatter={(value) => `${value.toFixed(0)}%`}
+                      fontSize={12}
+                      domain={[0, "auto"]}
+                    />
+                    <ChartTooltip
+                      content={
+                        <ChartTooltipContent
+                          formatter={(value, name) => [
+                            `${(value as number).toFixed(1)}%`,
+                            name === "tauxRecouvrement"
+                              ? "Taux mensuel"
+                              : "Taux cumulé",
+                          ]}
+                        />
+                      }
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey="tauxRecouvrement"
+                      name="Taux mensuel"
+                      stroke="hsl(262, 83%, 58%)"
+                      strokeWidth={2}
+                      dot={{ r: 4 }}
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey="tauxRecouvrementCumule"
+                      name="Taux cumulé"
+                      stroke="hsl(262, 83%, 78%)"
+                      strokeWidth={2}
+                      dot={{ r: 3 }}
+                      strokeDasharray="5 5"
+                    />
+                  </LineChart>
+                </ChartContainer>
+              </CardContent>
+            </Card>
+
+            {/* Graphique CA TTC vs CA Encaissé */}
+            <Card>
+              <CardHeader>
+                <CardTitle>CA TTC Total vs CA Encaissé TTC</CardTitle>
+                <CardDescription>
+                  Comparaison mensuelle des montants
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ChartContainer
+                  config={{
+                    caTTCTotal: { label: "CA TTC Total", color: "hsl(221, 83%, 53%)" },
+                    caEncaisseTTC: { label: "CA Encaissé", color: "hsl(142, 76%, 36%)" },
+                  }}
+                  className="h-[350px] w-full"
+                >
+                  <BarChart
+                    data={recouvrementData.chartData}
+                    margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                    <XAxis
+                      dataKey="label"
+                      tickLine={false}
+                      axisLine={false}
+                      fontSize={11}
+                      angle={-45}
+                      textAnchor="end"
+                      height={60}
+                    />
+                    <YAxis
+                      tickLine={false}
+                      axisLine={false}
+                      tickFormatter={(value) => `${(value / 1000000).toFixed(0)}M`}
+                      fontSize={12}
+                    />
+                    <ChartTooltip
+                      content={
+                        <ChartTooltipContent
+                          formatter={(value, name) => [
+                            formatCompactOnly(value as number),
+                            name === "caTTCTotal" ? "CA TTC Total" : "CA Encaissé",
+                          ]}
+                        />
+                      }
+                    />
+                    <Bar
+                      dataKey="caTTCTotal"
+                      name="CA TTC Total"
+                      fill="hsl(221, 83%, 53%)"
+                      barSize={24}
+                      radius={[4, 4, 0, 0]}
+                    />
+                    <Bar
+                      dataKey="caEncaisseTTC"
+                      name="CA Encaissé"
+                      fill="hsl(142, 76%, 36%)"
+                      barSize={24}
+                      radius={[4, 4, 0, 0]}
+                    />
+                  </BarChart>
+                </ChartContainer>
+              </CardContent>
+            </Card>
           </div>
         );
 
