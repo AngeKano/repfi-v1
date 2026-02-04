@@ -75,6 +75,8 @@ import {
   PieChart,
   ChevronDown,
   Percent,
+  Building2,
+  Trophy,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -142,6 +144,13 @@ interface Variations {
   tauxRecouvrement: number;
 }
 
+interface TopClient {
+  numeroClient: string;
+  nomClient: string;
+  montantCA: number;
+  pourcentageCA: number;
+}
+
 interface ReportingData {
   client: { id: string; name: string };
   year: string;
@@ -162,6 +171,7 @@ interface ReportingData {
     anneeN1: IndicateursFinanciers;
     variations: Variations;
   };
+  topClients: TopClient[];
 }
 
 type PeriodType = "year" | "month" | "ytd";
@@ -1256,6 +1266,86 @@ export default function ClientReportingChart({
 
             {/* Graphique Evolution CA */}
             <EvolutionCA />
+
+            {/* Top 10 Clients par CA */}
+            <Card>
+              <CardHeader>
+                <div className="flex items-center gap-2">
+                  <Trophy className="w-5 h-5 text-amber-500" />
+                  <div>
+                    <CardTitle>Top 10 Clients</CardTitle>
+                    <CardDescription>
+                      Clients avec le plus fort impact sur le chiffre d&apos;affaires
+                    </CardDescription>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {data.topClients && data.topClients.length > 0 ? (
+                  <div className="space-y-3">
+                    {data.topClients.map((client, index) => (
+                      <div
+                        key={client.numeroClient}
+                        className="flex items-center gap-4 p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors"
+                      >
+                        {/* Rang */}
+                        <div
+                          className={cn(
+                            "flex items-center justify-center w-8 h-8 rounded-full font-bold text-sm",
+                            index === 0 && "bg-amber-100 text-amber-700",
+                            index === 1 && "bg-gray-100 text-gray-600",
+                            index === 2 && "bg-orange-100 text-orange-700",
+                            index > 2 && "bg-blue-50 text-blue-600"
+                          )}
+                        >
+                          {index + 1}
+                        </div>
+
+                        {/* Icône entreprise et nom */}
+                        <div className="flex items-center gap-3 flex-1 min-w-0">
+                          <Building2 className="w-5 h-5 text-muted-foreground shrink-0" />
+                          <div className="min-w-0">
+                            <p className="font-medium truncate">
+                              {client.nomClient}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              {client.numeroClient}
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* Montant et pourcentage */}
+                        <div className="text-right shrink-0">
+                          <p className="font-semibold text-blue-600">
+                            {formatCompactOnly(client.montantCA)}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {client.pourcentageCA.toFixed(1)}% du CA
+                          </p>
+                        </div>
+
+                        {/* Barre de progression */}
+                        <div className="w-24 shrink-0">
+                          <div className="h-2 bg-muted rounded-full overflow-hidden">
+                            <div
+                              className="h-full bg-blue-500 rounded-full transition-all"
+                              style={{
+                                width: `${Math.min(client.pourcentageCA, 100)}%`,
+                              }}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
+                    <Building2 className="w-12 h-12 mb-2 opacity-20" />
+                    <p>Aucune donnée client disponible</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
           </div>
         );
 
