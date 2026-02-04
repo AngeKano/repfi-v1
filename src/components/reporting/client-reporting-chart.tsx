@@ -77,6 +77,7 @@ import {
   Percent,
   Building2,
   Trophy,
+  AlertTriangle,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -348,11 +349,21 @@ export default function ClientReportingChart({
       caTTCTotal: number;
       caEncaisseTTC: number;
       tauxRecouvrement: number;
+      soldeCreances: number;
     };
     periodRange: {
       start: { year: number; month: number; label: string };
       end: { year: number; month: number; label: string };
     };
+    topCreances: Array<{
+      numeroClient: string;
+      nomClient: string;
+      caTTCTotal: number;
+      caEncaisseTTC: number;
+      soldeCreance: number;
+      pourcentageTotal: number;
+    }>;
+    totalCreances: number;
   } | null>(null);
 
   // Sélecteurs mois et année pour le recouvrement (choix libre)
@@ -1712,6 +1723,161 @@ export default function ClientReportingChart({
                     />
                   </BarChart>
                 </ChartContainer>
+              </CardContent>
+            </Card>
+
+            {/* Top 10 Créances - Analyse des créances clients */}
+            <Card>
+              <CardHeader>
+                <div className="flex items-center gap-2">
+                  <AlertTriangle className="w-5 h-5 text-orange-500" />
+                  <div>
+                    <CardTitle>Analyse des Créances - Top 10</CardTitle>
+                    <CardDescription>
+                      Clients avec les créances les plus élevées (Solde = CA TTC Total - CA Encaissé TTC)
+                    </CardDescription>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {recouvrementData.topCreances && recouvrementData.topCreances.length > 0 ? (
+                  <div className="space-y-6">
+                    {/* Histogramme horizontal */}
+                    <ChartContainer
+                      config={{
+                        soldeCreance: { label: "Solde créance", color: "hsl(25, 95%, 53%)" },
+                      }}
+                      className="h-[400px] w-full"
+                    >
+                      <BarChart
+                        data={recouvrementData.topCreances}
+                        layout="vertical"
+                        margin={{ top: 10, right: 30, left: 150, bottom: 10 }}
+                      >
+                        <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} />
+                        <XAxis
+                          type="number"
+                          tickLine={false}
+                          axisLine={false}
+                          tickFormatter={(value) => formatCompactOnly(value)}
+                          fontSize={11}
+                        />
+                        <YAxis
+                          type="category"
+                          dataKey="nomClient"
+                          tickLine={false}
+                          axisLine={false}
+                          fontSize={11}
+                          width={140}
+                          tick={{ fill: "hsl(var(--foreground))" }}
+                        />
+                        <ChartTooltip
+                          content={
+                            <ChartTooltipContent
+                              formatter={(value, name, props) => {
+                                const item = props.payload;
+                                return [
+                                  <div key="tooltip" className="space-y-1">
+                                    <div className="font-semibold">{item.nomClient}</div>
+                                    <div className="text-xs text-muted-foreground">{item.numeroClient}</div>
+                                    <div className="grid grid-cols-2 gap-x-4 gap-y-1 mt-2 text-xs">
+                                      <span>CA TTC Total:</span>
+                                      <span className="font-medium">{formatCompactOnly(item.caTTCTotal)}</span>
+                                      <span>CA Encaissé:</span>
+                                      <span className="font-medium">{formatCompactOnly(item.caEncaisseTTC)}</span>
+                                      <span className="text-orange-600">Solde créance:</span>
+                                      <span className="font-medium text-orange-600">{formatCompactOnly(item.soldeCreance)}</span>
+                                      <span>% du total:</span>
+                                      <span className="font-medium">{item.pourcentageTotal.toFixed(1)}%</span>
+                                    </div>
+                                  </div>,
+                                  ""
+                                ];
+                              }}
+                            />
+                          }
+                        />
+                        <Bar
+                          dataKey="soldeCreance"
+                          name="Solde créance"
+                          fill="hsl(25, 95%, 53%)"
+                          radius={[0, 4, 4, 0]}
+                        />
+                      </BarChart>
+                    </ChartContainer>
+
+                    {/* Liste détaillée */}
+                    <div className="border rounded-lg overflow-hidden">
+                      <div className="grid grid-cols-12 gap-4 p-3 bg-muted/50 text-xs font-medium text-muted-foreground">
+                        <div className="col-span-1">#</div>
+                        <div className="col-span-4">Entreprise</div>
+                        <div className="col-span-2 text-right">CA TTC Total</div>
+                        <div className="col-span-2 text-right">CA Encaissé</div>
+                        <div className="col-span-2 text-right">Solde</div>
+                        <div className="col-span-1 text-right">%</div>
+                      </div>
+                      {recouvrementData.topCreances.map((client, index) => (
+                        <div
+                          key={client.numeroClient}
+                          className={cn(
+                            "grid grid-cols-12 gap-4 p-3 text-sm items-center",
+                            index % 2 === 0 ? "bg-background" : "bg-muted/20"
+                          )}
+                        >
+                          <div className="col-span-1">
+                            <span
+                              className={cn(
+                                "inline-flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold",
+                                index === 0 && "bg-orange-100 text-orange-700",
+                                index === 1 && "bg-orange-50 text-orange-600",
+                                index === 2 && "bg-amber-50 text-amber-600",
+                                index > 2 && "bg-gray-100 text-gray-600"
+                              )}
+                            >
+                              {index + 1}
+                            </span>
+                          </div>
+                          <div className="col-span-4">
+                            <div className="font-medium truncate">{client.nomClient}</div>
+                            <div className="text-xs text-muted-foreground">{client.numeroClient}</div>
+                          </div>
+                          <div className="col-span-2 text-right font-medium text-blue-600">
+                            {formatCompactOnly(client.caTTCTotal)}
+                          </div>
+                          <div className="col-span-2 text-right font-medium text-green-600">
+                            {formatCompactOnly(client.caEncaisseTTC)}
+                          </div>
+                          <div className="col-span-2 text-right font-bold text-orange-600">
+                            {formatCompactOnly(client.soldeCreance)}
+                          </div>
+                          <div className="col-span-1 text-right">
+                            <Badge variant="outline" className="text-xs">
+                              {client.pourcentageTotal.toFixed(1)}%
+                            </Badge>
+                          </div>
+                        </div>
+                      ))}
+                      {/* Total */}
+                      <div className="grid grid-cols-12 gap-4 p-3 bg-muted font-medium text-sm border-t">
+                        <div className="col-span-1"></div>
+                        <div className="col-span-4">Total Top 10</div>
+                        <div className="col-span-2 text-right"></div>
+                        <div className="col-span-2 text-right"></div>
+                        <div className="col-span-2 text-right font-bold text-orange-600">
+                          {formatCompactOnly(recouvrementData.totalCreances)}
+                        </div>
+                        <div className="col-span-1 text-right">
+                          <Badge variant="outline" className="text-xs">100%</Badge>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
+                    <AlertTriangle className="w-12 h-12 mb-2 opacity-20" />
+                    <p>Aucune créance client disponible</p>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </div>

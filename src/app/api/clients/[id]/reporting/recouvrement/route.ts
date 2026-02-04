@@ -97,6 +97,85 @@ async function recupererRecouvrementParYearMonth(
   return result;
 }
 
+// ============================================================================
+// TOP 10 CRÉANCES - Clients avec les créances les plus élevées
+// Créance = CA TTC Total (débit 41*) - CA Encaissé TTC (crédit 41*)
+// ============================================================================
+
+interface TopCreance {
+  numeroClient: string;
+  nomClient: string;
+  caTTCTotal: number;
+  caEncaisseTTC: number;
+  soldeCreance: number;
+  pourcentageTotal: number;
+}
+
+async function recupererTop10Creances(
+  dbName: string,
+  batchIds: string[]
+): Promise<TopCreance[]> {
+  if (batchIds.length === 0) return [];
+
+  // Requête pour récupérer les créances par client
+  const data = await clickhouseClient.query({
+    query: `
+      WITH creances_clients AS (
+        SELECT
+          n_tiers AS numero_client,
+          intitule_tiers AS nom_client,
+          sum(debit) AS ca_ttc_total,
+          sum(credit) AS ca_encaisse_ttc,
+          sum(debit) - sum(credit) AS solde_creance
+        FROM ${dbName}.grand_livre
+        WHERE batch_id IN ({batchIds:Array(String)})
+          AND startsWith(compte, '41')
+          AND n_tiers != ''
+          AND intitule_tiers != ''
+        GROUP BY n_tiers, intitule_tiers
+        HAVING solde_creance > 0
+      )
+      SELECT
+        numero_client,
+        nom_client,
+        ca_ttc_total,
+        ca_encaisse_ttc,
+        solde_creance
+      FROM creances_clients
+      ORDER BY solde_creance DESC
+      LIMIT 10
+    `,
+    query_params: { batchIds },
+    format: "JSONEachRow",
+  });
+
+  const rows = (await data.json()) as Array<{
+    numero_client: string;
+    nom_client: string;
+    ca_ttc_total: string;
+    ca_encaisse_ttc: string;
+    solde_creance: string;
+  }>;
+
+  // Calculer le total des créances pour les pourcentages
+  const totalCreances = rows.reduce(
+    (sum, row) => sum + (parseFloat(row.solde_creance) || 0),
+    0
+  );
+
+  return rows.map((row) => {
+    const soldeCreance = parseFloat(row.solde_creance) || 0;
+    return {
+      numeroClient: row.numero_client,
+      nomClient: row.nom_client,
+      caTTCTotal: parseFloat(row.ca_ttc_total) || 0,
+      caEncaisseTTC: parseFloat(row.ca_encaisse_ttc) || 0,
+      soldeCreance,
+      pourcentageTotal: totalCreances > 0 ? (soldeCreance / totalCreances) * 100 : 0,
+    };
+  });
+}
+
 export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -201,7 +280,14 @@ export async function GET(
       tauxRecouvrement: cumulativeCaTTC !== 0
         ? (cumulativeCaEncaisse / cumulativeCaTTC) * 100
         : 0,
+      soldeCreances: cumulativeCaTTC - cumulativeCaEncaisse,
     };
+
+    // Top 10 des créances clients
+    const topCreances = await recupererTop10Creances(dbName, allBatchIds);
+
+    // Calculer le total des créances pour les stats
+    const totalCreances = topCreances.reduce((sum, c) => sum + c.soldeCreance, 0);
 
     return NextResponse.json({
       client: { id: client.id, name: client.name },
@@ -214,6 +300,8 @@ export async function GET(
         start: last12Months[0],
         end: last12Months[last12Months.length - 1],
       },
+      topCreances,
+      totalCreances,
     });
   } catch (error) {
     console.error("Recouvrement API error:", error);
