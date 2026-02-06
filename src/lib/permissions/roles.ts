@@ -30,35 +30,40 @@ export const ROLES: Record<RoleIdType, RoleDefinition> = {
   },
   [RoleId.ADMIN_CF]: {
     id: RoleId.ADMIN_CF,
-    title: "Administrateur Comptable",
+    // title: "Administrateur Comptable",
+    title: "ADMIN_CF",
     description:
       "Administrateur responsable de la gestion comptable de l'entreprise",
     level: 1,
   },
   [RoleId.ADMIN_PARTENAIRE]: {
     id: RoleId.ADMIN_PARTENAIRE,
-    title: "Administrateur Partenaire",
+    // title: "Administrateur Partenaire",
+    title: "ADMIN_PARTENAIRE",
     description:
       "Administrateur partenaire responsable de la comptabilité d'une entité partenaire",
     level: 2,
   },
   [RoleId.LOADER]: {
     id: RoleId.LOADER,
-    title: "Stagiaire Assistant Comptable",
+    // title: "Stagiaire Assistant Comptable",
+    title: "LOADER",
     description:
       "Compte dédié aux stagiaires assistants comptables avec accès limité",
     level: 4,
   },
   [RoleId.LOADER_PLUS]: {
     id: RoleId.LOADER_PLUS,
-    title: "Assistant Comptable",
+    // title: "Assistant Comptable",
+    title: "LOADER_PLUS",
     description:
       "Assistant comptable disposant de droits intermédiaires pour le traitement comptable",
     level: 3,
   },
   [RoleId.VIEWER]: {
     id: RoleId.VIEWER,
-    title: "Visiteur",
+    // title: "Visiteur",
+    title: "VIEWER",
     description: "C'est le compte qui peut voir les clients et les membres",
     level: 5,
   },
