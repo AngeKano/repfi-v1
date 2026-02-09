@@ -440,39 +440,35 @@ async function recupererTop10Clients(
 ): Promise<TopClient[]> {
   if (batchIds.length === 0) return [];
 
-  // Calcul basé sur les comptes 70 (CA HT) au lieu des comptes 41 (TTC)
-  // Les lignes des comptes 70 n'ont pas de n_tiers/intitule_tiers,
-  // il faut les retrouver via les lignes correspondantes (même numero_piece + date_transaction)
+  // D'abord récupérer le CA total pour calculer les pourcentages
+  const totalQuery = await clickhouseClient.query({
+    query: `
+      SELECT sum(debit) as ca_total
+      FROM ${dbName}.grand_livre
+      WHERE batch_id IN ({batchIds:Array(String)})
+        AND startsWith(compte, '41')
+    `,
+    query_params: { batchIds },
+    format: "JSONEachRow",
+  });
+
+  const totalRows = (await totalQuery.json()) as Array<{ ca_total: string }>;
+  const caTotal = parseFloat(totalRows[0]?.ca_total) || 0;
+
+  if (caTotal === 0) return [];
+
+  // Récupérer le Top 10 des clients
   const data = await clickhouseClient.query({
     query: `
-      WITH ventes_ht AS (
-        SELECT
-          numero_piece,
-          date_transaction,
-          credit AS montant_ht
-        FROM ${dbName}.grand_livre
-        WHERE batch_id IN ({batchIds:Array(String)})
-          AND startsWith(compte, '70')
-          AND credit > 0
-      ),
-      correspondances AS (
-        SELECT
-          c.n_tiers,
-          c.intitule_tiers,
-          v.montant_ht
-        FROM ventes_ht v
-        INNER JOIN ${dbName}.grand_livre c
-          ON c.numero_piece = v.numero_piece
-          AND c.date_transaction = v.date_transaction
-          AND c.batch_id IN ({batchIds:Array(String)})
-          AND c.n_tiers != ''
-          AND c.intitule_tiers != ''
-      )
       SELECT
         n_tiers AS numero_client,
         intitule_tiers AS nom_client,
-        sum(montant_ht) AS ca_client
-      FROM correspondances
+        sum(debit) AS ca_client
+      FROM ${dbName}.grand_livre
+      WHERE batch_id IN ({batchIds:Array(String)})
+        AND startsWith(compte, '41')
+        AND n_tiers != ''
+        AND intitule_tiers != ''
       GROUP BY n_tiers, intitule_tiers
       ORDER BY ca_client DESC
       LIMIT 10
@@ -486,22 +482,6 @@ async function recupererTop10Clients(
     nom_client: string;
     ca_client: string;
   }>;
-
-  // Calculer le CA HT total pour les pourcentages
-  const totalQuery = await clickhouseClient.query({
-    query: `
-      SELECT sum(credit) as ca_total
-      FROM ${dbName}.grand_livre
-      WHERE batch_id IN ({batchIds:Array(String)})
-        AND startsWith(compte, '70')
-        AND credit > 0
-    `,
-    query_params: { batchIds },
-    format: "JSONEachRow",
-  });
-
-  const totalRows = (await totalQuery.json()) as Array<{ ca_total: string }>;
-  const caTotal = parseFloat(totalRows[0]?.ca_total) || 0;
 
   return rows.map((row) => {
     const montantCA = parseFloat(row.ca_client) || 0;
