@@ -467,7 +467,6 @@ async function recupererTop10Clients(
           AND c.batch_id IN ({batchIds:Array(String)})
           AND c.n_tiers != ''
           AND c.intitule_tiers != ''
-          AND c.debit > 0
       )
       SELECT
         n_tiers AS numero_client,
