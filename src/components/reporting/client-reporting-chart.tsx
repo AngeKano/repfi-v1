@@ -1286,7 +1286,7 @@ export default function ClientReportingChart({
                   <div>
                     <CardTitle>Top 10 Clients</CardTitle>
                     <CardDescription>
-                      Clients avec le plus fort impact sur le chiffre d&apos;affaires
+                      Clients avec le plus fort impact sur le chiffre d&apos;affaires (HT)
                     </CardDescription>
                   </div>
                 </div>
@@ -1331,7 +1331,7 @@ export default function ClientReportingChart({
                             {formatCompactOnly(client.montantCA)}
                           </p>
                           <p className="text-xs text-muted-foreground">
-                            {client.pourcentageCA.toFixed(1)}% du CA
+                            {client.pourcentageCA.toFixed(1)}% du CA HT
                           </p>
                         </div>
 
