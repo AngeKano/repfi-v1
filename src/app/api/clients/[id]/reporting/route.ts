@@ -464,10 +464,8 @@ async function recupererTop10Clients(
         INNER JOIN ${dbName}.grand_livre c
           ON c.numero_piece = v.numero_piece
           AND c.date_transaction = v.date_transaction
-          AND c.batch_id IN ({batchIds:Array(String)})
           AND c.n_tiers != ''
           AND c.intitule_tiers != ''
-          AND c.debit > 0
       )
       SELECT
         n_tiers AS numero_client,
