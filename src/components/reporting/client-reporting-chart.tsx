@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import {
   Card,
   CardContent,
@@ -321,6 +321,7 @@ export default function ClientReportingChart({
   const [data, setData] = useState<ReportingData | null>(null);
   const [loading, setLoading] = useState(true);
   const [year, setYear] = useState<string>(new Date().getFullYear().toString());
+  const yearInitialized = useRef(false);
   const [periodType, setPeriodType] = useState<PeriodType>("year");
   const [selectedMonth, setSelectedMonth] = useState<string>("12");
   const [hiddenPeriods, setHiddenPeriods] = useState<Set<string>>(new Set());
@@ -408,6 +409,16 @@ export default function ClientReportingChart({
       if (!res.ok) throw new Error("Erreur API");
       const json = await res.json();
       setData(json);
+
+      // Au premier chargement, se caler sur l'année la plus récente du reporting
+      if (!yearInitialized.current && json.availableYears?.length > 0) {
+        yearInitialized.current = true;
+        const mostRecentYear = json.availableYears[0];
+        if (mostRecentYear !== year) {
+          setYear(mostRecentYear);
+          return;
+        }
+      }
     } catch (error) {
       console.error("Fetch error:", error);
       toast.error("Erreur lors du chargement des données");
