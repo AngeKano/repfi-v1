@@ -7,7 +7,7 @@ import { ROLES, RoleIdType } from "./roles";
 
 // Mapping des variantes de badge par role
 export const ROLE_BADGE_VARIANTS: Record<string, string> = {
-  ADMIN_ROOT: "destructive",
+  ADMIN_ROOT: "gold",
   ADMIN_CF: "default",
   ADMIN_PARTENAIRE: "default",
   LOADER_PLUS: "secondary",
