@@ -297,7 +297,6 @@ const chartConfigTresorerie: ChartConfig = {
   soldeTresorerieN1: { label: "Trésorerie N-1", color: "hsl(174, 72%, 66%)" },
 };
 
-
 const MONTHS = [
   { value: "01", label: "Janvier" },
   { value: "02", label: "Février" },
@@ -326,11 +325,11 @@ export default function ClientReportingChart({
   const [selectedMonth, setSelectedMonth] = useState<string>("12");
   const [hiddenPeriods, setHiddenPeriods] = useState<Set<string>>(new Set());
   const [tunnelMetrics, setTunnelMetrics] = useState<TunnelMetric[]>(
-    INITIAL_TUNNEL_METRICS
+    INITIAL_TUNNEL_METRICS,
   );
   const [activeTab, setActiveTab] = useState<TabId>("synthese");
   const [expandedNav, setExpandedNav] = useState<Set<TabId>>(
-    new Set(["synthese"])
+    new Set(["synthese"]),
   );
 
   // États spécifiques au recouvrement
@@ -414,6 +413,9 @@ export default function ClientReportingChart({
       if (!yearInitialized.current && json.availableYears?.length > 0) {
         yearInitialized.current = true;
         const mostRecentYear = json.availableYears[0];
+        // Initialiser aussi le recouvrement sur l'année/mois le plus récent
+        setRecouvrementYear(mostRecentYear);
+        setRecouvrementMonth("12");
         if (mostRecentYear !== year) {
           setYear(mostRecentYear);
           return;
@@ -500,7 +502,7 @@ export default function ClientReportingChart({
 
   const toggleMetricVisibility = (id: string) => {
     setTunnelMetrics((prev) =>
-      prev.map((m) => (m.id === id ? { ...m, visible: !m.visible } : m))
+      prev.map((m) => (m.id === id ? { ...m, visible: !m.visible } : m)),
     );
   };
 
@@ -575,7 +577,7 @@ export default function ClientReportingChart({
 
   const formatPeriodLabel = (
     periodStart?: string,
-    periodEnd?: string
+    periodEnd?: string,
   ): string => {
     if (!periodStart || !periodEnd) return "Période";
     const start = new Date(periodStart);
@@ -990,7 +992,7 @@ export default function ClientReportingChart({
                   <p className="text-xs text-muted-foreground">
                     {yearN1}:{" "}
                     {formatCompactOnly(
-                      data.indicateurs.anneeN1.chiffreAffaires
+                      data.indicateurs.anneeN1.chiffreAffaires,
                     )}
                   </p>
                 </CardContent>
@@ -1040,13 +1042,13 @@ export default function ClientReportingChart({
                     }`}
                   >
                     {formatCompactOnly(
-                      data.indicateurs.anneeN.resultatExploitation
+                      data.indicateurs.anneeN.resultatExploitation,
                     )}
                   </div>
                   <p className="text-xs text-muted-foreground">
                     {yearN1}:{" "}
                     {formatCompactOnly(
-                      data.indicateurs.anneeN1.resultatExploitation
+                      data.indicateurs.anneeN1.resultatExploitation,
                     )}
                   </p>
                 </CardContent>
@@ -1106,7 +1108,7 @@ export default function ClientReportingChart({
                   <p className="text-xs text-muted-foreground">
                     {yearN1}:{" "}
                     {formatCompactOnly(
-                      data.indicateurs.anneeN1.soldeTresorerie
+                      data.indicateurs.anneeN1.soldeTresorerie,
                     )}
                   </p>
                 </CardContent>
@@ -1133,13 +1135,13 @@ export default function ClientReportingChart({
                     }`}
                   >
                     {formatCompactOnly(
-                      data.indicateurs.anneeN.margeCommerciale
+                      data.indicateurs.anneeN.margeCommerciale,
                     )}
                   </div>
                   <p className="text-xs text-muted-foreground">
                     {yearN1}:{" "}
                     {formatCompactOnly(
-                      data.indicateurs.anneeN1.margeCommerciale
+                      data.indicateurs.anneeN1.margeCommerciale,
                     )}
                   </p>
                 </CardContent>
@@ -1173,12 +1175,12 @@ export default function ClientReportingChart({
                           <div className="font-medium text-sm">
                             {formatPeriodLabel(
                               period.periodStart,
-                              period.periodEnd
+                              period.periodEnd,
                             )}
                           </div>
                           <div className="text-xs text-muted-foreground mt-1">
                             {Number(period.nb_transactions).toLocaleString(
-                              "fr-FR"
+                              "fr-FR",
                             )}{" "}
                             transactions
                           </div>
@@ -1279,7 +1281,7 @@ export default function ClientReportingChart({
                 <CardContent className="pt-0">
                   <div className="text-2xl font-bold text-blue-400">
                     {formatCompactOnly(
-                      data.indicateurs.anneeN1.chiffreAffaires
+                      data.indicateurs.anneeN1.chiffreAffaires,
                     )}
                   </div>
                 </CardContent>
@@ -1297,7 +1299,8 @@ export default function ClientReportingChart({
                   <div>
                     <CardTitle>Top 10 Clients</CardTitle>
                     <CardDescription>
-                      Clients avec le plus fort impact sur le chiffre d&apos;affaires (HT)
+                      Clients avec le plus fort impact sur le chiffre
+                      d&apos;affaires
                     </CardDescription>
                   </div>
                 </div>
@@ -1317,7 +1320,7 @@ export default function ClientReportingChart({
                             index === 0 && "bg-amber-100 text-amber-700",
                             index === 1 && "bg-gray-100 text-gray-600",
                             index === 2 && "bg-orange-100 text-orange-700",
-                            index > 2 && "bg-blue-50 text-blue-600"
+                            index > 2 && "bg-blue-50 text-blue-600",
                           )}
                         >
                           {index + 1}
@@ -1342,7 +1345,7 @@ export default function ClientReportingChart({
                             {formatCompactOnly(client.montantCA)}
                           </p>
                           <p className="text-xs text-muted-foreground">
-                            {client.pourcentageCA.toFixed(1)}% du CA HT
+                            {client.pourcentageCA.toFixed(1)}% du CA
                           </p>
                         </div>
 
@@ -1397,7 +1400,7 @@ export default function ClientReportingChart({
                     }`}
                   >
                     {formatCompactOnly(
-                      data.indicateurs.anneeN.resultatExploitation
+                      data.indicateurs.anneeN.resultatExploitation,
                     )}
                   </div>
                 </CardContent>
@@ -1419,7 +1422,7 @@ export default function ClientReportingChart({
                     }`}
                   >
                     {formatCompactOnly(
-                      data.indicateurs.anneeN.resultatFinancier
+                      data.indicateurs.anneeN.resultatFinancier,
                     )}
                   </div>
                 </CardContent>
@@ -1495,58 +1498,6 @@ export default function ClientReportingChart({
 
         return (
           <div className="space-y-6">
-            {/* Filtre de période */}
-            <Card>
-              <CardHeader className="pb-3">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <CardTitle className="text-lg">Période d'analyse</CardTitle>
-                    <CardDescription>
-                      Sélectionnez le mois de fin pour afficher les 12 derniers mois
-                    </CardDescription>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Calendar className="w-4 h-4 text-muted-foreground" />
-                    <Select
-                      value={recouvrementMonth}
-                      onValueChange={setRecouvrementMonth}
-                    >
-                      <SelectTrigger className="w-[140px]">
-                        <SelectValue placeholder="Mois" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {MONTHS.map((month) => (
-                          <SelectItem key={month.value} value={month.value}>
-                            {month.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <Select
-                      value={recouvrementYear}
-                      onValueChange={setRecouvrementYear}
-                    >
-                      <SelectTrigger className="w-[100px]">
-                        <SelectValue placeholder="Année" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {recouvrementYearOptions.map((y) => (
-                          <SelectItem key={y} value={y}>
-                            {y}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent className="pt-0">
-                <p className="text-sm text-muted-foreground">
-                  Période affichée : <span className="font-medium text-foreground">{recouvrementData.periodRange.start.label}</span> → <span className="font-medium text-foreground">{recouvrementData.periodRange.end.label}</span>
-                </p>
-              </CardContent>
-            </Card>
-
             {/* KPIs Recouvrement */}
             <div className="grid grid-cols-3 gap-4">
               <Card>
@@ -1612,8 +1563,14 @@ export default function ClientReportingChart({
               <CardContent>
                 <ChartContainer
                   config={{
-                    tauxRecouvrement: { label: "Taux mensuel", color: "hsl(262, 83%, 58%)" },
-                    tauxRecouvrementCumule: { label: "Taux cumulé", color: "hsl(262, 83%, 78%)" },
+                    tauxRecouvrement: {
+                      label: "Taux mensuel",
+                      color: "hsl(262, 83%, 58%)",
+                    },
+                    tauxRecouvrementCumule: {
+                      label: "Taux cumulé",
+                      color: "hsl(262, 83%, 78%)",
+                    },
                   }}
                   className="h-[400px] w-full"
                 >
@@ -1683,8 +1640,14 @@ export default function ClientReportingChart({
               <CardContent>
                 <ChartContainer
                   config={{
-                    caTTCTotal: { label: "CA TTC Total", color: "hsl(221, 83%, 53%)" },
-                    caEncaisseTTC: { label: "CA Encaissé", color: "hsl(142, 76%, 36%)" },
+                    caTTCTotal: {
+                      label: "CA TTC Total",
+                      color: "hsl(221, 83%, 53%)",
+                    },
+                    caEncaisseTTC: {
+                      label: "CA Encaissé",
+                      color: "hsl(142, 76%, 36%)",
+                    },
                   }}
                   className="h-[350px] w-full"
                 >
@@ -1705,7 +1668,9 @@ export default function ClientReportingChart({
                     <YAxis
                       tickLine={false}
                       axisLine={false}
-                      tickFormatter={(value) => `${(value / 1000000).toFixed(0)}M`}
+                      tickFormatter={(value) =>
+                        `${(value / 1000000).toFixed(0)}M`
+                      }
                       fontSize={12}
                     />
                     <ChartTooltip
@@ -1713,7 +1678,9 @@ export default function ClientReportingChart({
                         <ChartTooltipContent
                           formatter={(value, name) => [
                             formatCompactOnly(value as number),
-                            name === "caTTCTotal" ? "CA TTC Total" : "CA Encaissé",
+                            name === "caTTCTotal"
+                              ? "CA TTC Total"
+                              : "CA Encaissé",
                           ]}
                         />
                       }
@@ -1745,27 +1712,36 @@ export default function ClientReportingChart({
                   <div>
                     <CardTitle>Analyse des Créances - Top 10</CardTitle>
                     <CardDescription>
-                      Clients avec les créances les plus élevées (Solde = CA TTC Total - CA Encaissé TTC)
+                      Clients avec les créances les plus élevées (Solde = CA TTC
+                      Total - CA Encaissé TTC)
                     </CardDescription>
                   </div>
                 </div>
               </CardHeader>
               <CardContent>
-                {recouvrementData.topCreances && recouvrementData.topCreances.length > 0 ? (
+                {recouvrementData.topCreances &&
+                recouvrementData.topCreances.length > 0 ? (
                   <div className="space-y-6">
                     {/* Histogramme horizontal */}
                     <ChartContainer
                       config={{
-                        soldeCreance: { label: "Solde créance", color: "hsl(25, 95%, 53%)" },
+                        soldeCreance: {
+                          label: "Solde créance",
+                          color: "hsl(25, 95%, 53%)",
+                        },
                       }}
-                      className="h-[400px] w-full"
+                      className="h-[70px] w-full"
                     >
                       <BarChart
                         data={recouvrementData.topCreances}
                         layout="vertical"
                         margin={{ top: 10, right: 30, left: 150, bottom: 10 }}
                       >
-                        <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} />
+                        <CartesianGrid
+                          strokeDasharray="3 3"
+                          horizontal={true}
+                          vertical={false}
+                        />
                         <XAxis
                           type="number"
                           tickLine={false}
@@ -1789,20 +1765,28 @@ export default function ClientReportingChart({
                                 const item = props.payload;
                                 return [
                                   <div key="tooltip" className="space-y-1">
-                                    <div className="font-semibold">{item.nomClient}</div>
-                                    <div className="text-xs text-muted-foreground">{item.numeroClient}</div>
                                     <div className="grid grid-cols-2 gap-x-4 gap-y-1 mt-2 text-xs">
                                       <span>CA TTC Total:</span>
-                                      <span className="font-medium">{formatCompactOnly(item.caTTCTotal)}</span>
+                                      <span className="font-medium">
+                                        {formatCompactOnly(item.caTTCTotal)}
+                                      </span>
                                       <span>CA Encaissé:</span>
-                                      <span className="font-medium">{formatCompactOnly(item.caEncaisseTTC)}</span>
-                                      <span className="text-orange-600">Solde créance:</span>
-                                      <span className="font-medium text-orange-600">{formatCompactOnly(item.soldeCreance)}</span>
+                                      <span className="font-medium">
+                                        {formatCompactOnly(item.caEncaisseTTC)}
+                                      </span>
+                                      <span className="text-orange-600">
+                                        Solde créance:
+                                      </span>
+                                      <span className="font-medium text-orange-600">
+                                        {formatCompactOnly(item.soldeCreance)}
+                                      </span>
                                       <span>% du total:</span>
-                                      <span className="font-medium">{item.pourcentageTotal.toFixed(1)}%</span>
+                                      <span className="font-medium">
+                                        {item.pourcentageTotal.toFixed(1)}%
+                                      </span>
                                     </div>
                                   </div>,
-                                  ""
+                                  "",
                                 ];
                               }}
                             />
@@ -1822,7 +1806,9 @@ export default function ClientReportingChart({
                       <div className="grid grid-cols-12 gap-4 p-3 bg-muted/50 text-xs font-medium text-muted-foreground">
                         <div className="col-span-1">#</div>
                         <div className="col-span-4">Entreprise</div>
-                        <div className="col-span-2 text-right">CA TTC Total</div>
+                        <div className="col-span-2 text-right">
+                          CA TTC Total
+                        </div>
                         <div className="col-span-2 text-right">CA Encaissé</div>
                         <div className="col-span-2 text-right">Solde</div>
                         <div className="col-span-1 text-right">%</div>
@@ -1832,7 +1818,7 @@ export default function ClientReportingChart({
                           key={client.numeroClient}
                           className={cn(
                             "grid grid-cols-12 gap-4 p-3 text-sm items-center",
-                            index % 2 === 0 ? "bg-background" : "bg-muted/20"
+                            index % 2 === 0 ? "bg-background" : "bg-muted/20",
                           )}
                         >
                           <div className="col-span-1">
@@ -1842,15 +1828,19 @@ export default function ClientReportingChart({
                                 index === 0 && "bg-orange-100 text-orange-700",
                                 index === 1 && "bg-orange-50 text-orange-600",
                                 index === 2 && "bg-amber-50 text-amber-600",
-                                index > 2 && "bg-gray-100 text-gray-600"
+                                index > 2 && "bg-gray-100 text-gray-600",
                               )}
                             >
                               {index + 1}
                             </span>
                           </div>
                           <div className="col-span-4">
-                            <div className="font-medium truncate">{client.nomClient}</div>
-                            <div className="text-xs text-muted-foreground">{client.numeroClient}</div>
+                            <div className="font-medium truncate">
+                              {client.nomClient}
+                            </div>
+                            <div className="text-xs text-muted-foreground">
+                              {client.numeroClient}
+                            </div>
                           </div>
                           <div className="col-span-2 text-right font-medium text-blue-600">
                             {formatCompactOnly(client.caTTCTotal)}
@@ -1878,7 +1868,9 @@ export default function ClientReportingChart({
                           {formatCompactOnly(recouvrementData.totalCreances)}
                         </div>
                         <div className="col-span-1 text-right">
-                          <Badge variant="outline" className="text-xs">100%</Badge>
+                          <Badge variant="outline" className="text-xs">
+                            100%
+                          </Badge>
                         </div>
                       </div>
                     </div>
@@ -1924,7 +1916,7 @@ export default function ClientReportingChart({
                   "w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm transition-colors",
                   isActive
                     ? "bg-primary text-primary-foreground"
-                    : "hover:bg-muted"
+                    : "hover:bg-muted",
                 )}
               >
                 <div className="flex items-center gap-2">
@@ -1935,7 +1927,7 @@ export default function ClientReportingChart({
                   <ChevronDown
                     className={cn(
                       "w-4 h-4 transition-transform",
-                      isExpanded && "rotate-180"
+                      isExpanded && "rotate-180",
                     )}
                   />
                 )}
@@ -1964,43 +1956,91 @@ export default function ClientReportingChart({
           <div>
             <h2 className="text-2xl font-bold">{data.client.name}</h2>
             <p className="text-muted-foreground">
-              Reporting comptable - {getPeriodLabel()}
+              Reporting comptable - Année{" "}
+              {activeTab === "recouvrement" ? recouvrementYear : year}
             </p>
             <p>Devise : K FCFA</p>
           </div>
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-1 bg-muted rounded-lg p-1">
+          {activeTab !== "recouvrement" ? (
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-1 bg-muted rounded-lg p-1">
+                <Button
+                  variant={periodType === "year" ? "default" : "ghost"}
+                  size="sm"
+                  onClick={() => setPeriodType("year")}
+                  className="gap-1"
+                >
+                  <Calendar className="w-4 h-4" />
+                  Année
+                </Button>
+                <Button
+                  variant={periodType === "month" ? "default" : "ghost"}
+                  size="sm"
+                  onClick={() => setPeriodType("month")}
+                  className="gap-1"
+                >
+                  <CalendarDays className="w-4 h-4" />
+                  Mois
+                </Button>
+                <Button
+                  variant={periodType === "ytd" ? "default" : "ghost"}
+                  size="sm"
+                  onClick={() => setPeriodType("ytd")}
+                  className="gap-1"
+                >
+                  <CalendarRange className="w-4 h-4" />
+                  YTD
+                </Button>
+              </div>
+
+              {(periodType === "month" || periodType === "ytd") && (
+                <Select value={selectedMonth} onValueChange={setSelectedMonth}>
+                  <SelectTrigger className="w-[140px]">
+                    <SelectValue placeholder="Mois" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {MONTHS.map((month) => (
+                      <SelectItem key={month.value} value={month.value}>
+                        {month.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+
               <Button
-                variant={periodType === "year" ? "default" : "ghost"}
-                size="sm"
-                onClick={() => setPeriodType("year")}
-                className="gap-1"
+                variant="outline"
+                size="icon"
+                onClick={() => handleYearChange("prev")}
+                disabled={
+                  data.availableYears.indexOf(year) >=
+                  data.availableYears.length - 1
+                }
               >
-                <Calendar className="w-4 h-4" />
-                Année
+                <ChevronLeft className="w-4 h-4" />
               </Button>
+              <span className="text-xl font-semibold min-w-[80px] text-center">
+                {year}
+              </span>
               <Button
-                variant={periodType === "month" ? "default" : "ghost"}
-                size="sm"
-                onClick={() => setPeriodType("month")}
-                className="gap-1"
+                variant="outline"
+                size="icon"
+                onClick={() => handleYearChange("next")}
+                disabled={data.availableYears.indexOf(year) <= 0}
               >
-                <CalendarDays className="w-4 h-4" />
-                Mois
-              </Button>
-              <Button
-                variant={periodType === "ytd" ? "default" : "ghost"}
-                size="sm"
-                onClick={() => setPeriodType("ytd")}
-                className="gap-1"
-              >
-                <CalendarRange className="w-4 h-4" />
-                YTD
+                <ChevronRight className="w-4 h-4" />
               </Button>
             </div>
-
-            {(periodType === "month" || periodType === "ytd") && (
-              <Select value={selectedMonth} onValueChange={setSelectedMonth}>
+          ) : (
+            <div className="flex items-center gap-2">
+              <Calendar className="w-4 h-4 text-muted-foreground" />
+              <span className="text-sm text-muted-foreground">
+                Période d&apos;analyse :
+              </span>
+              <Select
+                value={recouvrementMonth}
+                onValueChange={setRecouvrementMonth}
+              >
                 <SelectTrigger className="w-[140px]">
                   <SelectValue placeholder="Mois" />
                 </SelectTrigger>
@@ -2012,31 +2052,23 @@ export default function ClientReportingChart({
                   ))}
                 </SelectContent>
               </Select>
-            )}
-
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={() => handleYearChange("prev")}
-              disabled={
-                data.availableYears.indexOf(year) >=
-                data.availableYears.length - 1
-              }
-            >
-              <ChevronLeft className="w-4 h-4" />
-            </Button>
-            <span className="text-xl font-semibold min-w-[80px] text-center">
-              {year}
-            </span>
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={() => handleYearChange("next")}
-              disabled={data.availableYears.indexOf(year) <= 0}
-            >
-              <ChevronRight className="w-4 h-4" />
-            </Button>
-          </div>
+              <Select
+                value={recouvrementYear}
+                onValueChange={setRecouvrementYear}
+              >
+                <SelectTrigger className="w-[100px]">
+                  <SelectValue placeholder="Année" />
+                </SelectTrigger>
+                <SelectContent>
+                  {recouvrementYearOptions.map((y) => (
+                    <SelectItem key={y} value={y}>
+                      {y}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
         </div>
 
         {/* Tab Content */}

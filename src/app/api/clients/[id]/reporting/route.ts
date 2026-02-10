@@ -182,7 +182,7 @@ function getDaysInMonth(year: number, month: number): number {
 
 async function recupererRubriquesParMois(
   dbName: string,
-  batchIds: string[]
+  batchIds: string[],
 ): Promise<Map<string, RubriquesOHADA>> {
   const result = new Map<string, RubriquesOHADA>();
   if (batchIds.length === 0) return result;
@@ -226,7 +226,7 @@ async function recupererRubriquesParMois(
 async function recupererRubriquesParJour(
   dbName: string,
   batchIds: string[],
-  monthFilter: string
+  monthFilter: string,
 ): Promise<Map<string, RubriquesOHADA>> {
   const result = new Map<string, RubriquesOHADA>();
   if (batchIds.length === 0) return result;
@@ -270,7 +270,7 @@ async function recupererRubriquesParJour(
 
 async function recupererTresorerieParMois(
   dbName: string,
-  batchIds: string[]
+  batchIds: string[],
 ): Promise<Map<string, number>> {
   const result = new Map<string, number>();
   if (batchIds.length === 0) return result;
@@ -305,7 +305,7 @@ async function recupererTresorerieParMois(
 async function recupererTresorerieParJour(
   dbName: string,
   batchIds: string[],
-  monthFilter: string
+  monthFilter: string,
 ): Promise<Map<string, number>> {
   const result = new Map<string, number>();
   if (batchIds.length === 0) return result;
@@ -347,9 +347,12 @@ async function recupererTresorerieParJour(
 
 async function recupererRecouvrementParMois(
   dbName: string,
-  batchIds: string[]
+  batchIds: string[],
 ): Promise<Map<string, { caTTCTotal: number; caEncaisseTTC: number }>> {
-  const result = new Map<string, { caTTCTotal: number; caEncaisseTTC: number }>();
+  const result = new Map<
+    string,
+    { caTTCTotal: number; caEncaisseTTC: number }
+  >();
   if (batchIds.length === 0) return result;
 
   const data = await clickhouseClient.query({
@@ -386,9 +389,12 @@ async function recupererRecouvrementParMois(
 async function recupererRecouvrementParJour(
   dbName: string,
   batchIds: string[],
-  monthFilter: string
+  monthFilter: string,
 ): Promise<Map<string, { caTTCTotal: number; caEncaisseTTC: number }>> {
-  const result = new Map<string, { caTTCTotal: number; caEncaisseTTC: number }>();
+  const result = new Map<
+    string,
+    { caTTCTotal: number; caEncaisseTTC: number }
+  >();
   if (batchIds.length === 0) return result;
 
   const data = await clickhouseClient.query({
@@ -436,7 +442,7 @@ interface TopClient {
 
 async function recupererTop10Clients(
   dbName: string,
-  batchIds: string[]
+  batchIds: string[],
 ): Promise<TopClient[]> {
   if (batchIds.length === 0) return [];
 
@@ -516,7 +522,7 @@ async function recupererTop10Clients(
 
 async function recupererFluxParMois(
   dbName: string,
-  batchIds: string[]
+  batchIds: string[],
 ): Promise<
   Map<string, { charges: number; produits: number; nbTransactions: number }>
 > {
@@ -563,7 +569,7 @@ async function recupererFluxParMois(
 async function recupererFluxParJour(
   dbName: string,
   batchIds: string[],
-  monthFilter: string
+  monthFilter: string,
 ): Promise<
   Map<string, { charges: number; produits: number; nbTransactions: number }>
 > {
@@ -678,8 +684,11 @@ function calculerSIG(rubriques: RubriquesOHADA): SoldesIntermediairesGestion {
 function calculerIndicateursPeriode(
   rubriquesParPeriode: Map<string, RubriquesOHADA>,
   tresorerieParPeriode: Map<string, number>,
-  recouvrementParPeriode: Map<string, { caTTCTotal: number; caEncaisseTTC: number }>,
-  periodesToInclude: string[]
+  recouvrementParPeriode: Map<
+    string,
+    { caTTCTotal: number; caEncaisseTTC: number }
+  >,
+  periodesToInclude: string[],
 ): IndicateursFinanciers {
   const rubriquesAgregees = { ...RUBRIQUES_VIDES };
   let tresorerieTotal = 0;
@@ -690,7 +699,7 @@ function calculerIndicateursPeriode(
     const rubriques = rubriquesParPeriode.get(period);
     if (rubriques) {
       for (const key of Object.keys(
-        rubriquesAgregees
+        rubriquesAgregees,
       ) as (keyof RubriquesOHADA)[]) {
         rubriquesAgregees[key] += rubriques[key];
       }
@@ -705,9 +714,8 @@ function calculerIndicateursPeriode(
   }
 
   const sig = calculerSIG(rubriquesAgregees);
-  const tauxRecouvrement = caTTCTotalSum !== 0
-    ? (caEncaisseTTCSum / caTTCTotalSum) * 100
-    : 0;
+  const tauxRecouvrement =
+    caTTCTotalSum !== 0 ? (caEncaisseTTCSum / caTTCTotalSum) * 100 : 0;
 
   return {
     chiffreAffaires: sig.XB,
@@ -731,7 +739,7 @@ const calculerVariation = (n: number, n1: number): number =>
 
 export async function GET(
   req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ id: string }> },
 ) {
   try {
     const session = await getServerSession(authOptions);
@@ -758,7 +766,7 @@ export async function GET(
     if (client.companyId !== session.user.companyId) {
       return NextResponse.json(
         { error: "Accès non autorisé" },
-        { status: 403 }
+        { status: 403 },
       );
     }
 
@@ -807,7 +815,7 @@ export async function GET(
 
     const availableYears = [
       ...new Set(
-        availableYearsData.map((p) => p.periodStart.getFullYear().toString())
+        availableYearsData.map((p) => p.periodStart.getFullYear().toString()),
       ),
     ].sort((a, b) => parseInt(b) - parseInt(a));
 
@@ -849,37 +857,37 @@ export async function GET(
       const rubriquesParJourN = await recupererRubriquesParJour(
         dbName,
         batchIds,
-        selectedMonth
+        selectedMonth,
       );
       const rubriquesParJourN1 = await recupererRubriquesParJour(
         dbName,
         batchIdsN1,
-        selectedMonth
+        selectedMonth,
       );
       const tresorerieParJourN = await recupererTresorerieParJour(
         dbName,
         batchIds,
-        selectedMonth
+        selectedMonth,
       );
       const tresorerieParJourN1 = await recupererTresorerieParJour(
         dbName,
         batchIdsN1,
-        selectedMonth
+        selectedMonth,
       );
       const fluxParJourN = await recupererFluxParJour(
         dbName,
         batchIds,
-        selectedMonth
+        selectedMonth,
       );
       const recouvrementParJourN = await recupererRecouvrementParJour(
         dbName,
         batchIds,
-        selectedMonth
+        selectedMonth,
       );
       const recouvrementParJourN1 = await recupererRecouvrementParJour(
         dbName,
         batchIdsN1,
-        selectedMonth
+        selectedMonth,
       );
 
       let cumulativeBalanceN = 0;
@@ -918,19 +926,27 @@ export async function GET(
         cumulativeBalanceN += resultatN;
 
         // Recouvrement
-        const recouvrementN = recouvrementParJourN.get(dayStr) || { caTTCTotal: 0, caEncaisseTTC: 0 };
-        const recouvrementN1Jour = recouvrementParJourN1.get(dayStr) || { caTTCTotal: 0, caEncaisseTTC: 0 };
+        const recouvrementN = recouvrementParJourN.get(dayStr) || {
+          caTTCTotal: 0,
+          caEncaisseTTC: 0,
+        };
+        const recouvrementN1Jour = recouvrementParJourN1.get(dayStr) || {
+          caTTCTotal: 0,
+          caEncaisseTTC: 0,
+        };
         cumulativeCaTTCN += recouvrementN.caTTCTotal;
         cumulativeCaEncaisseN += recouvrementN.caEncaisseTTC;
         cumulativeCaTTCN1 += recouvrementN1Jour.caTTCTotal;
         cumulativeCaEncaisseN1 += recouvrementN1Jour.caEncaisseTTC;
 
-        const tauxRecouvrementN = cumulativeCaTTCN !== 0
-          ? (cumulativeCaEncaisseN / cumulativeCaTTCN) * 100
-          : 0;
-        const tauxRecouvrementN1 = cumulativeCaTTCN1 !== 0
-          ? (cumulativeCaEncaisseN1 / cumulativeCaTTCN1) * 100
-          : 0;
+        const tauxRecouvrementN =
+          cumulativeCaTTCN !== 0
+            ? (cumulativeCaEncaisseN / cumulativeCaTTCN) * 100
+            : 0;
+        const tauxRecouvrementN1 =
+          cumulativeCaTTCN1 !== 0
+            ? (cumulativeCaEncaisseN1 / cumulativeCaTTCN1) * 100
+            : 0;
 
         chartData.push({
           label: `${d}`,
@@ -961,54 +977,55 @@ export async function GET(
         rubriquesParJourN,
         tresorerieParJourN,
         recouvrementParJourN,
-        periodsToIncludeN
+        periodsToIncludeN,
       );
       const indicateursN1 = calculerIndicateursPeriode(
         rubriquesParJourN1,
         tresorerieParJourN1,
         recouvrementParJourN1,
-        periodsToIncludeN1
+        periodsToIncludeN1,
       );
 
       const variations = {
         chiffreAffaires: calculerVariation(
           indicateursN.chiffreAffaires,
-          indicateursN1.chiffreAffaires
+          indicateursN1.chiffreAffaires,
         ),
         masseSalariale: calculerVariation(
           indicateursN.masseSalariale,
-          indicateursN1.masseSalariale
+          indicateursN1.masseSalariale,
         ),
         resultatExploitation: calculerVariation(
           indicateursN.resultatExploitation,
-          indicateursN1.resultatExploitation
+          indicateursN1.resultatExploitation,
         ),
         resultatNet: calculerVariation(
           indicateursN.resultatNet,
-          indicateursN1.resultatNet
+          indicateursN1.resultatNet,
         ),
         soldeTresorerie: calculerVariation(
           indicateursN.soldeTresorerie,
-          indicateursN1.soldeTresorerie
+          indicateursN1.soldeTresorerie,
         ),
         margeCommerciale: calculerVariation(
           indicateursN.margeCommerciale,
-          indicateursN1.margeCommerciale
+          indicateursN1.margeCommerciale,
         ),
         valeurAjoutee: calculerVariation(
           indicateursN.valeurAjoutee,
-          indicateursN1.valeurAjoutee
+          indicateursN1.valeurAjoutee,
         ),
         ebe: calculerVariation(indicateursN.ebe, indicateursN1.ebe),
         resultatFinancier: calculerVariation(
           indicateursN.resultatFinancier,
-          indicateursN1.resultatFinancier
+          indicateursN1.resultatFinancier,
         ),
         resultatHAO: calculerVariation(
           indicateursN.resultatHAO,
-          indicateursN1.resultatHAO
+          indicateursN1.resultatHAO,
         ),
-        tauxRecouvrement: indicateursN.tauxRecouvrement - indicateursN1.tauxRecouvrement,
+        tauxRecouvrement:
+          indicateursN.tauxRecouvrement - indicateursN1.tauxRecouvrement,
       };
 
       const totals = chartData.reduce(
@@ -1017,7 +1034,7 @@ export async function GET(
           totalProduits: acc.totalProduits + row.produits,
           totalTransactions: acc.totalTransactions + row.nbTransactions,
         }),
-        { totalCharges: 0, totalProduits: 0, totalTransactions: 0 }
+        { totalCharges: 0, totalProduits: 0, totalTransactions: 0 },
       );
 
       const periods = await enrichirPeriodes(postgresPeriodsData, dbName);
@@ -1053,19 +1070,25 @@ export async function GET(
     const rubriquesParMoisN = await recupererRubriquesParMois(dbName, batchIds);
     const rubriquesParMoisN1 = await recupererRubriquesParMois(
       dbName,
-      batchIdsN1
+      batchIdsN1,
     );
     const tresorerieParMoisN = await recupererTresorerieParMois(
       dbName,
-      batchIds
+      batchIds,
     );
     const tresorerieParMoisN1 = await recupererTresorerieParMois(
       dbName,
-      batchIdsN1
+      batchIdsN1,
     );
     const fluxParMoisN = await recupererFluxParMois(dbName, batchIds);
-    const recouvrementParMoisN = await recupererRecouvrementParMois(dbName, batchIds);
-    const recouvrementParMoisN1 = await recupererRecouvrementParMois(dbName, batchIdsN1);
+    const recouvrementParMoisN = await recupererRecouvrementParMois(
+      dbName,
+      batchIds,
+    );
+    const recouvrementParMoisN1 = await recupererRecouvrementParMois(
+      dbName,
+      batchIdsN1,
+    );
 
     let cumulativeBalance = 0;
     let cumulativeTresorerieN = 0;
@@ -1106,19 +1129,27 @@ export async function GET(
       cumulativeBalance += resultat;
 
       // Recouvrement
-      const recouvrementN = recouvrementParMoisN.get(monthStr) || { caTTCTotal: 0, caEncaisseTTC: 0 };
-      const recouvrementN1Mois = recouvrementParMoisN1.get(monthStr) || { caTTCTotal: 0, caEncaisseTTC: 0 };
+      const recouvrementN = recouvrementParMoisN.get(monthStr) || {
+        caTTCTotal: 0,
+        caEncaisseTTC: 0,
+      };
+      const recouvrementN1Mois = recouvrementParMoisN1.get(monthStr) || {
+        caTTCTotal: 0,
+        caEncaisseTTC: 0,
+      };
       cumulativeCaTTCN += recouvrementN.caTTCTotal;
       cumulativeCaEncaisseN += recouvrementN.caEncaisseTTC;
       cumulativeCaTTCN1 += recouvrementN1Mois.caTTCTotal;
       cumulativeCaEncaisseN1 += recouvrementN1Mois.caEncaisseTTC;
 
-      const tauxRecouvrementN = cumulativeCaTTCN !== 0
-        ? (cumulativeCaEncaisseN / cumulativeCaTTCN) * 100
-        : 0;
-      const tauxRecouvrementN1 = cumulativeCaTTCN1 !== 0
-        ? (cumulativeCaEncaisseN1 / cumulativeCaTTCN1) * 100
-        : 0;
+      const tauxRecouvrementN =
+        cumulativeCaTTCN !== 0
+          ? (cumulativeCaEncaisseN / cumulativeCaTTCN) * 100
+          : 0;
+      const tauxRecouvrementN1 =
+        cumulativeCaTTCN1 !== 0
+          ? (cumulativeCaEncaisseN1 / cumulativeCaTTCN1) * 100
+          : 0;
 
       chartData.push({
         label: monthNames[m - 1],
@@ -1154,54 +1185,55 @@ export async function GET(
       rubriquesParMoisN,
       tresorerieParMoisN,
       recouvrementParMoisN,
-      periodsToIncludeN
+      periodsToIncludeN,
     );
     const indicateursN1 = calculerIndicateursPeriode(
       rubriquesParMoisN1,
       tresorerieParMoisN1,
       recouvrementParMoisN1,
-      periodsToIncludeN1
+      periodsToIncludeN1,
     );
 
     const variations = {
       chiffreAffaires: calculerVariation(
         indicateursN.chiffreAffaires,
-        indicateursN1.chiffreAffaires
+        indicateursN1.chiffreAffaires,
       ),
       masseSalariale: calculerVariation(
         indicateursN.masseSalariale,
-        indicateursN1.masseSalariale
+        indicateursN1.masseSalariale,
       ),
       resultatExploitation: calculerVariation(
         indicateursN.resultatExploitation,
-        indicateursN1.resultatExploitation
+        indicateursN1.resultatExploitation,
       ),
       resultatNet: calculerVariation(
         indicateursN.resultatNet,
-        indicateursN1.resultatNet
+        indicateursN1.resultatNet,
       ),
       soldeTresorerie: calculerVariation(
         indicateursN.soldeTresorerie,
-        indicateursN1.soldeTresorerie
+        indicateursN1.soldeTresorerie,
       ),
       margeCommerciale: calculerVariation(
         indicateursN.margeCommerciale,
-        indicateursN1.margeCommerciale
+        indicateursN1.margeCommerciale,
       ),
       valeurAjoutee: calculerVariation(
         indicateursN.valeurAjoutee,
-        indicateursN1.valeurAjoutee
+        indicateursN1.valeurAjoutee,
       ),
       ebe: calculerVariation(indicateursN.ebe, indicateursN1.ebe),
       resultatFinancier: calculerVariation(
         indicateursN.resultatFinancier,
-        indicateursN1.resultatFinancier
+        indicateursN1.resultatFinancier,
       ),
       resultatHAO: calculerVariation(
         indicateursN.resultatHAO,
-        indicateursN1.resultatHAO
+        indicateursN1.resultatHAO,
       ),
-      tauxRecouvrement: indicateursN.tauxRecouvrement - indicateursN1.tauxRecouvrement,
+      tauxRecouvrement:
+        indicateursN.tauxRecouvrement - indicateursN1.tauxRecouvrement,
     };
 
     const totals = chartData.reduce(
@@ -1210,7 +1242,7 @@ export async function GET(
         totalProduits: acc.totalProduits + row.produits,
         totalTransactions: acc.totalTransactions + row.nbTransactions,
       }),
-      { totalCharges: 0, totalProduits: 0, totalTransactions: 0 }
+      { totalCharges: 0, totalProduits: 0, totalTransactions: 0 },
     );
 
     const periods = await enrichirPeriodes(postgresPeriodsData, dbName);
@@ -1238,7 +1270,7 @@ export async function GET(
     console.error("Reporting API error:", error);
     return NextResponse.json(
       { error: "Erreur lors de la récupération des données" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
@@ -1278,6 +1310,6 @@ async function enrichirPeriodes(postgresPeriodsData: any[], dbName: string) {
         produits: parseFloat(stats.produits as any) || 0,
         nb_transactions: stats.nb_transactions || 0,
       };
-    })
+    }),
   );
 }
