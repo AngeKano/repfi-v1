@@ -58,7 +58,7 @@ function FileTypeSelect({
   excludeTypes?: string[];
 }) {
   const filteredTypes = REQUIRED_FILE_TYPES.filter(
-    (t) => !excludeTypes.includes(t.type)
+    (t) => !excludeTypes.includes(t.type),
   );
 
   return (
@@ -119,7 +119,7 @@ export default function DeclarationComptable({
   const years = Array.from({ length: 10 }, (_, i) => currentYear - i);
   const [selectedYear, setSelectedYear] = useState<number>(currentYear);
   const [calendarMonth, setCalendarMonth] = useState<Date>(
-    new Date(selectedYear, 0)
+    new Date(selectedYear, 0),
   );
 
   // Fetch des périodes existantes
@@ -129,7 +129,7 @@ export default function DeclarationComptable({
     const fetchPeriods = async () => {
       try {
         const res = await fetch(
-          `/api/files/comptable/periods?clientId=${client.id}`
+          `/api/files/comptable/periods?clientId=${client.id}`,
         );
         const data = await res.json();
 
@@ -249,10 +249,21 @@ export default function DeclarationComptable({
     // Mots-clés pour la détection (format v3.0)
     const keywords: Record<string, string[]> = {
       GRAND_LIVRE: [
-        "grand", "livre", "compte", "grandlivre", 
-        "gl", "glcompte", "gltiers"  // Inclut les anciens noms pour compatibilité
+        "grand",
+        "livre",
+        "compte",
+        "grandlivre",
+        "gl",
+        "glcompte",
+        "gltiers", // Inclut les anciens noms pour compatibilité
       ],
-      PLAN_COMPTES: ["plan", "compte", "plancompte", "plancomptable", "comptable"],
+      PLAN_COMPTES: [
+        "plan",
+        "compte",
+        "plancompte",
+        "plancomptable",
+        "comptable",
+      ],
       PLAN_TIERS: ["plan", "tiers", "plantiers"],
       CODE_JOURNAL: ["code", "journal", "codejournal", "journaux"],
     };
@@ -271,7 +282,7 @@ export default function DeclarationComptable({
     }));
 
     const bestMatch = scores.reduce((prev, current) =>
-      current.score > prev.score ? current : prev
+      current.score > prev.score ? current : prev,
     );
 
     return bestMatch.score > 0 ? bestMatch.type : undefined;
@@ -372,7 +383,7 @@ export default function DeclarationComptable({
 
     if (!allFilesValid()) {
       toast.error(
-        `Veuillez sélectionner les ${MAX_FILES} fichiers obligatoires avec des types valides`
+        `Veuillez sélectionner les ${MAX_FILES} fichiers obligatoires avec des types valides`,
       );
       return;
     }
@@ -404,10 +415,10 @@ export default function DeclarationComptable({
       setUploadResult(data);
       toast.success(
         `Fichiers uploadés - Période: ${new Date(
-          data.period.start
+          data.period.start,
         ).toLocaleDateString("fr-FR")} au ${new Date(
-          data.period.end
-        ).toLocaleDateString("fr-FR")}`
+          data.period.end,
+        ).toLocaleDateString("fr-FR")}`,
       );
     } catch (error: any) {
       toast.error(error.message);
@@ -436,7 +447,7 @@ export default function DeclarationComptable({
 
       toast.success("Traitement ETL lancé avec succès");
       router.push(
-        `/clients/${client.id}/declaration/status/${uploadResult.batchId}`
+        `/clients/${client.id}/declaration/status/${uploadResult.batchId}`,
       );
     } catch (error: any) {
       toast.error(error.message);
@@ -512,7 +523,7 @@ export default function DeclarationComptable({
           disabled={(date) => {
             if (!isDateInSelectedYear(date)) return true;
             return disabledDates.some(
-              (d) => d.toDateString() === date.toDateString()
+              (d) => d.toDateString() === date.toDateString(),
             );
           }}
           modifiers={{
@@ -565,7 +576,8 @@ export default function DeclarationComptable({
             📋 Format v3.0 - 4 fichiers requis
           </p>
           <p className="text-xs text-blue-600 mt-1">
-            Le Grand Livre Comptable unifié remplace les anciens fichiers GL Comptes et GL Tiers
+            Le Grand Livre Comptable unifié remplace les anciens fichiers GL
+            Comptes et GL Tiers
           </p>
         </div>
 
@@ -575,8 +587,8 @@ export default function DeclarationComptable({
             dragActive
               ? "border-blue-500 bg-blue-50"
               : hasMaxFiles
-              ? "border-gray-200 bg-gray-100 opacity-60 pointer-events-none"
-              : "border-gray-300 hover:border-gray-400"
+                ? "border-gray-200 bg-gray-100 opacity-60 pointer-events-none"
+                : "border-gray-300 hover:border-gray-400"
           }`}
           onDragEnter={hasMaxFiles ? undefined : handleDrag}
           onDragLeave={hasMaxFiles ? undefined : handleDrag}
@@ -655,7 +667,7 @@ export default function DeclarationComptable({
               <p>
                 <strong>Période:</strong>{" "}
                 {new Date(uploadResult.period.start).toLocaleDateString(
-                  "fr-FR"
+                  "fr-FR",
                 )}{" "}
                 au{" "}
                 {new Date(uploadResult.period.end).toLocaleDateString("fr-FR")}
@@ -664,7 +676,8 @@ export default function DeclarationComptable({
                 <strong>Batch ID:</strong> {uploadResult.batchId}
               </p>
               <p>
-                <strong>Format:</strong> {uploadResult.fileFormat?.version || "v3.0"}
+                <strong>Format:</strong>{" "}
+                {uploadResult.fileFormat?.version || "v3.0"}
               </p>
             </div>
           </div>
@@ -673,7 +686,9 @@ export default function DeclarationComptable({
         {/* Files List */}
         {filesCount > 0 && (
           <div className="space-y-3 mb-6">
-            <Label>Fichiers sélectionnés ({filesCount}/{MAX_FILES} requis)</Label>
+            <Label>
+              Fichiers sélectionnés ({filesCount}/{MAX_FILES} requis)
+            </Label>
             {files.map((uploadFile) => (
               <div
                 key={uploadFile.id}
@@ -694,7 +709,7 @@ export default function DeclarationComptable({
                     <Badge variant="default">
                       <FileCheck className="w-3 h-3 mr-1" />
                       {REQUIRED_FILE_TYPES.find(
-                        (t) => t.type === uploadFile.fileType
+                        (t) => t.type === uploadFile.fileType,
                       )?.label || uploadFile.fileType}
                     </Badge>
                   ) : (

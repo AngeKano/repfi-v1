@@ -23,7 +23,10 @@ import {
   Eye,
 } from "lucide-react";
 import Link from "next/link";
-import { getRoleLabel, getRoleBadgeVariant } from "@/lib/permissions/role-utils";
+import {
+  getRoleLabel,
+  getRoleBadgeVariant,
+} from "@/lib/permissions/role-utils";
 
 interface UsersListClientProps {
   session: any;
@@ -233,7 +236,7 @@ export default function UsersListClient({
                         <p className="mt-1">
                           Derniere connexion :{" "}
                           {new Date(user.lastLoginAt).toLocaleDateString(
-                            "fr-FR"
+                            "fr-FR",
                           )}
                         </p>
                       )}

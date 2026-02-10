@@ -34,7 +34,7 @@ function getClickhouseDbName(clientId: string): string {
 
 export async function DELETE(
   req: NextRequest,
-  { params }: { params: Promise<{ periodsId: string }> }
+  { params }: { params: Promise<{ periodsId: string }> },
 ) {
   try {
     const session = await getServerSession(authOptions);
@@ -63,14 +63,14 @@ export async function DELETE(
     if (!period) {
       return NextResponse.json(
         { error: "Période non trouvée" },
-        { status: 404 }
+        { status: 404 },
       );
     }
 
     if (period.client.companyId !== session.user.companyId) {
       return NextResponse.json(
         { error: "Accès non autorisé" },
-        { status: 403 }
+        { status: 403 },
       );
     }
 
@@ -78,7 +78,7 @@ export async function DELETE(
     if (period.status === "PROCESSING" || period.status === "VALIDATING") {
       return NextResponse.json(
         { error: "Impossible de supprimer une période en cours de traitement" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -91,10 +91,14 @@ export async function DELETE(
       return `${year}${month}${day}`;
     };
     const periodFolder = `periode-${formatDateYYYYMMDD(
-      period.periodStart
+      period.periodStart,
     )}-${formatDateYYYYMMDD(period.periodEnd)}`;
-    const companyName = period.client.name.replace(/\s+/g, "_").replace(/[^\w\-]/g, "");
-    const clientName = period.client.name.replace(/\s+/g, "_").replace(/[^\w\-]/g, "");
+    const companyName = period.client.name
+      .replace(/\s+/g, "_")
+      .replace(/[^\w\-]/g, "");
+    const clientName = period.client.name
+      .replace(/\s+/g, "_")
+      .replace(/[^\w\-]/g, "");
     const s3Prefix = `${companyName}_${period.client.companyId}/${clientName}_${period.client.id}/declaration/${year}/${periodFolder}/`;
 
     // 1. Supprimer tous les fichiers S3 du dossier de la période
@@ -104,7 +108,7 @@ export async function DELETE(
         new ListObjectsV2Command({
           Bucket: bucket,
           Prefix: s3Prefix,
-        })
+        }),
       );
 
       if (listResponse.Contents && listResponse.Contents.length > 0) {
@@ -114,7 +118,7 @@ export async function DELETE(
               new DeleteObjectCommand({
                 Bucket: bucket,
                 Key: obj.Key,
-              })
+              }),
             );
           }
         }
@@ -133,12 +137,14 @@ export async function DELETE(
 
       for (const table of tablesToDelete) {
         console.log(
-          `🗑️ Suppression ClickHouse: ${dbName}.${table} WHERE batch_id = '${batchId}'`
+          `🗑️ Suppression ClickHouse: ${dbName}.${table} WHERE batch_id = '${batchId}'`,
         );
         await clickhouseClient.command({
           query: `ALTER TABLE ${dbName}.${table} DELETE WHERE batch_id = '${batchId}'`,
         });
-        console.log(`✅ Données ClickHouse supprimées pour batch_id: ${batchId} dans ${table}`);
+        console.log(
+          `✅ Données ClickHouse supprimées pour batch_id: ${batchId} dans ${table}`,
+        );
       }
     } catch (clickhouseError) {
       console.error("Erreur suppression ClickHouse:", clickhouseError);
@@ -158,7 +164,7 @@ export async function DELETE(
     console.error("DELETE period error:", error);
     return NextResponse.json(
       { error: "Erreur lors de la suppression de la période" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

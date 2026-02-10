@@ -7,7 +7,7 @@ import { prisma } from "@/lib/prisma";
 
 export async function GET(
   req: NextRequest,
-  { params }: { params: Promise<{ batchId: string }> }
+  { params }: { params: Promise<{ batchId: string }> },
 ) {
   try {
     const session = await getServerSession(authOptions);
@@ -42,20 +42,20 @@ export async function GET(
     if (!period) {
       return NextResponse.json(
         { error: "Période non trouvée" },
-        { status: 404 }
+        { status: 404 },
       );
     }
 
     if (period.client.companyId !== session.user.companyId) {
       return NextResponse.json(
         { error: "Accès non autorisé" },
-        { status: 403 }
+        { status: 403 },
       );
     }
 
     const totalFiles = period.files.length;
     const processedFiles = period.files.filter(
-      (f) => f.processingStatus === "COMPLETED"
+      (f) => f.processingStatus === "COMPLETED",
     ).length;
     const progress = totalFiles > 0 ? (processedFiles / totalFiles) * 100 : 0;
 
@@ -73,7 +73,7 @@ export async function GET(
     console.error("GET status error:", error);
     return NextResponse.json(
       { error: "Erreur lors de la récupération du statut" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

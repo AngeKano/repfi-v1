@@ -44,7 +44,7 @@ const signUpSchema = z
 async function createS3Folders(
   name: string,
   companyId: string,
-  selfEntityId: string
+  selfEntityId: string,
 ) {
   const bucketName = process.env.AWS_S3_BUCKET_NAME!;
 
@@ -53,7 +53,7 @@ async function createS3Folders(
       Bucket: bucketName,
       Key: `${name}_${companyId}/`,
       Body: "",
-    })
+    }),
   );
 
   await s3Client.send(
@@ -61,7 +61,7 @@ async function createS3Folders(
       Bucket: bucketName,
       Key: `${name}_${companyId}/${name}_${selfEntityId}/`,
       Body: "",
-    })
+    }),
   );
 }
 
@@ -77,7 +77,7 @@ export async function POST(req: NextRequest) {
     if (existingCompany) {
       return NextResponse.json(
         { error: "Cette entreprise est déjà enregistrée" },
-        { status: 409 }
+        { status: 409 },
       );
     }
 
@@ -88,7 +88,7 @@ export async function POST(req: NextRequest) {
     if (existingUser) {
       return NextResponse.json(
         { error: "Cet email est déjà utilisé" },
-        { status: 409 }
+        { status: 409 },
       );
     }
 
@@ -166,7 +166,7 @@ export async function POST(req: NextRequest) {
         message: "Entreprise créée avec succès",
         data: result,
       },
-      { status: 201 }
+      { status: 201 },
     );
   } catch (error: any) {
     console.error("Signup error:", error);
@@ -177,20 +177,20 @@ export async function POST(req: NextRequest) {
           error: "Données invalides",
           details: error.errors,
         },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
     if (error.code === "P2002") {
       return NextResponse.json(
         { error: "Email déjà utilisé" },
-        { status: 409 }
+        { status: 409 },
       );
     }
 
     return NextResponse.json(
       { error: "Erreur lors de l'inscription" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

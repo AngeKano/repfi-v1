@@ -14,7 +14,7 @@ const s3Client = new S3Client({
 
 export async function GET(
   req: NextRequest,
-  { params }: { params: Promise<{ fileId: string }> }
+  { params }: { params: Promise<{ fileId: string }> },
 ) {
   try {
     const session = await getServerSession(authOptions);
@@ -33,14 +33,17 @@ export async function GET(
     });
 
     if (!file) {
-      return NextResponse.json({ error: "Fichier non trouvé" }, { status: 404 });
+      return NextResponse.json(
+        { error: "Fichier non trouvé" },
+        { status: 404 },
+      );
     }
 
     const s3Response = await s3Client.send(
       new GetObjectCommand({
         Bucket: process.env.AWS_S3_BUCKET_NAME!,
         Key: file.s3Key,
-      })
+      }),
     );
 
     const stream = s3Response.Body as ReadableStream;
@@ -53,6 +56,9 @@ export async function GET(
     });
   } catch (error) {
     console.error("Download error:", error);
-    return NextResponse.json({ error: "Erreur téléchargement" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Erreur téléchargement" },
+      { status: 500 },
+    );
   }
 }

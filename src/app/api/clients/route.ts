@@ -45,12 +45,11 @@ const createClientSchema = z.object({
       z.object({
         type: z.enum(["FACEBOOK", "LINKEDIN", "TWITTER"]),
         url: z.string().url(),
-      })
+      }),
     )
     .max(3)
     .optional(),
 });
-
 
 const s3Client = new S3Client({
   region: process.env.AWS_REGION!,
@@ -68,7 +67,7 @@ async function createClientS3Folder(companyId: string, clientId: string) {
       Bucket: bucketName,
       Key: `${companyId}/${clientId}/`,
       Body: "",
-    })
+    }),
   );
 }
 
@@ -103,7 +102,7 @@ export async function GET(req: NextRequest) {
     const userRole = getMappedRole(session.user.role);
     const canSeeAllClients = checkPermissionSync(
       userRole,
-      CLIENTS_ACTIONS.VOIR_TOUS
+      CLIENTS_ACTIONS.VOIR_TOUS,
     );
 
     // Si l'utilisateur ne peut pas voir tous les clients, filtrer par assignments
@@ -190,7 +189,7 @@ export async function GET(req: NextRequest) {
             ...client,
             assignedMembers: assignments.map((a) => a.user),
           };
-        })
+        }),
       );
     }
 
@@ -207,7 +206,7 @@ export async function GET(req: NextRequest) {
     console.error("GET /api/clients error:", error);
     return NextResponse.json(
       { error: "Erreur lors de la récupération des clients" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
@@ -231,7 +230,7 @@ export async function POST(req: NextRequest) {
         {
           error: "Cette fonctionnalité nécessite le pack ENTREPRISE",
         },
-        { status: 403 }
+        { status: 403 },
       );
     }
 
@@ -248,7 +247,7 @@ export async function POST(req: NextRequest) {
     if (existingClient) {
       return NextResponse.json(
         { error: "Un client avec cet email existe déjà" },
-        { status: 409 }
+        { status: 409 },
       );
     }
 
@@ -299,19 +298,19 @@ export async function POST(req: NextRequest) {
         message: "Client créé avec succès",
         client: clientWithSocials,
       },
-      { status: 201 }
+      { status: 201 },
     );
   } catch (error: any) {
     console.error("POST /api/clients error:", error);
     if (error.name === "ZodError") {
       return NextResponse.json(
         { error: "Données invalides", details: error.errors },
-        { status: 400 }
+        { status: 400 },
       );
     }
     return NextResponse.json(
       { error: "Erreur lors de la création du client" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

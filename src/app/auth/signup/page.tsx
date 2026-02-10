@@ -398,10 +398,7 @@ export default function SignUpPage() {
                   conditions d'utilisation
                 </Link>{" "}
                 et notre{" "}
-                <Link
-                  href="/privacy"
-                  className="text-blue-600 hover:underline"
-                >
+                <Link href="/privacy" className="text-blue-600 hover:underline">
                   politique de confidentialité
                 </Link>
                 .

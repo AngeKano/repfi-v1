@@ -37,7 +37,7 @@ const uploadComptableSchema = z.object({
 // - CODE_JOURNAL: Codes journaux
 // ============================================================
 const REQUIRED_FILE_TYPES = [
-  FileType.GRAND_LIVRE,      // Nouveau: fichier unifié
+  FileType.GRAND_LIVRE, // Nouveau: fichier unifié
   FileType.PLAN_COMPTES,
   FileType.PLAN_TIERS,
   FileType.CODE_JOURNAL,
@@ -71,15 +71,15 @@ async function createBackupIfNeeded(s3Prefix: string): Promise<void> {
         Bucket: bucket,
         Prefix: s3Prefix,
         MaxKeys: 10,
-      })
+      }),
     );
 
     if (listResponse.Contents && listResponse.Contents.length > 0) {
       const now = new Date();
       const timestamp = `${formatDateYYYYMMDD(now)}_${String(
-        now.getHours()
+        now.getHours(),
       ).padStart(2, "0")}${String(now.getMinutes()).padStart(2, "0")}${String(
-        now.getSeconds()
+        now.getSeconds(),
       ).padStart(2, "0")}`;
       const backupPrefix = `${s3Prefix}backup/${timestamp}/`;
 
@@ -96,7 +96,7 @@ async function createBackupIfNeeded(s3Prefix: string): Promise<void> {
               Bucket: bucket,
               CopySource: `${bucket}/${obj.Key}`,
               Key: `${backupPrefix}${fileName}`,
-            })
+            }),
           );
         }
       }
@@ -135,15 +135,15 @@ export async function POST(req: NextRequest) {
 
     if (missingFiles.length > 0) {
       return NextResponse.json(
-        { 
+        {
           error: `Fichier(s) manquant(s): ${missingFiles.join(", ")}`,
           missingFiles,
-          requiredFiles: REQUIRED_FILE_TYPES.map(ft => ({
+          requiredFiles: REQUIRED_FILE_TYPES.map((ft) => ({
             type: ft,
-            label: FILE_TYPE_LABELS[ft] || ft
-          }))
+            label: FILE_TYPE_LABELS[ft] || ft,
+          })),
         },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -165,7 +165,7 @@ export async function POST(req: NextRequest) {
     if (periodStart >= periodEnd) {
       return NextResponse.json(
         { error: "La date de début doit être antérieure à la date de fin" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -195,10 +195,10 @@ export async function POST(req: NextRequest) {
     for (const { file, fileType } of files) {
       if (!validExcelTypes.includes(file.type)) {
         return NextResponse.json(
-          { 
-            error: `Le fichier "${FILE_TYPE_LABELS[fileType]}" (${file.name}) doit être un fichier Excel (.xls ou .xlsx)` 
+          {
+            error: `Le fichier "${FILE_TYPE_LABELS[fileType]}" (${file.name}) doit être un fichier Excel (.xls ou .xlsx)`,
           },
-          { status: 400 }
+          { status: 400 },
         );
       }
     }
@@ -209,7 +209,7 @@ export async function POST(req: NextRequest) {
     if (uniqueTypes.size !== fileTypes.length) {
       return NextResponse.json(
         { error: "Types de fichiers dupliqués détectés" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -240,7 +240,7 @@ export async function POST(req: NextRequest) {
             end: overlappingPeriod.periodEnd.toISOString(),
           },
         },
-        { status: 409 }
+        { status: 409 },
       );
     }
 
@@ -258,7 +258,7 @@ export async function POST(req: NextRequest) {
     if (!company) {
       return NextResponse.json(
         { error: "Entreprise non trouvée" },
-        { status: 404 }
+        { status: 404 },
       );
     }
     const companyName = company.name
@@ -270,7 +270,7 @@ export async function POST(req: NextRequest) {
 
     // Créer un backup si des fichiers existent déjà
     await createBackupIfNeeded(s3Prefix);
-    
+
     // Créer ou mettre à jour l'enregistrement de la période
     const comptablePeriod = await prisma.comptablePeriod.upsert({
       where: {
@@ -317,7 +317,7 @@ export async function POST(req: NextRequest) {
           Key: s3Key,
           Body: buffer,
           ContentType: file.type,
-        })
+        }),
       );
 
       // Créer l'enregistrement dans la base
@@ -353,7 +353,7 @@ export async function POST(req: NextRequest) {
           fileName: fileName,
           action: "UPLOAD_COMPTABLE",
           details: `Fichier comptable uploadé (${FILE_TYPE_LABELS[fileType]}) - Période: ${formatDateYYYYMMDD(
-            periodStart
+            periodStart,
           )} au ${formatDateYYYYMMDD(periodEnd)}`,
           userId: user.id,
           userEmail: user.email ?? "",
@@ -378,20 +378,20 @@ export async function POST(req: NextRequest) {
         fileFormat: {
           version: "3.0",
           description: "Format 4 fichiers avec Grand Livre unifié",
-          requiredFiles: REQUIRED_FILE_TYPES.map(ft => ({
+          requiredFiles: REQUIRED_FILE_TYPES.map((ft) => ({
             type: ft,
-            label: FILE_TYPE_LABELS[ft]
-          }))
-        }
+            label: FILE_TYPE_LABELS[ft],
+          })),
+        },
       },
-      { status: 201 }
+      { status: 201 },
     );
   } catch (error: any) {
     console.error("Upload comptable error:", error);
     if (error.name === "ZodError") {
       return NextResponse.json(
         { error: "Données invalides", details: error.errors },
-        { status: 400 }
+        { status: 400 },
       );
     }
     return NextResponse.json(
@@ -399,7 +399,7 @@ export async function POST(req: NextRequest) {
         error: "Erreur lors de l'upload des fichiers comptables",
         details: error.message,
       },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

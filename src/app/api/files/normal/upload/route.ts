@@ -62,7 +62,7 @@ export async function POST(req: NextRequest) {
       if (!folder) {
         return NextResponse.json(
           { error: "Dossier non trouvé" },
-          { status: 404 }
+          { status: 404 },
         );
       }
     }
@@ -83,7 +83,7 @@ export async function POST(req: NextRequest) {
     if (!company) {
       return NextResponse.json(
         { error: "Entreprise non trouvée" },
-        { status: 404 }
+        { status: 404 },
       );
     }
     const companyName = company.name
@@ -117,7 +117,7 @@ export async function POST(req: NextRequest) {
           Key: s3Key,
           Body: buffer,
           ContentType: file.type,
-        })
+        }),
       );
 
       fileRecord = await prisma.normalFile.update({
@@ -149,7 +149,7 @@ export async function POST(req: NextRequest) {
 
       return NextResponse.json(
         { error: "Erreur lors du transfert du fichier" },
-        { status: 500 }
+        { status: 500 },
       );
     }
 
@@ -158,19 +158,19 @@ export async function POST(req: NextRequest) {
         message: "Fichier uploadé avec succès",
         file: fileRecord,
       },
-      { status: 201 }
+      { status: 201 },
     );
   } catch (error: any) {
     console.error("Upload error:", error);
     if (error.name === "ZodError") {
       return NextResponse.json(
         { error: "Données invalides", details: error.errors },
-        { status: 400 }
+        { status: 400 },
       );
     }
     return NextResponse.json(
       { error: "Erreur lors de l'upload" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

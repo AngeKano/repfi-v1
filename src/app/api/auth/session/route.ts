@@ -7,7 +7,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "../[...nextauth]/route";
-import { prisma } from '@/lib/prisma'
+import { prisma } from "@/lib/prisma";
 
 export async function GET(req: NextRequest) {
   try {
@@ -47,7 +47,7 @@ export async function GET(req: NextRequest) {
     if (!user) {
       return NextResponse.json(
         { error: "Utilisateur non trouvé" },
-        { status: 404 }
+        { status: 404 },
       );
     }
 

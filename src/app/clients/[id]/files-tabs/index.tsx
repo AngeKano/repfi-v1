@@ -65,7 +65,7 @@ const FilesTabs: React.FC<FilesTabsProps> = ({ clientId }) => {
 
     // Load folders
     const foldersRes = await fetch(
-      `/api/folders?clientId=${clientId}&parentId=${parentParam}`
+      `/api/folders?clientId=${clientId}&parentId=${parentParam}`,
     );
     const foldersData = await foldersRes.json();
     setFolders(foldersData.folders || []);
@@ -74,7 +74,7 @@ const FilesTabs: React.FC<FilesTabsProps> = ({ clientId }) => {
     const filesRes = await fetch(
       `/api/files/normal?clientId=${clientId}${
         currentFolderId ? `&folderId=${currentFolderId}` : ""
-      }`
+      }`,
     );
     const filesData = await filesRes.json();
     setFiles(filesData.files || []);
@@ -233,7 +233,7 @@ const FilesTabs: React.FC<FilesTabsProps> = ({ clientId }) => {
                         <p className="text-sm text-gray-500">
                           {(file.fileSize / 1024).toFixed(2)} KB •{" "}
                           {new Date(file.uploadedAt).toLocaleDateString(
-                            "fr-FR"
+                            "fr-FR",
                           )}
                         </p>
                       </div>
@@ -244,19 +244,19 @@ const FilesTabs: React.FC<FilesTabsProps> = ({ clientId }) => {
                           file.status === "SUCCES"
                             ? "default"
                             : file.status === "ERROR"
-                            ? "destructive"
-                            : "secondary"
+                              ? "destructive"
+                              : "secondary"
                         }
                       >
                         {file.status === "EN_COURS" ? "En cours" : file.status}
                       </Badge>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleDownload(file.id, file.fileName)}
-                        >
-                          <Download className="w-4 h-4" />
-                        </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleDownload(file.id, file.fileName)}
+                      >
+                        <Download className="w-4 h-4" />
+                      </Button>
                       <Button
                         size="sm"
                         variant="ghost"

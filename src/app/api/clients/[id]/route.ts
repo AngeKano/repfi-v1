@@ -47,7 +47,7 @@ const updateClientSchema = z.object({
       z.object({
         type: z.enum(["FACEBOOK", "LINKEDIN", "TWITTER"]),
         url: z.string().url(),
-      })
+      }),
     )
     .max(3)
     .optional(),
@@ -60,7 +60,7 @@ const updateClientSchema = z.object({
 async function checkClientAccess(
   clientId: string,
   userId: string,
-  role: string
+  role: string,
 ) {
   const client = await prisma.client.findUnique({
     where: { id: clientId },
@@ -81,7 +81,7 @@ async function checkClientAccess(
   const mappedRole = getMappedRole(role);
   const canSeeAllClients = checkPermissionSync(
     mappedRole,
-    CLIENTS_ACTIONS.VOIR_TOUS
+    CLIENTS_ACTIONS.VOIR_TOUS,
   );
 
   if (canSeeAllClients) {
@@ -113,7 +113,7 @@ async function checkClientAccess(
  */
 export async function GET(
   req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ id: string }> },
 ) {
   try {
     const { id } = await params;
@@ -126,13 +126,13 @@ export async function GET(
     const { hasAccess, client, error } = await checkClientAccess(
       id,
       session.user.id,
-      session.user.role
+      session.user.role,
     );
 
     if (!hasAccess) {
       return NextResponse.json(
         { error: error || "Accès refusé" },
-        { status: error === "Client non trouvé" ? 404 : 403 }
+        { status: error === "Client non trouvé" ? 404 : 403 },
       );
     }
 
@@ -209,7 +209,7 @@ export async function GET(
     console.error("GET /api/clients/:id error:", error);
     return NextResponse.json(
       { error: "Erreur lors de la récupération du client" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
@@ -220,7 +220,7 @@ export async function GET(
  */
 export async function PATCH(
   req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ id: string }> },
 ) {
   try {
     const { id } = await params;
@@ -232,12 +232,16 @@ export async function PATCH(
     }
     const { user } = permissionResult;
 
-    const { hasAccess, error } = await checkClientAccess(id, user.id, user.role);
+    const { hasAccess, error } = await checkClientAccess(
+      id,
+      user.id,
+      user.role,
+    );
 
     if (!hasAccess) {
       return NextResponse.json(
         { error: error || "Accès refusé" },
-        { status: error === "Client non trouvé" ? 404 : 403 }
+        { status: error === "Client non trouvé" ? 404 : 403 },
       );
     }
 
@@ -253,7 +257,7 @@ export async function PATCH(
           error:
             "Impossible de modifier l'entité self. Modifiez les informations de l'entreprise.",
         },
-        { status: 403 }
+        { status: 403 },
       );
     }
 
@@ -273,7 +277,7 @@ export async function PATCH(
       if (existingClient) {
         return NextResponse.json(
           { error: "Un client avec cet email existe déjà" },
-          { status: 409 }
+          { status: 409 },
         );
       }
     }
@@ -330,13 +334,13 @@ export async function PATCH(
     if (error.name === "ZodError") {
       return NextResponse.json(
         { error: "Données invalides", details: error.errors },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
     return NextResponse.json(
       { error: "Erreur lors de la mise à jour du client" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
@@ -348,14 +352,14 @@ export async function PATCH(
 
 export async function DELETE(
   req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ id: string }> },
 ) {
   try {
     const { id } = await params;
 
     // Vérifier la permission de désactiver un client
     const permissionResult = await requirePermission(
-      CLIENTS_ACTIONS.DESACTIVER
+      CLIENTS_ACTIONS.DESACTIVER,
     );
     if (permissionResult instanceof NextResponse) {
       return permissionResult;
@@ -367,13 +371,13 @@ export async function DELETE(
     const { hasAccess, error } = await checkClientAccess(
       clientId,
       user.id,
-      user.role
+      user.role,
     );
 
     if (!hasAccess) {
       return NextResponse.json(
         { error: error || "Accès refusé" },
-        { status: error === "Client non trouvé" ? 404 : 403 }
+        { status: error === "Client non trouvé" ? 404 : 403 },
       );
     }
 
@@ -386,7 +390,7 @@ export async function DELETE(
     if (client?.isSelfEntity) {
       return NextResponse.json(
         { error: "Impossible de supprimer l'entité self" },
-        { status: 403 }
+        { status: 403 },
       );
     }
 
@@ -402,7 +406,7 @@ export async function DELETE(
     console.error("DELETE /api/clients/:id error:", error);
     return NextResponse.json(
       { error: "Erreur lors de la suppression du client" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

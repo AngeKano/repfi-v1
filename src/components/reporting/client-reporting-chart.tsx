@@ -1299,7 +1299,8 @@ export default function ClientReportingChart({
                   <div>
                     <CardTitle>Top 10 Clients</CardTitle>
                     <CardDescription>
-                      Clients avec le plus fort impact sur le chiffre d&apos;affaires
+                      Clients avec le plus fort impact sur le chiffre
+                      d&apos;affaires
                     </CardDescription>
                   </div>
                 </div>

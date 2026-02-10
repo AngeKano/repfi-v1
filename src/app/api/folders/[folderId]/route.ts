@@ -13,7 +13,7 @@ const updateFolderSchema = z.object({
 // UPDATE Folder
 export async function PATCH(
   req: NextRequest,
-  { params }: { params: Promise<{ folderId: string }> }
+  { params }: { params: Promise<{ folderId: string }> },
 ) {
   try {
     const session = await getServerSession(authOptions);
@@ -36,7 +36,7 @@ export async function PATCH(
     if (!folder) {
       return NextResponse.json(
         { error: "Dossier non trouvé" },
-        { status: 404 }
+        { status: 404 },
       );
     }
 
@@ -62,12 +62,12 @@ export async function PATCH(
     if (error.name === "ZodError") {
       return NextResponse.json(
         { error: "Données invalides", details: error.errors },
-        { status: 400 }
+        { status: 400 },
       );
     }
     return NextResponse.json(
       { error: "Erreur lors de la mise à jour du dossier" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
@@ -75,7 +75,7 @@ export async function PATCH(
 // DELETE Folder
 export async function DELETE(
   req: NextRequest,
-  { params }: { params: Promise<{ folderId: string }> }
+  { params }: { params: Promise<{ folderId: string }> },
 ) {
   try {
     const session = await getServerSession(authOptions);
@@ -104,14 +104,14 @@ export async function DELETE(
     if (!folder) {
       return NextResponse.json(
         { error: "Dossier non trouvé" },
-        { status: 404 }
+        { status: 404 },
       );
     }
 
     if (folder._count.children > 0 || folder._count.files > 0) {
       return NextResponse.json(
         { error: "Le dossier doit être vide avant suppression" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -124,7 +124,7 @@ export async function DELETE(
     console.error("Delete folder error:", error);
     return NextResponse.json(
       { error: "Erreur lors de la suppression du dossier" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

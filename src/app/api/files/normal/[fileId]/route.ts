@@ -17,7 +17,7 @@ const s3Client = new S3Client({
 // DELETE NormalFile
 export async function DELETE(
   req: NextRequest,
-  { params }: { params: Promise<{ fileId: string }> }
+  { params }: { params: Promise<{ fileId: string }> },
 ) {
   try {
     const session = await getServerSession(authOptions);
@@ -40,7 +40,7 @@ export async function DELETE(
     if (!file) {
       return NextResponse.json(
         { error: "Fichier non trouvé" },
-        { status: 404 }
+        { status: 404 },
       );
     }
 
@@ -49,7 +49,7 @@ export async function DELETE(
       new DeleteObjectCommand({
         Bucket: process.env.AWS_S3_BUCKET_NAME!,
         Key: file.s3Key,
-      })
+      }),
     );
 
     // Supprimer logiquement de la base (soft delete)
@@ -74,7 +74,7 @@ export async function DELETE(
     console.error("Delete normal file error:", error);
     return NextResponse.json(
       { error: "Erreur lors de la suppression du fichier" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

@@ -45,7 +45,7 @@ export default function NewUserForm({ availableRoles }: NewUserFormProps) {
 
   // Trouver la description du role selectionne
   const selectedRoleDescription = availableRoles.find(
-    (r) => r.value === role
+    (r) => r.value === role,
   )?.description;
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -207,7 +207,9 @@ export default function NewUserForm({ availableRoles }: NewUserFormProps) {
                 </SelectContent>
               </Select>
               {selectedRoleDescription && (
-                <p className="text-xs text-gray-500">{selectedRoleDescription}</p>
+                <p className="text-xs text-gray-500">
+                  {selectedRoleDescription}
+                </p>
               )}
             </div>
 

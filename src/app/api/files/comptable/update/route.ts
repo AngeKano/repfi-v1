@@ -9,7 +9,10 @@ import {
 import { z } from "zod";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import { prisma } from "@/lib/prisma";
-import { FileType, ProcessingStatus } from "../../../../../../prisma/generated/prisma/enums";
+import {
+  FileType,
+  ProcessingStatus,
+} from "../../../../../../prisma/generated/prisma/enums";
 
 const s3Client = new S3Client({
   region: process.env.AWS_REGION!,
@@ -17,10 +20,6 @@ const s3Client = new S3Client({
     accessKeyId: process.env.AWS_ACCESS_KEY_ID!,
     secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY!,
   },
-});
-
-const updateComptableSchema = z.object({
-  periodId: z.string(),
 });
 
 const REQUIRED_FILE_TYPES = [
@@ -47,20 +46,20 @@ async function deleteS3Folder(prefix: string): Promise<number> {
       new ListObjectsV2Command({
         Bucket: bucket,
         Prefix: prefix,
-      })
+      }),
     );
 
     if (listResponse.Contents && listResponse.Contents.length > 0) {
-      const objectsToDelete = listResponse.Contents
-        .filter((obj) => obj.Key && !obj.Key.includes("backup/"))
-        .map((obj) => ({ Key: obj.Key! }));
+      const objectsToDelete = listResponse.Contents.filter(
+        (obj) => obj.Key && !obj.Key.includes("backup/"),
+      ).map((obj) => ({ Key: obj.Key! }));
 
       if (objectsToDelete.length > 0) {
         await s3Client.send(
           new DeleteObjectsCommand({
             Bucket: bucket,
             Delete: { Objects: objectsToDelete },
-          })
+          }),
         );
         deletedCount = objectsToDelete.length;
       }
@@ -83,10 +82,7 @@ export async function PUT(req: NextRequest) {
     const periodId = formData.get("periodId") as string;
 
     if (!periodId) {
-      return NextResponse.json(
-        { error: "periodId manquant" },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "periodId manquant" }, { status: 400 });
     }
 
     // Récupérer les 5 fichiers
@@ -96,7 +92,7 @@ export async function PUT(req: NextRequest) {
       if (!file) {
         return NextResponse.json(
           { error: `Fichier manquant: ${fileType}` },
-          { status: 400 }
+          { status: 400 },
         );
       }
       files.push({ file, fileType });
@@ -116,23 +112,25 @@ export async function PUT(req: NextRequest) {
     if (!existingPeriod) {
       return NextResponse.json(
         { error: "Période non trouvée" },
-        { status: 404 }
+        { status: 404 },
       );
     }
 
     if (existingPeriod.client.companyId !== session.user.companyId) {
       return NextResponse.json(
         { error: "Accès non autorisé" },
-        { status: 403 }
+        { status: 403 },
       );
     }
 
     // Vérifier que la période n'est pas en cours de traitement
-    if (existingPeriod.status === ProcessingStatus.PROCESSING || 
-        existingPeriod.status === ProcessingStatus.VALIDATING) {
+    if (
+      existingPeriod.status === ProcessingStatus.PROCESSING ||
+      existingPeriod.status === ProcessingStatus.VALIDATING
+    ) {
       return NextResponse.json(
         { error: "Impossible de modifier une période en cours de traitement" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -146,7 +144,7 @@ export async function PUT(req: NextRequest) {
       if (!validExcelTypes.includes(file.type)) {
         return NextResponse.json(
           { error: `Le fichier ${file.name} doit être un fichier Excel` },
-          { status: 400 }
+          { status: 400 },
         );
       }
     }
@@ -166,12 +164,14 @@ export async function PUT(req: NextRequest) {
     if (!company) {
       return NextResponse.json(
         { error: "Entreprise non trouvée" },
-        { status: 404 }
+        { status: 404 },
       );
     }
 
     const clientName = client.name.replace(/\s+/g, "_").replace(/[^\w\-]/g, "");
-    const companyName = company.name.replace(/\s+/g, "_").replace(/[^\w\-]/g, "");
+    const companyName = company.name
+      .replace(/\s+/g, "_")
+      .replace(/[^\w\-]/g, "");
     const periodFolder = `periode-${formatDateYYYYMMDD(periodStart)}-${formatDateYYYYMMDD(periodEnd)}`;
     const s3Prefix = `${companyName}_${company.id}/${clientName}_${client.id}/declaration/${year}/${periodFolder}/`;
 
@@ -208,7 +208,7 @@ export async function PUT(req: NextRequest) {
           Key: s3Key,
           Body: buffer,
           ContentType: file.type,
-        })
+        }),
       );
 
       const fileRecord = await prisma.comptableFile.create({
@@ -271,7 +271,7 @@ export async function PUT(req: NextRequest) {
         files: uploadedFiles,
         comptablePeriod: updatedPeriod,
       },
-      { status: 200 }
+      { status: 200 },
     );
   } catch (error: any) {
     console.error("Update comptable error:", error);
@@ -280,7 +280,7 @@ export async function PUT(req: NextRequest) {
         error: "Erreur lors de la mise à jour",
         details: error.message,
       },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

@@ -18,7 +18,7 @@ const s3Client = new S3Client({
 
 export async function GET(
   req: NextRequest,
-  { params }: { params: Promise<{ fileId: string }> }
+  { params }: { params: Promise<{ fileId: string }> },
 ) {
   try {
     const session = await getServerSession(authOptions);
@@ -40,14 +40,14 @@ export async function GET(
     if (!file) {
       return NextResponse.json(
         { error: "Fichier non trouvé" },
-        { status: 404 }
+        { status: 404 },
       );
     }
 
     if (!file.s3Key) {
       return NextResponse.json(
         { error: "Fichier non disponible" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -70,7 +70,7 @@ export async function GET(
     console.error("Erreur génération URL signée:", error);
     return NextResponse.json(
       { error: "Erreur lors de la génération du lien de téléchargement" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

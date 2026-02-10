@@ -23,7 +23,7 @@ export async function GET(req: NextRequest) {
     if (!batchId || !fileName) {
       return NextResponse.json(
         { error: "batchId et fileName sont requis" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -46,7 +46,7 @@ export async function GET(req: NextRequest) {
     if (!file) {
       return NextResponse.json(
         { error: "Fichier non trouvé" },
-        { status: 404 }
+        { status: 404 },
       );
     }
 
@@ -74,7 +74,7 @@ export async function GET(req: NextRequest) {
           // Echec du parsing (format URL incorrect)
           return NextResponse.json(
             { error: "Format du lien S3 invalide (ni s3://, ni HTTPS)" },
-            { status: 400 }
+            { status: 400 },
           );
         }
       }
@@ -83,7 +83,7 @@ export async function GET(req: NextRequest) {
     if (!bucket || !key) {
       return NextResponse.json(
         { error: "Impossible d'extraire le bucket ou la clé S3" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -106,7 +106,7 @@ export async function GET(req: NextRequest) {
     console.error("Erreur génération URL signée:", error);
     return NextResponse.json(
       { error: "Erreur lors de la génération du lien de téléchargement" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

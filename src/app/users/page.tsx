@@ -81,7 +81,10 @@ export default async function UsersPage({
   };
 
   // Calculer les permissions
-  const canAddMember = checkPermissionSync(session.user.role, MEMBRES_ACTIONS.CREER);
+  const canAddMember = checkPermissionSync(
+    session.user.role,
+    MEMBRES_ACTIONS.CREER,
+  );
 
   return (
     <UsersListClient

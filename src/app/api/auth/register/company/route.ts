@@ -25,7 +25,7 @@ export async function POST(request: Request) {
     ) {
       return NextResponse.json(
         { error: "Tous les champs obligatoires doivent être remplis" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -37,7 +37,7 @@ export async function POST(request: Request) {
     if (existingCompany) {
       return NextResponse.json(
         { error: "Cet email est déjà utilisé" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -50,7 +50,7 @@ export async function POST(request: Request) {
       if (!parentCompany) {
         return NextResponse.json(
           { error: "Entreprise parente introuvable" },
-          { status: 404 }
+          { status: 404 },
         );
       }
     }
@@ -85,13 +85,13 @@ export async function POST(request: Request) {
         message: "Entreprise créée avec succès",
         company,
       },
-      { status: 201 }
+      { status: 201 },
     );
   } catch (error) {
     console.error("Erreur lors de la création de l'entreprise:", error);
     return NextResponse.json(
       { error: "Erreur serveur lors de la création de l'entreprise" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

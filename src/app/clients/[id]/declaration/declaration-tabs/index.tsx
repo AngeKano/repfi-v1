@@ -57,7 +57,7 @@ const DeclarationTabs: React.FC<DeclarationTabsProps> = ({ clientId }) => {
         `/api/files/comptable/periods/${periodToDelete.id}`,
         {
           method: "DELETE",
-        }
+        },
       );
 
       const data = await response.json();
@@ -70,7 +70,7 @@ const DeclarationTabs: React.FC<DeclarationTabsProps> = ({ clientId }) => {
         <>
           <div className="font-semibold">Période supprimée</div>
           <div>{data.deletedFiles} fichier(s) supprimé(s)</div>
-        </>
+        </>,
       );
 
       loadPeriods();
@@ -80,7 +80,7 @@ const DeclarationTabs: React.FC<DeclarationTabsProps> = ({ clientId }) => {
         <>
           <div className="font-semibold">Erreur</div>
           <div>{error.message}</div>
-        </>
+        </>,
       );
     } finally {
       setDeleting(false);
@@ -96,7 +96,7 @@ const DeclarationTabs: React.FC<DeclarationTabsProps> = ({ clientId }) => {
         `/api/files/download/${encodeURIComponent(period.id)}`,
         {
           method: "GET",
-        }
+        },
       );
       let data;
       try {
@@ -117,7 +117,7 @@ const DeclarationTabs: React.FC<DeclarationTabsProps> = ({ clientId }) => {
         <>
           <div className="font-semibold">Erreur de téléchargement</div>
           <div>{error.message}</div>
-        </>
+        </>,
       );
     }
   };
@@ -165,7 +165,7 @@ const DeclarationTabs: React.FC<DeclarationTabsProps> = ({ clientId }) => {
                     <div>
                       <p className="font-medium">
                         {new Date(period.periodStart).toLocaleDateString(
-                          "fr-FR"
+                          "fr-FR",
                         )}{" "}
                         au{" "}
                         {new Date(period.periodEnd).toLocaleDateString("fr-FR")}
@@ -182,10 +182,10 @@ const DeclarationTabs: React.FC<DeclarationTabsProps> = ({ clientId }) => {
                         period.status === "COMPLETED"
                           ? "default"
                           : period.status === "FAILED"
-                          ? "destructive"
-                          : period.status === "PROCESSING"
-                          ? "secondary"
-                          : "outline"
+                            ? "destructive"
+                            : period.status === "PROCESSING"
+                              ? "secondary"
+                              : "outline"
                       }
                     >
                       {period.status === "PENDING" && "En attente"}
@@ -269,11 +269,11 @@ const DeclarationTabs: React.FC<DeclarationTabsProps> = ({ clientId }) => {
                   <p className="font-medium">
                     Période:{" "}
                     {new Date(periodToDelete.periodStart).toLocaleDateString(
-                      "fr-FR"
+                      "fr-FR",
                     )}{" "}
                     au{" "}
                     {new Date(periodToDelete.periodEnd).toLocaleDateString(
-                      "fr-FR"
+                      "fr-FR",
                     )}
                   </p>
                 </div>

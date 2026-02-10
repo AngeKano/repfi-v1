@@ -50,7 +50,7 @@ function FileTypeSelect({
   excludeTypes?: string[];
 }) {
   const filteredTypes = REQUIRED_FILE_TYPES.filter(
-    (t) => !excludeTypes.includes(t.type)
+    (t) => !excludeTypes.includes(t.type),
   );
 
   return (
@@ -122,7 +122,7 @@ export default function DeclarationComptable({
   const years = Array.from({ length: 10 }, (_, i) => currentYear - i);
   const [selectedYear, setSelectedYear] = useState<number>(currentYear);
   const [calendarMonth, setCalendarMonth] = useState<Date>(
-    new Date(selectedYear, 0)
+    new Date(selectedYear, 0),
   );
 
   // Fetch des périodes existantes
@@ -134,7 +134,7 @@ export default function DeclarationComptable({
   const fetchPeriods = async () => {
     try {
       const res = await fetch(
-        `/api/files/comptable/periods?clientId=${client.id}`
+        `/api/files/comptable/periods?clientId=${client.id}`,
       );
       const data = await res.json();
 
@@ -235,8 +235,8 @@ export default function DeclarationComptable({
       setUploadResult(null);
       toast.info(
         `Mode modification: ${new Date(period.periodStart).toLocaleDateString(
-          "fr-FR"
-        )} - ${new Date(period.periodEnd).toLocaleDateString("fr-FR")}`
+          "fr-FR",
+        )} - ${new Date(period.periodEnd).toLocaleDateString("fr-FR")}`,
       );
     }
   };
@@ -357,7 +357,7 @@ export default function DeclarationComptable({
     ];
 
     const bestMatch = scores.reduce((prev, current) =>
-      current.score > prev.score ? current : prev
+      current.score > prev.score ? current : prev,
     );
 
     return bestMatch.score > 0 ? bestMatch.type : undefined;
@@ -459,7 +459,7 @@ export default function DeclarationComptable({
 
     if (!allFilesValid()) {
       toast.error(
-        "Veuillez sélectionner les 5 fichiers obligatoires avec des types valides"
+        "Veuillez sélectionner les 5 fichiers obligatoires avec des types valides",
       );
       return;
     }
@@ -507,7 +507,7 @@ export default function DeclarationComptable({
 
     if (!allFilesValid()) {
       toast.error(
-        "Veuillez sélectionner les 5 fichiers obligatoires avec des types valides"
+        "Veuillez sélectionner les 5 fichiers obligatoires avec des types valides",
       );
       return;
     }
@@ -564,7 +564,7 @@ export default function DeclarationComptable({
 
       toast.success("Traitement ETL lancé avec succès");
       router.push(
-        `/clients/${client.id}/declaration/status/${uploadResult.batchId}`
+        `/clients/${client.id}/declaration/status/${uploadResult.batchId}`,
       );
     } catch (error: any) {
       toast.error(error.message);
@@ -672,7 +672,7 @@ export default function DeclarationComptable({
             if (!isDateInSelectedYear(date)) return true;
             if (editMode) return false; // En mode édition, rien n'est désactivé
             return disabledDates.some(
-              (d) => d.toDateString() === date.toDateString()
+              (d) => d.toDateString() === date.toDateString(),
             );
           }}
           modifiers={{
@@ -813,10 +813,10 @@ export default function DeclarationComptable({
             dragActive
               ? "border-blue-500 bg-blue-50"
               : hasMaxFiles
-              ? "border-gray-200 bg-gray-100 opacity-60 pointer-events-none"
-              : editMode
-              ? "border-yellow-400 hover:border-yellow-500"
-              : "border-gray-300 hover:border-gray-400"
+                ? "border-gray-200 bg-gray-100 opacity-60 pointer-events-none"
+                : editMode
+                  ? "border-yellow-400 hover:border-yellow-500"
+                  : "border-gray-300 hover:border-gray-400"
           }`}
           onDragEnter={hasMaxFiles ? undefined : handleDrag}
           onDragLeave={hasMaxFiles ? undefined : handleDrag}
@@ -857,8 +857,8 @@ export default function DeclarationComptable({
                 {hasMaxFiles
                   ? "Maximum 5 fichiers atteints"
                   : editMode
-                  ? "Sélectionner les nouveaux fichiers"
-                  : "Sélectionner des fichiers"}
+                    ? "Sélectionner les nouveaux fichiers"
+                    : "Sélectionner des fichiers"}
               </span>
             </Button>
           </Label>
@@ -923,7 +923,7 @@ export default function DeclarationComptable({
               <p>
                 <strong>Période:</strong>{" "}
                 {new Date(uploadResult.period.start).toLocaleDateString(
-                  "fr-FR"
+                  "fr-FR",
                 )}{" "}
                 au{" "}
                 {new Date(uploadResult.period.end).toLocaleDateString("fr-FR")}
@@ -959,7 +959,7 @@ export default function DeclarationComptable({
                     <Badge variant="default">
                       <FileCheck className="w-3 h-3 mr-1" />
                       {REQUIRED_FILE_TYPES.find(
-                        (t) => t.type === uploadFile.fileType
+                        (t) => t.type === uploadFile.fileType,
                       )?.label || uploadFile.fileType}
                     </Badge>
                   ) : (

@@ -1,4 +1,3 @@
-// app/clients/new/new-client-form.tsx
 "use client";
 
 import { useState } from "react";
@@ -342,7 +341,7 @@ export default function NewClientForm() {
                         <p className="font-medium text-sm">
                           {
                             SOCIAL_NETWORKS.find(
-                              (n) => n.value === network.type
+                              (n) => n.value === network.type,
                             )?.label
                           }
                         </p>

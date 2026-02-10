@@ -21,7 +21,10 @@ export default async function StatusPage({
   }
 
   // Verifier permissions via RBAC
-  const canViewFiles = checkPermissionSync(session.user.role, FICHIERS_ACTIONS.VOIR);
+  const canViewFiles = checkPermissionSync(
+    session.user.role,
+    FICHIERS_ACTIONS.VOIR,
+  );
   if (!canViewFiles) {
     redirect("/clients");
   }

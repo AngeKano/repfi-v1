@@ -19,7 +19,10 @@ import {
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { getRoleLabel, getRoleBadgeVariant } from "@/lib/permissions/role-utils";
+import {
+  getRoleLabel,
+  getRoleBadgeVariant,
+} from "@/lib/permissions/role-utils";
 
 interface DashboardClientProps {
   session: any;
@@ -340,8 +343,8 @@ export default function DashboardClient({
                           file.status === "SUCCES"
                             ? "default"
                             : file.status === "ERROR"
-                            ? "destructive"
-                            : "secondary"
+                              ? "destructive"
+                              : "secondary"
                         }
                       >
                         {file.status}
