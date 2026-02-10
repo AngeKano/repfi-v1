@@ -6,7 +6,6 @@ import { checkPermissionSync } from "@/lib/permissions/middleware";
 import { FICHIERS_ACTIONS } from "@/lib/permissions/actions";
 import { Button } from "@/components/ui/button";
 
-
 import { prisma } from "@/lib/prisma";
 import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
@@ -24,7 +23,10 @@ export default async function DeclarationComptablePage({
   }
 
   // Verifier permissions via RBAC
-  const canUploadFiles = checkPermissionSync(session.user.role, FICHIERS_ACTIONS.CHARGER);
+  const canUploadFiles = checkPermissionSync(
+    session.user.role,
+    FICHIERS_ACTIONS.CHARGER,
+  );
   if (!canUploadFiles) {
     redirect("/clients");
   }

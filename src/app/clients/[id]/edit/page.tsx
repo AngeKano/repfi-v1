@@ -1,4 +1,3 @@
-// app/clients/[id]/edit/page.tsx
 "use client";
 
 import { useState, useEffect } from "react";
@@ -96,7 +95,7 @@ export default function EditClientPage() {
         client.socialNetworks?.map((s: any) => ({
           type: s.type,
           url: s.url,
-        })) || []
+        })) || [],
       );
 
       setLoading(false);
@@ -434,7 +433,7 @@ export default function EditClientPage() {
                         <p className="font-medium text-sm">
                           {
                             SOCIAL_NETWORKS.find(
-                              (n) => n.value === network.type
+                              (n) => n.value === network.type,
                             )?.label
                           }
                         </p>

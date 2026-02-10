@@ -1,4 +1,4 @@
-// app/clients/clients-list-client.tsx
+
 "use client";
 
 import { useState } from "react";
@@ -20,7 +20,6 @@ import {
   Plus,
   Users,
   FileText,
-  Filter,
   ArrowLeft,
   ChevronLeft,
   ChevronRight,
@@ -58,7 +57,6 @@ interface ClientsListClientProps {
 }
 
 export default function ClientsListClient({
-  session,
   initialClients,
   pagination,
   initialSearch,

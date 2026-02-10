@@ -47,7 +47,7 @@ export async function GET(req: NextRequest) {
     console.error("Erreur chargement fichiers normaux:", error);
     return NextResponse.json(
       { error: "Erreur lors du chargement des fichiers" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

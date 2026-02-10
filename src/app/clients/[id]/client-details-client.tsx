@@ -29,7 +29,10 @@ import { toast } from "sonner";
 import FilesTabs from "./files-tabs";
 import DeclarationTabs from "./declaration/declaration-tabs";
 import ClientReportingChart from "@/components/reporting/client-reporting-chart";
-import { getRoleLabel, getRoleBadgeVariant } from "@/lib/permissions/role-utils";
+import {
+  getRoleLabel,
+  getRoleBadgeVariant,
+} from "@/lib/permissions/role-utils";
 
 interface ClientDetailsClientProps {
   session: any;
@@ -406,7 +409,7 @@ export default function ClientDetailsClient({
                                 year: "numeric",
                                 month: "long",
                                 day: "numeric",
-                              }
+                              },
                             )}
                           </p>
                         </div>
@@ -457,7 +460,9 @@ export default function ClientDetailsClient({
                               </p>
                             </div>
                           </div>
-                          <Badge variant={getRoleBadgeVariant(member.role) as any}>
+                          <Badge
+                            variant={getRoleBadgeVariant(member.role) as any}
+                          >
                             {getRoleLabel(member.role)}
                           </Badge>
                         </div>

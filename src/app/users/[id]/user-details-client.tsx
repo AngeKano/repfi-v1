@@ -44,7 +44,10 @@ import {
   Eye,
 } from "lucide-react";
 import Link from "next/link";
-import { getRoleLabel, getRoleBadgeVariant } from "@/lib/permissions/role-utils";
+import {
+  getRoleLabel,
+  getRoleBadgeVariant,
+} from "@/lib/permissions/role-utils";
 
 interface RoleOption {
   value: string;
@@ -357,7 +360,7 @@ export default function UserDetailsClient({
                         </p>
                         <p className="font-medium">
                           {new Date(user.lastLoginAt).toLocaleDateString(
-                            "fr-FR"
+                            "fr-FR",
                           )}
                         </p>
                       </div>

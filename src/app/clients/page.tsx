@@ -1,4 +1,4 @@
-// app/clients/page.tsx
+
 import { getServerSession } from "next-auth";
 import { authOptions } from "../api/auth/[...nextauth]/route";
 import { redirect } from "next/navigation";
@@ -29,10 +29,17 @@ export default async function ClientsPage({
   const skip = (page - 1) * limit;
 
   // Verifier les permissions via le systeme RBAC
-  const canViewAllClients = checkPermissionSync(session.user.role, CLIENTS_ACTIONS.VOIR_TOUS);
-  const canCreateClient = checkPermissionSync(session.user.role, CLIENTS_ACTIONS.CREER)
-    && session.user.companyPackType === "ENTREPRISE";
-  const canViewMembers = checkPermissionSync(session.user.role, MEMBRES_ACTIONS.VOIR);
+  const canViewAllClients = checkPermissionSync(
+    session.user.role,
+    CLIENTS_ACTIONS.VOIR_TOUS,
+  );
+  const canCreateClient =
+    checkPermissionSync(session.user.role, CLIENTS_ACTIONS.CREER) &&
+    session.user.companyPackType === "ENTREPRISE";
+  const canViewMembers = checkPermissionSync(
+    session.user.role,
+    MEMBRES_ACTIONS.VOIR,
+  );
 
   // Appeler Prisma directement (pas de fetch)
   let whereClause: any = {
@@ -118,7 +125,7 @@ export default async function ClientsPage({
           ...client,
           assignedMembers: assignments.map((a) => a.user),
         };
-      })
+      }),
     );
   }
 

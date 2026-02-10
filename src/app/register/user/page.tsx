@@ -45,7 +45,7 @@ export default function UserRegister() {
     <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
       <Card className="w-full max-w-md p-8">
         <h1 className="text-2xl font-bold mb-6">Inscription Utilisateur</h1>
-        
+
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="name">Nom complet *</Label>
@@ -92,6 +92,8 @@ export default function UserRegister() {
             <Label htmlFor="companyId">Entreprise *</Label>
             <select
               id="companyId"
+              name="companyId"
+              title="Entreprise"
               className="w-full p-2 border rounded-md"
               value={formData.companyId}
               onChange={(e) =>

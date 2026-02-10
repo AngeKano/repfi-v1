@@ -19,8 +19,7 @@ const s3Client = new S3Client({
 // Correct handling of context in Next.js API routes for both sync/async context
 export async function GET(
   req: NextRequest,
-  { params }: { params: Promise<{ periodId: string }> }
-
+  { params }: { params: Promise<{ periodId: string }> },
 ) {
   try {
     const { periodId } = await params;
@@ -43,14 +42,14 @@ export async function GET(
     if (!period) {
       return NextResponse.json(
         { error: "Période non trouvée" },
-        { status: 404 }
+        { status: 404 },
       );
     }
 
     if (!period.excelFileUrl || !period.excelFileUrl.startsWith("s3://")) {
       return NextResponse.json(
         { error: "Aucun fichier Excel S3 disponible pour cette période" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -59,7 +58,7 @@ export async function GET(
     if (!s3UrlMatch) {
       return NextResponse.json(
         { error: "Format du lien S3 invalide" },
-        { status: 400 }
+        { status: 400 },
       );
     }
     const bucket = s3UrlMatch[1];
@@ -87,11 +86,11 @@ export async function GET(
   } catch (error) {
     console.error(
       "Erreur lors de la génération du lien de téléchargement S3 (excelFileUrl):",
-      error
+      error,
     );
     return NextResponse.json(
       { error: "Erreur lors de la génération du lien de téléchargement Excel" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

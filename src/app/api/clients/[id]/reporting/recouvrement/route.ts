@@ -28,12 +28,25 @@ interface RecouvrementDataPoint {
 }
 
 const MONTH_NAMES = [
-  "Jan", "Fév", "Mar", "Avr", "Mai", "Juin",
-  "Juil", "Août", "Sep", "Oct", "Nov", "Déc"
+  "Jan",
+  "Fév",
+  "Mar",
+  "Avr",
+  "Mai",
+  "Juin",
+  "Juil",
+  "Août",
+  "Sep",
+  "Oct",
+  "Nov",
+  "Déc",
 ];
 
 // Génère les 12 derniers mois à partir d'un mois/année donné (inclus)
-function getLast12Months(endYear: number, endMonth: number): { year: number; month: number; label: string }[] {
+function getLast12Months(
+  endYear: number,
+  endMonth: number,
+): { year: number; month: number; label: string }[] {
   const months: { year: number; month: number; label: string }[] = [];
 
   let currentYear = endYear;
@@ -43,7 +56,7 @@ function getLast12Months(endYear: number, endMonth: number): { year: number; mon
     months.unshift({
       year: currentYear,
       month: currentMonth,
-      label: `${MONTH_NAMES[currentMonth - 1]} ${currentYear}`
+      label: `${MONTH_NAMES[currentMonth - 1]} ${currentYear}`,
     });
 
     currentMonth--;
@@ -58,9 +71,12 @@ function getLast12Months(endYear: number, endMonth: number): { year: number; mon
 
 async function recupererRecouvrementParYearMonth(
   dbName: string,
-  batchIds: string[]
+  batchIds: string[],
 ): Promise<Map<string, { caTTCTotal: number; caEncaisseTTC: number }>> {
-  const result = new Map<string, { caTTCTotal: number; caEncaisseTTC: number }>();
+  const result = new Map<
+    string,
+    { caTTCTotal: number; caEncaisseTTC: number }
+  >();
   if (batchIds.length === 0) return result;
 
   const data = await clickhouseClient.query({
@@ -113,7 +129,7 @@ interface TopCreance {
 
 async function recupererTop10Creances(
   dbName: string,
-  batchIds: string[]
+  batchIds: string[],
 ): Promise<TopCreance[]> {
   if (batchIds.length === 0) return [];
 
@@ -160,7 +176,7 @@ async function recupererTop10Creances(
   // Calculer le total des créances pour les pourcentages
   const totalCreances = rows.reduce(
     (sum, row) => sum + (parseFloat(row.solde_creance) || 0),
-    0
+    0,
   );
 
   return rows.map((row) => {
@@ -171,14 +187,15 @@ async function recupererTop10Creances(
       caTTCTotal: parseFloat(row.ca_ttc_total) || 0,
       caEncaisseTTC: parseFloat(row.ca_encaisse_ttc) || 0,
       soldeCreance,
-      pourcentageTotal: totalCreances > 0 ? (soldeCreance / totalCreances) * 100 : 0,
+      pourcentageTotal:
+        totalCreances > 0 ? (soldeCreance / totalCreances) * 100 : 0,
     };
   });
 }
 
 export async function GET(
   req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ id: string }> },
 ) {
   try {
     const session = await getServerSession(authOptions);
@@ -218,7 +235,7 @@ export async function GET(
     if (client.companyId !== session.user.companyId) {
       return NextResponse.json(
         { error: "Accès non autorisé" },
-        { status: 403 }
+        { status: 403 },
       );
     }
 
@@ -238,7 +255,10 @@ export async function GET(
       .filter((b): b is string => !!b);
 
     // Récupérer les données de recouvrement
-    const recouvrementData = await recupererRecouvrementParYearMonth(dbName, allBatchIds);
+    const recouvrementData = await recupererRecouvrementParYearMonth(
+      dbName,
+      allBatchIds,
+    );
 
     // Construire les données du graphique
     const chartData: RecouvrementDataPoint[] = [];
@@ -247,18 +267,23 @@ export async function GET(
 
     for (const monthInfo of last12Months) {
       const key = `${monthInfo.year}-${monthInfo.month.toString().padStart(2, "0")}`;
-      const data = recouvrementData.get(key) || { caTTCTotal: 0, caEncaisseTTC: 0 };
+      const data = recouvrementData.get(key) || {
+        caTTCTotal: 0,
+        caEncaisseTTC: 0,
+      };
 
       cumulativeCaTTC += data.caTTCTotal;
       cumulativeCaEncaisse += data.caEncaisseTTC;
 
-      const tauxRecouvrement = data.caTTCTotal !== 0
-        ? (data.caEncaisseTTC / data.caTTCTotal) * 100
-        : 0;
+      const tauxRecouvrement =
+        data.caTTCTotal !== 0
+          ? (data.caEncaisseTTC / data.caTTCTotal) * 100
+          : 0;
 
-      const tauxRecouvrementCumule = cumulativeCaTTC !== 0
-        ? (cumulativeCaEncaisse / cumulativeCaTTC) * 100
-        : 0;
+      const tauxRecouvrementCumule =
+        cumulativeCaTTC !== 0
+          ? (cumulativeCaEncaisse / cumulativeCaTTC) * 100
+          : 0;
 
       chartData.push({
         label: monthInfo.label,
@@ -277,9 +302,10 @@ export async function GET(
     const totals = {
       caTTCTotal: cumulativeCaTTC,
       caEncaisseTTC: cumulativeCaEncaisse,
-      tauxRecouvrement: cumulativeCaTTC !== 0
-        ? (cumulativeCaEncaisse / cumulativeCaTTC) * 100
-        : 0,
+      tauxRecouvrement:
+        cumulativeCaTTC !== 0
+          ? (cumulativeCaEncaisse / cumulativeCaTTC) * 100
+          : 0,
       soldeCreances: cumulativeCaTTC - cumulativeCaEncaisse,
     };
 
@@ -287,7 +313,10 @@ export async function GET(
     const topCreances = await recupererTop10Creances(dbName, allBatchIds);
 
     // Calculer le total des créances pour les stats
-    const totalCreances = topCreances.reduce((sum, c) => sum + c.soldeCreance, 0);
+    const totalCreances = topCreances.reduce(
+      (sum, c) => sum + c.soldeCreance,
+      0,
+    );
 
     return NextResponse.json({
       client: { id: client.id, name: client.name },
@@ -307,7 +336,7 @@ export async function GET(
     console.error("Recouvrement API error:", error);
     return NextResponse.json(
       { error: "Erreur lors de la récupération des données de recouvrement" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

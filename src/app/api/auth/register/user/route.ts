@@ -11,7 +11,7 @@ export async function POST(request: Request) {
     if (!email || !password || !name || !companyId) {
       return NextResponse.json(
         { error: "Tous les champs obligatoires doivent être remplis" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -23,7 +23,7 @@ export async function POST(request: Request) {
     if (existingUser) {
       return NextResponse.json(
         { error: "Cet email est déjà utilisé" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -35,7 +35,7 @@ export async function POST(request: Request) {
     if (!company) {
       return NextResponse.json(
         { error: "Entreprise introuvable" },
-        { status: 404 }
+        { status: 404 },
       );
     }
 
@@ -68,19 +68,18 @@ export async function POST(request: Request) {
       },
     });
 
-
     return NextResponse.json(
       {
         message: "Utilisateur créé avec succès",
         user,
       },
-      { status: 201 }
+      { status: 201 },
     );
   } catch (error) {
     console.error("Erreur lors de la création de l'utilisateur:", error);
     return NextResponse.json(
       { error: "Erreur serveur lors de la création de l'utilisateur" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

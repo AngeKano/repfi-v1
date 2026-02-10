@@ -29,7 +29,7 @@ export async function GET(req: NextRequest) {
     console.error("GET periods error:", error);
     return NextResponse.json(
       { error: "Erreur lors de la récupération des périodes" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

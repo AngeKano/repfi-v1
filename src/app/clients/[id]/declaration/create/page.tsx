@@ -24,7 +24,10 @@ export default async function DeclarationComptablePage({
   }
 
   // Verifier permissions via RBAC
-  const canUploadFiles = checkPermissionSync(session.user.role, FICHIERS_ACTIONS.CHARGER);
+  const canUploadFiles = checkPermissionSync(
+    session.user.role,
+    FICHIERS_ACTIONS.CHARGER,
+  );
   if (!canUploadFiles) {
     redirect("/clients");
   }

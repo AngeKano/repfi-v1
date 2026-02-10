@@ -21,7 +21,10 @@ export default async function ClientAssignmentPage({
   }
 
   // Verifier permissions via RBAC
-  const canAssignMembers = checkPermissionSync(session.user.role, CLIENTS_ACTIONS.ASSIGNER_MEMBRE);
+  const canAssignMembers = checkPermissionSync(
+    session.user.role,
+    CLIENTS_ACTIONS.ASSIGNER_MEMBRE,
+  );
   if (!canAssignMembers) {
     redirect("/clients");
   }

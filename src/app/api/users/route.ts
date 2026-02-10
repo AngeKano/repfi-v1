@@ -6,8 +6,6 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "../auth/[...nextauth]/route";
 import { z } from "zod";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
@@ -127,7 +125,7 @@ export async function GET(req: NextRequest) {
     console.error("GET /api/users error:", error);
     return NextResponse.json(
       { error: "Erreur lors de la récupération des utilisateurs" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
@@ -159,7 +157,7 @@ export async function POST(req: NextRequest) {
           error:
             "Vous ne pouvez pas créer un membre avec un rôle supérieur ou égal au vôtre",
         },
-        { status: 403 }
+        { status: 403 },
       );
     }
 
@@ -167,7 +165,7 @@ export async function POST(req: NextRequest) {
     if (targetRole === RoleId.ADMIN_ROOT) {
       return NextResponse.json(
         { error: "Impossible de créer un administrateur root" },
-        { status: 403 }
+        { status: 403 },
       );
     }
 
@@ -179,7 +177,7 @@ export async function POST(req: NextRequest) {
     if (existingUser) {
       return NextResponse.json(
         { error: "Cet email est déjà utilisé" },
-        { status: 409 }
+        { status: 409 },
       );
     }
 
@@ -213,7 +211,7 @@ export async function POST(req: NextRequest) {
         message: "Membre ajouté avec succès",
         user: newUser,
       },
-      { status: 201 }
+      { status: 201 },
     );
   } catch (error: any) {
     console.error("POST /api/users error:", error);
@@ -221,13 +219,13 @@ export async function POST(req: NextRequest) {
     if (error.name === "ZodError") {
       return NextResponse.json(
         { error: "Données invalides", details: error.errors },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
     return NextResponse.json(
       { error: "Erreur lors de l'ajout du membre" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

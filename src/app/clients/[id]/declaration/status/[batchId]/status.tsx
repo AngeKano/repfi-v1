@@ -70,7 +70,7 @@ export default function StatusComponents({
     try {
       const res = await fetch(
         `/api/files/download/${encodeURIComponent(status.periodId)}`,
-        { method: "GET" }
+        { method: "GET" },
       );
       let data;
       try {
@@ -91,7 +91,7 @@ export default function StatusComponents({
         <>
           <div className="font-semibold">Erreur de téléchargement</div>
           <div>{error.message}</div>
-        </>
+        </>,
       );
     } finally {
       setDownloading(false);
@@ -104,9 +104,9 @@ export default function StatusComponents({
     try {
       const res = await fetch(
         `/api/files/download/comptable?batchId=${encodeURIComponent(
-          batchId
+          batchId,
         )}&fileName=${encodeURIComponent(fileName)}`,
-        { method: "GET" }
+        { method: "GET" },
       );
       let data: any = {};
       try {
@@ -114,7 +114,9 @@ export default function StatusComponents({
       } catch (_e) {}
       if (!res.ok || data?.error) {
         throw new Error(
-          data?.error ? data.error : "Erreur lors du téléchargement du fichier."
+          data?.error
+            ? data.error
+            : "Erreur lors du téléchargement du fichier.",
         );
       }
       if (data?.url) {
@@ -135,7 +137,7 @@ export default function StatusComponents({
         <>
           <div className="font-semibold">Erreur de téléchargement</div>
           <div>{error.message || "Une erreur inconnue est survenue."}</div>
-        </>
+        </>,
       );
     } finally {
       setDownloading(false);
@@ -262,7 +264,7 @@ export default function StatusComponents({
     const fetchStatus = async () => {
       try {
         const response = await fetch(
-          `/api/files/comptable/status/${params.batchId}`
+          `/api/files/comptable/status/${params.batchId}`,
         );
         const data = await response.json();
         setStatus(data);
@@ -337,7 +339,7 @@ export default function StatusComponents({
   const config = statusConfig[status.status as keyof typeof statusConfig];
   const Icon = config.icon;
   const isProcessing = ["PENDING", "VALIDATING", "PROCESSING"].includes(
-    status.status
+    status.status,
   );
 
   return (
@@ -371,8 +373,8 @@ export default function StatusComponents({
               status.status === "COMPLETED"
                 ? "default"
                 : status.status === "FAILED"
-                ? "destructive"
-                : "secondary"
+                  ? "destructive"
+                  : "secondary"
             }
           >
             {Math.round(animatedProgress)}%
@@ -438,8 +440,8 @@ export default function StatusComponents({
                       file.processingStatus === "COMPLETED"
                         ? "default"
                         : file.processingStatus === "FAILED"
-                        ? "destructive"
-                        : "secondary"
+                          ? "destructive"
+                          : "secondary"
                     }
                   >
                     {file.processingStatus}
@@ -450,7 +452,7 @@ export default function StatusComponents({
                       onClick={() =>
                         handleDownloadExcelFile(
                           params?.batchId ?? "",
-                          file.fileName
+                          file.fileName,
                         )
                       }
                       disabled={downloading}

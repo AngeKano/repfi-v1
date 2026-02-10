@@ -33,12 +33,12 @@ const unassignMembersSchema = z.object({
  */
 export async function POST(
   req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ id: string }> },
 ) {
   try {
     // Vérifier la permission d'assigner des membres
     const permissionResult = await requirePermission(
-      CLIENTS_ACTIONS.ASSIGNER_MEMBRE
+      CLIENTS_ACTIONS.ASSIGNER_MEMBRE,
     );
     if (permissionResult instanceof NextResponse) {
       return permissionResult;
@@ -72,7 +72,7 @@ export async function POST(
     if (users.length !== userIds.length) {
       return NextResponse.json(
         { error: "Certains utilisateurs sont invalides" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -85,7 +85,7 @@ export async function POST(
 
     const existingUserIds = existingAssignments.map((a) => a.userId);
     const newUserIds = userIds.filter(
-      (userId) => !existingUserIds.includes(userId)
+      (userId) => !existingUserIds.includes(userId),
     );
 
     if (newUserIds.length > 0) {
@@ -127,13 +127,13 @@ export async function POST(
     if (error instanceof z.ZodError) {
       return NextResponse.json(
         { error: "Données invalides", details: error.issues },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
     return NextResponse.json(
       { error: "Erreur lors de l'assignation" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
@@ -144,12 +144,12 @@ export async function POST(
  */
 export async function DELETE(
   req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ id: string }> },
 ) {
   try {
     // Vérifier la permission de retirer des membres
     const permissionResult = await requirePermission(
-      CLIENTS_ACTIONS.RETIRER_MEMBRE
+      CLIENTS_ACTIONS.RETIRER_MEMBRE,
     );
     if (permissionResult instanceof NextResponse) {
       return permissionResult;
@@ -208,13 +208,13 @@ export async function DELETE(
     if (error instanceof z.ZodError) {
       return NextResponse.json(
         { error: "Données invalides", details: error.issues },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
     return NextResponse.json(
       { error: "Erreur lors du retrait" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
@@ -225,7 +225,7 @@ export async function DELETE(
  */
 export async function GET(
   req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ id: string }> },
 ) {
   try {
     const session = await getServerSession(authOptions);
@@ -311,7 +311,7 @@ export async function GET(
     console.error("GET /api/clients/:id/assign error:", error);
     return NextResponse.json(
       { error: "Erreur lors de la récupération" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

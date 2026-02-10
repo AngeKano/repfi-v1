@@ -1,9 +1,12 @@
-// app/dashboard/page.tsx
 import { getServerSession } from "next-auth";
 import { authOptions } from "../api/auth/[...nextauth]/route";
 import { redirect } from "next/navigation";
 import { checkPermissionSync } from "@/lib/permissions/middleware";
-import { CLIENTS_ACTIONS, MEMBRES_ACTIONS, FICHIERS_ACTIONS } from "@/lib/permissions/actions";
+import {
+  CLIENTS_ACTIONS,
+  MEMBRES_ACTIONS,
+  FICHIERS_ACTIONS,
+} from "@/lib/permissions/actions";
 
 import DashboardClient from "./dashboard-client";
 
@@ -17,11 +20,21 @@ export default async function DashboardPage() {
   }
 
   // Verifier les permissions via le systeme RBAC
-  const canViewAllClients = checkPermissionSync(session.user.role, CLIENTS_ACTIONS.VOIR_TOUS);
-  const canViewMembers = checkPermissionSync(session.user.role, MEMBRES_ACTIONS.VOIR);
-  const canViewFiles = checkPermissionSync(session.user.role, FICHIERS_ACTIONS.VOIR);
-  const canCreateClient = checkPermissionSync(session.user.role, CLIENTS_ACTIONS.CREER)
-    && session.user.companyPackType === "ENTREPRISE";
+  const canViewAllClients = checkPermissionSync(
+    session.user.role,
+    CLIENTS_ACTIONS.VOIR_TOUS,
+  );
+  const canViewMembers = checkPermissionSync(
+    session.user.role,
+    MEMBRES_ACTIONS.VOIR,
+  );
+  const canViewFiles = checkPermissionSync(
+    session.user.role,
+    FICHIERS_ACTIONS.VOIR,
+  );
+  const canCreateClient =
+    checkPermissionSync(session.user.role, CLIENTS_ACTIONS.CREER) &&
+    session.user.companyPackType === "ENTREPRISE";
 
   // Recuperer les stats
   let clientsCount = 0;

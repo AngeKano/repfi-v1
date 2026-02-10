@@ -26,7 +26,10 @@ import {
   CheckCircle2,
 } from "lucide-react";
 import Link from "next/link";
-import { getRoleLabel, getRoleBadgeVariant } from "@/lib/permissions/role-utils";
+import {
+  getRoleLabel,
+  getRoleBadgeVariant,
+} from "@/lib/permissions/role-utils";
 
 interface ClientAssignmentClientProps {
   session: any;
@@ -131,7 +134,7 @@ export default function ClientAssignmentClient({
     setSelectedToAssign((prev) =>
       prev.includes(userId)
         ? prev.filter((id) => id !== userId)
-        : [...prev, userId]
+        : [...prev, userId],
     );
   };
 
@@ -139,7 +142,7 @@ export default function ClientAssignmentClient({
     setSelectedToUnassign((prev) =>
       prev.includes(userId)
         ? prev.filter((id) => id !== userId)
-        : [...prev, userId]
+        : [...prev, userId],
     );
   };
 
@@ -216,7 +219,9 @@ export default function ClientAssignmentClient({
                       </p>
                       <p className="text-sm text-gray-500">{member.email}</p>
                     </div>
-                    <Badge variant={getRoleBadgeVariant(member.role) as any}>{getRoleLabel(member.role)}</Badge>
+                    <Badge variant={getRoleBadgeVariant(member.role) as any}>
+                      {getRoleLabel(member.role)}
+                    </Badge>
                   </div>
                 ))}
               </div>
@@ -291,7 +296,11 @@ export default function ClientAssignmentClient({
                         {assignment.user.email}
                       </p>
                     </div>
-                    <Badge variant={getRoleBadgeVariant(assignment.user.role) as any}>{getRoleLabel(assignment.user.role)}</Badge>
+                    <Badge
+                      variant={getRoleBadgeVariant(assignment.user.role) as any}
+                    >
+                      {getRoleLabel(assignment.user.role)}
+                    </Badge>
                   </div>
                 ))}
               </div>
@@ -373,14 +382,18 @@ export default function ClientAssignmentClient({
                       <p className="text-xs text-gray-400 mt-1">
                         Assigné le{" "}
                         {new Date(assignment.assignedAt).toLocaleDateString(
-                          "fr-FR"
+                          "fr-FR",
                         )}
                       </p>
                     </div>
                   </div>
 
                   <div className="flex items-center gap-2">
-                    <Badge variant={getRoleBadgeVariant(assignment.user.role) as any}>{getRoleLabel(assignment.user.role)}</Badge>
+                    <Badge
+                      variant={getRoleBadgeVariant(assignment.user.role) as any}
+                    >
+                      {getRoleLabel(assignment.user.role)}
+                    </Badge>
                     {!assignment.user.isActive && (
                       <Badge variant="destructive">Désactivé</Badge>
                     )}

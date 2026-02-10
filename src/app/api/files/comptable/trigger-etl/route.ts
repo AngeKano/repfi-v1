@@ -1,8 +1,6 @@
 // app/api/files/comptable/trigger-etl/route.ts
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
 import { z } from "zod";
-import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import { requirePermission } from "@/lib/permissions/middleware";
 import { FICHIERS_ACTIONS } from "@/lib/permissions/actions";
 
@@ -16,7 +14,7 @@ const triggerETLSchema = z.object({
 async function triggerAirflowDAG(
   batchId: string,
   clientId: string,
-  s3Prefix: string
+  s3Prefix: string,
 ): Promise<string> {
   const airflowUrl = process.env.AIRFLOW_API_URL;
   const airflowUsername = process.env.AIRFLOW_USERNAME;
@@ -27,7 +25,7 @@ async function triggerAirflowDAG(
   }
 
   const basicAuth = Buffer.from(
-    `${airflowUsername}:${airflowPassword}`
+    `${airflowUsername}:${airflowPassword}`,
   ).toString("base64");
 
   const response = await fetch(
@@ -45,7 +43,7 @@ async function triggerAirflowDAG(
           s3_prefix: s3Prefix,
         },
       }),
-    }
+    },
   );
 
   if (!response.ok) {
@@ -81,28 +79,28 @@ export async function POST(req: NextRequest) {
     if (!comptablePeriod) {
       return NextResponse.json(
         { error: "Période comptable non trouvée" },
-        { status: 404 }
+        { status: 404 },
       );
     }
 
     if (comptablePeriod.client.companyId !== user.companyId) {
       return NextResponse.json(
         { error: "Accès non autorisé" },
-        { status: 403 }
+        { status: 403 },
       );
     }
 
     if (comptablePeriod.status === ProcessingStatus.PROCESSING) {
       return NextResponse.json(
         { error: "Période déjà en cours de traitement" },
-        { status: 409 }
+        { status: 409 },
       );
     }
 
     if (comptablePeriod.status === ProcessingStatus.COMPLETED) {
       return NextResponse.json(
         { error: "Période déjà traitée" },
-        { status: 409 }
+        { status: 409 },
       );
     }
 
@@ -121,7 +119,7 @@ export async function POST(req: NextRequest) {
     if (overlapping) {
       return NextResponse.json(
         { error: "Période chevauchante en cours" },
-        { status: 409 }
+        { status: 409 },
       );
     }
 
@@ -132,14 +130,14 @@ export async function POST(req: NextRequest) {
     if (files.length !== 4) {
       return NextResponse.json(
         { error: `Fichiers invalides: ${files.length}/4` },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
     const year = comptablePeriod.periodStart.getFullYear();
     const formatDate = (d: Date) =>
       `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, "0")}${String(
-        d.getDate()
+        d.getDate(),
       ).padStart(2, "0")}`;
 
     const clientName = comptablePeriod.client.name
@@ -154,14 +152,14 @@ export async function POST(req: NextRequest) {
       ? company.name.replace(/\s+/g, "_").replace(/[^\w\-]/g, "")
       : "";
     const periodFolder = `periode-${formatDate(
-      comptablePeriod.periodStart
+      comptablePeriod.periodStart,
     )}-${formatDate(comptablePeriod.periodEnd)}`;
     const s3Prefix = `${companyName}_${companyId}/${clientName}_${comptablePeriod.clientId}/declaration/${year}/${periodFolder}/`;
 
     const dagRunId = await triggerAirflowDAG(
       batchId,
       comptablePeriod.client.id,
-      s3Prefix
+      s3Prefix,
     );
 
     await prisma.comptablePeriod.update({
@@ -200,13 +198,13 @@ export async function POST(req: NextRequest) {
     if (error.name === "ZodError") {
       return NextResponse.json(
         { error: "Données invalides", details: error.errors },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
     return NextResponse.json(
       { error: "Erreur ETL", details: error.message },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
@@ -248,7 +246,7 @@ export async function GET(req: NextRequest) {
     console.error("GET error:", error);
     return NextResponse.json(
       { error: "Erreur récupération périodes" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

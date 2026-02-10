@@ -69,12 +69,12 @@ export async function POST(req: NextRequest) {
     if (error.name === "ZodError") {
       return NextResponse.json(
         { error: "Données invalides", details: error.errors },
-        { status: 400 }
+        { status: 400 },
       );
     }
     return NextResponse.json(
       { error: "Erreur lors de la création du dossier" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
@@ -100,8 +100,8 @@ export async function GET(req: NextRequest) {
         ...(parentId === "root"
           ? { parentId: null }
           : parentId
-          ? { parentId }
-          : {}),
+            ? { parentId }
+            : {}),
       },
       include: {
         parent: true,
@@ -130,7 +130,7 @@ export async function GET(req: NextRequest) {
     console.error("GET folders error:", error);
     return NextResponse.json(
       { error: "Erreur lors de la récupération des dossiers" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

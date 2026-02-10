@@ -2,7 +2,10 @@
 import { getServerSession } from "next-auth";
 import { authOptions } from "../../api/auth/[...nextauth]/route";
 import { redirect } from "next/navigation";
-import { checkPermissionSync, getMappedRole } from "@/lib/permissions/middleware";
+import {
+  checkPermissionSync,
+  getMappedRole,
+} from "@/lib/permissions/middleware";
 import { MEMBRES_ACTIONS } from "@/lib/permissions/actions";
 import { ROLES, canManageRole } from "@/lib/permissions/roles";
 
@@ -25,10 +28,22 @@ export default async function UserDetailsPage({
 
   // Verifier les permissions via RBAC
   const isSelf = id === session.user.id;
-  const canViewMembers = checkPermissionSync(session.user.role, MEMBRES_ACTIONS.VOIR);
-  const canEditMembers = checkPermissionSync(session.user.role, MEMBRES_ACTIONS.MODIFIER);
-  const canDeactivateMembers = checkPermissionSync(session.user.role, MEMBRES_ACTIONS.DESACTIVER);
-  const canCreateMembers = checkPermissionSync(session.user.role, MEMBRES_ACTIONS.CREER);
+  const canViewMembers = checkPermissionSync(
+    session.user.role,
+    MEMBRES_ACTIONS.VOIR,
+  );
+  const canEditMembers = checkPermissionSync(
+    session.user.role,
+    MEMBRES_ACTIONS.MODIFIER,
+  );
+  const canDeactivateMembers = checkPermissionSync(
+    session.user.role,
+    MEMBRES_ACTIONS.DESACTIVER,
+  );
+  const canCreateMembers = checkPermissionSync(
+    session.user.role,
+    MEMBRES_ACTIONS.CREER,
+  );
 
   // L'utilisateur peut voir s'il a la permission ou si c'est lui-meme
   if (!canViewMembers && !isSelf) {
@@ -85,13 +100,15 @@ export default async function UserDetailsPage({
   const targetUserRole = getMappedRole(user.role);
 
   // Peut editer si: a la permission ET (est admin OU c'est soi-meme)
-  const canEdit = (canEditMembers || isSelf);
+  const canEdit = canEditMembers || isSelf;
 
   // Peut desactiver si: a la permission ET n'est pas soi-meme ET l'utilisateur n'est pas ADMIN_ROOT
-  const canDeactivate = canDeactivateMembers && !isSelf && user.role !== "ADMIN_ROOT";
+  const canDeactivate =
+    canDeactivateMembers && !isSelf && user.role !== "ADMIN_ROOT";
 
   // Peut changer le role si: peut creer des membres ET peut gerer le role cible
-  const canChangeRole = canCreateMembers && canManageRole(currentUserRole, targetUserRole);
+  const canChangeRole =
+    canCreateMembers && canManageRole(currentUserRole, targetUserRole);
 
   // Roles disponibles: seulement ceux que l'utilisateur peut gerer
   const availableRoles = Object.values(ROLES)

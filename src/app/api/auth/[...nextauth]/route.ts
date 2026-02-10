@@ -1,4 +1,3 @@
-// app/api/auth/[...nextauth]/route.ts
 /**
  * Route NextAuth - Gère signin, signout, session
  * Endpoint: /api/auth/*

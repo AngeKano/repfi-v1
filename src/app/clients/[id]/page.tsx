@@ -113,10 +113,22 @@ export default async function ClientDetailsPage({
   }
 
   // Verifier les permissions RBAC
-  const canViewAllClients = checkPermissionSync(session.user.role, CLIENTS_ACTIONS.VOIR_TOUS);
-  const canEdit = checkPermissionSync(session.user.role, CLIENTS_ACTIONS.MODIFIER);
-  const canDelete = checkPermissionSync(session.user.role, CLIENTS_ACTIONS.DESACTIVER);
-  const canAssignMembers = checkPermissionSync(session.user.role, CLIENTS_ACTIONS.ASSIGNER_MEMBRE);
+  const canViewAllClients = checkPermissionSync(
+    session.user.role,
+    CLIENTS_ACTIONS.VOIR_TOUS,
+  );
+  const canEdit = checkPermissionSync(
+    session.user.role,
+    CLIENTS_ACTIONS.MODIFIER,
+  );
+  const canDelete = checkPermissionSync(
+    session.user.role,
+    CLIENTS_ACTIONS.DESACTIVER,
+  );
+  const canAssignMembers = checkPermissionSync(
+    session.user.role,
+    CLIENTS_ACTIONS.ASSIGNER_MEMBRE,
+  );
 
   // Si l'utilisateur ne peut pas voir tous les clients, verifier qu'il est assigne
   if (!canViewAllClients) {
