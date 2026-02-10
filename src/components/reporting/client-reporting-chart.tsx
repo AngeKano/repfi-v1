@@ -874,7 +874,7 @@ export default function ClientReportingChart({
                 <ChartTooltipContent
                   formatter={(value, name) => [
                     formatCompactOnly(value as number),
-                    name === "chiffreAffaires" ? `CA ${yearN}` : `CA ${yearN1}`,
+                    name === `CA ${yearN}` ? `CA ${yearN}` : `CA ${yearN1}`,
                   ]}
                 />
               }
@@ -935,7 +935,7 @@ export default function ClientReportingChart({
                 <ChartTooltipContent
                   formatter={(value, name) => [
                     formatCompactOnly(value as number),
-                    name === "soldeTresorerie"
+                    name === `Trésorerie ${yearN}`
                       ? `Trésorerie ${yearN}`
                       : `Trésorerie ${yearN1}`,
                   ]}
@@ -1600,7 +1600,7 @@ export default function ClientReportingChart({
                         <ChartTooltipContent
                           formatter={(value, name) => [
                             `${(value as number).toFixed(1)}%`,
-                            name === "tauxRecouvrement"
+                            name === "Taux mensuel"
                               ? "Taux mensuel"
                               : "Taux cumulé",
                           ]}
@@ -1678,7 +1678,7 @@ export default function ClientReportingChart({
                         <ChartTooltipContent
                           formatter={(value, name) => [
                             formatCompactOnly(value as number),
-                            name === "caTTCTotal"
+                            name === "CA TTC Total"
                               ? "CA TTC Total"
                               : "CA Encaissé",
                           ]}
@@ -1730,12 +1730,12 @@ export default function ClientReportingChart({
                           color: "hsl(25, 95%, 53%)",
                         },
                       }}
-                      className="h-[70px] w-full"
+                      className="h-[220px] w-full"
                     >
                       <BarChart
                         data={recouvrementData.topCreances}
                         layout="vertical"
-                        margin={{ top: 10, right: 30, left: 150, bottom: 10 }}
+                        margin={{ top: 10, right: 30, left: 15, bottom: 10 }}
                       >
                         <CartesianGrid
                           strokeDasharray="3 3"
