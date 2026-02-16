@@ -130,8 +130,45 @@ interface TopCreance {
 async function recupererTop10Creances(
   dbName: string,
   batchIds: string[],
+  endYear?: number,
+  endMonth?: number,
 ): Promise<TopCreance[]> {
   if (batchIds.length === 0) return [];
+
+  // Construire le filtre de période pour les 12 derniers mois
+  // date_transaction format: DD/MM/YYYY
+  let periodFilter = "";
+  const queryParams: Record<string, unknown> = { batchIds };
+
+  if (endYear && endMonth) {
+    // Calculer le mois de début (12 mois avant endMonth/endYear inclus)
+    let startMonth = endMonth + 1;
+    let startYear = endYear - 1;
+    if (startMonth > 12) {
+      startMonth = 1;
+      startYear = endYear;
+    }
+    // Filtre : (year > startYear) OR (year = startYear AND month >= startMonth)
+    // ET (year < endYear) OR (year = endYear AND month <= endMonth)
+    const startYearStr = startYear.toString();
+    const startMonthStr = startMonth.toString().padStart(2, "0");
+    const endYearStr = endYear.toString();
+    const endMonthStr = endMonth.toString().padStart(2, "0");
+    queryParams.startYear = startYearStr;
+    queryParams.startMonth = startMonthStr;
+    queryParams.endYear = endYearStr;
+    queryParams.endMonth = endMonthStr;
+    periodFilter = `
+      AND (
+        (substring(date_transaction, 7, 4) > {startYear:String})
+        OR (substring(date_transaction, 7, 4) = {startYear:String} AND substring(date_transaction, 4, 2) >= {startMonth:String})
+      )
+      AND (
+        (substring(date_transaction, 7, 4) < {endYear:String})
+        OR (substring(date_transaction, 7, 4) = {endYear:String} AND substring(date_transaction, 4, 2) <= {endMonth:String})
+      )
+    `;
+  }
 
   // Requête pour récupérer les créances par client
   const data = await clickhouseClient.query({
@@ -148,6 +185,7 @@ async function recupererTop10Creances(
           AND startsWith(compte, '41')
           AND n_tiers != ''
           AND intitule_tiers != ''
+          ${periodFilter}
         GROUP BY n_tiers, intitule_tiers
         HAVING solde_creance > 0
       )
@@ -161,7 +199,7 @@ async function recupererTop10Creances(
       ORDER BY solde_creance DESC
       LIMIT 10
     `,
-    query_params: { batchIds },
+    query_params: queryParams,
     format: "JSONEachRow",
   });
 
@@ -309,8 +347,8 @@ export async function GET(
       soldeCreances: cumulativeCaTTC - cumulativeCaEncaisse,
     };
 
-    // Top 10 des créances clients
-    const topCreances = await recupererTop10Creances(dbName, allBatchIds);
+    // Top 10 des créances clients (filtré par la période sélectionnée)
+    const topCreances = await recupererTop10Creances(dbName, allBatchIds, endYear, endMonth);
 
     // Calculer le total des créances pour les stats
     const totalCreances = topCreances.reduce(

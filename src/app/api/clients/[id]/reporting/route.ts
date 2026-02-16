@@ -443,8 +443,26 @@ interface TopClient {
 async function recupererTop10Clients(
   dbName: string,
   batchIds: string[],
+  periodType?: string,
+  selectedMonth?: string,
 ): Promise<TopClient[]> {
   if (batchIds.length === 0) return [];
+
+  // Construire le filtre de période selon le mode sélectionné
+  // date_transaction format: DD/MM/YYYY
+  let periodFilter = "";
+  const queryParams: Record<string, unknown> = { batchIds };
+
+  if (periodType === "month" && selectedMonth) {
+    // Mode mois : filtrer sur le mois exact
+    periodFilter = `AND substring(date_transaction, 4, 2) = {monthFilter:String}`;
+    queryParams.monthFilter = selectedMonth;
+  } else if (periodType === "ytd" && selectedMonth) {
+    // Mode YTD : filtrer du mois 01 jusqu'au mois sélectionné inclus
+    periodFilter = `AND substring(date_transaction, 4, 2) <= {monthFilter:String}`;
+    queryParams.monthFilter = selectedMonth;
+  }
+  // Mode "year" : pas de filtre supplémentaire (toute l'année via batchIds)
 
   // Calcul basé sur la rubrique TC (CA HT) au lieu des comptes 41 (TTC)
   // Les lignes TC n'ont pas de n_tiers/intitule_tiers,
@@ -459,6 +477,7 @@ async function recupererTop10Clients(
         FROM ${dbName}.grand_livre
         WHERE batch_id IN ({batchIds:Array(String)})
           AND rubrique = 'TC'
+          ${periodFilter}
       ),
       correspondances AS (
         SELECT
@@ -482,7 +501,7 @@ async function recupererTop10Clients(
       ORDER BY ca_client DESC
       LIMIT 10
     `,
-    query_params: { batchIds },
+    query_params: queryParams,
     format: "JSONEachRow",
   });
 
@@ -492,15 +511,16 @@ async function recupererTop10Clients(
     ca_client: string;
   }>;
 
-  // CA HT total (rubrique TC) pour les pourcentages
+  // CA HT total (rubrique TC) pour les pourcentages (même filtre de période)
   const totalQuery = await clickhouseClient.query({
     query: `
       SELECT sum(credit - debit) as ca_total
       FROM ${dbName}.grand_livre
       WHERE batch_id IN ({batchIds:Array(String)})
         AND rubrique = 'TC'
+        ${periodFilter}
     `,
-    query_params: { batchIds },
+    query_params: queryParams,
     format: "JSONEachRow",
   });
 
@@ -1037,8 +1057,8 @@ export async function GET(
 
       const periods = await enrichirPeriodes(postgresPeriodsData, dbName);
 
-      // Top 10 clients par CA
-      const topClients = await recupererTop10Clients(dbName, batchIds);
+      // Top 10 clients par CA (filtré par mois sélectionné)
+      const topClients = await recupererTop10Clients(dbName, batchIds, periodType, selectedMonth ?? undefined);
 
       return NextResponse.json({
         client: { id: client.id, name: client.name },
@@ -1245,8 +1265,8 @@ export async function GET(
 
     const periods = await enrichirPeriodes(postgresPeriodsData, dbName);
 
-    // Top 10 clients par CA
-    const topClients = await recupererTop10Clients(dbName, batchIds);
+    // Top 10 clients par CA (filtré par période sélectionnée)
+    const topClients = await recupererTop10Clients(dbName, batchIds, periodType, selectedMonth ?? undefined);
 
     return NextResponse.json({
       client: { id: client.id, name: client.name },
