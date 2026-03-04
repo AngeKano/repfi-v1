@@ -64,18 +64,19 @@ export async function GET(
     const bucket = s3UrlMatch[1];
     const s3Key = s3UrlMatch[2];
 
-    // Générer une URL signée S3 pour 1 heure
+    // Nom du fichier exporté (extraction du nom originel si possible)
+    let fileName = s3Key.split("/").pop();
+    if (!fileName) fileName = `export-comptable-${period.id}.xlsx`;
+
+    // Générer une URL signée S3 pour 1 heure avec Content-Disposition: attachment
     const command = new GetObjectCommand({
       Bucket: bucket,
       Key: s3Key,
+      ResponseContentDisposition: `attachment; filename="${fileName}"`,
     });
     const signedUrl = await getSignedUrl(s3Client, command, {
       expiresIn: 3600,
     });
-
-    // Nom du fichier exporté (extraction du nom originel si possible)
-    let fileName = s3Key.split("/").pop();
-    if (!fileName) fileName = `export-comptable-${period.id}.xlsx`;
 
     return NextResponse.json({
       url: signedUrl,

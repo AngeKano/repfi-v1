@@ -63,6 +63,23 @@ export default function StatusComponents({
   const messageIndexRef = useRef(0);
   const progressIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
+  // Utilitaire pour télécharger un fichier via une URL presignée S3
+  const downloadFromPresignedUrl = async (url: string, fileName: string) => {
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error("Erreur lors du téléchargement du fichier depuis S3");
+    }
+    const blob = await response.blob();
+    const blobUrl = window.URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = blobUrl;
+    link.download = fileName;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.URL.revokeObjectURL(blobUrl);
+  };
+
   // Download Excel handler
   const handleDownloadExcel = async () => {
     if (!status?.periodId) return;
@@ -82,7 +99,10 @@ export default function StatusComponents({
         throw new Error(data.error || "Erreur lors du téléchargement");
       }
       if (data?.url) {
-        window.open(data.url, "_blank");
+        await downloadFromPresignedUrl(
+          data.url,
+          data.fileName || `export-comptable-${status.periodId}.xlsx`,
+        );
       } else {
         throw new Error("Lien de téléchargement indisponible");
       }
@@ -120,15 +140,10 @@ export default function StatusComponents({
         );
       }
       if (data?.url) {
-        const link = document.createElement("a");
-        link.href = data.url;
-        link.target = "_blank";
-        if (data.fileName) {
-          link.download = data.fileName;
-        }
-        document.body.appendChild(link);
-        link.click();
-        link.remove();
+        await downloadFromPresignedUrl(
+          data.url,
+          data.fileName || fileName,
+        );
       } else {
         throw new Error("Lien de téléchargement indisponible.");
       }

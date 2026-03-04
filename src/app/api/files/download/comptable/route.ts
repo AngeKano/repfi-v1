@@ -87,10 +87,11 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    // Générer une URL signée pour ce fichier/bucket/key
+    // Générer une URL signée pour ce fichier/bucket/key avec Content-Disposition: attachment
     const command = new GetObjectCommand({
       Bucket: bucket,
       Key: key,
+      ResponseContentDisposition: `attachment; filename="${file.fileName ?? "export.xlsx"}"`,
     });
 
     signedUrl = await getSignedUrl(s3Client, command, {
