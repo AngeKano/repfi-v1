@@ -89,57 +89,10 @@ const DeclarationTabs: React.FC<DeclarationTabsProps> = ({ clientId }) => {
     }
   };
 
-  // Utilitaire pour télécharger un fichier via une URL presignée S3
-  const downloadFromPresignedUrl = async (url: string, fileName: string) => {
-    const response = await fetch(url);
-    if (!response.ok) {
-      throw new Error("Erreur lors du téléchargement du fichier depuis S3");
-    }
-    const blob = await response.blob();
-    const blobUrl = window.URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = blobUrl;
-    link.download = fileName;
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    window.URL.revokeObjectURL(blobUrl);
-  };
-
-  const handleDownloadExcel = async (period: any) => {
+  // Download Excel — l'API streame le fichier directement (pas de CORS)
+  const handleDownloadExcel = (period: any) => {
     if (!period?.id) return;
-    try {
-      const res = await fetch(
-        `/api/files/download/${encodeURIComponent(period.id)}`,
-        {
-          method: "GET",
-        },
-      );
-      let data;
-      try {
-        data = await res.json();
-      } catch {
-        data = {};
-      }
-      if (!res.ok) {
-        throw new Error(data.error || "Erreur lors du téléchargement");
-      }
-      if (data?.url) {
-        await downloadFromPresignedUrl(
-          data.url,
-          data.fileName || `export-comptable-${period.id}.xlsx`,
-        );
-      } else {
-        throw new Error("Lien de téléchargement indisponible");
-      }
-    } catch (error: any) {
-      toast?.error(
-        <>
-          <div className="font-semibold">Erreur de téléchargement</div>
-          <div>{error.message}</div>
-        </>,
-      );
-    }
+    window.location.href = `/api/files/download/${encodeURIComponent(period.id)}`;
   };
 
   return (

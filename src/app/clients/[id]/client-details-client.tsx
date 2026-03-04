@@ -80,41 +80,9 @@ export default function ClientDetailsClient({
     }
   };
 
-  const handleDownload = async (fileId: string, fileName: string) => {
-    try {
-      // Appeler l'API pour obtenir l'URL signée
-      const response = await fetch(`/api/files/download/${fileId}`);
-
-      if (!response.ok) {
-        throw new Error("Erreur lors du téléchargement");
-      }
-
-      const data = await response.json();
-
-      if (!data?.url) {
-        throw new Error("Lien de téléchargement indisponible");
-      }
-
-      // Télécharger via fetch + blob pour éviter les problèmes cross-origin
-      const fileResponse = await fetch(data.url);
-      if (!fileResponse.ok) {
-        throw new Error("Erreur lors du téléchargement du fichier depuis S3");
-      }
-      const blob = await fileResponse.blob();
-      const blobUrl = window.URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = blobUrl;
-      link.download = data.fileName || fileName;
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      window.URL.revokeObjectURL(blobUrl);
-
-      toast.success("Téléchargement démarré");
-    } catch (error) {
-      console.error("Erreur téléchargement:", error);
-      toast.error("Erreur lors du téléchargement du fichier");
-    }
+  // Download — l'API streame le fichier directement (pas de CORS)
+  const handleDownload = (fileId: string, _fileName: string) => {
+    window.location.href = `/api/files/download/${fileId}`;
   };
 
   const getSocialIcon = (type: string) => {

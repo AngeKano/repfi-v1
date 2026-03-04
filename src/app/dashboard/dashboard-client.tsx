@@ -52,41 +52,9 @@ export default function DashboardClient({
     router.push("/auth/signin");
   };
 
-  const handleDownload = async (fileId: string, fileName: string) => {
-    try {
-      // Appeler l'API pour obtenir l'URL signee
-      const response = await fetch(`/api/files/download/normal/${fileId}`);
-
-      if (!response.ok) {
-        throw new Error("Erreur lors du telechargement");
-      }
-
-      const data = await response.json();
-
-      if (!data?.url) {
-        throw new Error("Lien de telechargement indisponible");
-      }
-
-      // Telecharger via fetch + blob pour eviter les problemes cross-origin
-      const fileResponse = await fetch(data.url);
-      if (!fileResponse.ok) {
-        throw new Error("Erreur lors du telechargement du fichier depuis S3");
-      }
-      const blob = await fileResponse.blob();
-      const blobUrl = window.URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = blobUrl;
-      link.download = data.fileName || fileName;
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      window.URL.revokeObjectURL(blobUrl);
-
-      toast.success("Telechargement demarre");
-    } catch (error) {
-      console.error("Erreur telechargement:", error);
-      toast.error("Erreur lors du telechargement du fichier");
-    }
+  // Download — l'API streame le fichier directement (pas de CORS)
+  const handleDownload = (fileId: string, _fileName: string) => {
+    window.location.href = `/api/files/download/normal/${fileId}`;
   };
 
   const roleLabel = getRoleLabel(session.user.role);

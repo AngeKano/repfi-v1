@@ -63,100 +63,15 @@ export default function StatusComponents({
   const messageIndexRef = useRef(0);
   const progressIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Utilitaire pour télécharger un fichier via une URL presignée S3
-  const downloadFromPresignedUrl = async (url: string, fileName: string) => {
-    const response = await fetch(url);
-    if (!response.ok) {
-      throw new Error("Erreur lors du téléchargement du fichier depuis S3");
-    }
-    const blob = await response.blob();
-    const blobUrl = window.URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = blobUrl;
-    link.download = fileName;
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    window.URL.revokeObjectURL(blobUrl);
-  };
-
-  // Download Excel handler
-  const handleDownloadExcel = async () => {
+  // Download Excel handler — l'API streame le fichier directement (pas de CORS)
+  const handleDownloadExcel = () => {
     if (!status?.periodId) return;
-    setDownloading(true);
-    try {
-      const res = await fetch(
-        `/api/files/download/${encodeURIComponent(status.periodId)}`,
-        { method: "GET" },
-      );
-      let data;
-      try {
-        data = await res.json();
-      } catch {
-        data = {};
-      }
-      if (!res.ok) {
-        throw new Error(data.error || "Erreur lors du téléchargement");
-      }
-      if (data?.url) {
-        await downloadFromPresignedUrl(
-          data.url,
-          data.fileName || `export-comptable-${status.periodId}.xlsx`,
-        );
-      } else {
-        throw new Error("Lien de téléchargement indisponible");
-      }
-    } catch (error: any) {
-      toast.error(
-        <>
-          <div className="font-semibold">Erreur de téléchargement</div>
-          <div>{error.message}</div>
-        </>,
-      );
-    } finally {
-      setDownloading(false);
-    }
+    window.location.href = `/api/files/download/${encodeURIComponent(status.periodId)}`;
   };
 
-  const handleDownloadExcelFile = async (batchId: string, fileName: string) => {
+  const handleDownloadExcelFile = (batchId: string, fileName: string) => {
     if (!batchId || !fileName) return;
-    setDownloading(true);
-    try {
-      const res = await fetch(
-        `/api/files/download/comptable?batchId=${encodeURIComponent(
-          batchId,
-        )}&fileName=${encodeURIComponent(fileName)}`,
-        { method: "GET" },
-      );
-      let data: any = {};
-      try {
-        data = await res.json();
-      } catch (_e) {}
-      if (!res.ok || data?.error) {
-        throw new Error(
-          data?.error
-            ? data.error
-            : "Erreur lors du téléchargement du fichier.",
-        );
-      }
-      if (data?.url) {
-        await downloadFromPresignedUrl(
-          data.url,
-          data.fileName || fileName,
-        );
-      } else {
-        throw new Error("Lien de téléchargement indisponible.");
-      }
-    } catch (error: any) {
-      toast.error(
-        <>
-          <div className="font-semibold">Erreur de téléchargement</div>
-          <div>{error.message || "Une erreur inconnue est survenue."}</div>
-        </>,
-      );
-    } finally {
-      setDownloading(false);
-    }
+    window.location.href = `/api/files/download/comptable?batchId=${encodeURIComponent(batchId)}&fileName=${encodeURIComponent(fileName)}`;
   };
 
   // Handler for relancer le traitement ETL si Echec
