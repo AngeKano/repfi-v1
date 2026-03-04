@@ -63,14 +63,24 @@ export default function DashboardClient({
 
       const data = await response.json();
 
-      // Telecharger le fichier avec l'URL signee
+      if (!data?.url) {
+        throw new Error("Lien de telechargement indisponible");
+      }
+
+      // Telecharger via fetch + blob pour eviter les problemes cross-origin
+      const fileResponse = await fetch(data.url);
+      if (!fileResponse.ok) {
+        throw new Error("Erreur lors du telechargement du fichier depuis S3");
+      }
+      const blob = await fileResponse.blob();
+      const blobUrl = window.URL.createObjectURL(blob);
       const link = document.createElement("a");
-      link.href = data.url;
-      link.download = fileName;
-      link.target = "_blank";
+      link.href = blobUrl;
+      link.download = data.fileName || fileName;
       document.body.appendChild(link);
       link.click();
-      document.body.removeChild(link);
+      link.remove();
+      window.URL.revokeObjectURL(blobUrl);
 
       toast.success("Telechargement demarre");
     } catch (error) {

@@ -50,28 +50,24 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    let bucket: string | undefined = undefined;
-    let key: string | undefined = undefined;
-    let signedUrl: string | undefined = undefined;
+    // Utiliser s3Key directement (plus fiable que de parser s3Url qui peut avoir des problèmes d'encodage)
+    const bucket = process.env.AWS_S3_BUCKET_NAME;
+    let key: string | undefined = file.s3Key ?? undefined;
 
-    if (typeof file.s3Url === "string") {
+    // Fallback: extraire la clé depuis s3Url si s3Key n'est pas disponible
+    if (!key && typeof file.s3Url === "string") {
       const s3Match = file.s3Url.match(/^s3:\/\/([^\/]+)\/(.+)$/);
       if (s3Match) {
-        bucket = s3Match[1];
         key = s3Match[2];
       } else {
         try {
           const parsedUrl = new URL(file.s3Url);
-          // bucket: repfi-dev
-          // host possible: repfi-dev.s3.eu-north-1.amazonaws.com
-          const [bucketPart] = parsedUrl.host.split(".");
-          bucket = bucketPart;
-          // On enlève le "/" initial
-          key = parsedUrl.pathname.startsWith("/")
+          const rawPath = parsedUrl.pathname.startsWith("/")
             ? parsedUrl.pathname.slice(1)
             : parsedUrl.pathname;
+          // Décoder pour éviter le double encodage (%20 → espace)
+          key = decodeURIComponent(rawPath);
         } catch (e) {
-          // Echec du parsing (format URL incorrect)
           return NextResponse.json(
             { error: "Format du lien S3 invalide (ni s3://, ni HTTPS)" },
             { status: 400 },
