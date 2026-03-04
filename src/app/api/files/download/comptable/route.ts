@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { S3Client, GetObjectCommand } from "@aws-sdk/client-s3";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
-import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { prisma } from "@/lib/prisma";
 
 const s3Client = new S3Client({
@@ -27,13 +26,11 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    // Authentification utilisateur
     const session = await getServerSession(authOptions);
     if (!session?.user) {
       return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
     }
 
-    // Récupération du fichier en base pour le batch et fileName spécifiés et vérification société
     const file = await prisma.comptableFile.findFirst({
       where: {
         batchId: batchId,
@@ -50,7 +47,7 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    // Utiliser s3Key directement (plus fiable que de parser s3Url qui peut avoir des problèmes d'encodage)
+    // Utiliser s3Key directement (plus fiable que de parser s3Url)
     const bucket = process.env.AWS_S3_BUCKET_NAME;
     let key: string | undefined = file.s3Key ?? undefined;
 
@@ -65,11 +62,10 @@ export async function GET(req: NextRequest) {
           const rawPath = parsedUrl.pathname.startsWith("/")
             ? parsedUrl.pathname.slice(1)
             : parsedUrl.pathname;
-          // Décoder pour éviter le double encodage (%20 → espace)
           key = decodeURIComponent(rawPath);
         } catch (e) {
           return NextResponse.json(
-            { error: "Format du lien S3 invalide (ni s3://, ni HTTPS)" },
+            { error: "Format du lien S3 invalide" },
             { status: 400 },
           );
         }
@@ -83,26 +79,30 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    // Générer une URL signée pour ce fichier/bucket/key avec Content-Disposition: attachment
-    const command = new GetObjectCommand({
-      Bucket: bucket,
-      Key: key,
-      ResponseContentDisposition: `attachment; filename="${file.fileName ?? "export.xlsx"}"`,
-    });
+    // Streamer le fichier directement depuis S3
+    const s3Response = await s3Client.send(
+      new GetObjectCommand({
+        Bucket: bucket,
+        Key: key,
+      }),
+    );
 
-    const signedUrl = await getSignedUrl(s3Client, command, {
-      expiresIn: 3600,
-    });
+    const stream = s3Response.Body as ReadableStream;
 
-    return NextResponse.json({
-      url: signedUrl,
-      fileName: file.fileName ?? undefined,
-      mimeType: file.mimeType ?? undefined,
+    return new NextResponse(stream, {
+      headers: {
+        "Content-Type":
+          file.mimeType || "application/octet-stream",
+        "Content-Disposition": `attachment; filename="${encodeURIComponent(file.fileName ?? "export.xlsx")}"`,
+        ...(s3Response.ContentLength
+          ? { "Content-Length": String(s3Response.ContentLength) }
+          : {}),
+      },
     });
   } catch (error) {
-    console.error("Erreur génération URL signée:", error);
+    console.error("Erreur téléchargement S3 (comptable):", error);
     return NextResponse.json(
-      { error: "Erreur lors de la génération du lien de téléchargement" },
+      { error: "Erreur lors du téléchargement du fichier" },
       { status: 500 },
     );
   }
