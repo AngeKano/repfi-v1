@@ -90,7 +90,7 @@ export async function GET(req: NextRequest) {
       ResponseContentDisposition: `attachment; filename="${file.fileName ?? "export.xlsx"}"`,
     });
 
-    signedUrl = await getSignedUrl(s3Client, command, {
+    const signedUrl = await getSignedUrl(s3Client, command, {
       expiresIn: 3600,
     });
 
