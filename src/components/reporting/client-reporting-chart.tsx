@@ -776,7 +776,7 @@ export default function ClientReportingChart({
         <div className="space-y-3">
           {tunnelData.map((item) => {
             const barWidth =
-              maxAbsValue !== 0 ? (Math.abs(item.value) / maxAbsValue) * 50 : 0;
+              maxAbsValue !== 0 ? (Math.abs(item.value) / maxAbsValue) * 85 : 0;
             const isPositive = item.value >= 0;
 
             return (
@@ -784,15 +784,15 @@ export default function ClientReportingChart({
                 <div className="w-44 text-sm font-medium text-right shrink-0">
                   {item.name}
                 </div>
-                <div className="flex-1 flex items-center h-9">
+                <div className="flex-1 flex items-center h-11">
                   <div className="w-1/2 flex justify-end pr-1">
                     {!isPositive && (
                       <div
-                        className="h-7 rounded-l-md transition-all duration-500 ease-out flex items-center justify-end pr-2"
+                        className="h-9 rounded-l-md transition-all duration-500 ease-out flex items-center justify-end pr-2"
                         style={{
                           width: `${barWidth}%`,
                           backgroundColor: "hsl(0, 84%, 60%)",
-                          minWidth: item.value !== 0 ? "40px" : "0",
+                          minWidth: item.value !== 0 ? "60px" : "0",
                         }}
                       >
                         <span className="text-xs font-semibold text-white whitespace-nowrap">
@@ -801,15 +801,15 @@ export default function ClientReportingChart({
                       </div>
                     )}
                   </div>
-                  <div className="w-0.5 h-9 bg-gray-300 shrink-0" />
+                  <div className="w-0.5 h-11 bg-gray-300 shrink-0" />
                   <div className="w-1/2 flex justify-start pl-1">
                     {isPositive && (
                       <div
-                        className="h-7 rounded-r-md transition-all duration-500 ease-out flex items-center pl-2"
+                        className="h-9 rounded-r-md transition-all duration-500 ease-out flex items-center pl-2"
                         style={{
                           width: `${barWidth}%`,
                           backgroundColor: "hsl(221, 83%, 53%)",
-                          minWidth: item.value !== 0 ? "40px" : "0",
+                          minWidth: item.value !== 0 ? "60px" : "0",
                         }}
                       >
                         <span className="text-xs font-semibold text-white whitespace-nowrap">
@@ -855,6 +855,8 @@ export default function ClientReportingChart({
           <BarChart
             data={visibleChartData}
             margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
+            barGap={8}
+            barCategoryGap="20%"
           >
             <CartesianGrid strokeDasharray="3 3" vertical={false} />
             <XAxis
@@ -883,14 +885,14 @@ export default function ClientReportingChart({
               dataKey="chiffreAffairesN1"
               name={`CA ${yearN1}`}
               fill="hsl(221, 83%, 73%)"
-              barSize={32}
+              barSize={28}
               radius={[4, 4, 0, 0]}
             />
             <Bar
               dataKey="chiffreAffaires"
               name={`CA ${yearN}`}
               fill="hsl(221, 83%, 53%)"
-              barSize={32}
+              barSize={28}
               radius={[4, 4, 0, 0]}
             />
           </BarChart>
