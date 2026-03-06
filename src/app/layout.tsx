@@ -4,8 +4,6 @@ import "./globals.css";
 import { Providers } from "./providers";
 
 const inter = Inter({ subsets: ["latin"] });
-// docker compose -p airflow-prod --env-file .env.prod up -d --build
-// docker compose -p airflow-preprod --env-file .env.preprod up -d --build
 export const metadata: Metadata = {
   title: "Repfi",
   description: "Reporting financier",
@@ -24,3 +22,8 @@ export default function RootLayout({
     </html>
   );
 }
+
+
+
+// // docker compose -p airflow-prod --env-file .env.prod up -d --build
+// // docker compose -p airflow-preprod --env-file .env.preprod up -d --build
