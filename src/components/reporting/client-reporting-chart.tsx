@@ -855,8 +855,6 @@ export default function ClientReportingChart({
           <BarChart
             data={visibleChartData}
             margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
-            barGap={8}
-            barCategoryGap="20%"
           >
             <CartesianGrid strokeDasharray="3 3" vertical={false} />
             <XAxis
@@ -885,14 +883,14 @@ export default function ClientReportingChart({
               dataKey="chiffreAffairesN1"
               name={`CA ${yearN1}`}
               fill="hsl(221, 83%, 73%)"
-              barSize={28}
+              barSize={24}
               radius={[4, 4, 0, 0]}
             />
             <Bar
               dataKey="chiffreAffaires"
               name={`CA ${yearN}`}
               fill="hsl(221, 83%, 53%)"
-              barSize={28}
+              barSize={24}
               radius={[4, 4, 0, 0]}
             />
           </BarChart>
