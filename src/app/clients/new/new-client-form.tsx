@@ -15,6 +15,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
 import { Building2, ArrowLeft, CheckCircle2 } from "lucide-react";
 import Link from "next/link";
 
@@ -53,6 +54,7 @@ export default function NewClientForm() {
   const [website, setWebsite] = useState("");
   const [description, setDescription] = useState("");
   const [denomination, setDenomination] = useState("");
+  const [assujettiTVA, setAssujettiTVA] = useState(true);
 
   // Social networks
   const [socialNetworks, setSocialNetworks] = useState<
@@ -89,6 +91,7 @@ export default function NewClientForm() {
       website: website || undefined,
       description: description || undefined,
       denomination: denomination || undefined,
+      assujettiTVA,
       socialNetworks: socialNetworks.length > 0 ? socialNetworks : undefined,
     };
 
@@ -254,6 +257,24 @@ export default function NewClientForm() {
                     placeholder="SARL, SAS, etc."
                     value={denomination}
                     onChange={(e) => setDenomination(e.target.value)}
+                    disabled={loading}
+                  />
+                </div>
+
+                <div className="flex items-center justify-between p-4 border rounded-lg md:col-span-2">
+                  <div className="space-y-0.5">
+                    <Label htmlFor="assujettiTVA" className="text-sm font-medium">
+                      Assujetti a la TVA
+                    </Label>
+                    <p className="text-xs text-gray-500">
+                      Si active, le CA est calcule sur les comptes 70 (ventes HT).
+                      Sinon, sur les comptes 41 (clients TTC).
+                    </p>
+                  </div>
+                  <Switch
+                    id="assujettiTVA"
+                    checked={assujettiTVA}
+                    onCheckedChange={setAssujettiTVA}
                     disabled={loading}
                   />
                 </div>

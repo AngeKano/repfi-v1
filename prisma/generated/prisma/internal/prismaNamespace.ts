@@ -1387,6 +1387,7 @@ export const ClientScalarFieldEnum = {
   website: 'website',
   companyId: 'companyId',
   isSelfEntity: 'isSelfEntity',
+  assujettiTVA: 'assujettiTVA',
   createdById: 'createdById',
   modifiedById: 'modifiedById',
   createdAt: 'createdAt',

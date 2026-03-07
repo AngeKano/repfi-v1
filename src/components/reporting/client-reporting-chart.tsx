@@ -153,7 +153,7 @@ interface TopClient {
 }
 
 interface ReportingData {
-  client: { id: string; name: string };
+  client: { id: string; name: string; assujettiTVA: boolean };
   year: string;
   yearN1: string;
   periodType: string;
@@ -855,6 +855,7 @@ export default function ClientReportingChart({
           <BarChart
             data={visibleChartData}
             margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
+            barCategoryGap="20%"
           >
             <CartesianGrid strokeDasharray="3 3" vertical={false} />
             <XAxis
@@ -1250,6 +1251,16 @@ export default function ClientReportingChart({
       case "chiffre-affaires":
         return (
           <div className="space-y-6">
+            {/* Indicateur mode CA */}
+            {!data.client.assujettiTVA && (
+              <div className="flex items-center gap-2 p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800">
+                <AlertTriangle className="w-4 h-4 shrink-0" />
+                <span>
+                  Client non assujetti TVA — Le CA est calcule sur les comptes clients (41*) au lieu des comptes de ventes (70*).
+                </span>
+              </div>
+            )}
+
             {/* KPI CA en haut */}
             <div className="grid grid-cols-2 gap-4">
               <Card>
@@ -1258,6 +1269,9 @@ export default function ClientReportingChart({
                     <CardDescription className="flex items-center gap-1 text-xs">
                       <DollarSign className="w-4 h-4 text-blue-600" />
                       Chiffre d&apos;Affaires {yearN}
+                      <Badge variant="outline" className="ml-1 text-[10px] px-1 py-0">
+                        {data.client.assujettiTVA ? "HT" : "TTC"}
+                      </Badge>
                     </CardDescription>
                     <VariationBadge
                       value={data.indicateurs.variations.chiffreAffaires}
@@ -1276,6 +1290,9 @@ export default function ClientReportingChart({
                   <CardDescription className="flex items-center gap-1 text-xs">
                     <DollarSign className="w-4 h-4 text-blue-400" />
                     Chiffre d&apos;Affaires {yearN1}
+                    <Badge variant="outline" className="ml-1 text-[10px] px-1 py-0">
+                      {data.client.assujettiTVA ? "HT" : "TTC"}
+                    </Badge>
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="pt-0">
