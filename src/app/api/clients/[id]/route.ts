@@ -42,6 +42,7 @@ const updateClientSchema = z.object({
   website: z.string().url().optional().nullable().or(z.literal("")),
   description: z.string().max(1000).optional().nullable(),
   denomination: z.string().max(100).optional().nullable(),
+  assujettiTVA: z.boolean().optional(),
   socialNetworks: z
     .array(
       z.object({
@@ -293,6 +294,7 @@ export async function PATCH(
         companyType: data.companyType,
         denomination: data.denomination,
         description: data.description,
+        assujettiTVA: data.assujettiTVA,
         updatedAt: new Date(),
       },
     });
