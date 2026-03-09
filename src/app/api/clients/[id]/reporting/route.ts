@@ -435,6 +435,114 @@ async function recupererRecouvrementParJour(
 }
 
 // ============================================================================
+// CA PAR NATURE - Détail des comptes de la rubrique TC (Travaux & services)
+// ============================================================================
+
+interface CAParNatureItem {
+  compte: string;
+  intituleCompte: string;
+  montantN: number;
+  montantN1: number;
+  variation: number;
+}
+
+async function recupererCAParNature(
+  dbName: string,
+  batchIdsN: string[],
+  batchIdsN1: string[],
+  periodType?: string,
+  selectedMonth?: string,
+): Promise<CAParNatureItem[]> {
+  // Construire le filtre de période
+  let periodFilter = "";
+  const baseParams: Record<string, unknown> = {};
+
+  if (periodType === "month" && selectedMonth) {
+    periodFilter = `AND substring(date_transaction, 4, 2) = {monthFilter:String}`;
+    baseParams.monthFilter = selectedMonth;
+  } else if (periodType === "ytd" && selectedMonth) {
+    periodFilter = `AND substring(date_transaction, 4, 2) <= {monthFilter:String}`;
+    baseParams.monthFilter = selectedMonth;
+  }
+
+  // Requête pour N
+  const fetchComptes = async (batchIds: string[]): Promise<Map<string, { intitule: string; montant: number }>> => {
+    const result = new Map<string, { intitule: string; montant: number }>();
+    if (batchIds.length === 0) return result;
+
+    const data = await clickhouseClient.query({
+      query: `
+        SELECT
+          compte,
+          any(intitule_compte) as intitule_compte,
+          sum(credit - debit) as montant
+        FROM ${dbName}.grand_livre
+        WHERE batch_id IN ({batchIds:Array(String)})
+          AND rubrique = 'TC'
+          ${periodFilter}
+        GROUP BY compte
+        ORDER BY montant DESC
+      `,
+      query_params: { ...baseParams, batchIds },
+      format: "JSONEachRow",
+    });
+
+    const rows = (await data.json()) as Array<{
+      compte: string;
+      intitule_compte: string;
+      montant: string;
+    }>;
+
+    for (const row of rows) {
+      result.set(row.compte, {
+        intitule: row.intitule_compte || row.compte,
+        montant: parseFloat(row.montant) || 0,
+      });
+    }
+    return result;
+  };
+
+  const [comptesN, comptesN1] = await Promise.all([
+    fetchComptes(batchIdsN),
+    fetchComptes(batchIdsN1),
+  ]);
+
+  // Fusionner les comptes N et N-1
+  const allComptes = new Set([...comptesN.keys(), ...comptesN1.keys()]);
+  const items: CAParNatureItem[] = [];
+
+  for (const compte of allComptes) {
+    const n = comptesN.get(compte);
+    const n1 = comptesN1.get(compte);
+    const montantN = n?.montant ?? 0;
+    const montantN1 = n1?.montant ?? 0;
+
+    // Ignorer les comptes à 0 des deux côtés
+    if (montantN === 0 && montantN1 === 0) continue;
+
+    const variation =
+      montantN1 !== 0
+        ? ((montantN - montantN1) / Math.abs(montantN1)) * 100
+        : montantN !== 0
+          ? 100
+          : 0;
+
+    items.push({
+      compte,
+      intituleCompte: n?.intitule ?? n1?.intitule ?? compte,
+      montantN,
+      montantN1,
+      variation,
+    });
+  }
+
+  // Trier par montant N décroissant
+  items.sort((a, b) => b.montantN - a.montantN);
+
+  return items;
+}
+
+// ============================================================================
 // TOP 10 CLIENTS - Clients avec le plus fort impact sur le CA
 // ============================================================================
 
@@ -1116,6 +1224,9 @@ export async function GET(
       // Top 10 clients par CA (filtré par mois sélectionné)
       const topClients = await recupererTop10Clients(dbName, batchIds, periodType, selectedMonth ?? undefined, client.assujettiTVA);
 
+      // CA par Nature — détail des comptes TC
+      const caParNature = await recupererCAParNature(dbName, batchIds, batchIdsN1, periodType, selectedMonth ?? undefined);
+
       return NextResponse.json({
         client: { id: client.id, name: client.name, assujettiTVA: client.assujettiTVA },
         year,
@@ -1135,6 +1246,7 @@ export async function GET(
           variations,
         },
         topClients,
+        caParNature,
       });
     }
 
@@ -1330,6 +1442,9 @@ export async function GET(
     // Top 10 clients par CA (filtré par période sélectionnée)
     const topClients = await recupererTop10Clients(dbName, batchIds, periodType, selectedMonth ?? undefined, client.assujettiTVA);
 
+    // CA par Nature — détail des comptes TC
+    const caParNature = await recupererCAParNature(dbName, batchIds, batchIdsN1, periodType, selectedMonth ?? undefined);
+
     return NextResponse.json({
       client: { id: client.id, name: client.name, assujettiTVA: client.assujettiTVA },
       year,
@@ -1345,6 +1460,7 @@ export async function GET(
       },
       indicateurs: { anneeN: indicateursN, anneeN1: indicateursN1, variations },
       topClients,
+      caParNature,
     });
   } catch (error) {
     console.error("Reporting API error:", error);

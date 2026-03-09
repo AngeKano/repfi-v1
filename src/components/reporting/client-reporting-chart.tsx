@@ -161,6 +161,14 @@ interface TopClient {
   pourcentageCA: number;
 }
 
+interface CAParNatureItem {
+  compte: string;
+  intituleCompte: string;
+  montantN: number;
+  montantN1: number;
+  variation: number;
+}
+
 interface ReportingData {
   client: { id: string; name: string; assujettiTVA: boolean };
   year: string;
@@ -182,6 +190,7 @@ interface ReportingData {
     variations: Variations;
   };
   topClients: TopClient[];
+  caParNature: CAParNatureItem[];
 }
 
 type PeriodType = "year" | "month" | "ytd";
@@ -310,14 +319,6 @@ const chartConfigCANature: ChartConfig = {
   montantN: { label: "Année N", color: "hsl(221, 83%, 53%)" },
   montantN1: { label: "Année N-1", color: "hsl(221, 83%, 73%)" },
 };
-
-// Labels et couleurs pour les natures de CA (rubriques OHADA)
-const CA_NATURES = [
-  { key: "caTA" as const, label: "Ventes de marchandises", rubrique: "TA", color: "hsl(221, 83%, 53%)", colorN1: "hsl(221, 83%, 73%)" },
-  { key: "caTB" as const, label: "Produits fabriqués", rubrique: "TB", color: "hsl(142, 76%, 36%)", colorN1: "hsl(142, 76%, 56%)" },
-  { key: "caTC" as const, label: "Travaux & services", rubrique: "TC", color: "hsl(262, 83%, 58%)", colorN1: "hsl(262, 83%, 78%)" },
-  { key: "caTD" as const, label: "Production stockée", rubrique: "TD", color: "hsl(38, 92%, 50%)", colorN1: "hsl(38, 92%, 70%)" },
-];
 
 const MONTHS = [
   { value: "01", label: "Janvier" },
@@ -922,33 +923,14 @@ export default function ClientReportingChart({
     </Card>
   );
 
-  // Composant CA par Nature — Histogramme horizontal N vs N-1
+  // Composant CA par Nature — Détail des comptes TC avec comparaison N vs N-1
   const CAParNature = () => {
-    // Préparer les données pour le graphique horizontal
-    const natureData = useMemo(() => {
-      if (!data) return [];
-      const indN = data.indicateurs.anneeN;
-      const indN1 = data.indicateurs.anneeN1;
-
-      return CA_NATURES
-        .map((nature) => ({
-          label: nature.label,
-          rubrique: nature.rubrique,
-          montantN: indN[nature.key],
-          montantN1: indN1[nature.key],
-          color: nature.color,
-          colorN1: nature.colorN1,
-          variation:
-            indN1[nature.key] !== 0
-              ? ((indN[nature.key] - indN1[nature.key]) / Math.abs(indN1[nature.key])) * 100
-              : indN[nature.key] !== 0
-                ? 100
-                : 0,
-        }))
-        .filter((d) => d.montantN !== 0 || d.montantN1 !== 0); // masquer les natures à 0
-    }, [data]);
+    const natureData = data?.caParNature ?? [];
 
     if (natureData.length === 0) return null;
+
+    // Hauteur dynamique : 70px par compte + marge
+    const chartHeight = Math.max(natureData.length * 70 + 40, 200);
 
     return (
       <Card>
@@ -958,13 +940,13 @@ export default function ClientReportingChart({
             <div>
               <CardTitle>CA par Nature</CardTitle>
               <CardDescription>
-                Décomposition du chiffre d&apos;affaires par rubrique OHADA — {yearN} vs {yearN1}
+                Détail des comptes (rubrique TC) — {yearN} vs {yearN1}
               </CardDescription>
             </div>
           </div>
         </CardHeader>
         <CardContent>
-          <ChartContainer config={chartConfigCANature} className="w-full" style={{ height: `${Math.max(natureData.length * 100 + 40, 200)}px` }}>
+          <ChartContainer config={chartConfigCANature} className="w-full" style={{ height: `${chartHeight}px` }}>
             <BarChart
               data={natureData}
               layout="vertical"
@@ -986,11 +968,12 @@ export default function ClientReportingChart({
               />
               <YAxis
                 type="category"
-                dataKey="label"
+                dataKey="intituleCompte"
                 tickLine={false}
                 axisLine={false}
-                fontSize={12}
-                width={160}
+                fontSize={11}
+                width={180}
+                tick={{ fill: "hsl(var(--foreground))" }}
               />
               <ChartTooltip
                 content={
@@ -1006,14 +989,14 @@ export default function ClientReportingChart({
                 dataKey="montantN1"
                 name={`${yearN1}`}
                 fill="hsl(221, 83%, 73%)"
-                barSize={20}
+                barSize={18}
                 radius={[0, 4, 4, 0]}
               />
               <Bar
                 dataKey="montantN"
                 name={`${yearN}`}
                 fill="hsl(221, 83%, 53%)"
-                barSize={20}
+                barSize={18}
                 radius={[0, 4, 4, 0]}
               />
             </BarChart>
@@ -1024,7 +1007,7 @@ export default function ClientReportingChart({
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b">
-                  <th className="text-left py-2 font-medium text-muted-foreground">Nature</th>
+                  <th className="text-left py-2 font-medium text-muted-foreground">Compte</th>
                   <th className="text-right py-2 font-medium text-muted-foreground">{yearN}</th>
                   <th className="text-right py-2 font-medium text-muted-foreground">{yearN1}</th>
                   <th className="text-right py-2 font-medium text-muted-foreground">Variation</th>
@@ -1032,15 +1015,11 @@ export default function ClientReportingChart({
               </thead>
               <tbody>
                 {natureData.map((item) => (
-                  <tr key={item.rubrique} className="border-b last:border-0 hover:bg-muted/50">
+                  <tr key={item.compte} className="border-b last:border-0 hover:bg-muted/50">
                     <td className="py-2.5">
                       <div className="flex items-center gap-2">
-                        <div
-                          className="w-3 h-3 rounded-sm shrink-0"
-                          style={{ backgroundColor: item.color }}
-                        />
-                        <span className="font-medium">{item.rubrique}</span>
-                        <span className="text-muted-foreground">— {item.label}</span>
+                        <span className="font-mono text-xs text-muted-foreground">{item.compte}</span>
+                        <span className="font-medium">{item.intituleCompte}</span>
                       </div>
                     </td>
                     <td className="text-right py-2.5 font-semibold">
@@ -1056,12 +1035,16 @@ export default function ClientReportingChart({
                 ))}
                 {/* Ligne total */}
                 <tr className="border-t-2 font-bold">
-                  <td className="py-2.5">Total CA (XB)</td>
+                  <td className="py-2.5">Total CA</td>
                   <td className="text-right py-2.5 text-blue-600">
-                    {formatCompactOnly(data?.indicateurs.anneeN.chiffreAffaires ?? 0)}
+                    {formatCompactOnly(
+                      natureData.reduce((sum, item) => sum + item.montantN, 0)
+                    )}
                   </td>
                   <td className="text-right py-2.5 text-muted-foreground">
-                    {formatCompactOnly(data?.indicateurs.anneeN1.chiffreAffaires ?? 0)}
+                    {formatCompactOnly(
+                      natureData.reduce((sum, item) => sum + item.montantN1, 0)
+                    )}
                   </td>
                   <td className="text-right py-2.5">
                     <VariationBadge value={data?.indicateurs.variations.chiffreAffaires ?? 0} />
