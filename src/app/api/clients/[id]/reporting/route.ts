@@ -81,6 +81,11 @@ interface IndicateursFinanciers {
   tauxRecouvrement: number;
   caTTCTotal: number;
   caEncaisseTTC: number;
+  // CA par Nature (rubriques OHADA)
+  caTA: number; // Ventes de marchandises
+  caTB: number; // Ventes de produits fabriqués
+  caTC: number; // Travaux et services vendus
+  caTD: number; // Production stockée
 }
 
 interface DataPoint {
@@ -789,6 +794,11 @@ function calculerIndicateursPeriode(
     tauxRecouvrement,
     caTTCTotal: caTTCTotalSum,
     caEncaisseTTC: caEncaisseTTCSum,
+    // CA par Nature (rubriques OHADA individuelles)
+    caTA: rubriquesAgregees.TA,
+    caTB: rubriquesAgregees.TB,
+    caTC: rubriquesAgregees.TC,
+    caTD: rubriquesAgregees.TD,
   };
 }
 
@@ -1086,6 +1096,10 @@ export async function GET(
         ),
         tauxRecouvrement:
           indicateursN.tauxRecouvrement - indicateursN1.tauxRecouvrement,
+        caTA: calculerVariation(indicateursN.caTA, indicateursN1.caTA),
+        caTB: calculerVariation(indicateursN.caTB, indicateursN1.caTB),
+        caTC: calculerVariation(indicateursN.caTC, indicateursN1.caTC),
+        caTD: calculerVariation(indicateursN.caTD, indicateursN1.caTD),
       };
 
       const totals = chartData.reduce(
@@ -1296,6 +1310,10 @@ export async function GET(
       ),
       tauxRecouvrement:
         indicateursN.tauxRecouvrement - indicateursN1.tauxRecouvrement,
+      caTA: calculerVariation(indicateursN.caTA, indicateursN1.caTA),
+      caTB: calculerVariation(indicateursN.caTB, indicateursN1.caTB),
+      caTC: calculerVariation(indicateursN.caTC, indicateursN1.caTC),
+      caTD: calculerVariation(indicateursN.caTD, indicateursN1.caTD),
     };
 
     const totals = chartData.reduce(

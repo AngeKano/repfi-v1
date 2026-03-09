@@ -129,6 +129,11 @@ interface IndicateursFinanciers {
   tauxRecouvrement: number;
   caTTCTotal: number;
   caEncaisseTTC: number;
+  // CA par Nature
+  caTA: number;
+  caTB: number;
+  caTC: number;
+  caTD: number;
 }
 
 interface Variations {
@@ -143,6 +148,10 @@ interface Variations {
   resultatFinancier: number;
   resultatHAO: number;
   tauxRecouvrement: number;
+  caTA: number;
+  caTB: number;
+  caTC: number;
+  caTD: number;
 }
 
 interface TopClient {
@@ -296,6 +305,19 @@ const chartConfigTresorerie: ChartConfig = {
   soldeTresorerie: { label: "Trésorerie N", color: "hsl(174, 72%, 46%)" },
   soldeTresorerieN1: { label: "Trésorerie N-1", color: "hsl(174, 72%, 66%)" },
 };
+
+const chartConfigCANature: ChartConfig = {
+  montantN: { label: "Année N", color: "hsl(221, 83%, 53%)" },
+  montantN1: { label: "Année N-1", color: "hsl(221, 83%, 73%)" },
+};
+
+// Labels et couleurs pour les natures de CA (rubriques OHADA)
+const CA_NATURES = [
+  { key: "caTA" as const, label: "Ventes de marchandises", rubrique: "TA", color: "hsl(221, 83%, 53%)", colorN1: "hsl(221, 83%, 73%)" },
+  { key: "caTB" as const, label: "Produits fabriqués", rubrique: "TB", color: "hsl(142, 76%, 36%)", colorN1: "hsl(142, 76%, 56%)" },
+  { key: "caTC" as const, label: "Travaux & services", rubrique: "TC", color: "hsl(262, 83%, 58%)", colorN1: "hsl(262, 83%, 78%)" },
+  { key: "caTD" as const, label: "Production stockée", rubrique: "TD", color: "hsl(38, 92%, 50%)", colorN1: "hsl(38, 92%, 70%)" },
+];
 
 const MONTHS = [
   { value: "01", label: "Janvier" },
@@ -900,6 +922,159 @@ export default function ClientReportingChart({
     </Card>
   );
 
+  // Composant CA par Nature — Histogramme horizontal N vs N-1
+  const CAParNature = () => {
+    // Préparer les données pour le graphique horizontal
+    const natureData = useMemo(() => {
+      if (!data) return [];
+      const indN = data.indicateurs.anneeN;
+      const indN1 = data.indicateurs.anneeN1;
+
+      return CA_NATURES
+        .map((nature) => ({
+          label: nature.label,
+          rubrique: nature.rubrique,
+          montantN: indN[nature.key],
+          montantN1: indN1[nature.key],
+          color: nature.color,
+          colorN1: nature.colorN1,
+          variation:
+            indN1[nature.key] !== 0
+              ? ((indN[nature.key] - indN1[nature.key]) / Math.abs(indN1[nature.key])) * 100
+              : indN[nature.key] !== 0
+                ? 100
+                : 0,
+        }))
+        .filter((d) => d.montantN !== 0 || d.montantN1 !== 0); // masquer les natures à 0
+    }, [data]);
+
+    if (natureData.length === 0) return null;
+
+    return (
+      <Card>
+        <CardHeader>
+          <div className="flex items-center gap-2">
+            <BarChart3 className="w-5 h-5 text-blue-600" />
+            <div>
+              <CardTitle>CA par Nature</CardTitle>
+              <CardDescription>
+                Décomposition du chiffre d&apos;affaires par rubrique OHADA — {yearN} vs {yearN1}
+              </CardDescription>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <ChartContainer config={chartConfigCANature} className="w-full" style={{ height: `${Math.max(natureData.length * 100 + 40, 200)}px` }}>
+            <BarChart
+              data={natureData}
+              layout="vertical"
+              margin={{ top: 10, right: 40, left: 10, bottom: 10 }}
+              barCategoryGap="30%"
+            >
+              <CartesianGrid strokeDasharray="3 3" horizontal={false} />
+              <XAxis
+                type="number"
+                tickLine={false}
+                axisLine={false}
+                fontSize={12}
+                tickFormatter={(value) => {
+                  const absVal = Math.abs(value);
+                  if (absVal >= 1000000) return `${(value / 1000000).toFixed(0)}M`;
+                  if (absVal >= 1000) return `${(value / 1000).toFixed(0)}K`;
+                  return value.toString();
+                }}
+              />
+              <YAxis
+                type="category"
+                dataKey="label"
+                tickLine={false}
+                axisLine={false}
+                fontSize={12}
+                width={160}
+              />
+              <ChartTooltip
+                content={
+                  <ChartTooltipContent
+                    formatter={(value, name) => [
+                      formatCompactOnly(value as number),
+                      name === `${yearN1}` ? `CA ${yearN1}` : `CA ${yearN}`,
+                    ]}
+                  />
+                }
+              />
+              <Bar
+                dataKey="montantN1"
+                name={`${yearN1}`}
+                fill="hsl(221, 83%, 73%)"
+                barSize={20}
+                radius={[0, 4, 4, 0]}
+              />
+              <Bar
+                dataKey="montantN"
+                name={`${yearN}`}
+                fill="hsl(221, 83%, 53%)"
+                barSize={20}
+                radius={[0, 4, 4, 0]}
+              />
+            </BarChart>
+          </ChartContainer>
+
+          {/* Tableau récapitulatif sous le graphique */}
+          <div className="mt-6 overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b">
+                  <th className="text-left py-2 font-medium text-muted-foreground">Nature</th>
+                  <th className="text-right py-2 font-medium text-muted-foreground">{yearN}</th>
+                  <th className="text-right py-2 font-medium text-muted-foreground">{yearN1}</th>
+                  <th className="text-right py-2 font-medium text-muted-foreground">Variation</th>
+                </tr>
+              </thead>
+              <tbody>
+                {natureData.map((item) => (
+                  <tr key={item.rubrique} className="border-b last:border-0 hover:bg-muted/50">
+                    <td className="py-2.5">
+                      <div className="flex items-center gap-2">
+                        <div
+                          className="w-3 h-3 rounded-sm shrink-0"
+                          style={{ backgroundColor: item.color }}
+                        />
+                        <span className="font-medium">{item.rubrique}</span>
+                        <span className="text-muted-foreground">— {item.label}</span>
+                      </div>
+                    </td>
+                    <td className="text-right py-2.5 font-semibold">
+                      {formatCompactOnly(item.montantN)}
+                    </td>
+                    <td className="text-right py-2.5 text-muted-foreground">
+                      {formatCompactOnly(item.montantN1)}
+                    </td>
+                    <td className="text-right py-2.5">
+                      <VariationBadge value={item.variation} />
+                    </td>
+                  </tr>
+                ))}
+                {/* Ligne total */}
+                <tr className="border-t-2 font-bold">
+                  <td className="py-2.5">Total CA (XB)</td>
+                  <td className="text-right py-2.5 text-blue-600">
+                    {formatCompactOnly(data?.indicateurs.anneeN.chiffreAffaires ?? 0)}
+                  </td>
+                  <td className="text-right py-2.5 text-muted-foreground">
+                    {formatCompactOnly(data?.indicateurs.anneeN1.chiffreAffaires ?? 0)}
+                  </td>
+                  <td className="text-right py-2.5">
+                    <VariationBadge value={data?.indicateurs.variations.chiffreAffaires ?? 0} />
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  };
+
   // Composant Evolution Trésorerie
   const EvolutionTresorerie = () => (
     <Card>
@@ -1307,6 +1482,9 @@ export default function ClientReportingChart({
 
             {/* Graphique Evolution CA */}
             <EvolutionCA />
+
+            {/* CA par Nature — Histogramme horizontal N vs N-1 */}
+            <CAParNature />
 
             {/* Top 10 Clients par CA */}
             <Card>
