@@ -129,6 +129,11 @@ interface IndicateursFinanciers {
   tauxRecouvrement: number;
   caTTCTotal: number;
   caEncaisseTTC: number;
+  // CA par Nature
+  caTA: number;
+  caTB: number;
+  caTC: number;
+  caTD: number;
 }
 
 interface Variations {
@@ -143,6 +148,10 @@ interface Variations {
   resultatFinancier: number;
   resultatHAO: number;
   tauxRecouvrement: number;
+  caTA: number;
+  caTB: number;
+  caTC: number;
+  caTD: number;
 }
 
 interface TopClient {
@@ -150,6 +159,14 @@ interface TopClient {
   nomClient: string;
   montantCA: number;
   pourcentageCA: number;
+}
+
+interface CAParNatureItem {
+  compte: string;
+  intituleCompte: string;
+  montantN: number;
+  montantN1: number;
+  variation: number;
 }
 
 interface ReportingData {
@@ -173,6 +190,7 @@ interface ReportingData {
     variations: Variations;
   };
   topClients: TopClient[];
+  caParNature: CAParNatureItem[];
 }
 
 type PeriodType = "year" | "month" | "ytd";
@@ -295,6 +313,11 @@ const chartConfigCA: ChartConfig = {
 const chartConfigTresorerie: ChartConfig = {
   soldeTresorerie: { label: "Trésorerie N", color: "hsl(174, 72%, 46%)" },
   soldeTresorerieN1: { label: "Trésorerie N-1", color: "hsl(174, 72%, 66%)" },
+};
+
+const chartConfigCANature: ChartConfig = {
+  montantN: { label: "Année N", color: "hsl(221, 83%, 53%)" },
+  montantN1: { label: "Année N-1", color: "hsl(221, 83%, 73%)" },
 };
 
 const MONTHS = [
@@ -900,6 +923,141 @@ export default function ClientReportingChart({
     </Card>
   );
 
+  // Composant CA par Nature — Détail des comptes TC avec comparaison N vs N-1
+  const CAParNature = () => {
+    const natureData = data?.caParNature ?? [];
+
+    if (natureData.length === 0) return null;
+
+    // Hauteur dynamique : 70px par compte + marge
+    const chartHeight = Math.max(natureData.length * 70 + 40, 200);
+
+    return (
+      <Card>
+        <CardHeader>
+          <div className="flex items-center gap-2">
+            <BarChart3 className="w-5 h-5 text-blue-600" />
+            <div>
+              <CardTitle>CA par Nature</CardTitle>
+              <CardDescription>
+                Détail des comptes (rubrique TC) — {yearN} vs {yearN1}
+              </CardDescription>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <ChartContainer config={chartConfigCANature} className="w-full" style={{ height: `${chartHeight}px` }}>
+            <BarChart
+              data={natureData}
+              layout="vertical"
+              margin={{ top: 10, right: 40, left: 10, bottom: 10 }}
+              barCategoryGap="30%"
+            >
+              <CartesianGrid strokeDasharray="3 3" horizontal={false} />
+              <XAxis
+                type="number"
+                tickLine={false}
+                axisLine={false}
+                fontSize={12}
+                tickFormatter={(value) => {
+                  const absVal = Math.abs(value);
+                  if (absVal >= 1000000) return `${(value / 1000000).toFixed(0)}M`;
+                  if (absVal >= 1000) return `${(value / 1000).toFixed(0)}K`;
+                  return value.toString();
+                }}
+              />
+              <YAxis
+                type="category"
+                dataKey="intituleCompte"
+                tickLine={false}
+                axisLine={false}
+                fontSize={11}
+                width={180}
+                tick={{ fill: "hsl(var(--foreground))" }}
+              />
+              <ChartTooltip
+                content={
+                  <ChartTooltipContent
+                    formatter={(value, name) => [
+                      formatCompactOnly(value as number),
+                      name === `${yearN1}` ? `CA ${yearN1}` : `CA ${yearN}`,
+                    ]}
+                  />
+                }
+              />
+              <Bar
+                dataKey="montantN1"
+                name={`${yearN1}`}
+                fill="hsl(221, 83%, 73%)"
+                barSize={18}
+                radius={[0, 4, 4, 0]}
+              />
+              <Bar
+                dataKey="montantN"
+                name={`${yearN}`}
+                fill="hsl(221, 83%, 53%)"
+                barSize={18}
+                radius={[0, 4, 4, 0]}
+              />
+            </BarChart>
+          </ChartContainer>
+
+          {/* Tableau récapitulatif sous le graphique */}
+          <div className="mt-6 overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b">
+                  <th className="text-left py-2 font-medium text-muted-foreground">Compte</th>
+                  <th className="text-right py-2 font-medium text-muted-foreground">{yearN}</th>
+                  <th className="text-right py-2 font-medium text-muted-foreground">{yearN1}</th>
+                  <th className="text-right py-2 font-medium text-muted-foreground">Variation</th>
+                </tr>
+              </thead>
+              <tbody>
+                {natureData.map((item) => (
+                  <tr key={item.compte} className="border-b last:border-0 hover:bg-muted/50">
+                    <td className="py-2.5">
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono text-xs text-muted-foreground">{item.compte}</span>
+                        <span className="font-medium">{item.intituleCompte}</span>
+                      </div>
+                    </td>
+                    <td className="text-right py-2.5 font-semibold">
+                      {formatCompactOnly(item.montantN)}
+                    </td>
+                    <td className="text-right py-2.5 text-muted-foreground">
+                      {formatCompactOnly(item.montantN1)}
+                    </td>
+                    <td className="text-right py-2.5">
+                      <VariationBadge value={item.variation} />
+                    </td>
+                  </tr>
+                ))}
+                {/* Ligne total */}
+                <tr className="border-t-2 font-bold">
+                  <td className="py-2.5">Total CA</td>
+                  <td className="text-right py-2.5 text-blue-600">
+                    {formatCompactOnly(
+                      natureData.reduce((sum, item) => sum + item.montantN, 0)
+                    )}
+                  </td>
+                  <td className="text-right py-2.5 text-muted-foreground">
+                    {formatCompactOnly(
+                      natureData.reduce((sum, item) => sum + item.montantN1, 0)
+                    )}
+                  </td>
+                  <td className="text-right py-2.5">
+                    <VariationBadge value={data?.indicateurs.variations.chiffreAffaires ?? 0} />
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  };
+
   // Composant Evolution Trésorerie
   const EvolutionTresorerie = () => (
     <Card>
@@ -1307,6 +1465,9 @@ export default function ClientReportingChart({
 
             {/* Graphique Evolution CA */}
             <EvolutionCA />
+
+            {/* CA par Nature — Histogramme horizontal N vs N-1 */}
+            <CAParNature />
 
             {/* Top 10 Clients par CA */}
             <Card>
