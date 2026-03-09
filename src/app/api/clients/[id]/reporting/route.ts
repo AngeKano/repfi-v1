@@ -273,6 +273,80 @@ async function recupererRubriquesParJour(
   return result;
 }
 
+// ============================================================================
+// CA COMPTES 70* — Somme directe credit-debit sur les comptes 70
+// ============================================================================
+
+async function recupererCA70ParMois(
+  dbName: string,
+  batchIds: string[],
+): Promise<Map<string, number>> {
+  const result = new Map<string, number>();
+  if (batchIds.length === 0) return result;
+
+  const data = await clickhouseClient.query({
+    query: `
+      SELECT
+        substring(date_transaction, 4, 2) as period,
+        sum(credit - debit) as ca70
+      FROM ${dbName}.grand_livre
+      WHERE batch_id IN ({batchIds:Array(String)})
+        AND startsWith(compte, '70')
+      GROUP BY period
+      ORDER BY period
+    `,
+    query_params: { batchIds },
+    format: "JSONEachRow",
+  });
+
+  const rows = (await data.json()) as Array<{
+    period: string;
+    ca70: string;
+  }>;
+
+  for (const row of rows) {
+    result.set(row.period, parseFloat(row.ca70) || 0);
+  }
+
+  return result;
+}
+
+async function recupererCA70ParJour(
+  dbName: string,
+  batchIds: string[],
+  monthFilter: string,
+): Promise<Map<string, number>> {
+  const result = new Map<string, number>();
+  if (batchIds.length === 0) return result;
+
+  const data = await clickhouseClient.query({
+    query: `
+      SELECT
+        substring(date_transaction, 1, 2) as period,
+        sum(credit - debit) as ca70
+      FROM ${dbName}.grand_livre
+      WHERE batch_id IN ({batchIds:Array(String)})
+        AND substring(date_transaction, 4, 2) = {monthFilter:String}
+        AND startsWith(compte, '70')
+      GROUP BY period
+      ORDER BY period
+    `,
+    query_params: { batchIds, monthFilter },
+    format: "JSONEachRow",
+  });
+
+  const rows = (await data.json()) as Array<{
+    period: string;
+    ca70: string;
+  }>;
+
+  for (const row of rows) {
+    result.set(row.period, parseFloat(row.ca70) || 0);
+  }
+
+  return result;
+}
+
 async function recupererTresorerieParMois(
   dbName: string,
   batchIds: string[],
@@ -1065,6 +1139,16 @@ export async function GET(
         batchIdsN1,
         selectedMonth,
       );
+      const ca70ParJourN = await recupererCA70ParJour(
+        dbName,
+        batchIds,
+        selectedMonth,
+      );
+      const ca70ParJourN1 = await recupererCA70ParJour(
+        dbName,
+        batchIdsN1,
+        selectedMonth,
+      );
 
       let cumulativeBalanceN = 0;
       let cumulativeTresoN = 0;
@@ -1072,6 +1156,8 @@ export async function GET(
       let cumulativeCaTTCN = 0;
       let cumulativeCaEncaisseN = 0;
       let cumulativeCaTTCN1 = 0;
+      let cumulativeCA70N = 0;
+      let cumulativeCA70N1 = 0;
       let cumulativeCaEncaisseN1 = 0;
 
       for (let d = 1; d <= maxDays; d++) {
@@ -1115,6 +1201,10 @@ export async function GET(
         cumulativeCaTTCN1 += recouvrementN1Jour.caTTCTotal;
         cumulativeCaEncaisseN1 += recouvrementN1Jour.caEncaisseTTC;
 
+        // CA comptes 70*
+        cumulativeCA70N += ca70ParJourN.get(dayStr) || 0;
+        cumulativeCA70N1 += ca70ParJourN1.get(dayStr) || 0;
+
         const tauxRecouvrementN =
           cumulativeCaTTCN !== 0
             ? (cumulativeCaEncaisseN / cumulativeCaTTCN) * 100
@@ -1133,8 +1223,8 @@ export async function GET(
           resultat: resultatN,
           cumulativeBalance: cumulativeBalanceN,
           nbTransactions: fluxN.nbTransactions,
-          chiffreAffaires: client.assujettiTVA ? sigN.XB : cumulativeCaTTCN,
-          chiffreAffairesN1: client.assujettiTVA ? sigN1.XB : cumulativeCaTTCN1,
+          chiffreAffaires: cumulativeCA70N,
+          chiffreAffairesN1: cumulativeCA70N1,
           soldeTresorerie: cumulativeTresoN,
           soldeTresorerieN1: cumulativeTresoN1,
           margeCommerciale: sigN.XA,
@@ -1275,6 +1365,8 @@ export async function GET(
       dbName,
       batchIdsN1,
     );
+    const ca70ParMoisN = await recupererCA70ParMois(dbName, batchIds);
+    const ca70ParMoisN1 = await recupererCA70ParMois(dbName, batchIdsN1);
 
     let cumulativeBalance = 0;
     let cumulativeTresorerieN = 0;
@@ -1283,6 +1375,8 @@ export async function GET(
     let cumulativeCaEncaisseN = 0;
     let cumulativeCaTTCN1 = 0;
     let cumulativeCaEncaisseN1 = 0;
+    let cumulativeCA70N = 0;
+    let cumulativeCA70N1 = 0;
 
     const endMonth =
       periodType === "ytd" && selectedMonth ? parseInt(selectedMonth) : 12;
@@ -1328,6 +1422,10 @@ export async function GET(
       cumulativeCaTTCN1 += recouvrementN1Mois.caTTCTotal;
       cumulativeCaEncaisseN1 += recouvrementN1Mois.caEncaisseTTC;
 
+      // CA comptes 70*
+      cumulativeCA70N += ca70ParMoisN.get(monthStr) || 0;
+      cumulativeCA70N1 += ca70ParMoisN1.get(monthStr) || 0;
+
       const tauxRecouvrementN =
         cumulativeCaTTCN !== 0
           ? (cumulativeCaEncaisseN / cumulativeCaTTCN) * 100
@@ -1346,8 +1444,8 @@ export async function GET(
         resultat,
         cumulativeBalance,
         nbTransactions: fluxN.nbTransactions,
-        chiffreAffaires: client.assujettiTVA ? sigN.XB : cumulativeCaTTCN,
-        chiffreAffairesN1: client.assujettiTVA ? sigN1.XB : cumulativeCaTTCN1,
+        chiffreAffaires: cumulativeCA70N,
+        chiffreAffairesN1: cumulativeCA70N1,
         soldeTresorerie: cumulativeTresorerieN,
         soldeTresorerieN1: cumulativeTresorerieN1,
         margeCommerciale: sigN.XA,
