@@ -48,15 +48,15 @@ export default function SignInPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-white to-purple-50 p-4">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#EBF5FF] via-white to-[#F0F7FF] p-4">
       <Card className="w-full max-w-md p-8 shadow-xl">
         {/* Header */}
         <div className="mb-8 text-center">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-blue-100 mb-4">
-            <Building2 className="w-8 h-8 text-blue-600" />
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-[#EBF5FF] mb-4">
+            <Building2 className="w-8 h-8 text-[#0077C3]" />
           </div>
-          <h1 className="text-3xl font-bold text-gray-900">Connexion</h1>
-          <p className="text-sm text-gray-600 mt-2">
+          <h1 className="text-3xl font-bold text-[#00122E]">Connexion</h1>
+          <p className="text-sm text-[#335890] mt-2">
             Accédez à votre espace de gestion comptable
           </p>
         </div>
@@ -93,7 +93,7 @@ export default function SignInPage() {
               </Label>
               <Link
                 href="/auth/forgot-password"
-                className="text-xs text-blue-600 hover:text-blue-700"
+                className="text-xs text-[#0077C3] hover:text-[#005992]"
               >
                 Mot de passe oublié ?
               </Link>
@@ -135,7 +135,7 @@ export default function SignInPage() {
             <span className="w-full border-t" />
           </div>
           <div className="relative flex justify-center text-xs uppercase">
-            <span className="bg-white px-2 text-gray-500">
+            <span className="bg-white px-2 text-[#335890]">
               Nouveau sur la plateforme ?
             </span>
           </div>
@@ -154,13 +154,13 @@ export default function SignInPage() {
             </Button>
           </Link>
 
-          <p className="text-xs text-center text-gray-500">
+          <p className="text-xs text-center text-[#335890]">
             En vous connectant, vous acceptez nos{" "}
-            <Link href="/terms" className="text-blue-600 hover:underline">
+            <Link href="/terms" className="text-[#0077C3] hover:underline">
               conditions d'utilisation
             </Link>{" "}
             et notre{" "}
-            <Link href="/privacy" className="text-blue-600 hover:underline">
+            <Link href="/privacy" className="text-[#0077C3] hover:underline">
               politique de confidentialité
             </Link>
             .
