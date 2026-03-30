@@ -116,18 +116,18 @@ export default function SignUpPage() {
 
   if (success) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-green-50 via-white to-blue-50 p-4">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#EBF5FF] via-white to-[#F0F7FF] p-4">
         <Card className="w-full max-w-md p-8 text-center">
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-green-100 mb-4">
             <CheckCircle2 className="w-8 h-8 text-green-600" />
           </div>
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">
+          <h2 className="text-2xl font-bold text-[#00122E] mb-2">
             Inscription réussie !
           </h2>
-          <p className="text-gray-600 mb-4">
+          <p className="text-[#335890] mb-4">
             Votre entreprise a été créée avec succès.
           </p>
-          <p className="text-sm text-gray-500">
+          <p className="text-sm text-[#335890]">
             Redirection vers la page de connexion...
           </p>
         </Card>
@@ -136,12 +136,12 @@ export default function SignUpPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 py-12 px-4">
+    <div className="min-h-screen bg-gradient-to-br from-[#EBF5FF] via-white to-[#F0F7FF] py-12 px-4">
       <div className="max-w-3xl mx-auto">
         {/* Back Button */}
         <Link
           href="/auth/signin"
-          className="inline-flex items-center text-sm text-gray-600 hover:text-gray-900 mb-6"
+          className="inline-flex items-center text-sm text-[#335890] hover:text-[#00122E] mb-6"
         >
           <ArrowLeft className="w-4 h-4 mr-2" />
           Retour à la connexion
@@ -150,13 +150,13 @@ export default function SignUpPage() {
         <Card className="p-8 shadow-xl">
           {/* Header */}
           <div className="mb-8 text-center">
-            <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-blue-100 mb-4">
-              <Building2 className="w-8 h-8 text-blue-600" />
+            <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-[#EBF5FF] mb-4">
+              <Building2 className="w-8 h-8 text-[#0077C3]" />
             </div>
-            <h1 className="text-3xl font-bold text-gray-900">
+            <h1 className="text-3xl font-bold text-[#00122E]">
               Créer un compte entreprise
             </h1>
-            <p className="text-sm text-gray-600 mt-2">
+            <p className="text-sm text-[#335890] mt-2">
               Commencez à gérer votre comptabilité dès aujourd'hui
             </p>
           </div>
@@ -172,7 +172,7 @@ export default function SignUpPage() {
             {/* Company Information */}
             <div className="space-y-4">
               <div className="flex items-center gap-2 pb-2 border-b">
-                <Building2 className="w-5 h-5 text-blue-600" />
+                <Building2 className="w-5 h-5 text-[#0077C3]" />
                 <h2 className="text-xl font-semibold">
                   Informations de l'entreprise
                 </h2>
@@ -295,7 +295,7 @@ export default function SignUpPage() {
             {/* Admin Information */}
             <div className="space-y-4">
               <div className="flex items-center gap-2 pb-2 border-b">
-                <User className="w-5 h-5 text-blue-600" />
+                <User className="w-5 h-5 text-[#0077C3]" />
                 <h2 className="text-xl font-semibold">
                   Administrateur principal
                 </h2>
@@ -352,7 +352,7 @@ export default function SignUpPage() {
                     disabled={loading}
                     required
                   />
-                  <p className="text-xs text-gray-500">
+                  <p className="text-xs text-[#335890]">
                     Min 8 caractères, 1 majuscule, 1 minuscule, 1 chiffre
                   </p>
                 </div>
@@ -392,13 +392,13 @@ export default function SignUpPage() {
                 )}
               </Button>
 
-              <p className="text-xs text-center text-gray-500">
+              <p className="text-xs text-center text-[#335890]">
                 En créant un compte, vous acceptez nos{" "}
-                <Link href="/terms" className="text-blue-600 hover:underline">
+                <Link href="/terms" className="text-[#0077C3] hover:underline">
                   conditions d'utilisation
                 </Link>{" "}
                 et notre{" "}
-                <Link href="/privacy" className="text-blue-600 hover:underline">
+                <Link href="/privacy" className="text-[#0077C3] hover:underline">
                   politique de confidentialité
                 </Link>
                 .
