@@ -7,15 +7,15 @@ import { ROLES, RoleIdType } from "./roles";
 
 // Mapping des variantes de badge par role
 export const ROLE_BADGE_VARIANTS: Record<string, string> = {
-  ADMIN_ROOT: "gold",
-  ADMIN_CF: "default",
-  ADMIN_PARTENAIRE: "default",
-  LOADER_PLUS: "secondary",
-  LOADER: "secondary",
-  VIEWER: "outline",
+  ADMIN_ROOT: "role-admin-root",
+  ADMIN_CF: "role-admin-cf",
+  ADMIN_PARTENAIRE: "role-admin-partenaire",
+  LOADER_PLUS: "role-loader-plus",
+  LOADER: "role-loader",
+  VIEWER: "role-viewer",
   // Support des anciens roles
-  ADMIN: "default",
-  USER: "secondary",
+  ADMIN: "role-admin-cf",
+  USER: "role-loader",
 };
 
 /**
