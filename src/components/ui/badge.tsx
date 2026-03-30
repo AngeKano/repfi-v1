@@ -18,6 +18,19 @@ const badgeVariants = cva(
         outline:
           "text-foreground [a&]:hover:bg-accent [a&]:hover:text-accent-foreground",
         gold: "border-transparent bg-yellow-400 text-yellow-900 [a&]:hover:bg-yellow-300",
+        // Role-specific variants
+        "role-admin-root":
+          "border-transparent bg-gradient-to-r from-[#0095F4] to-[#0077C3] text-white font-semibold shadow-sm",
+        "role-admin-cf":
+          "border-[#0095F4] bg-[#EBF5FF] text-[#0077C3] font-semibold",
+        "role-admin-partenaire":
+          "border-[#33AAF6] bg-white text-[#0077C3] font-semibold",
+        "role-loader":
+          "border-[#D0E3F5] bg-white text-[#335890] font-medium",
+        "role-loader-plus":
+          "border-[#8B30F1] bg-[#F3EAFF] text-[#8B30F1] font-semibold",
+        "role-viewer":
+          "border-[#8B30F1]/50 bg-white text-[#8B30F1]/80 font-medium",
       },
     },
     defaultVariants: {
