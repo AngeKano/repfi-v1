@@ -49,7 +49,8 @@ export default function DashboardClient({
 
   const handleSignOut = async () => {
     await signOut({ redirect: false });
-    router.push("/auth/signin");
+    // Replace history entry so back button can't return to this page
+    window.location.replace("/auth/signin");
   };
 
   // Download — l'API streame le fichier directement (pas de CORS)
