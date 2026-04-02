@@ -62,7 +62,7 @@ export function Sidebar() {
       {/* Logo */}
       <div className="px-5 pt-6 pb-8">
         <Image
-          src="/logo-click-insight-fill.png"
+          src="/logo-click-insight-light.png"
           alt="Click Insight"
           width={120}
           height={55}

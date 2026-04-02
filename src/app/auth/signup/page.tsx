@@ -21,15 +21,15 @@ import Image from "next/image";
 const COMPANY_TYPES = [
   { value: "TECHNOLOGIE", label: "Technologie" },
   { value: "FINANCE", label: "Finance" },
-  { value: "SANTE", label: "Sant\u00e9" },
-  { value: "EDUCATION", label: "\u00c9ducation" },
+  { value: "SANTE", label: "Santé" },
+  { value: "EDUCATION", label: "Éducation" },
   { value: "COMMERCE", label: "Commerce" },
   { value: "INDUSTRIE", label: "Industrie" },
   { value: "AGRICULTURE", label: "Agriculture" },
   { value: "IMMOBILIER", label: "Immobilier" },
   { value: "TRANSPORT", label: "Transport" },
-  { value: "ENERGIE", label: "\u00c9nergie" },
-  { value: "TELECOMMUNICATION", label: "T\u00e9l\u00e9communication" },
+  { value: "ENERGIE", label: "Énergie" },
+  { value: "TELECOMMUNICATION", label: "Télécommunication" },
   { value: "TOURISME", label: "Tourisme" },
 ];
 
@@ -80,7 +80,7 @@ export default function SignUpPage() {
     }
 
     if (adminPassword.length < 8) {
-      setError("Le mot de passe doit contenir au moins 8 caract\u00e8res");
+      setError("Le mot de passe doit contenir au moins 8 caractères");
       setLoading(false);
       return;
     }
@@ -120,7 +120,7 @@ export default function SignUpPage() {
         router.push("/auth/signin?registered=true");
       }, 2000);
     } catch (err) {
-      setError("Une erreur est survenue. Veuillez r\u00e9essayer.");
+      setError("Une erreur est survenue. Veuillez réessayer.");
       setLoading(false);
     }
   };
@@ -133,10 +133,10 @@ export default function SignUpPage() {
             <CheckCircle2 className="w-8 h-8 text-green-600" />
           </div>
           <h2 className="text-2xl font-bold text-[#00122E] mb-2">
-            Inscription r\u00e9ussie !
+            Inscription réussie !
           </h2>
           <p className="text-[#335890] mb-4">
-            Votre entreprise a \u00e9t\u00e9 cr\u00e9\u00e9e avec succ\u00e8s.
+            Votre entreprise a été créée avec succès.
           </p>
           <p className="text-sm text-[#335890]">
             Redirection vers la page de connexion...
@@ -164,7 +164,7 @@ export default function SignUpPage() {
         {/* Background watermark */}
         <div className="absolute inset-0 flex items-center justify-center opacity-[0.03] pointer-events-none">
           <Image
-            src="/logo-click-insight-fill.png"
+            src="/logo-click-insight-light.png"
             alt=""
             width={600}
             height={600}
@@ -187,7 +187,7 @@ export default function SignUpPage() {
           {/* Title */}
           <div className="mb-6">
             <h1 className="text-3xl font-bold text-[#00122E] italic">
-              Cr\u00e9ez votre compte
+              Créez votre compte
             </h1>
             {/* Step indicator */}
             <div className="flex items-center gap-3 mt-4">
@@ -280,7 +280,7 @@ export default function SignUpPage() {
                   required
                 >
                   <SelectTrigger className="h-12 bg-[#F8FAFC] border-[#E2E8F0]">
-                    <SelectValue placeholder="S\u00e9lectionner" />
+                    <SelectValue placeholder="Sélectionner" />
                   </SelectTrigger>
                   <SelectContent>
                     {COMPANY_TYPES.map((type) => (
@@ -293,7 +293,7 @@ export default function SignUpPage() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="companyPhone">T\u00e9l\u00e9phone</Label>
+                <Label htmlFor="companyPhone">Téléphone</Label>
                 <Input
                   id="companyPhone"
                   type="tel"
@@ -318,7 +318,7 @@ export default function SignUpPage() {
                   href="/auth/signin"
                   className="text-sm text-[#0077C3] hover:text-[#005992]"
                 >
-                  D\u00e9j\u00e0 un compte ? Se connecter
+                  Déjà un compte ? Se connecter
                 </Link>
               </div>
             </form>
@@ -343,7 +343,7 @@ export default function SignUpPage() {
 
               <div className="space-y-2">
                 <Label htmlFor="adminFirstName">
-                  Pr\u00e9nom de l&apos;administrateur
+                  Prénom de l&apos;administrateur
                 </Label>
                 <Input
                   id="adminFirstName"
@@ -450,10 +450,10 @@ export default function SignUpPage() {
                   {loading ? (
                     <>
                       <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
-                      Cr\u00e9ation...
+                      Création...
                     </>
                   ) : (
-                    "Cr\u00e9er le compte"
+                    "Créer le compte"
                   )}
                 </Button>
               </div>
@@ -463,7 +463,7 @@ export default function SignUpPage() {
                   href="/auth/signin"
                   className="text-sm text-[#0077C3] hover:text-[#005992]"
                 >
-                  Retour \u00e0 la connexion
+                  Retour à la connexion
                 </Link>
               </div>
             </form>

@@ -15,7 +15,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
         {/* Background watermark */}
         <div className="fixed right-0 bottom-0 opacity-[0.03] pointer-events-none z-0">
           <Image
-            src="/logo-click-insight-fill.png"
+            src="/logologo-click-insight-light.png"
             alt=""
             width={500}
             height={500}

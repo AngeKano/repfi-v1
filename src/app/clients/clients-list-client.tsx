@@ -28,15 +28,15 @@ const COMPANY_TYPES = [
   { value: "", label: "Tous les types" },
   { value: "TECHNOLOGIE", label: "Technologie" },
   { value: "FINANCE", label: "Finance" },
-  { value: "SANTE", label: "Sant\u00e9" },
-  { value: "EDUCATION", label: "\u00c9ducation" },
+  { value: "SANTE", label: "Santé" },
+  { value: "EDUCATION", label: "Éducation" },
   { value: "COMMERCE", label: "Commerce" },
   { value: "INDUSTRIE", label: "Industrie" },
   { value: "AGRICULTURE", label: "Agriculture" },
   { value: "IMMOBILIER", label: "Immobilier" },
   { value: "TRANSPORT", label: "Transport" },
-  { value: "ENERGIE", label: "\u00c9nergie" },
-  { value: "TELECOMMUNICATION", label: "T\u00e9l\u00e9communication" },
+  { value: "ENERGIE", label: "Énergie" },
+  { value: "TELECOMMUNICATION", label: "Télécommunication" },
   { value: "TOURISME", label: "Tourisme" },
 ];
 
@@ -123,7 +123,7 @@ export default function ClientsListClient({
             <div className="flex-1 relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-[#94A3B8]" />
               <Input
-                placeholder="Rechercher par nom, email ou d\u00e9nomination..."
+                placeholder="Rechercher par nom, email ou dénomination..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 className="pl-10 h-11 bg-[#F8FAFC] border-[#E2E8F0]"
@@ -152,18 +152,18 @@ export default function ClientsListClient({
           <div className="text-center py-16 border border-[#D0E3F5] rounded-xl bg-white">
             <Users className="w-16 h-16 text-[#D0E3F5] mx-auto mb-4" />
             <h3 className="text-lg font-semibold text-[#00122E] mb-2">
-              Aucun client trouv\u00e9
+              Aucun client trouvé
             </h3>
             <p className="text-[#335890] mb-6">
               {search || companyType
-                ? "Essayez de modifier vos crit\u00e8res de recherche"
-                : "Commencez par cr\u00e9er votre premier client"}
+                ? "Essayez de modifier vos critères de recherche"
+                : "Commencez par créer votre premier client"}
             </p>
             {canCreateClient && (
               <Link href="/clients/new">
                 <Button>
                   <Plus className="w-4 h-4 mr-2" />
-                  Cr\u00e9er un client
+                  Créer un client
                 </Button>
               </Link>
             )}
@@ -283,7 +283,7 @@ export default function ClientsListClient({
                 disabled={pagination.page === 1}
               >
                 <ChevronLeft className="w-4 h-4 mr-1" />
-                Pr\u00e9c\u00e9dent
+                Précédent
               </Button>
 
               <Button

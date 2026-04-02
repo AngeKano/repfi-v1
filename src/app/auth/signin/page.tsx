@@ -66,7 +66,7 @@ export default function SignInPage() {
         {/* Background watermark */}
         <div className="absolute inset-0 flex items-center justify-center opacity-[0.03] pointer-events-none">
           <Image
-            src="/logo-click-insight-fill.png"
+            src="/logo-click-insight-light.png"
             alt=""
             width={600}
             height={600}
@@ -92,7 +92,7 @@ export default function SignInPage() {
               Connectez-vous
             </h1>
             <p className="text-sm text-[#335890] mt-1">
-              pour acc\u00e9der \u00e0 votre espace de gestion comptable
+              pour accéder à votre espace de gestion comptable
             </p>
           </div>
 
