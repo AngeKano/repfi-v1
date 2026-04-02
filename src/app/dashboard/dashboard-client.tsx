@@ -64,7 +64,7 @@ export default function DashboardClient({
             className="text-[#0077C3] border-[#0077C3] hover:bg-[#EBF5FF]"
           >
             <RefreshCw className="w-4 h-4 mr-2" />
-            Rafra\u00eechir
+            Rafraichir
           </Button>
 
           <div className="flex items-center gap-3">
@@ -93,7 +93,7 @@ export default function DashboardClient({
           <Card className="flex items-center gap-4 px-5 py-4 w-fit">
             <div className="w-12 h-12 rounded-xl bg-[#EBF5FF] flex items-center justify-center">
               <Image
-                src="/logo-click-insight-fill.png"
+                src="/logo-click-insight-unit.png"
                 alt=""
                 width={32}
                 height={32}
@@ -165,7 +165,7 @@ export default function DashboardClient({
         <Card className="p-6 mb-6">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-lg font-semibold text-[#00122E]">
-              Clients r\u00e9cents
+              Clients recents
             </h3>
             <Link href="/clients">
               <Button variant="ghost" size="sm" className="text-[#0077C3]">
@@ -222,7 +222,7 @@ export default function DashboardClient({
         <Card className="p-6">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-lg font-semibold text-[#00122E]">
-              Fichiers r\u00e9cents
+              Fichiers recents
             </h3>
           </div>
 
