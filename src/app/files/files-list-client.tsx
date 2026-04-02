@@ -135,12 +135,12 @@ export default function FilesListClient({ files }: FilesListClientProps) {
           <div className="text-center py-16 border border-[#D0E3F5] rounded-xl bg-white">
             <FileText className="w-16 h-16 text-[#D0E3F5] mx-auto mb-4" />
             <h3 className="text-lg font-semibold text-[#00122E] mb-2">
-              Aucun fichier trouv\u00e9
+              Aucun fichier trouvé
             </h3>
             <p className="text-[#335890]">
               {search
-                ? "Essayez de modifier vos crit\u00e8res de recherche"
-                : "Aucun fichier n'a encore \u00e9t\u00e9 upload\u00e9"}
+                ? "Essayez de modifier vos critères de recherche"
+                : "Aucun fichier n'a encore été uploadé"}
             </p>
           </div>
         ) : (
@@ -155,7 +155,7 @@ export default function FilesListClient({ files }: FilesListClientProps) {
                     Nom
                   </th>
                   <th className="text-left px-5 py-3 text-xs font-semibold text-[#335890] uppercase tracking-wider">
-                    D\u00e9pos\u00e9 par
+                    Déposé par
                   </th>
                   <th className="text-left px-5 py-3 text-xs font-semibold text-[#335890] uppercase tracking-wider">
                     Date
