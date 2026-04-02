@@ -1,11 +1,9 @@
-
 "use client";
 
 import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
   Select,
@@ -15,30 +13,30 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
-  Building2,
   Search,
   Plus,
   Users,
   FileText,
-  ArrowLeft,
   ChevronLeft,
   ChevronRight,
+  Eye,
 } from "lucide-react";
 import Link from "next/link";
+import { DashboardLayout } from "@/components/dashboard-layout";
 
 const COMPANY_TYPES = [
   { value: "", label: "Tous les types" },
   { value: "TECHNOLOGIE", label: "Technologie" },
   { value: "FINANCE", label: "Finance" },
-  { value: "SANTE", label: "Santé" },
-  { value: "EDUCATION", label: "Éducation" },
+  { value: "SANTE", label: "Sant\u00e9" },
+  { value: "EDUCATION", label: "\u00c9ducation" },
   { value: "COMMERCE", label: "Commerce" },
   { value: "INDUSTRIE", label: "Industrie" },
   { value: "AGRICULTURE", label: "Agriculture" },
   { value: "IMMOBILIER", label: "Immobilier" },
   { value: "TRANSPORT", label: "Transport" },
-  { value: "ENERGIE", label: "Énergie" },
-  { value: "TELECOMMUNICATION", label: "Télécommunication" },
+  { value: "ENERGIE", label: "\u00c9nergie" },
+  { value: "TELECOMMUNICATION", label: "T\u00e9l\u00e9communication" },
   { value: "TOURISME", label: "Tourisme" },
 ];
 
@@ -68,7 +66,6 @@ export default function ClientsListClient({
 
   const [search, setSearch] = useState(initialSearch);
   const [companyType, setCompanyType] = useState(initialType);
-  const [showFilters, setShowFilters] = useState(false);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -98,232 +95,200 @@ export default function ClientsListClient({
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-white border-b">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
-            <div className="flex items-center gap-3">
-              <Link href="/dashboard">
-                <Button variant="ghost" size="icon">
-                  <ArrowLeft className="w-5 h-5" />
-                </Button>
-              </Link>
-              <div>
-                <h1 className="text-2xl font-bold text-gray-900">Clients</h1>
-                <p className="text-sm text-gray-500">
-                  {pagination.total} client{pagination.total > 1 ? "s" : ""}
-                </p>
-              </div>
-            </div>
-
-            {canCreateClient && (
-              <Link href="/clients/new">
-                <Button>
-                  <Plus className="w-4 h-4 mr-2" />
-                  Nouveau client
-                </Button>
-              </Link>
-            )}
+    <DashboardLayout>
+      <div className="px-8 py-6">
+        {/* Header */}
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h1 className="text-3xl font-bold text-[#00122E]">Clients</h1>
+            <p className="text-sm text-[#335890] mt-1">
+              {pagination.total} client{pagination.total > 1 ? "s" : ""} au
+              total
+            </p>
           </div>
+
+          {canCreateClient && (
+            <Link href="/clients/new">
+              <Button className="bg-gradient-to-r from-[#0077C3] to-[#0095F4] hover:from-[#005992] hover:to-[#0077C3]">
+                <Plus className="w-4 h-4 mr-2" />
+                Nouveau client
+              </Button>
+            </Link>
+          )}
         </div>
-      </header>
 
-      {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Search and Filters */}
-        <Card className="p-4 mb-6">
-          <form onSubmit={handleSearch} className="space-y-4">
-            <div className="flex gap-3">
-              <div className="flex-1 relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                <Input
-                  placeholder="Rechercher par nom, email ou dénomination..."
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  className="pl-10"
-                />
-              </div>
-
-              {/* <Button
-                type="button"
-                variant="outline"
-                onClick={() => setShowFilters(!showFilters)}
-              >
-                <Filter className="w-4 h-4 mr-2" />
-                Filtres
-              </Button> */}
-
-              <Button type="submit">Rechercher</Button>
+        <div className="flex gap-3 mb-6">
+          <form onSubmit={handleSearch} className="flex gap-3 flex-1">
+            <div className="flex-1 relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-[#94A3B8]" />
+              <Input
+                placeholder="Rechercher par nom, email ou d\u00e9nomination..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="pl-10 h-11 bg-[#F8FAFC] border-[#E2E8F0]"
+              />
             </div>
-
-            {showFilters && (
-              <div className="pt-3 border-t">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="text-sm font-medium mb-2 block">
-                      Type d'entreprise
-                    </label>
-                    <Select value={companyType} onValueChange={setCompanyType}>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {COMPANY_TYPES.map((type) => (
-                          <SelectItem key={type.value} value={type.value}>
-                            {type.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-              </div>
-            )}
+            <Select value={companyType} onValueChange={setCompanyType}>
+              <SelectTrigger className="w-[200px] h-11 bg-[#F8FAFC] border-[#E2E8F0]">
+                <SelectValue placeholder="Type" />
+              </SelectTrigger>
+              <SelectContent>
+                {COMPANY_TYPES.map((type) => (
+                  <SelectItem key={type.value} value={type.value || "all"}>
+                    {type.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Button type="submit" variant="outline" className="h-11">
+              Rechercher
+            </Button>
           </form>
-        </Card>
+        </div>
 
-        {/* Clients List */}
+        {/* Clients Table */}
         {initialClients.length === 0 ? (
-          <Card className="p-12 text-center">
-            <Building2 className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">
-              Aucun client trouvé
+          <div className="text-center py-16 border border-[#D0E3F5] rounded-xl bg-white">
+            <Users className="w-16 h-16 text-[#D0E3F5] mx-auto mb-4" />
+            <h3 className="text-lg font-semibold text-[#00122E] mb-2">
+              Aucun client trouv\u00e9
             </h3>
-            <p className="text-gray-600 mb-6">
+            <p className="text-[#335890] mb-6">
               {search || companyType
-                ? "Essayez de modifier vos critères de recherche"
-                : "Commencez par créer votre premier client"}
+                ? "Essayez de modifier vos crit\u00e8res de recherche"
+                : "Commencez par cr\u00e9er votre premier client"}
             </p>
             {canCreateClient && (
               <Link href="/clients/new">
                 <Button>
                   <Plus className="w-4 h-4 mr-2" />
-                  Créer un client
+                  Cr\u00e9er un client
                 </Button>
               </Link>
             )}
-          </Card>
+          </div>
         ) : (
-          <div className="space-y-4">
-            {initialClients.map((client) => (
-              <Link key={client.id} href={`/clients/${client.id}`}>
-                <Card className="p-6 hover:shadow-lg transition-shadow cursor-pointer">
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-start gap-4 flex-1">
-                      <div className="p-3 bg-blue-100 rounded-lg">
-                        <Building2 className="w-6 h-6 text-blue-600" />
-                      </div>
-
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-1">
-                          <h3 className="text-lg font-semibold text-gray-900">
-                            {client.name}
-                          </h3>
-                          {client.isSelfEntity && (
-                            <Badge variant="secondary">Entreprise</Badge>
-                          )}
-                        </div>
-
-                        <p className="text-sm text-gray-600 mb-3">
-                          {client.email}
-                          {client.phone && ` • ${client.phone}`}
+          <div className="border border-[#D0E3F5] rounded-xl overflow-hidden bg-white">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-[#D0E3F5] bg-[#F5F9FF]">
+                  <th className="text-left px-5 py-3 text-xs font-semibold text-[#335890] uppercase tracking-wider">
+                    Nom
+                  </th>
+                  <th className="text-left px-5 py-3 text-xs font-semibold text-[#335890] uppercase tracking-wider">
+                    Email
+                  </th>
+                  <th className="text-left px-5 py-3 text-xs font-semibold text-[#335890] uppercase tracking-wider">
+                    Type
+                  </th>
+                  <th className="text-center px-5 py-3 text-xs font-semibold text-[#335890] uppercase tracking-wider">
+                    Fichiers
+                  </th>
+                  <th className="text-center px-5 py-3 text-xs font-semibold text-[#335890] uppercase tracking-wider">
+                    Membres
+                  </th>
+                  <th className="text-left px-5 py-3 text-xs font-semibold text-[#335890] uppercase tracking-wider">
+                    Date
+                  </th>
+                  <th className="text-center px-5 py-3 text-xs font-semibold text-[#335890] uppercase tracking-wider">
+                    Actions
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {initialClients.map((client, idx) => (
+                  <tr
+                    key={client.id}
+                    className={`border-b border-[#D0E3F5] last:border-b-0 hover:bg-[#F5F9FF] transition-colors ${
+                      idx % 2 === 0 ? "bg-white" : "bg-[#FAFCFF]"
+                    }`}
+                  >
+                    <td className="px-5 py-4">
+                      <div className="flex items-center gap-2">
+                        <p className="font-medium text-[#00122E] text-sm">
+                          {client.name}
                         </p>
-
-                        <div className="flex items-center gap-4 text-sm text-gray-500">
-                          <div className="flex items-center gap-1">
-                            <FileText className="w-4 h-4" />
-                            <span>
-                              {client._count.normalFiles} fichier
-                              {client._count.normalFiles > 1 ? "s" : ""}
-                            </span>
-                          </div>
-
-                          {client.assignedMembers && (
-                            <div className="flex items-center gap-1">
-                              <Users className="w-4 h-4" />
-                              <span>
-                                {client._count.assignments} membre
-                                {client._count.assignments > 1 ? "s" : ""}
-                              </span>
-                            </div>
-                          )}
-
-                          <Badge variant="outline">
-                            {getCompanyTypeLabel(client.companyType)}
+                        {client.isSelfEntity && (
+                          <Badge variant="secondary" className="text-xs">
+                            Entreprise
                           </Badge>
-                        </div>
-
-                        {client.description && (
-                          <p className="text-sm text-gray-500 mt-3 line-clamp-2">
-                            {client.description}
-                          </p>
                         )}
                       </div>
-                    </div>
-
-                    <div className="text-right text-sm text-gray-500">
-                      <p>
-                        {new Date(client.createdAt).toLocaleDateString("fr-FR")}
-                      </p>
                       {client.denomination && (
-                        <Badge variant="outline" className="mt-2">
+                        <p className="text-xs text-[#335890] mt-0.5">
                           {client.denomination}
-                        </Badge>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Assigned Members Preview */}
-                  {client.assignedMembers &&
-                    client.assignedMembers.length > 0 && (
-                      <div className="mt-4 pt-4 border-t">
-                        <p className="text-xs text-gray-500 mb-2">
-                          Membres assignés :
                         </p>
-                        <div className="flex flex-wrap gap-2">
-                          {client.assignedMembers
-                            .slice(0, 3)
-                            .map((member: any) => (
-                              <Badge key={member.id} variant="secondary">
-                                {member.firstName && member.lastName
-                                  ? `${member.firstName} ${member.lastName}`
-                                  : member.email}
-                              </Badge>
-                            ))}
-                          {client.assignedMembers.length > 3 && (
-                            <Badge variant="secondary">
-                              +{client.assignedMembers.length - 3}
-                            </Badge>
-                          )}
-                        </div>
+                      )}
+                    </td>
+                    <td className="px-5 py-4 text-sm text-[#335890]">
+                      {client.email}
+                      {client.phone && (
+                        <p className="text-xs text-[#94A3B8] mt-0.5">
+                          {client.phone}
+                        </p>
+                      )}
+                    </td>
+                    <td className="px-5 py-4">
+                      <Badge variant="outline" className="text-xs">
+                        {getCompanyTypeLabel(client.companyType)}
+                      </Badge>
+                    </td>
+                    <td className="px-5 py-4 text-center">
+                      <div className="flex items-center justify-center gap-1 text-sm text-[#335890]">
+                        <FileText className="w-4 h-4" />
+                        {client._count.normalFiles}
                       </div>
-                    )}
-                </Card>
-              </Link>
-            ))}
+                    </td>
+                    <td className="px-5 py-4 text-center">
+                      <div className="flex items-center justify-center gap-1 text-sm text-[#335890]">
+                        <Users className="w-4 h-4" />
+                        {client._count.assignments}
+                      </div>
+                    </td>
+                    <td className="px-5 py-4 text-sm text-[#335890]">
+                      {new Date(client.createdAt).toLocaleDateString("fr-FR")}
+                    </td>
+                    <td className="px-5 py-4 text-center">
+                      <Link href={`/clients/${client.id}`}>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="text-[#0077C3] hover:text-[#005992] hover:bg-[#EBF5FF]"
+                        >
+                          <Eye className="w-4 h-4 mr-1" />
+                          Voir
+                        </Button>
+                      </Link>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         )}
 
         {/* Pagination */}
         {pagination.totalPages > 1 && (
-          <div className="mt-8 flex items-center justify-between">
-            <p className="text-sm text-gray-600">
+          <div className="mt-6 flex items-center justify-between">
+            <p className="text-sm text-[#335890]">
               Page {pagination.page} sur {pagination.totalPages}
             </p>
 
             <div className="flex gap-2">
               <Button
                 variant="outline"
+                size="sm"
                 onClick={() => handlePageChange(pagination.page - 1)}
                 disabled={pagination.page === 1}
               >
                 <ChevronLeft className="w-4 h-4 mr-1" />
-                Précédent
+                Pr\u00e9c\u00e9dent
               </Button>
 
               <Button
                 variant="outline"
+                size="sm"
                 onClick={() => handlePageChange(pagination.page + 1)}
                 disabled={pagination.page === pagination.totalPages}
               >
@@ -333,7 +298,7 @@ export default function ClientsListClient({
             </div>
           </div>
         )}
-      </main>
-    </div>
+      </div>
+    </DashboardLayout>
   );
 }
