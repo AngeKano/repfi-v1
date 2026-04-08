@@ -43,7 +43,8 @@ export default function SignInPage() {
         router.refresh();
       }
     } catch (err) {
-      setError("Une erreur est survenue. Veuillez r\u00e9essayer.");
+      setError("Une erreur est survenue. Veuillez réessayer.");
+ 
       setLoading(false);
     }
   };

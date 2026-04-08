@@ -5,24 +5,22 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
-  Building2,
   ArrowLeft,
-  Mail,
-  Phone,
-  Globe,
-  MapPin,
   Edit,
   Trash2,
-  FileText,
   Users,
-  Facebook,
-  Linkedin,
-  Twitter,
-  Calendar,
   UserPlus,
+  Plus,
+  RefreshCw,
+  BarChart3,
+  DollarSign,
+  Target,
+  Receipt,
+  FileText,
+  ChevronLeft,
 } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
@@ -33,6 +31,8 @@ import {
   getRoleLabel,
   getRoleBadgeVariant,
 } from "@/lib/permissions/role-utils";
+import { DashboardLayout } from "@/components/dashboard-layout";
+import { ConfirmDialog } from "@/components/confirm-dialog";
 
 interface ClientDetailsClientProps {
   session: any;
@@ -41,6 +41,16 @@ interface ClientDetailsClientProps {
   canDelete: boolean;
   canAssignMembers: boolean;
 }
+
+const CLIENT_TABS = [
+  { id: "overview", label: "Synth\u00e8se Financi\u00e8re", icon: BarChart3 },
+  { id: "chiffres", label: "Chiffres d'affaires", icon: DollarSign },
+  { id: "resultats", label: "R\u00e9sultats", icon: Target },
+  { id: "recouvrement", label: "Recouvrement", icon: Receipt },
+  { id: "members", label: "Membres", icon: Users },
+  { id: "declaration", label: "Reporting Financier", icon: FileText },
+  { id: "files", label: "Autres Fichiers", icon: FileText },
+];
 
 export default function ClientDetailsClient({
   session,
@@ -52,16 +62,17 @@ export default function ClientDetailsClient({
   const router = useRouter();
   const [client, setClient] = useState(initialClient);
   const [loading, setLoading] = useState(false);
-
   const [error, setError] = useState("");
+  const [activeTab, setActiveTab] = useState("overview");
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+
+  const roleLabel = getRoleLabel(session.user.role);
+  const roleBadgeVariant = getRoleBadgeVariant(session.user.role);
 
   const handleDelete = async () => {
-    if (!confirm("Êtes-vous sûr de vouloir supprimer ce client ?")) {
-      return;
-    }
-
     setLoading(true);
     setError("");
+    setShowDeleteConfirm(false);
 
     try {
       const response = await fetch(`/api/clients/${client.id}`, {
@@ -80,398 +91,305 @@ export default function ClientDetailsClient({
     }
   };
 
-  // Download — l'API streame le fichier directement (pas de CORS)
-  const handleDownload = (fileId: string, _fileName: string) => {
-    window.location.href = `/api/files/download/${fileId}`;
-  };
-
-  const getSocialIcon = (type: string) => {
-    const icons: Record<string, any> = {
-      FACEBOOK: Facebook,
-      LINKEDIN: Linkedin,
-      TWITTER: Twitter,
-    };
-    return icons[type] || Globe;
-  };
-
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-white border-b">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
-            <div className="flex items-center gap-3">
-              <Link href="/clients">
-                <Button variant="ghost" size="icon">
-                  <ArrowLeft className="w-5 h-5" />
-                </Button>
-              </Link>
-              <div>
-                <h1 className="text-2xl font-bold text-gray-900">
-                  {client.name}
-                </h1>
-                {client.isSelfEntity && (
-                  <Badge variant="secondary" className="mt-1">
-                    Entreprise
-                  </Badge>
-                )}
-              </div>
+    <DashboardLayout>
+      <div className="px-8 py-6">
+        {/* Top Bar */}
+        <div className="flex items-center justify-between mb-6">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => router.refresh()}
+            className="text-[#0077C3] border-[#0077C3] hover:bg-[#EBF5FF]"
+          >
+            <RefreshCw className="w-4 h-4 mr-2" />
+            Rafraichir
+          </Button>
+
+          <h2 className="text-xl font-bold text-[#00122E]">
+            Synth\u00e8se Financi\u00e8re
+          </h2>
+
+          <div className="flex items-center gap-3">
+            <div className="text-right">
+              <p className="text-xs text-[#335890]">Utilisateur</p>
+              <p className="text-sm font-semibold text-[#00122E]">
+                {session.user.firstName && session.user.lastName
+                  ? `${session.user.firstName} ${session.user.lastName}`
+                  : session.user.name || session.user.email}
+              </p>
+              <Badge variant={roleBadgeVariant as any} className="text-xs mt-0.5">
+                {roleLabel}
+              </Badge>
             </div>
-
-            <div className="flex gap-2">
-              {canEdit && !client.isSelfEntity && (
-                <>
-                  <Link href={`/clients/${client.id}/edit`}>
-                    <Button variant="outline">
-                      <Edit className="w-4 h-4 mr-2" />
-                      Modifier
-                    </Button>
-                  </Link>
-
-                  {canDelete && (
-                    <Button
-                      variant="destructive"
-                      onClick={handleDelete}
-                      disabled={loading}
-                    >
-                      <Trash2 className="w-4 h-4 mr-2" />
-                      Supprimer
-                    </Button>
-                  )}
-                </>
-              )}
+            <div className="w-10 h-10 rounded-full bg-[#EBF5FF] flex items-center justify-center overflow-hidden">
+              <Users className="w-5 h-5 text-[#0077C3]" />
             </div>
           </div>
         </div>
-      </header>
 
-      {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {error && (
           <Alert variant="destructive" className="mb-6">
             <AlertDescription>{error}</AlertDescription>
           </Alert>
         )}
 
-        {client.isSelfEntity && (
-          <Alert className="mb-6">
-            <AlertDescription>
-              Ceci est l'entité de votre entreprise. Pour la modifier, allez
-              dans les paramètres de l'entreprise.
-            </AlertDescription>
-          </Alert>
-        )}
-
-        <div className="w-full">
-          {/* Left Column - Info */}
-          <div className="lg:col-span-1 space-y-6 hidden">
-            {/* Basic Info */}
-            <Card className="p-6">
-              <h2 className="text-lg font-semibold mb-4">Informations</h2>
-
-              <div className="space-y-4">
-                {client.email && (
-                  <div className="flex items-start gap-3">
-                    <Mail className="w-5 h-5 text-gray-400 mt-0.5" />
-                    <div>
-                      <p className="text-sm text-gray-500">Email</p>
-                      <a
-                        href={`mailto:${client.email}`}
-                        className="text-blue-600 hover:underline"
-                      >
-                        {client.email}
-                      </a>
-                    </div>
-                  </div>
-                )}
-
-                {client.phone && (
-                  <div className="flex items-start gap-3">
-                    <Phone className="w-5 h-5 text-gray-400 mt-0.5" />
-                    <div>
-                      <p className="text-sm text-gray-500">Téléphone</p>
-                      <a
-                        href={`tel:${client.phone}`}
-                        className="text-blue-600 hover:underline"
-                      >
-                        {client.phone}
-                      </a>
-                    </div>
-                  </div>
-                )}
-
-                {client.website && (
-                  <div className="flex items-start gap-3">
-                    <Globe className="w-5 h-5 text-gray-400 mt-0.5" />
-                    <div>
-                      <p className="text-sm text-gray-500">Site web</p>
-                      <a
-                        href={client.website}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-blue-600 hover:underline"
-                        title={client.website}
-                      >
-                        {client.website.length > 40
-                          ? client.website.slice(0, 37) + "..."
-                          : client.website}
-                      </a>
-                    </div>
-                  </div>
-                )}
-
-                {(client.address || client.city) && (
-                  <div className="flex items-start gap-3">
-                    <MapPin className="w-5 h-5 text-gray-400 mt-0.5" />
-                    <div>
-                      <p className="text-sm text-gray-500">Adresse</p>
-                      <p className="text-gray-900">
-                        {client.address}
-                        {client.city && (
-                          <>
-                            <br />
-                            {client.postalCode} {client.city}
-                          </>
-                        )}
-                        {client.country && (
-                          <>
-                            <br />
-                            {client.country}
-                          </>
-                        )}
-                      </p>
-                    </div>
-                  </div>
-                )}
-
-                {client.companyType && (
-                  <div className="flex items-start gap-3">
-                    <Building2 className="w-5 h-5 text-gray-400 mt-0.5" />
-                    <div>
-                      <p className="text-sm text-gray-500">Type</p>
-                      <Badge variant="outline">{client.companyType}</Badge>
-                    </div>
-                  </div>
-                )}
-
+        {/* Client Info Header */}
+        <div className="flex items-center justify-between mb-8">
+          <div className="flex items-center gap-4">
+            <div className="w-16 h-16 rounded-full bg-[#EBF5FF] flex items-center justify-center text-2xl font-bold text-[#0077C3]">
+              {client.name.charAt(0).toUpperCase()}
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold text-[#00122E]">{client.name}</h1>
+              <p className="text-sm text-[#335890]">{client.email}</p>
+              <div className="flex items-center gap-2 mt-1">
                 {client.denomination && (
-                  <div className="flex items-start gap-3">
-                    <Building2 className="w-5 h-5 text-gray-400 mt-0.5" />
-                    <div>
-                      <p className="text-sm text-gray-500">Dénomination</p>
-                      <p className="text-gray-900">{client.denomination}</p>
-                    </div>
-                  </div>
+                  <Badge variant="outline" className="text-xs">
+                    {client.denomination}
+                  </Badge>
                 )}
+                <Badge variant="outline" className="text-xs">
+                  {client.companyType}
+                </Badge>
+                <Badge
+                  className="text-xs bg-[#DCFCE7] text-[#16A34A] hover:bg-[#DCFCE7]"
+                >
+                  Actif
+                </Badge>
               </div>
-            </Card>
+            </div>
+          </div>
 
-            {/* Social Networks */}
-            {client.socialNetworks && client.socialNetworks.length > 0 && (
-              <Card className="p-6">
-                <h2 className="text-lg font-semibold mb-4">Réseaux sociaux</h2>
-                <div className="space-y-3">
-                  {client.socialNetworks.map((network: any) => {
-                    const Icon = getSocialIcon(network.type);
-                    return (
-                      <a
-                        key={network.id}
-                        href={network.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-50 transition-colors"
-                      >
-                        <Icon className="w-5 h-5 text-gray-600" />
-                        <span className="text-sm font-medium">
-                          {network.type}
-                        </span>
-                      </a>
-                    );
-                  })}
-                </div>
+          <div className="flex items-center gap-2">
+            <Link href="/clients">
+              <Button variant="outline" className="gap-2 border-[#D0E3F5] text-[#335890]">
+                <ChevronLeft className="w-4 h-4" />
+                Retour aux clients
+              </Button>
+            </Link>
+
+            {canDelete && !client.isSelfEntity && (
+              <Button
+                variant="outline"
+                className="gap-2 border-red-200 text-red-500 hover:bg-red-50"
+                onClick={() => setShowDeleteConfirm(true)}
+                disabled={loading}
+              >
+                <Trash2 className="w-4 h-4" />
+                Supprimer
+              </Button>
+            )}
+
+            {canEdit && !client.isSelfEntity && (
+              <Link href={`/clients/${client.id}/edit`}>
+                <Button variant="outline" className="gap-2 border-[#D0E3F5] text-[#335890]">
+                  <Edit className="w-4 h-4" />
+                  Modifier
+                </Button>
+              </Link>
+            )}
+
+            <Button className="gap-2 bg-gradient-to-r from-[#0077C3] to-[#0095F4] hover:from-[#005992] hover:to-[#0077C3]">
+              <Plus className="w-4 h-4" />
+              Charger fichier
+            </Button>
+          </div>
+        </div>
+
+        {/* Main Layout: Sidebar + Content */}
+        <div className="flex gap-6">
+          {/* Left Sidebar Navigation */}
+          <div className="w-[220px] shrink-0">
+            <nav className="space-y-1">
+              {CLIENT_TABS.map((tab) => {
+                const active = activeTab === tab.id;
+                return (
+                  <button
+                    key={tab.id}
+                    onClick={() => setActiveTab(tab.id)}
+                    className={`flex items-center gap-3 w-full px-4 py-3 rounded-lg text-sm font-medium transition-colors ${
+                      active
+                        ? "bg-[#0077C3] text-white"
+                        : "text-[#335890] hover:bg-[#EBF5FF] hover:text-[#0077C3]"
+                    }`}
+                  >
+                    <tab.icon className="w-5 h-5" />
+                    {tab.label}
+                  </button>
+                );
+              })}
+            </nav>
+
+            <div className="mt-8">
+              <Link href="/clients">
+                <button className="flex items-center gap-3 w-full px-4 py-3 rounded-lg text-sm font-medium text-[#335890] hover:bg-[#EBF5FF] hover:text-[#0077C3] transition-colors">
+                  <ChevronLeft className="w-5 h-5" />
+                  Retour aux clients
+                </button>
+              </Link>
+            </div>
+          </div>
+
+          {/* Content Area */}
+          <div className="flex-1 min-w-0">
+            {/* Overview / Synthese Financiere */}
+            {activeTab === "overview" && (
+              <ClientReportingChart clientId={client.id} />
+            )}
+
+            {/* Chiffres d'affaires */}
+            {activeTab === "chiffres" && (
+              <Card className="p-8 text-center">
+                <DollarSign className="w-12 h-12 text-[#D0E3F5] mx-auto mb-4" />
+                <h3 className="text-lg font-semibold text-[#00122E] mb-2">
+                  Chiffres d&apos;affaires
+                </h3>
+                <p className="text-[#335890]">
+                  Les donn\u00e9es de chiffres d&apos;affaires seront affich\u00e9es ici
+                </p>
               </Card>
             )}
 
-            {/* Stats */}
-            <Card className="p-6">
-              <h2 className="text-lg font-semibold mb-4">Statistiques</h2>
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <FileText className="w-4 h-4 text-gray-400" />
-                    <span className="text-sm text-gray-600">Fichiers</span>
-                  </div>
-                  <span className="font-semibold">
-                    {client.stats.totalFiles}
-                  </span>
-                </div>
+            {/* Resultats */}
+            {activeTab === "resultats" && (
+              <Card className="p-8 text-center">
+                <Target className="w-12 h-12 text-[#D0E3F5] mx-auto mb-4" />
+                <h3 className="text-lg font-semibold text-[#00122E] mb-2">
+                  R\u00e9sultats
+                </h3>
+                <p className="text-[#335890]">
+                  Les r\u00e9sultats financiers seront affich\u00e9s ici
+                </p>
+              </Card>
+            )}
 
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Users className="w-4 h-4 text-gray-400" />
-                    <span className="text-sm text-gray-600">Membres</span>
-                  </div>
-                  <span className="font-semibold">
-                    {client.stats.totalMembers}
-                  </span>
-                </div>
+            {/* Recouvrement */}
+            {activeTab === "recouvrement" && (
+              <Card className="p-8 text-center">
+                <Receipt className="w-12 h-12 text-[#D0E3F5] mx-auto mb-4" />
+                <h3 className="text-lg font-semibold text-[#00122E] mb-2">
+                  Recouvrement
+                </h3>
+                <p className="text-[#335890]">
+                  Les donn\u00e9es de recouvrement seront affich\u00e9es ici
+                </p>
+              </Card>
+            )}
 
-                <div className="pt-3 border-t">
-                  <div className="flex items-center gap-2 text-xs text-gray-500">
-                    <Calendar className="w-4 h-4" />
-                    <span>
-                      Créé le{" "}
-                      {new Date(client.createdAt).toLocaleDateString("fr-FR")}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </Card>
-          </div>
-
-          {/* Right Column - Tabs */}
-          <div className="lg:col-span-2">
-            <Tabs defaultValue="overview" className="space-y-6">
-              <TabsList>
-                <TabsTrigger value="overview">Vue d'ensemble</TabsTrigger>
-                <TabsTrigger value="members">
-                  Membres ({client.stats.totalMembers})
-                </TabsTrigger>
-                <TabsTrigger value="declaration">
-                  Reporting Financier ({client.stats.totalComptablePeriods})
-                </TabsTrigger>
-                <TabsTrigger value="files">
-                  Autres fichiers ({client.stats.totalFiles})
-                </TabsTrigger>
-              </TabsList>
-
-              {/* Reporting */}
-
-              {/* Overview Tab */}
-              <TabsContent value="overview">
-                <ClientReportingChart clientId={client.id} />
-
-                <Card className="p-6 hidden">
-                  <h2 className="text-lg font-semibold mb-4">Description</h2>
-                  {client.description ? (
-                    <p className="text-gray-700 whitespace-pre-wrap">
-                      {client.description}
-                    </p>
-                  ) : (
-                    <p className="text-gray-400 italic">
-                      Aucune description disponible
-                    </p>
+            {/* Members */}
+            {activeTab === "members" && (
+              <Card className="p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-lg font-semibold text-[#00122E]">
+                    Membres assign\u00e9s
+                  </h2>
+                  {canAssignMembers && (
+                    <Link href={`/clients/${client.id}/assign`}>
+                      <Button size="sm" className="gap-2">
+                        <UserPlus className="w-4 h-4" />
+                        G\u00e9rer les membres
+                      </Button>
+                    </Link>
                   )}
+                </div>
 
-                  {client.createdBy && (
-                    <div className="mt-6 pt-6 border-t">
-                      <p className="text-sm text-gray-500 mb-2">Créé par</p>
-                      <div className="flex items-center gap-2">
-                        <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center">
-                          <span className="text-sm font-medium text-blue-600">
-                            {client.createdBy.firstName?.[0] ||
-                              client.createdBy.email[0].toUpperCase()}
-                          </span>
-                        </div>
-                        <div>
-                          <p className="text-sm font-medium">
-                            {client.createdBy.firstName &&
-                            client.createdBy.lastName
-                              ? `${client.createdBy.firstName} ${client.createdBy.lastName}`
-                              : client.createdBy.email}
-                          </p>
-                          <p className="text-xs text-gray-500">
-                            {new Date(client.createdAt).toLocaleDateString(
-                              "fr-FR",
-                              {
-                                year: "numeric",
-                                month: "long",
-                                day: "numeric",
-                              },
-                            )}
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </Card>
-              </TabsContent>
-
-              {/* Members Tab */}
-              <TabsContent value="members">
-                <Card className="p-6">
-                  <div className="flex items-center justify-between mb-4">
-                    <h2 className="text-lg font-semibold">Membres assignes</h2>
+                {client.assignedMembers && client.assignedMembers.length > 0 ? (
+                  <div className="border border-[#D0E3F5] rounded-xl overflow-hidden">
+                    <table className="w-full">
+                      <thead>
+                        <tr className="border-b border-[#D0E3F5] bg-[#F5F9FF]">
+                          <th className="text-left px-4 py-3 text-xs font-semibold text-[#335890] uppercase">
+                            Membre
+                          </th>
+                          <th className="text-left px-4 py-3 text-xs font-semibold text-[#335890] uppercase">
+                            Email
+                          </th>
+                          <th className="text-left px-4 py-3 text-xs font-semibold text-[#335890] uppercase">
+                            R\u00f4le
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {client.assignedMembers.map((member: any, idx: number) => (
+                          <tr
+                            key={member.id}
+                            className={`border-b border-[#D0E3F5] last:border-b-0 ${
+                              idx % 2 === 0 ? "bg-white" : "bg-[#FAFCFF]"
+                            }`}
+                          >
+                            <td className="px-4 py-3">
+                              <div className="flex items-center gap-3">
+                                <div className="w-8 h-8 rounded-full bg-[#EBF5FF] flex items-center justify-center text-sm font-semibold text-[#0077C3]">
+                                  {member.firstName
+                                    ? member.firstName.charAt(0).toUpperCase()
+                                    : member.email.charAt(0).toUpperCase()}
+                                </div>
+                                <span className="text-sm font-medium text-[#00122E]">
+                                  {member.firstName && member.lastName
+                                    ? `${member.firstName} ${member.lastName}`
+                                    : member.email}
+                                </span>
+                              </div>
+                            </td>
+                            <td className="px-4 py-3 text-sm text-[#335890]">
+                              {member.email}
+                            </td>
+                            <td className="px-4 py-3">
+                              <Badge
+                                variant={getRoleBadgeVariant(member.role) as any}
+                                className="text-xs"
+                              >
+                                {getRoleLabel(member.role)}
+                              </Badge>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <div className="text-center py-12">
+                    <Users className="w-12 h-12 text-[#D0E3F5] mx-auto mb-3" />
+                    <p className="text-[#335890]">Aucun membre assign\u00e9</p>
                     {canAssignMembers && (
                       <Link href={`/clients/${client.id}/assign`}>
-                        <Button size="sm">
-                          <UserPlus className="w-4 h-4 mr-2" />
-                          Gerer les membres
+                        <Button variant="outline" className="mt-4 gap-2">
+                          <UserPlus className="w-4 h-4" />
+                          Assigner des membres
                         </Button>
                       </Link>
                     )}
                   </div>
+                )}
+              </Card>
+            )}
 
-                  {client.assignedMembers &&
-                  client.assignedMembers.length > 0 ? (
-                    <div className="space-y-3">
-                      {client.assignedMembers.map((member: any) => (
-                        <div
-                          key={member.id}
-                          className="flex items-center justify-between p-4 border rounded-lg"
-                        >
-                          <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center">
-                              <span className="font-medium text-blue-600">
-                                {member.firstName?.[0] ||
-                                  member.email[0].toUpperCase()}
-                              </span>
-                            </div>
-                            <div>
-                              <p className="font-medium">
-                                {member.firstName && member.lastName
-                                  ? `${member.firstName} ${member.lastName}`
-                                  : member.email}
-                              </p>
-                              <p className="text-sm text-gray-500">
-                                {member.email}
-                              </p>
-                            </div>
-                          </div>
-                          <Badge
-                            variant={getRoleBadgeVariant(member.role) as any}
-                          >
-                            {getRoleLabel(member.role)}
-                          </Badge>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="text-center py-12">
-                      <Users className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-                      <p className="text-gray-500">Aucun membre assigne</p>
-                      {canAssignMembers && (
-                        <Link href={`/clients/${client.id}/assign`}>
-                          <Button variant="outline" className="mt-4">
-                            <UserPlus className="w-4 h-4 mr-2" />
-                            Assigner des membres
-                          </Button>
-                        </Link>
-                      )}
-                    </div>
-                  )}
-                </Card>
-              </TabsContent>
+            {/* Declaration / Reporting Financier */}
+            {activeTab === "declaration" && (
+              <Tabs value="declaration">
+                <DeclarationTabs clientId={client.id} />
+              </Tabs>
+            )}
 
-              {/* Declaration Tab */}
-              <DeclarationTabs clientId={client.id} />
-
-              {/* Files Tab */}
-              <FilesTabs clientId={client.id} />
-            </Tabs>
+            {/* Files */}
+            {activeTab === "files" && <FilesTabs clientId={client.id} />}
           </div>
         </div>
-      </main>
-    </div>
+      </div>
+
+      {/* Delete Confirmation */}
+      <ConfirmDialog
+        open={showDeleteConfirm}
+        onClose={() => setShowDeleteConfirm(false)}
+        onConfirm={handleDelete}
+        title="Attention"
+        message={`\u00cates-vous s\u00fbr de vouloir supprimer le client "${client.name}" ? Cette action est irr\u00e9versible.`}
+        confirmLabel="Supprimer"
+        cancelLabel="Annuler"
+        variant="danger"
+        confirmIcon={<Trash2 className="w-4 h-4" />}
+      />
+    </DashboardLayout>
   );
 }
