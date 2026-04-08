@@ -43,7 +43,8 @@ export default function SignInPage() {
         router.refresh();
       }
     } catch (err) {
-      setError("Une erreur est survenue. Veuillez r\u00e9essayer.");
+      setError("Une erreur est survenue. Veuillez réessayer.");
+ 
       setLoading(false);
     }
   };
@@ -177,7 +178,7 @@ export default function SignInPage() {
                 className="w-full h-12 rounded-full border-[#0077C3] text-[#0077C3] hover:bg-[#EBF5FF]"
                 disabled={loading}
               >
-                Cr\u00e9er un compte
+                Créer un compte
               </Button>
             </Link>
           </div>
