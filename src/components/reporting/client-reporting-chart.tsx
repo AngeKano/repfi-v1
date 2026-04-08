@@ -2177,10 +2177,10 @@ export default function ClientReportingChart({
                   <span className="text-xs text-[#335890]">Année :</span>
                   <span className="font-semibold text-[#00122E]">{year}</span>
                   <div className="flex gap-1 ml-1">
-                    <button onClick={() => handleYearChange("prev")} disabled={data.availableYears.indexOf(year) >= data.availableYears.length - 1} className="text-[#94A3B8] hover:text-[#0077C3] disabled:opacity-30">
+                    <button title="Année précédente" onClick={() => handleYearChange("prev")} disabled={data.availableYears.indexOf(year) >= data.availableYears.length - 1} className="text-[#94A3B8] hover:text-[#0077C3] disabled:opacity-30">
                       <ChevronLeft className="w-4 h-4" />
                     </button>
-                    <button onClick={() => handleYearChange("next")} disabled={data.availableYears.indexOf(year) <= 0} className="text-[#94A3B8] hover:text-[#0077C3] disabled:opacity-30">
+                    <button  title="Année suivante" onClick={() => handleYearChange("next")} disabled={data.availableYears.indexOf(year) <= 0} className="text-[#94A3B8] hover:text-[#0077C3] disabled:opacity-30">
                       <ChevronRight className="w-4 h-4" />
                     </button>
                   </div>
