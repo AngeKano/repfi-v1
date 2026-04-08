@@ -41,7 +41,7 @@ export default async function FilesPage() {
       orderBy: { uploadedAt: "desc" },
       take: 50,
       include: {
-        client: { select: { name: true } },
+        client: { select: { name: true, email: true } },
         uploadedBy: {
           select: { firstName: true, lastName: true, email: true },
         },
@@ -60,7 +60,7 @@ export default async function FilesPage() {
       orderBy: { uploadedAt: "desc" },
       take: 50,
       include: {
-        client: { select: { name: true } },
+        client: { select: { name: true, email: true } },
         uploadedBy: {
           select: { firstName: true, lastName: true, email: true },
         },
@@ -68,5 +68,5 @@ export default async function FilesPage() {
     });
   }
 
-  return <FilesListClient files={files} />;
+  return <FilesListClient files={files} session={session} />;
 }

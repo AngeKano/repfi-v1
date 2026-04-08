@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { usePathname } from "next/navigation";
 import { signOut } from "next-auth/react";
 import Link from "next/link";
@@ -12,6 +13,7 @@ import {
   Settings,
   LogOut,
 } from "lucide-react";
+import { ConfirmDialog } from "./confirm-dialog";
 
 const mainNavItems = [
   {
@@ -46,6 +48,7 @@ const bottomNavItems = [
 
 export function Sidebar() {
   const pathname = usePathname();
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 
   const handleSignOut = async () => {
     await signOut({ redirect: false });
@@ -58,76 +61,91 @@ export function Sidebar() {
   };
 
   return (
-    <aside className="fixed left-0 top-0 bottom-0 w-[220px] bg-[#F5F9FF] flex flex-col z-50">
-      {/* Logo */}
-      <div className="px-5 pt-6 pb-8">
-        <Image
-          src="/logo-click-insight-light.png"
-          alt="Click Insight"
-          width={120}
-          height={55}
-          className="object-contain"
-        />
-      </div>
+    <>
+      <aside className="fixed left-0 top-0 bottom-0 w-[220px] bg-[#F5F9FF] flex flex-col z-50">
+        {/* Logo */}
+        <div className="px-5 pt-6 pb-8">
+          <Image
+            src="/logo-click-insight-light.png"
+            alt="Click Insight"
+            width={120}
+            height={55}
+            className="object-contain"
+          />
+        </div>
 
-      {/* Main Navigation */}
-      <nav className="flex-1 px-3">
-        <ul className="space-y-1">
-          {mainNavItems.map((item) => {
-            const active = isActive(item.href);
-            return (
-              <li key={item.href}>
-                <Link
-                  href={item.href}
-                  className={`flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors ${
-                    active
-                      ? "bg-[#EBF5FF] text-[#0077C3]"
-                      : "text-[#335890] hover:bg-[#EBF5FF]/50 hover:text-[#0077C3]"
-                  }`}
-                >
-                  <item.icon className="w-5 h-5" />
-                  {item.label}
-                </Link>
-              </li>
-            );
-          })}
-        </ul>
-      </nav>
+        {/* Main Navigation */}
+        <nav className="flex-1 px-3">
+          <ul className="space-y-1">
+            {mainNavItems.map((item) => {
+              const active = isActive(item.href);
+              return (
+                <li key={item.href}>
+                  <Link
+                    href={item.href}
+                    className={`flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors ${
+                      active
+                        ? "bg-[#EBF5FF] text-[#0077C3]"
+                        : "text-[#335890] hover:bg-[#EBF5FF]/50 hover:text-[#0077C3]"
+                    }`}
+                  >
+                    <item.icon className="w-5 h-5" />
+                    {item.label}
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+        </nav>
 
-      {/* Bottom Navigation */}
-      <div className="px-3 pb-4">
-        <ul className="space-y-1">
-          {bottomNavItems.map((item) => {
-            const active = isActive(item.href);
-            return (
-              <li key={item.href}>
-                <Link
-                  href={item.href}
-                  className={`flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors ${
-                    active
-                      ? "bg-[#EBF5FF] text-[#0077C3]"
-                      : "text-[#335890] hover:bg-[#EBF5FF]/50 hover:text-[#0077C3]"
-                  }`}
-                >
-                  <item.icon className="w-5 h-5" />
-                  {item.label}
-                </Link>
-              </li>
-            );
-          })}
-          <li>
-            <button
-              onClick={handleSignOut}
-              className="flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium text-[#335890] hover:bg-[#EBF5FF]/50 hover:text-[#0077C3] transition-colors w-full"
-            >
-              <LogOut className="w-5 h-5" />
-              Se d\u00e9connecter
-            </button>
-          </li>
-        </ul>
+        {/* Bottom Navigation */}
+        <div className="px-3 pb-4">
+          <ul className="space-y-1">
+            {bottomNavItems.map((item) => {
+              const active = isActive(item.href);
+              return (
+                <li key={item.href}>
+                  <Link
+                    href={item.href}
+                    className={`flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors ${
+                      active
+                        ? "bg-[#EBF5FF] text-[#0077C3]"
+                        : "text-[#335890] hover:bg-[#EBF5FF]/50 hover:text-[#0077C3]"
+                    }`}
+                  >
+                    <item.icon className="w-5 h-5" />
+                    {item.label}
+                  </Link>
+                </li>
+              );
+            })}
+            <li>
+              <button
+                onClick={() => setShowLogoutConfirm(true)}
+                className="flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium text-[#335890] hover:bg-[#EBF5FF]/50 hover:text-[#0077C3] transition-colors w-full"
+              >
+                <LogOut className="w-5 h-5" />
+                Se d\u00e9connecter
+              </button>
+            </li>
+          </ul>
 
-        <p className="text-xs text-[#94A3B8] px-4 mt-4">Version V 0.0.1</p>
-      </div>
-    </aside>
+          <p className="text-xs text-[#94A3B8] px-4 mt-4">Version V 0.0.1</p>
+        </div>
+      </aside>
+
+      {/* Logout Confirmation Dialog */}
+      <ConfirmDialog
+        open={showLogoutConfirm}
+        onClose={() => setShowLogoutConfirm(false)}
+        onConfirm={handleSignOut}
+        title="Attention"
+        message="\u00cates-vous s\u00fbr de vouloir vous d\u00e9connecter ?"
+        confirmLabel="Se d\u00e9connecter"
+        cancelLabel="Annuler"
+        variant="warning"
+        confirmIcon={<LogOut className="w-4 h-4" />}
+      />
+    </>
   );
 }
