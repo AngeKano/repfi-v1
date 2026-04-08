@@ -8,7 +8,6 @@ import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
-  ArrowLeft,
   Edit,
   Trash2,
   Users,
@@ -23,7 +22,6 @@ import {
   ChevronLeft,
 } from "lucide-react";
 import Link from "next/link";
-import { toast } from "sonner";
 import FilesTabs from "./files-tabs";
 import DeclarationTabs from "./declaration/declaration-tabs";
 import ClientReportingChart from "@/components/reporting/client-reporting-chart";
@@ -43,9 +41,9 @@ interface ClientDetailsClientProps {
 }
 
 const CLIENT_TABS = [
-  { id: "overview", label: "Synth\u00e8se Financi\u00e8re", icon: BarChart3 },
+  { id: "overview", label: "Synthèse Financière", icon: BarChart3 },
   { id: "chiffres", label: "Chiffres d'affaires", icon: DollarSign },
-  { id: "resultats", label: "R\u00e9sultats", icon: Target },
+  { id: "resultats", label: "Résultats", icon: Target },
   { id: "recouvrement", label: "Recouvrement", icon: Receipt },
   { id: "members", label: "Membres", icon: Users },
   { id: "declaration", label: "Reporting Financier", icon: FileText },
@@ -107,7 +105,7 @@ export default function ClientDetailsClient({
           </Button>
 
           <h2 className="text-xl font-bold text-[#00122E]">
-            Synth\u00e8se Financi\u00e8re
+            {CLIENT_TABS.find((t) => t.id === activeTab)?.label || "Synthèse Financière"}
           </h2>
 
           <div className="flex items-center gap-3">
@@ -233,48 +231,21 @@ export default function ClientDetailsClient({
 
           {/* Content Area */}
           <div className="flex-1 min-w-0">
-            {/* Overview / Synthese Financiere */}
+            {/* Financial tabs - delegated to ClientReportingChart */}
             {activeTab === "overview" && (
-              <ClientReportingChart clientId={client.id} />
+              <ClientReportingChart clientId={client.id} initialTab="synthese" hideNav />
             )}
 
-            {/* Chiffres d'affaires */}
             {activeTab === "chiffres" && (
-              <Card className="p-8 text-center">
-                <DollarSign className="w-12 h-12 text-[#D0E3F5] mx-auto mb-4" />
-                <h3 className="text-lg font-semibold text-[#00122E] mb-2">
-                  Chiffres d&apos;affaires
-                </h3>
-                <p className="text-[#335890]">
-                  Les donn\u00e9es de chiffres d&apos;affaires seront affich\u00e9es ici
-                </p>
-              </Card>
+              <ClientReportingChart clientId={client.id} initialTab="chiffre-affaires" hideNav />
             )}
 
-            {/* Resultats */}
             {activeTab === "resultats" && (
-              <Card className="p-8 text-center">
-                <Target className="w-12 h-12 text-[#D0E3F5] mx-auto mb-4" />
-                <h3 className="text-lg font-semibold text-[#00122E] mb-2">
-                  R\u00e9sultats
-                </h3>
-                <p className="text-[#335890]">
-                  Les r\u00e9sultats financiers seront affich\u00e9s ici
-                </p>
-              </Card>
+              <ClientReportingChart clientId={client.id} initialTab="resultat" hideNav />
             )}
 
-            {/* Recouvrement */}
             {activeTab === "recouvrement" && (
-              <Card className="p-8 text-center">
-                <Receipt className="w-12 h-12 text-[#D0E3F5] mx-auto mb-4" />
-                <h3 className="text-lg font-semibold text-[#00122E] mb-2">
-                  Recouvrement
-                </h3>
-                <p className="text-[#335890]">
-                  Les donn\u00e9es de recouvrement seront affich\u00e9es ici
-                </p>
-              </Card>
+              <ClientReportingChart clientId={client.id} initialTab="recouvrement" hideNav />
             )}
 
             {/* Members */}
@@ -282,13 +253,13 @@ export default function ClientDetailsClient({
               <Card className="p-6">
                 <div className="flex items-center justify-between mb-4">
                   <h2 className="text-lg font-semibold text-[#00122E]">
-                    Membres assign\u00e9s
+                    Membres assignés
                   </h2>
                   {canAssignMembers && (
                     <Link href={`/clients/${client.id}/assign`}>
                       <Button size="sm" className="gap-2">
                         <UserPlus className="w-4 h-4" />
-                        G\u00e9rer les membres
+                        Gérer les membres
                       </Button>
                     </Link>
                   )}
@@ -306,7 +277,7 @@ export default function ClientDetailsClient({
                             Email
                           </th>
                           <th className="text-left px-4 py-3 text-xs font-semibold text-[#335890] uppercase">
-                            R\u00f4le
+                            Rôle
                           </th>
                         </tr>
                       </thead>
@@ -351,7 +322,7 @@ export default function ClientDetailsClient({
                 ) : (
                   <div className="text-center py-12">
                     <Users className="w-12 h-12 text-[#D0E3F5] mx-auto mb-3" />
-                    <p className="text-[#335890]">Aucun membre assign\u00e9</p>
+                    <p className="text-[#335890]">Aucun membre assigné</p>
                     {canAssignMembers && (
                       <Link href={`/clients/${client.id}/assign`}>
                         <Button variant="outline" className="mt-4 gap-2">
@@ -384,7 +355,7 @@ export default function ClientDetailsClient({
         onClose={() => setShowDeleteConfirm(false)}
         onConfirm={handleDelete}
         title="Attention"
-        message={`\u00cates-vous s\u00fbr de vouloir supprimer le client "${client.name}" ? Cette action est irr\u00e9versible.`}
+        message={`Êtes-vous sûr de vouloir supprimer le client "${client.name}" ? Cette action est irréversible.`}
         confirmLabel="Supprimer"
         cancelLabel="Annuler"
         variant="danger"
