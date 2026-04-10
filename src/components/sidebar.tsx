@@ -17,7 +17,7 @@ import { ConfirmDialog } from "./confirm-dialog";
 
 const mainNavItems = [
   {
-    label: "Dashboard",
+    label: "Overview",
     href: "/dashboard",
     icon: LayoutDashboard,
   },

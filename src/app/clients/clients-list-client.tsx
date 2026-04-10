@@ -23,6 +23,11 @@ import {
   getRoleLabel,
   getRoleBadgeVariant,
 } from "@/lib/permissions/role-utils";
+import { ClientDetailsDialog } from "./client-details-dialog";
+import {
+  ReportingParamsDialog,
+  paramsToQuery,
+} from "./reporting-params-dialog";
 
 const COMPANY_TYPES = [
   { value: "", label: "Tous les types" },
@@ -69,6 +74,8 @@ export default function ClientsListClient({
   const [companyType, setCompanyType] = useState(initialType);
   const [activeTab, setActiveTab] = useState<"active" | "deleted">("active");
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [detailsClient, setDetailsClient] = useState<any | null>(null);
+  const [reportingClient, setReportingClient] = useState<any | null>(null);
 
   const roleLabel = getRoleLabel(session.user.role);
   const roleBadgeVariant = getRoleBadgeVariant(session.user.role);
@@ -351,16 +358,15 @@ export default function ClientsListClient({
                     </td>
                     <td className="px-4 py-4">
                       <div className="flex items-center justify-center gap-1">
-                        <Link href={`/clients/${client.id}`}>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="text-[#0077C3] hover:text-[#005992] hover:bg-[#EBF5FF] h-8 w-8 p-0"
-                            title="Synthèse"
-                          >
-                            <BarChart3 className="w-4 h-4" />
-                          </Button>
-                        </Link>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setReportingClient(client)}
+                          className="text-[#0077C3] hover:text-[#005992] hover:bg-[#EBF5FF] h-8 w-8 p-0"
+                          title="Reporting"
+                        >
+                          <BarChart3 className="w-4 h-4" />
+                        </Button>
                         <Button
                           variant="ghost"
                           size="sm"
@@ -369,16 +375,15 @@ export default function ClientsListClient({
                         >
                           <Trash2 className="w-4 h-4" />
                         </Button>
-                        <Link href={`/clients/${client.id}`}>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="text-[#0077C3] hover:text-[#005992] hover:bg-[#EBF5FF] h-8 w-8 p-0"
-                            title="Voir"
-                          >
-                            <Eye className="w-4 h-4" />
-                          </Button>
-                        </Link>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setDetailsClient(client)}
+                          className="text-[#0077C3] hover:text-[#005992] hover:bg-[#EBF5FF] h-8 w-8 p-0"
+                          title="Voir les détails"
+                        >
+                          <Eye className="w-4 h-4" />
+                        </Button>
                       </div>
                     </td>
                   </tr>
@@ -387,6 +392,24 @@ export default function ClientsListClient({
             </table>
           </div>
         )}
+
+        <ClientDetailsDialog
+          client={detailsClient}
+          open={!!detailsClient}
+          onClose={() => setDetailsClient(null)}
+          getCompanyTypeLabel={getCompanyTypeLabel}
+        />
+
+        <ReportingParamsDialog
+          open={!!reportingClient}
+          clientName={reportingClient?.name}
+          onClose={() => setReportingClient(null)}
+          onValidate={(params) => {
+            if (!reportingClient) return;
+            const qs = paramsToQuery(params);
+            router.push(`/clients/${reportingClient.id}?${qs}`);
+          }}
+        />
 
         {/* Pagination */}
         {pagination.totalPages > 1 && (
