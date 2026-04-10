@@ -125,10 +125,10 @@ export default function FilesListClient({ files, session }: FilesListClientProps
           <h1 className="text-3xl font-bold text-[#00122E]">Fichiers</h1>
 
           <div className="flex items-center gap-3">
-            <Button variant="outline" className="h-10 gap-2 border-[#0077C3] text-[#0077C3]">
+            {/* <Button variant="outline" className="h-10 gap-2 border-[#0077C3] text-[#0077C3]">
               <Download className="w-4 h-4" />
               Exporter
-            </Button>
+            </Button> */}
             <Button className="h-10 bg-gradient-to-r from-[#0077C3] to-[#0095F4] hover:from-[#005992] hover:to-[#0077C3]">
               <Plus className="w-4 h-4 mr-2" />
               Charger un fichier
