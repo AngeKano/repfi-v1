@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -25,6 +25,7 @@ import Link from "next/link";
 import FilesTabs from "./files-tabs";
 import DeclarationTabs from "./declaration/declaration-tabs";
 import ClientReportingChart from "@/components/reporting/client-reporting-chart";
+import { UploadFileDialog } from "./upload-file-dialog";
 import {
   getRoleLabel,
   getRoleBadgeVariant,
@@ -58,11 +59,19 @@ export default function ClientDetailsClient({
   canAssignMembers,
 }: ClientDetailsClientProps) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [client, setClient] = useState(initialClient);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [activeTab, setActiveTab] = useState("overview");
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showUploadDialog, setShowUploadDialog] = useState(false);
+
+  const initialPeriodType = (() => {
+    const qp = searchParams.get("periodType");
+    if (qp === "year" || qp === "month" || qp === "ytd") return qp;
+    return undefined;
+  })();
 
   const roleLabel = getRoleLabel(session.user.role);
   const roleBadgeVariant = getRoleBadgeVariant(session.user.role);
@@ -188,9 +197,12 @@ export default function ClientDetailsClient({
               </Link>
             )}
 
-            <Button className="gap-2 bg-gradient-to-r from-[#0077C3] to-[#0095F4] hover:from-[#005992] hover:to-[#0077C3]">
+            <Button
+              onClick={() => setShowUploadDialog(true)}
+              className="gap-2 bg-gradient-to-r from-[#0077C3] to-[#0095F4] hover:from-[#005992] hover:to-[#0077C3]"
+            >
               <Plus className="w-4 h-4" />
-              Charger fichier
+              Charger un fichier
             </Button>
           </div>
         </div>
@@ -233,19 +245,39 @@ export default function ClientDetailsClient({
           <div className="flex-1 min-w-0">
             {/* Financial tabs - delegated to ClientReportingChart */}
             {activeTab === "overview" && (
-              <ClientReportingChart clientId={client.id} initialTab="synthese" hideNav />
+              <ClientReportingChart
+                clientId={client.id}
+                initialTab="synthese"
+                initialPeriodType={initialPeriodType}
+                hideNav
+              />
             )}
 
             {activeTab === "chiffres" && (
-              <ClientReportingChart clientId={client.id} initialTab="chiffre-affaires" hideNav />
+              <ClientReportingChart
+                clientId={client.id}
+                initialTab="chiffre-affaires"
+                initialPeriodType={initialPeriodType}
+                hideNav
+              />
             )}
 
             {activeTab === "resultats" && (
-              <ClientReportingChart clientId={client.id} initialTab="resultat" hideNav />
+              <ClientReportingChart
+                clientId={client.id}
+                initialTab="resultat"
+                initialPeriodType={initialPeriodType}
+                hideNav
+              />
             )}
 
             {activeTab === "recouvrement" && (
-              <ClientReportingChart clientId={client.id} initialTab="recouvrement" hideNav />
+              <ClientReportingChart
+                clientId={client.id}
+                initialTab="recouvrement"
+                initialPeriodType={initialPeriodType}
+                hideNav
+              />
             )}
 
             {/* Members */}
@@ -348,6 +380,12 @@ export default function ClientDetailsClient({
           </div>
         </div>
       </div>
+
+      <UploadFileDialog
+        open={showUploadDialog}
+        onClose={() => setShowUploadDialog(false)}
+        client={{ id: client.id, name: client.name, email: client.email }}
+      />
 
       {/* Delete Confirmation */}
       <ConfirmDialog

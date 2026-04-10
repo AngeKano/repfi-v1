@@ -338,17 +338,21 @@ const MONTHS = [
 export default function ClientReportingChart({
   clientId,
   initialTab,
+  initialPeriodType,
   hideNav = false,
 }: {
   clientId: string;
   initialTab?: TabId;
+  initialPeriodType?: PeriodType;
   hideNav?: boolean;
 }) {
   const [data, setData] = useState<ReportingData | null>(null);
   const [loading, setLoading] = useState(true);
   const [year, setYear] = useState<string>(new Date().getFullYear().toString());
   const yearInitialized = useRef(false);
-  const [periodType, setPeriodType] = useState<PeriodType>("year");
+  const [periodType, setPeriodType] = useState<PeriodType>(
+    initialPeriodType || "year",
+  );
   const [selectedMonth, setSelectedMonth] = useState<string>("12");
   const [hiddenPeriods, setHiddenPeriods] = useState<Set<string>>(new Set());
   const [tunnelMetrics, setTunnelMetrics] = useState<TunnelMetric[]>(
