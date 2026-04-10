@@ -290,7 +290,7 @@ export function UploadFileDialog({
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
       <DialogContent
         showCloseButton={false}
-        className="p-0 overflow-hidden max-w-[640px] border border-[#D0E3F5]"
+        className="p-0 overflow-hidden w-[calc(100vw-2rem)] max-w-[calc(100vw-2rem)] sm:max-w-[820px] max-h-[calc(100vh-2rem)] border border-[#D0E3F5]"
       >
         <div className="p-6 pb-4">
           <div className="flex items-start justify-between mb-5">
@@ -325,140 +325,155 @@ export function UploadFileDialog({
               }}
             >
               {/* STEP 1 */}
-              <div className="w-full shrink-0 pr-2 space-y-5">
-                <div>
-                  <Label className="block text-sm font-medium text-[#335890] mb-2">
-                    Type de fichier <span className="text-red-500">*</span>
-                  </Label>
-                  <div className="grid grid-cols-2 gap-2 rounded-lg border border-[#D0E3F5] p-1 bg-[#F8FAFC]">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setFileKind("comptable");
-                        setFiles([]);
-                      }}
-                      className={`flex items-center justify-center gap-2 py-2 rounded-md text-sm font-medium transition-colors ${
-                        fileKind === "comptable"
-                          ? "bg-white text-[#0077C3] border border-[#0077C3] shadow-sm"
-                          : "text-[#335890] hover:text-[#0077C3]"
-                      }`}
-                    >
-                      <FileSpreadsheet className="w-4 h-4" />
-                      Fichiers comptables
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setFileKind("autres");
-                        setFiles([]);
-                      }}
-                      className={`flex items-center justify-center gap-2 py-2 rounded-md text-sm font-medium transition-colors ${
-                        fileKind === "autres"
-                          ? "bg-white text-[#0077C3] border border-[#0077C3] shadow-sm"
-                          : "text-[#335890] hover:text-[#0077C3]"
-                      }`}
-                    >
-                      <FileText className="w-4 h-4" />
-                      Autres fichiers
-                    </button>
-                  </div>
-                </div>
-
-                <div>
-                  <Label className="block text-sm font-medium text-[#335890] mb-2">
-                    Client <span className="text-red-500">*</span>
-                  </Label>
-                  <Select
-                    value={clientId}
-                    onValueChange={(v) => setClientId(v)}
-                  >
-                    <SelectTrigger className="w-full h-11 border-[#D0E3F5]">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectGroup>
-                        <SelectLabel>Client</SelectLabel>
-                        <SelectItem value={client.id}>{client.name}</SelectItem>
-                      </SelectGroup>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {fileKind === "comptable" && (
-                  <div>
-                    <Label className="block text-sm font-medium text-[#335890] mb-2">
-                      Période <span className="text-red-500">*</span>
-                    </Label>
-                    <div className="grid grid-cols-2 gap-3 mb-3">
-                      <div className="flex items-center gap-2 px-3 py-2.5 rounded-lg border border-[#D0E3F5] bg-white text-sm">
-                        <span className="text-[#94A3B8] text-xs">Début :</span>
-                        <span className="font-medium text-[#00122E]">
-                          {dateRange?.from
-                            ? dateRange.from.toLocaleDateString("fr-FR")
-                            : "—"}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-2 px-3 py-2.5 rounded-lg border border-[#D0E3F5] bg-white text-sm">
-                        <span className="text-[#94A3B8] text-xs">Fin :</span>
-                        <span className="font-medium text-[#00122E]">
-                          {dateRange?.to
-                            ? dateRange.to.toLocaleDateString("fr-FR")
-                            : "—"}
-                        </span>
+              <div className="w-full shrink-0 px-1">
+                <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-5 items-start">
+                  {/* Left column: Type + Client + Period summary */}
+                  <div className="space-y-4 min-w-0">
+                    <div>
+                      <Label className="block text-sm font-medium text-[#335890] mb-2">
+                        Type de fichier{" "}
+                        <span className="text-red-500">*</span>
+                      </Label>
+                      <div className="grid grid-cols-2 gap-2 rounded-lg border border-[#D0E3F5] p-1 bg-[#F8FAFC]">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setFileKind("comptable");
+                            setFiles([]);
+                          }}
+                          className={`flex items-center justify-center gap-1.5 py-2 px-2 rounded-md text-xs font-medium transition-colors whitespace-nowrap ${
+                            fileKind === "comptable"
+                              ? "bg-white text-[#0077C3] border border-[#0077C3] shadow-sm"
+                              : "text-[#335890] hover:text-[#0077C3]"
+                          }`}
+                        >
+                          <FileSpreadsheet className="w-4 h-4" />
+                          Fichiers comptables
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setFileKind("autres");
+                            setFiles([]);
+                          }}
+                          className={`flex items-center justify-center gap-1.5 py-2 px-2 rounded-md text-xs font-medium transition-colors whitespace-nowrap ${
+                            fileKind === "autres"
+                              ? "bg-white text-[#0077C3] border border-[#0077C3] shadow-sm"
+                              : "text-[#335890] hover:text-[#0077C3]"
+                          }`}
+                        >
+                          <FileText className="w-4 h-4" />
+                          Autres fichiers
+                        </button>
                       </div>
                     </div>
+
+                    <div>
+                      <Label className="block text-sm font-medium text-[#335890] mb-2">
+                        Client <span className="text-red-500">*</span>
+                      </Label>
+                      <Select
+                        value={clientId}
+                        onValueChange={(v) => setClientId(v)}
+                      >
+                        <SelectTrigger className="w-full h-10 border-[#D0E3F5]">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectGroup>
+                            <SelectLabel>Client</SelectLabel>
+                            <SelectItem value={client.id}>
+                              {client.name}
+                            </SelectItem>
+                          </SelectGroup>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    {fileKind === "comptable" && (
+                      <div>
+                        <Label className="block text-sm font-medium text-[#335890] mb-2">
+                          Période <span className="text-red-500">*</span>
+                        </Label>
+                        <div className="space-y-2">
+                          <div className="flex items-center gap-2 px-3 py-2 rounded-lg border border-[#D0E3F5] bg-white text-sm">
+                            <span className="text-[#94A3B8] text-xs">
+                              Début :
+                            </span>
+                            <span className="font-medium text-[#00122E]">
+                              {dateRange?.from
+                                ? dateRange.from.toLocaleDateString("fr-FR")
+                                : "—"}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2 px-3 py-2 rounded-lg border border-[#D0E3F5] bg-white text-sm">
+                            <span className="text-[#94A3B8] text-xs">
+                              Fin :
+                            </span>
+                            <span className="font-medium text-[#00122E]">
+                              {dateRange?.to
+                                ? dateRange.to.toLocaleDateString("fr-FR")
+                                : "—"}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Right column: Calendar (comptable only) */}
+                  {fileKind === "comptable" && (
                     <Calendar
                       mode="range"
-                      numberOfMonths={2}
+                      numberOfMonths={1}
                       selected={dateRange}
                       onSelect={setDateRange}
                       className="rounded-lg border border-[#D0E3F5] shadow-sm"
                     />
-                  </div>
-                )}
+                  )}
+                </div>
               </div>
 
               {/* STEP 2 */}
-              <div className="w-full shrink-0 pl-2 space-y-4">
+              <div className="w-full shrink-0 px-1 space-y-3">
                 {/* Client summary header */}
-                <div className="flex items-center gap-4">
-                  <div className="w-14 h-14 rounded-full bg-[#EBF5FF] flex items-center justify-center text-xl font-bold text-[#0077C3]">
+                <div className="flex items-center gap-3">
+                  <div className="w-11 h-11 rounded-full bg-[#EBF5FF] flex items-center justify-center text-base font-bold text-[#0077C3] shrink-0">
                     {client.name.charAt(0).toUpperCase()}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-lg font-bold text-[#00122E] truncate">
+                    <p className="text-base font-bold text-[#00122E] truncate">
                       {client.name}
                     </p>
                     {client.email && (
-                      <p className="text-sm text-[#335890] truncate">
+                      <p className="text-xs text-[#335890] truncate">
                         {client.email}
                       </p>
                     )}
                   </div>
+                  {fileKind === "comptable" && periodStart && periodEnd && (
+                    <div className="text-right text-xs">
+                      <div className="text-[#94A3B8]">Période</div>
+                      <div className="font-semibold text-[#00122E]">
+                        {new Date(periodStart).toLocaleDateString("fr-FR")} →{" "}
+                        {new Date(periodEnd).toLocaleDateString("fr-FR")}
+                      </div>
+                    </div>
+                  )}
                 </div>
-
-                {fileKind === "comptable" && periodStart && periodEnd && (
-                  <div className="flex items-center gap-2 text-sm">
-                    <span className="text-[#94A3B8]">Période :</span>
-                    <span className="font-semibold text-[#00122E]">
-                      {new Date(periodStart).toLocaleDateString("fr-FR")} au{" "}
-                      {new Date(periodEnd).toLocaleDateString("fr-FR")}
-                    </span>
-                  </div>
-                )}
 
                 {/* Files list */}
                 {files.length > 0 && (
                   <div className="border border-[#D0E3F5] rounded-lg overflow-hidden">
-                    <div className="grid grid-cols-[1fr_auto_auto] gap-4 px-4 py-2 bg-[#F5F9FF] text-xs font-semibold text-[#335890] uppercase">
+                    <div className="grid grid-cols-[1fr_auto_auto] gap-4 px-3 py-1.5 bg-[#F5F9FF] text-[10px] font-semibold text-[#335890] uppercase">
                       <span>Nom du fichier</span>
                       <span>Taille</span>
-                      <span className="w-8" />
+                      <span className="w-6" />
                     </div>
                     {files.map((f) => (
                       <div
                         key={f.id}
-                        className="grid grid-cols-[1fr_auto_auto] gap-4 px-4 py-3 items-center border-t border-[#D0E3F5] text-sm"
+                        className="grid grid-cols-[1fr_auto_auto] gap-3 px-3 py-2 items-center border-t border-[#D0E3F5] text-sm"
                       >
                         <div className="min-w-0">
                           <p className="font-medium text-[#00122E] truncate">
@@ -533,7 +548,7 @@ export function UploadFileDialog({
 
                 {/* Drop zone */}
                 <div
-                  className={`border-2 border-dashed rounded-xl p-6 text-center transition-colors ${
+                  className={`border-2 border-dashed rounded-xl p-4 text-center transition-colors ${
                     dragActive
                       ? "border-[#0077C3] bg-[#EBF5FF]"
                       : "border-[#D0E3F5] bg-[#F8FAFC]"
@@ -543,35 +558,40 @@ export function UploadFileDialog({
                   onDragOver={handleDrag}
                   onDrop={handleDrop}
                 >
-                  <div className="w-12 h-12 mx-auto mb-3 rounded-lg bg-white border border-[#D0E3F5] flex items-center justify-center">
-                    <Upload className="w-6 h-6 text-[#0077C3]" />
+                  <div className="flex items-center justify-center gap-4">
+                    <div className="w-10 h-10 rounded-lg bg-white border border-[#D0E3F5] flex items-center justify-center shrink-0">
+                      <Upload className="w-5 h-5 text-[#0077C3]" />
+                    </div>
+                    <div className="text-left flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-[#00122E]">
+                        Glissez-déposez vos fichiers ici
+                      </p>
+                      <p className="text-xs text-[#335890]">
+                        ou cliquez pour sélectionner (max {maxFiles} fichiers,
+                        10MB chacun)
+                      </p>
+                    </div>
+                    <Input
+                      type="file"
+                      multiple
+                      accept={
+                        fileKind === "comptable" ? ".xlsx,.xls" : undefined
+                      }
+                      onChange={(e) => handleFiles(e.target.files)}
+                      className="hidden"
+                      id="upload-dialog-input"
+                    />
+                    <Label htmlFor="upload-dialog-input">
+                      <Button
+                        type="button"
+                        asChild
+                        size="sm"
+                        className="bg-gradient-to-r from-[#0077C3] to-[#0095F4] hover:from-[#005992] hover:to-[#0077C3] whitespace-nowrap"
+                      >
+                        <span>Sélectionner</span>
+                      </Button>
+                    </Label>
                   </div>
-                  <p className="text-sm font-semibold text-[#00122E]">
-                    Glissez-déposez vos fichiers ici
-                  </p>
-                  <p className="text-xs text-[#335890] mb-3">
-                    ou cliquez pour sélectionner
-                  </p>
-                  <Input
-                    type="file"
-                    multiple
-                    accept={fileKind === "comptable" ? ".xlsx,.xls" : undefined}
-                    onChange={(e) => handleFiles(e.target.files)}
-                    className="hidden"
-                    id="upload-dialog-input"
-                  />
-                  <Label htmlFor="upload-dialog-input">
-                    <Button
-                      type="button"
-                      asChild
-                      className="bg-gradient-to-r from-[#0077C3] to-[#0095F4] hover:from-[#005992] hover:to-[#0077C3]"
-                    >
-                      <span>Sélectionner les fichiers</span>
-                    </Button>
-                  </Label>
-                  <p className="text-xs text-[#0077C3] mt-3">
-                    (max {maxFiles} fichiers, 10MB chacun)
-                  </p>
                 </div>
               </div>
             </div>
