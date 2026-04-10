@@ -44,7 +44,7 @@ export function ReportingParamsDialog({
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
       <DialogContent
         showCloseButton={false}
-        className="p-0 overflow-hidden max-w-[480px] border border-[#D0E3F5]"
+        className="p-0 overflow-hidden w-[calc(100vw-2rem)] max-w-[calc(100vw-2rem)] sm:max-w-[480px] border border-[#D0E3F5]"
       >
         <div className="p-6 pb-4">
           <div className="flex items-start justify-between mb-5">

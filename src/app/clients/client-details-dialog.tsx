@@ -68,7 +68,7 @@ export function ClientDetailsDialog({
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
       <DialogContent
         showCloseButton={false}
-        className="p-0 overflow-hidden max-w-[560px] border border-[#D0E3F5]"
+        className="p-0 overflow-hidden w-[calc(100vw-2rem)] max-w-[calc(100vw-2rem)] sm:max-w-[560px] max-h-[calc(100vh-2rem)] border border-[#D0E3F5]"
       >
         <div className="p-6 pb-4">
           <DialogTitle className="sr-only">
