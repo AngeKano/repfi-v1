@@ -173,11 +173,11 @@ export default function DashboardClient({
             <h3 className="text-lg font-semibold text-[#00122E]">
               Reportings financiers récents
             </h3>
-            <Link href="/clients">
+            {/* <Link href="/clients">
               <Button variant="ghost" size="sm" className="text-[#0077C3]">
                 Voir tout
               </Button>
-            </Link>
+            </Link> */}
           </div>
 
           {recentReportings.length === 0 ? (
