@@ -23,20 +23,25 @@ import {
   getRoleLabel,
   getRoleBadgeVariant,
 } from "@/lib/permissions/role-utils";
+import { ClientDetailsDialog } from "./client-details-dialog";
+import {
+  ReportingParamsDialog,
+  paramsToQuery,
+} from "./reporting-params-dialog";
 
 const COMPANY_TYPES = [
   { value: "", label: "Tous les types" },
   { value: "TECHNOLOGIE", label: "Technologie" },
   { value: "FINANCE", label: "Finance" },
-  { value: "SANTE", label: "Sant\u00e9" },
-  { value: "EDUCATION", label: "\u00c9ducation" },
+  { value: "SANTE", label: "Santé" },
+  { value: "EDUCATION", label: "Éducation" },
   { value: "COMMERCE", label: "Commerce" },
   { value: "INDUSTRIE", label: "Industrie" },
   { value: "AGRICULTURE", label: "Agriculture" },
   { value: "IMMOBILIER", label: "Immobilier" },
   { value: "TRANSPORT", label: "Transport" },
-  { value: "ENERGIE", label: "\u00c9nergie" },
-  { value: "TELECOMMUNICATION", label: "T\u00e9l\u00e9communication" },
+  { value: "ENERGIE", label: "Énergie" },
+  { value: "TELECOMMUNICATION", label: "Télécommunication" },
   { value: "TOURISME", label: "Tourisme" },
 ];
 
@@ -69,6 +74,8 @@ export default function ClientsListClient({
   const [companyType, setCompanyType] = useState(initialType);
   const [activeTab, setActiveTab] = useState<"active" | "deleted">("active");
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [detailsClient, setDetailsClient] = useState<any | null>(null);
+  const [reportingClient, setReportingClient] = useState<any | null>(null);
 
   const roleLabel = getRoleLabel(session.user.role);
   const roleBadgeVariant = getRoleBadgeVariant(session.user.role);
@@ -226,7 +233,7 @@ export default function ClientsListClient({
                 : "text-[#335890] hover:text-[#0077C3]"
             }`}
           >
-            Clients Supprim\u00e9s (0)
+            Clients Supprimés (0)
             {activeTab === "deleted" && (
               <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#0077C3]" />
             )}
@@ -238,18 +245,18 @@ export default function ClientsListClient({
           <div className="text-center py-16 border border-[#D0E3F5] rounded-xl bg-white">
             <Users className="w-16 h-16 text-[#D0E3F5] mx-auto mb-4" />
             <h3 className="text-lg font-semibold text-[#00122E] mb-2">
-              Aucun client trouv\u00e9
+              Aucun client trouvé
             </h3>
             <p className="text-[#335890] mb-6">
               {search || companyType
-                ? "Essayez de modifier vos crit\u00e8res de recherche"
-                : "Commencez par cr\u00e9er votre premier client"}
+                ? "Essayez de modifier vos critères de recherche"
+                : "Commencez par créer votre premier client"}
             </p>
             {canCreateClient && (
               <Link href="/clients/new">
                 <Button>
                   <Plus className="w-4 h-4 mr-2" />
-                  Cr\u00e9er un client
+                  Créer un client
                 </Button>
               </Link>
             )}
@@ -283,7 +290,7 @@ export default function ClientsListClient({
                     Date d&apos;ajout
                   </th>
                   <th className="text-left px-4 py-3 text-xs font-semibold text-[#335890] uppercase tracking-wider">
-                    D\u00e9nomination
+                    Dénomination
                   </th>
                   <th className="text-center px-4 py-3 text-xs font-semibold text-[#335890] uppercase tracking-wider">
                     Actions
@@ -351,16 +358,15 @@ export default function ClientsListClient({
                     </td>
                     <td className="px-4 py-4">
                       <div className="flex items-center justify-center gap-1">
-                        <Link href={`/clients/${client.id}`}>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="text-[#0077C3] hover:text-[#005992] hover:bg-[#EBF5FF] h-8 w-8 p-0"
-                            title="Synth\u00e8se"
-                          >
-                            <BarChart3 className="w-4 h-4" />
-                          </Button>
-                        </Link>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setReportingClient(client)}
+                          className="text-[#0077C3] hover:text-[#005992] hover:bg-[#EBF5FF] h-8 w-8 p-0"
+                          title="Reporting"
+                        >
+                          <BarChart3 className="w-4 h-4" />
+                        </Button>
                         <Button
                           variant="ghost"
                           size="sm"
@@ -369,16 +375,15 @@ export default function ClientsListClient({
                         >
                           <Trash2 className="w-4 h-4" />
                         </Button>
-                        <Link href={`/clients/${client.id}`}>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="text-[#0077C3] hover:text-[#005992] hover:bg-[#EBF5FF] h-8 w-8 p-0"
-                            title="Voir"
-                          >
-                            <Eye className="w-4 h-4" />
-                          </Button>
-                        </Link>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setDetailsClient(client)}
+                          className="text-[#0077C3] hover:text-[#005992] hover:bg-[#EBF5FF] h-8 w-8 p-0"
+                          title="Voir les détails"
+                        >
+                          <Eye className="w-4 h-4" />
+                        </Button>
                       </div>
                     </td>
                   </tr>
@@ -387,6 +392,24 @@ export default function ClientsListClient({
             </table>
           </div>
         )}
+
+        <ClientDetailsDialog
+          client={detailsClient}
+          open={!!detailsClient}
+          onClose={() => setDetailsClient(null)}
+          getCompanyTypeLabel={getCompanyTypeLabel}
+        />
+
+        <ReportingParamsDialog
+          open={!!reportingClient}
+          clientName={reportingClient?.name}
+          onClose={() => setReportingClient(null)}
+          onValidate={(params) => {
+            if (!reportingClient) return;
+            const qs = paramsToQuery(params);
+            router.push(`/clients/${reportingClient.id}?${qs}`);
+          }}
+        />
 
         {/* Pagination */}
         {pagination.totalPages > 1 && (
@@ -428,7 +451,7 @@ export default function ClientsListClient({
                 className="text-[#335890]"
               >
                 <ChevronLeft className="w-4 h-4 mr-1" />
-                Pr\u00e9c\u00e9dent
+                Précédent
               </Button>
               <Button
                 variant="outline"

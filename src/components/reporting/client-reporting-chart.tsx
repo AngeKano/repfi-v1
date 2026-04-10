@@ -337,23 +337,38 @@ const MONTHS = [
 
 export default function ClientReportingChart({
   clientId,
+  initialTab,
+  initialPeriodType,
+  hideNav = false,
 }: {
   clientId: string;
+  initialTab?: TabId;
+  initialPeriodType?: PeriodType;
+  hideNav?: boolean;
 }) {
   const [data, setData] = useState<ReportingData | null>(null);
   const [loading, setLoading] = useState(true);
   const [year, setYear] = useState<string>(new Date().getFullYear().toString());
   const yearInitialized = useRef(false);
-  const [periodType, setPeriodType] = useState<PeriodType>("year");
+  const [periodType, setPeriodType] = useState<PeriodType>(
+    initialPeriodType || "year",
+  );
   const [selectedMonth, setSelectedMonth] = useState<string>("12");
   const [hiddenPeriods, setHiddenPeriods] = useState<Set<string>>(new Set());
   const [tunnelMetrics, setTunnelMetrics] = useState<TunnelMetric[]>(
     INITIAL_TUNNEL_METRICS,
   );
-  const [activeTab, setActiveTab] = useState<TabId>("synthese");
+  const [activeTab, setActiveTab] = useState<TabId>(initialTab || "synthese");
   const [expandedNav, setExpandedNav] = useState<Set<TabId>>(
-    new Set(["synthese"]),
+    new Set([initialTab || "synthese"]),
   );
+
+  // Sync activeTab with initialTab when parent changes it
+  useEffect(() => {
+    if (initialTab) {
+      setActiveTab(initialTab);
+    }
+  }, [initialTab]);
 
   // États spécifiques au recouvrement
   const [recouvrementData, setRecouvrementData] = useState<{
@@ -2070,66 +2085,168 @@ export default function ClientReportingChart({
   };
 
   return (
-    <div className="flex h-full">
+    <div className={hideNav ? "" : "flex h-full"}>
       {/* Sidebar Navigation */}
-      <div className="w-64 border-r bg-muted/30 p-4 space-y-2 shrink-0">
-        <div className="mb-6">
-          <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide">
-            Navigation
-          </h3>
-        </div>
-        {NAV_ITEMS.map((item) => {
-          const Icon = item.icon;
-          const isExpanded = expandedNav.has(item.id);
-          const isActive = activeTab === item.id;
+      {!hideNav && (
+        <div className="w-64 border-r bg-muted/30 p-4 space-y-2 shrink-0">
+          <div className="mb-6">
+            <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide">
+              Navigation
+            </h3>
+          </div>
+          {NAV_ITEMS.map((item) => {
+            const Icon = item.icon;
+            const isExpanded = expandedNav.has(item.id);
+            const isActive = activeTab === item.id;
 
-          return (
-            <div key={item.id}>
-              <button
-                onClick={() => {
-                  setActiveTab(item.id);
-                  toggleNavExpand(item.id);
-                }}
-                className={cn(
-                  "w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm transition-colors",
-                  isActive
-                    ? "bg-primary text-primary-foreground"
-                    : "hover:bg-muted",
+            return (
+              <div key={item.id}>
+                <button
+                  onClick={() => {
+                    setActiveTab(item.id);
+                    toggleNavExpand(item.id);
+                  }}
+                  className={cn(
+                    "w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm transition-colors",
+                    isActive
+                      ? "bg-primary text-primary-foreground"
+                      : "hover:bg-muted",
+                  )}
+                >
+                  <div className="flex items-center gap-2">
+                    <Icon className="w-4 h-4" />
+                    <span className="font-medium">{item.label}</span>
+                  </div>
+                  {item.subItems && (
+                    <ChevronDown
+                      className={cn(
+                        "w-4 h-4 transition-transform",
+                        isExpanded && "rotate-180",
+                      )}
+                    />
+                  )}
+                </button>
+                {item.subItems && isExpanded && (
+                  <div className="ml-6 mt-1 space-y-1">
+                    {item.subItems.map((subItem, idx) => (
+                      <div
+                        key={idx}
+                        className="px-3 py-1.5 text-xs text-muted-foreground"
+                      >
+                        {subItem}
+                      </div>
+                    ))}
+                  </div>
                 )}
-              >
-                <div className="flex items-center gap-2">
-                  <Icon className="w-4 h-4" />
-                  <span className="font-medium">{item.label}</span>
-                </div>
-                {item.subItems && (
-                  <ChevronDown
-                    className={cn(
-                      "w-4 h-4 transition-transform",
-                      isExpanded && "rotate-180",
-                    )}
-                  />
-                )}
-              </button>
-              {item.subItems && isExpanded && (
-                <div className="ml-6 mt-1 space-y-1">
-                  {item.subItems.map((subItem, idx) => (
-                    <div
-                      key={idx}
-                      className="px-3 py-1.5 text-xs text-muted-foreground"
-                    >
-                      {subItem}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          );
-        })}
-      </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
 
       {/* Main Content */}
-      <div className="flex-1 p-6 overflow-auto">
+      <div className={hideNav ? "" : "flex-1 p-6 overflow-auto"}>
         {/* Header */}
+        {hideNav ? (
+          /* Redesigned filter bar for embedded mode */
+          <div className="flex items-center gap-4 mb-6">
+            {activeTab !== "recouvrement" ? (
+              <>
+                <div className="flex items-center gap-2 border border-[#D0E3F5] rounded-lg px-4 py-2.5">
+                  <span className="text-xs text-[#335890]">Mode calcul :</span>
+                  <Select value={periodType} onValueChange={(v: string) => setPeriodType(v as PeriodType)}>
+                    <SelectTrigger className="border-0 p-0 h-auto shadow-none min-w-[100px] font-semibold text-[#00122E]">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="year">Périodique</SelectItem>
+                      <SelectItem value="month">Mensuel</SelectItem>
+                      <SelectItem value="ytd">Cumulé</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex items-center gap-2 border border-[#D0E3F5] rounded-lg px-4 py-2.5">
+                  <span className="text-xs text-[#335890]">Granularité :</span>
+                  <Select value={periodType === "month" ? "month" : "year"} onValueChange={(v: string) => setPeriodType(v === "month" ? "month" : "year")}>
+                    <SelectTrigger className="border-0 p-0 h-auto shadow-none min-w-[60px] font-semibold text-[#00122E]">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="year">Année</SelectItem>
+                      <SelectItem value="month">Mois</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex items-center gap-2 border border-[#D0E3F5] rounded-lg px-4 py-2.5">
+                  <span className="text-xs text-[#335890]">Année :</span>
+                  <span className="font-semibold text-[#00122E]">{year}</span>
+                  <div className="flex gap-1 ml-1">
+                    <button title="Année précédente" onClick={() => handleYearChange("prev")} disabled={data.availableYears.indexOf(year) >= data.availableYears.length - 1} className="text-[#94A3B8] hover:text-[#0077C3] disabled:opacity-30">
+                      <ChevronLeft className="w-4 h-4" />
+                    </button>
+                    <button  title="Année suivante" onClick={() => handleYearChange("next")} disabled={data.availableYears.indexOf(year) <= 0} className="text-[#94A3B8] hover:text-[#0077C3] disabled:opacity-30">
+                      <ChevronRight className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+                {(periodType === "month" || periodType === "ytd") && (
+                  <div className="flex items-center gap-2 border border-[#D0E3F5] rounded-lg px-4 py-2.5">
+                    <span className="text-xs text-[#335890]">Mois :</span>
+                    <Select value={selectedMonth} onValueChange={setSelectedMonth}>
+                      <SelectTrigger className="border-0 p-0 h-auto shadow-none min-w-[80px] font-semibold text-[#00122E]">
+                        <SelectValue placeholder="Mois" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {MONTHS.map((month) => (
+                          <SelectItem key={month.value} value={month.value}>
+                            {month.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+              </>
+            ) : (
+              <>
+                <div className="flex items-center gap-2 border border-[#D0E3F5] rounded-lg px-4 py-2.5">
+                  <span className="text-xs text-[#335890]">Mode calcul :</span>
+                  <span className="font-semibold text-[#00122E]">Périodique</span>
+                </div>
+                <div className="flex items-center gap-2 border border-[#D0E3F5] rounded-lg px-4 py-2.5">
+                  <span className="text-xs text-[#335890]">Granularité :</span>
+                  <span className="font-semibold text-[#00122E]">Mois</span>
+                </div>
+                <div className="flex items-center gap-2 border border-[#D0E3F5] rounded-lg px-4 py-2.5">
+                  <span className="text-xs text-[#335890]">Année :</span>
+                  <Select value={recouvrementYear} onValueChange={setRecouvrementYear}>
+                    <SelectTrigger className="border-0 p-0 h-auto shadow-none min-w-[60px] font-semibold text-[#00122E]">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {data.availableYears.map((y) => (
+                        <SelectItem key={y} value={y}>{y}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex items-center gap-2 border border-[#D0E3F5] rounded-lg px-4 py-2.5">
+                  <span className="text-xs text-[#335890]">Mois :</span>
+                  <Select value={recouvrementMonth} onValueChange={setRecouvrementMonth}>
+                    <SelectTrigger className="border-0 p-0 h-auto shadow-none min-w-[80px] font-semibold text-[#00122E]">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {MONTHS.map((month) => (
+                        <SelectItem key={month.value} value={month.value}>{month.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </>
+            )}
+          </div>
+        ) : (
         <div className="flex items-center justify-between mb-6">
           <div>
             <h2 className="text-2xl font-bold">{data.client.name}</h2>
@@ -2248,6 +2365,7 @@ export default function ClientReportingChart({
             </div>
           )}
         </div>
+        )}
 
         {/* Tab Content */}
         {renderTabContent()}

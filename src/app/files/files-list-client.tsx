@@ -146,7 +146,7 @@ export default function FilesListClient({ files, session }: FilesListClientProps
                 : "text-[#335890] hover:text-[#0077C3]"
             }`}
           >
-            Fichiers charg\u00e9s ({files.length})
+            Fichiers chargés ({files.length})
             {activeTab === "loaded" && (
               <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#0077C3]" />
             )}
@@ -231,10 +231,10 @@ export default function FilesListClient({ files, session }: FilesListClientProps
           <div className="text-center py-16 border border-[#D0E3F5] rounded-xl bg-white">
             <FileText className="w-16 h-16 text-[#D0E3F5] mx-auto mb-4" />
             <h3 className="text-lg font-semibold text-[#00122E] mb-2">
-              Aucun fichier trouv\u00e9
+              Aucun fichier trouvé
             </h3>
             <p className="text-[#335890]">
-              Aucun fichier ne correspond aux filtres s\u00e9lectionn\u00e9s
+              Aucun fichier ne correspond aux filtres sélectionnés
             </p>
           </div>
         ) : (
@@ -254,7 +254,7 @@ export default function FilesListClient({ files, session }: FilesListClientProps
                     Nom du fichier
                   </th>
                   <th className="text-left px-4 py-3 text-xs font-semibold text-[#335890] uppercase tracking-wider">
-                    P\u00e9riode
+                    Période
                   </th>
                   <th className="text-left px-4 py-3 text-xs font-semibold text-[#335890] uppercase tracking-wider">
                     Nom du client
@@ -329,7 +329,7 @@ export default function FilesListClient({ files, session }: FilesListClientProps
                           variant="ghost"
                           size="sm"
                           className="text-[#0077C3] hover:text-[#005992] hover:bg-[#EBF5FF] h-8 w-8 p-0"
-                          title="T\u00e9l\u00e9charger"
+                          title="Télécharger"
                           onClick={() => handleDownload(file.id)}
                         >
                           <Download className="w-4 h-4" />
@@ -373,7 +373,7 @@ export default function FilesListClient({ files, session }: FilesListClientProps
               className="text-[#335890]"
             >
               <ChevronLeft className="w-4 h-4 mr-1" />
-              Pr\u00e9c\u00e9dent
+              Précédent
             </Button>
             <Button
               variant="outline"

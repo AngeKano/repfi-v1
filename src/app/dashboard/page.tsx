@@ -80,81 +80,37 @@ export default async function DashboardPage() {
     }
   }
 
-  // Recuperer les clients recents
-  let recentClients;
+  // Recuperer les reportings financiers recents (ComptablePeriod)
+  let recentReportings: any[] = [];
   if (canViewAllClients) {
-    recentClients = await prisma.client.findMany({
-      where: { companyId: session.user.companyId },
+    recentReportings = await prisma.comptablePeriod.findMany({
+      where: {
+        client: { companyId: session.user.companyId },
+      },
       orderBy: { createdAt: "desc" },
       take: 5,
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        companyType: true,
-        isSelfEntity: true,
-        createdAt: true,
+      include: {
+        client: { select: { id: true, name: true, email: true } },
+        _count: { select: { files: true } },
       },
     });
   } else {
     const assignments = await prisma.clientAssignment.findMany({
       where: { userId: session.user.id },
-      include: {
-        client: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-            companyType: true,
-            isSelfEntity: true,
-            createdAt: true,
-          },
-        },
-      },
-      orderBy: { assignedAt: "desc" },
-      take: 5,
+      select: { clientId: true },
     });
-    recentClients = assignments.map((a) => a.client);
-  }
 
-  // Recuperer les fichiers recents (seulement si l'utilisateur peut voir les fichiers)
-  let recentFiles: any[] = [];
-  if (canViewFiles) {
-    if (canViewAllClients) {
-      recentFiles = await prisma.normalFile.findMany({
-        where: {
-          client: { companyId: session.user.companyId },
-          deletedAt: null,
-        },
-        orderBy: { uploadedAt: "desc" },
-        take: 5,
-        include: {
-          client: { select: { name: true } },
-          uploadedBy: {
-            select: { firstName: true, lastName: true, email: true },
-          },
-        },
-      });
-    } else {
-      const assignments = await prisma.clientAssignment.findMany({
-        where: { userId: session.user.id },
-      });
-
-      recentFiles = await prisma.normalFile.findMany({
-        where: {
-          clientId: { in: assignments.map((a) => a.clientId) },
-          deletedAt: null,
-        },
-        orderBy: { uploadedAt: "desc" },
-        take: 5,
-        include: {
-          client: { select: { name: true } },
-          uploadedBy: {
-            select: { firstName: true, lastName: true, email: true },
-          },
-        },
-      });
-    }
+    recentReportings = await prisma.comptablePeriod.findMany({
+      where: {
+        clientId: { in: assignments.map((a) => a.clientId) },
+      },
+      orderBy: { createdAt: "desc" },
+      take: 5,
+      include: {
+        client: { select: { id: true, name: true, email: true } },
+        _count: { select: { files: true } },
+      },
+    });
   }
 
   const stats = {
@@ -167,8 +123,7 @@ export default async function DashboardPage() {
     <DashboardClient
       session={session}
       stats={stats}
-      recentClients={recentClients}
-      recentFiles={recentFiles}
+      recentReportings={recentReportings}
       canViewMembers={canViewMembers}
       canCreateClient={canCreateClient}
     />

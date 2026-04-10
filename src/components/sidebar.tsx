@@ -17,7 +17,7 @@ import { ConfirmDialog } from "./confirm-dialog";
 
 const mainNavItems = [
   {
-    label: "Dashboard",
+    label: "Overview",
     href: "/dashboard",
     icon: LayoutDashboard,
   },
@@ -40,7 +40,7 @@ const mainNavItems = [
 
 const bottomNavItems = [
   {
-    label: "Param\u00e8tres",
+    label: "Paramètres",
     href: "/settings",
     icon: Settings,
   },
@@ -125,7 +125,7 @@ export function Sidebar() {
                 className="flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium text-[#335890] hover:bg-[#EBF5FF]/50 hover:text-[#0077C3] transition-colors w-full"
               >
                 <LogOut className="w-5 h-5" />
-                Se d\u00e9connecter
+                Se déconnecter
               </button>
             </li>
           </ul>
@@ -140,8 +140,8 @@ export function Sidebar() {
         onClose={() => setShowLogoutConfirm(false)}
         onConfirm={handleSignOut}
         title="Attention"
-        message="\u00cates-vous s\u00fbr de vouloir vous d\u00e9connecter ?"
-        confirmLabel="Se d\u00e9connecter"
+        message="Êtes-vous sûr de vouloir vous déconnecter ?"
+        confirmLabel="Se déconnecter"
         cancelLabel="Annuler"
         variant="warning"
         confirmIcon={<LogOut className="w-4 h-4" />}
