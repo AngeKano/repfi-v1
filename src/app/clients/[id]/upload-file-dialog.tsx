@@ -14,6 +14,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Calendar } from "@/components/ui/calendar";
 import { DateRange } from "react-day-picker";
+import { fr } from "date-fns/locale";
 import {
   Select,
   SelectContent,
@@ -103,13 +104,22 @@ export function UploadFileDialog({
   client,
 }: UploadFileDialogProps) {
   const router = useRouter();
+  const currentYear = new Date().getFullYear();
   const [step, setStep] = useState<1 | 2>(1);
   const [fileKind, setFileKind] = useState<FileKind>("comptable");
   const [clientId, setClientId] = useState(client.id);
   const [dateRange, setDateRange] = useState<DateRange | undefined>();
+  const [calendarMonth, setCalendarMonth] = useState<Date>(
+    new Date(currentYear, 0),
+  );
+  const [selectedYear, setSelectedYear] = useState<number>(currentYear);
   const [files, setFiles] = useState<PickedFile[]>([]);
   const [dragActive, setDragActive] = useState(false);
   const [uploading, setUploading] = useState(false);
+
+  const yearOptions = useMemo(() => {
+    return Array.from({ length: 10 }, (_, i) => currentYear - i);
+  }, [currentYear]);
 
   // Reset whenever dialog opens
   useEffect(() => {
@@ -118,9 +128,24 @@ export function UploadFileDialog({
       setFileKind("comptable");
       setClientId(client.id);
       setDateRange(undefined);
+      setSelectedYear(currentYear);
+      setCalendarMonth(new Date(currentYear, 0));
       setFiles([]);
     }
-  }, [open, client.id]);
+  }, [open, client.id, currentYear]);
+
+  const handleSelectFullYear = (year: number) => {
+    const start = new Date(year, 0, 1);
+    const end = new Date(year, 11, 31);
+    setSelectedYear(year);
+    setCalendarMonth(new Date(year, 0));
+    setDateRange({ from: start, to: end });
+  };
+
+  const handleYearChange = (year: number) => {
+    setSelectedYear(year);
+    setCalendarMonth(new Date(year, 0));
+  };
 
   const periodStart = dateRange?.from
     ? dateRange.from.toISOString().slice(0, 10)
@@ -350,7 +375,7 @@ export function UploadFileDialog({
                           <FileSpreadsheet className="w-4 h-4" />
                           Fichiers comptables
                         </button>
-                        <button
+                        {/* <button
                           type="button"
                           onClick={() => {
                             setFileKind("autres");
@@ -364,7 +389,7 @@ export function UploadFileDialog({
                         >
                           <FileText className="w-4 h-4" />
                           Autres fichiers
-                        </button>
+                        </button> */}
                       </div>
                     </div>
 
@@ -423,13 +448,47 @@ export function UploadFileDialog({
 
                   {/* Right column: Calendar (comptable only) */}
                   {fileKind === "comptable" && (
-                    <Calendar
-                      mode="range"
-                      numberOfMonths={1}
-                      selected={dateRange}
-                      onSelect={setDateRange}
-                      className="rounded-lg border border-[#D0E3F5] shadow-sm"
-                    />
+                    <div className="w-[320px] shrink-0">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Select
+                          value={selectedYear.toString()}
+                          onValueChange={(v) => handleYearChange(Number(v))}
+                        >
+                          <SelectTrigger
+                            className="h-8 w-[90px] text-xs border-[#D0E3F5]"
+                            aria-label="Année"
+                          >
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {yearOptions.map((y) => (
+                              <SelectItem key={y} value={y.toString()}>
+                                {y}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleSelectFullYear(selectedYear)}
+                          className="h-8 text-xs border-[#0077C3] text-[#0077C3] hover:bg-[#EBF5FF] flex-1"
+                        >
+                          Toute l&apos;année {selectedYear}
+                        </Button>
+                      </div>
+                      <Calendar
+                        mode="range"
+                        numberOfMonths={1}
+                        locale={fr}
+                        selected={dateRange}
+                        onSelect={setDateRange}
+                        month={calendarMonth}
+                        onMonthChange={setCalendarMonth}
+                        className="rounded-lg border border-[#D0E3F5] shadow-sm [--cell-size:--spacing(8)] [&_.rdp-root]:w-full"
+                      />
+                    </div>
                   )}
                 </div>
               </div>

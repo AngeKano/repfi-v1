@@ -125,10 +125,10 @@ export default function FilesListClient({ files, session }: FilesListClientProps
           <h1 className="text-3xl font-bold text-[#00122E]">Fichiers</h1>
 
           <div className="flex items-center gap-3">
-            <Button variant="outline" className="h-10 gap-2 border-[#0077C3] text-[#0077C3]">
+            {/* <Button variant="outline" className="h-10 gap-2 border-[#0077C3] text-[#0077C3]">
               <Download className="w-4 h-4" />
               Exporter
-            </Button>
+            </Button> */}
             <Button className="h-10 bg-gradient-to-r from-[#0077C3] to-[#0095F4] hover:from-[#005992] hover:to-[#0077C3]">
               <Plus className="w-4 h-4 mr-2" />
               Charger un fichier
@@ -212,7 +212,7 @@ export default function FilesListClient({ files, session }: FilesListClientProps
 
           <Select value={uploaderFilter} onValueChange={setUploaderFilter}>
             <SelectTrigger className="h-11 bg-white border-[#D0E3F5]">
-              <span className="text-xs text-[#335890] mr-1">Chargeur :</span>
+              <span className="text-xs text-[#335890] mr-1">Chargé par :</span>
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -263,7 +263,7 @@ export default function FilesListClient({ files, session }: FilesListClientProps
                     Date chargement
                   </th>
                   <th className="text-left px-4 py-3 text-xs font-semibold text-[#335890] uppercase tracking-wider">
-                    Chargeur
+                    Chargé par
                   </th>
                   <th className="text-center px-4 py-3 text-xs font-semibold text-[#335890] uppercase tracking-wider">
                     Actions

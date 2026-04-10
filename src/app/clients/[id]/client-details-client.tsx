@@ -48,7 +48,7 @@ const CLIENT_TABS = [
   { id: "recouvrement", label: "Recouvrement", icon: Receipt },
   { id: "members", label: "Membres", icon: Users },
   { id: "declaration", label: "Reporting Financier", icon: FileText },
-  { id: "files", label: "Autres Fichiers", icon: FileText },
+  // { id: "files", label: "Autres Fichiers", icon: FileText },
 ];
 
 export default function ClientDetailsClient({
