@@ -31,6 +31,7 @@ export default async function FilesPage() {
   );
 
   let files: any[] = [];
+  let availableClients: { id: string; name: string; email: string }[] = [];
 
   if (canViewAllClients) {
     files = await prisma.normalFile.findMany({
@@ -47,14 +48,26 @@ export default async function FilesPage() {
         },
       },
     });
+
+    availableClients = await prisma.client.findMany({
+      where: { companyId: session.user.companyId },
+      orderBy: { name: "asc" },
+      select: { id: true, name: true, email: true },
+    });
   } else {
     const assignments = await prisma.clientAssignment.findMany({
       where: { userId: session.user.id },
+      include: {
+        client: { select: { id: true, name: true, email: true } },
+      },
+      orderBy: { assignedAt: "desc" },
     });
+
+    const clientIds = assignments.map((a) => a.clientId);
 
     files = await prisma.normalFile.findMany({
       where: {
-        clientId: { in: assignments.map((a) => a.clientId) },
+        clientId: { in: clientIds },
         deletedAt: null,
       },
       orderBy: { uploadedAt: "desc" },
@@ -66,7 +79,19 @@ export default async function FilesPage() {
         },
       },
     });
+
+    availableClients = assignments
+      .map((a) => a.client)
+      .filter(
+        (c, idx, arr) => arr.findIndex((x) => x.id === c.id) === idx,
+      );
   }
 
-  return <FilesListClient files={files} session={session} />;
+  return (
+    <FilesListClient
+      files={files}
+      session={session}
+      availableClients={availableClients}
+    />
+  );
 }

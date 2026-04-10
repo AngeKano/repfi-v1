@@ -26,16 +26,23 @@ import {
   getRoleLabel,
   getRoleBadgeVariant,
 } from "@/lib/permissions/role-utils";
+import { UploadFileDialog } from "@/app/clients/[id]/upload-file-dialog";
 
 interface FilesListClientProps {
   files: any[];
   session: any;
+  availableClients?: { id: string; name: string; email?: string }[];
 }
 
-export default function FilesListClient({ files, session }: FilesListClientProps) {
+export default function FilesListClient({
+  files,
+  session,
+  availableClients = [],
+}: FilesListClientProps) {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<"loaded" | "pending">("loaded");
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [showUploadDialog, setShowUploadDialog] = useState(false);
   const [clientFilter, setClientFilter] = useState("all");
   const [typeFilter, setTypeFilter] = useState("all");
   const [dateFilter, setDateFilter] = useState("all");
@@ -129,7 +136,10 @@ export default function FilesListClient({ files, session }: FilesListClientProps
               <Download className="w-4 h-4" />
               Exporter
             </Button> */}
-            <Button className="h-10 bg-gradient-to-r from-[#0077C3] to-[#0095F4] hover:from-[#005992] hover:to-[#0077C3]">
+            <Button
+              onClick={() => setShowUploadDialog(true)}
+              className="h-10 bg-gradient-to-r from-[#0077C3] to-[#0095F4] hover:from-[#005992] hover:to-[#0077C3]"
+            >
               <Plus className="w-4 h-4 mr-2" />
               Charger un fichier
             </Button>
@@ -386,6 +396,13 @@ export default function FilesListClient({ files, session }: FilesListClientProps
             </Button>
           </div>
         </div>
+
+        <UploadFileDialog
+          open={showUploadDialog}
+          onClose={() => setShowUploadDialog(false)}
+          clients={availableClients}
+          defaultClientId={availableClients[0]?.id}
+        />
       </div>
     </DashboardLayout>
   );
