@@ -14,6 +14,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Calendar } from "@/components/ui/calendar";
 import { DateRange } from "react-day-picker";
+import { fr } from "date-fns/locale";
 import {
   Select,
   SelectContent,
@@ -39,10 +40,21 @@ import { toast } from "sonner";
 
 type FileKind = "comptable" | "autres";
 
+interface ClientOption {
+  id: string;
+  name: string;
+  email?: string;
+}
+
 interface UploadFileDialogProps {
   open: boolean;
   onClose: () => void;
-  client: { id: string; name: string; email?: string };
+  /** Client context when opened from a single-client page. Used as default selection. */
+  client?: ClientOption;
+  /** Optional list of clients to populate the selector (used on the /files page). */
+  clients?: ClientOption[];
+  /** Default selected client id when opened from a multi-client page. */
+  defaultClientId?: string;
 }
 
 const REQUIRED_FILE_TYPES = [
@@ -101,26 +113,68 @@ export function UploadFileDialog({
   open,
   onClose,
   client,
+  clients,
+  defaultClientId,
 }: UploadFileDialogProps) {
   const router = useRouter();
+  const currentYear = new Date().getFullYear();
+
+  // Unified list of selectable clients (clients prop wins, else single client).
+  const clientList: ClientOption[] = useMemo(() => {
+    if (clients && clients.length > 0) return clients;
+    if (client) return [client];
+    return [];
+  }, [clients, client]);
+
+  const initialClientId =
+    defaultClientId ?? client?.id ?? clientList[0]?.id ?? "";
+
   const [step, setStep] = useState<1 | 2>(1);
   const [fileKind, setFileKind] = useState<FileKind>("comptable");
-  const [clientId, setClientId] = useState(client.id);
+  const [clientId, setClientId] = useState(initialClientId);
   const [dateRange, setDateRange] = useState<DateRange | undefined>();
+  const [calendarMonth, setCalendarMonth] = useState<Date>(
+    new Date(currentYear, 0),
+  );
+  const [selectedYear, setSelectedYear] = useState<number>(currentYear);
   const [files, setFiles] = useState<PickedFile[]>([]);
   const [dragActive, setDragActive] = useState(false);
   const [uploading, setUploading] = useState(false);
+
+  const yearOptions = useMemo(() => {
+    return Array.from({ length: 10 }, (_, i) => currentYear - i);
+  }, [currentYear]);
+
+  // Currently selected client object (for step 2 header)
+  const selectedClient =
+    clientList.find((c) => c.id === clientId) || clientList[0];
 
   // Reset whenever dialog opens
   useEffect(() => {
     if (open) {
       setStep(1);
       setFileKind("comptable");
-      setClientId(client.id);
+      setClientId(initialClientId);
       setDateRange(undefined);
+      setSelectedYear(currentYear);
+      setCalendarMonth(new Date(currentYear, 0));
       setFiles([]);
     }
-  }, [open, client.id]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, initialClientId, currentYear]);
+
+  const handleSelectFullYear = (year: number) => {
+    const start = new Date(year, 0, 1);
+    const end = new Date(year, 11, 31);
+    setSelectedYear(year);
+    setCalendarMonth(new Date(year, 0));
+    setDateRange({ from: start, to: end });
+  };
+
+  const handleYearChange = (year: number) => {
+    setSelectedYear(year);
+    setCalendarMonth(new Date(year, 0));
+  };
 
   const periodStart = dateRange?.from
     ? dateRange.from.toISOString().slice(0, 10)
@@ -350,7 +404,7 @@ export function UploadFileDialog({
                           <FileSpreadsheet className="w-4 h-4" />
                           Fichiers comptables
                         </button>
-                        <button
+                        {/* <button
                           type="button"
                           onClick={() => {
                             setFileKind("autres");
@@ -364,7 +418,7 @@ export function UploadFileDialog({
                         >
                           <FileText className="w-4 h-4" />
                           Autres fichiers
-                        </button>
+                        </button> */}
                       </div>
                     </div>
 
@@ -377,14 +431,16 @@ export function UploadFileDialog({
                         onValueChange={(v) => setClientId(v)}
                       >
                         <SelectTrigger className="w-full h-10 border-[#D0E3F5]">
-                          <SelectValue />
+                          <SelectValue placeholder="Sélectionner un client" />
                         </SelectTrigger>
                         <SelectContent>
                           <SelectGroup>
                             <SelectLabel>Client</SelectLabel>
-                            <SelectItem value={client.id}>
-                              {client.name}
-                            </SelectItem>
+                            {clientList.map((c) => (
+                              <SelectItem key={c.id} value={c.id}>
+                                {c.name}
+                              </SelectItem>
+                            ))}
                           </SelectGroup>
                         </SelectContent>
                       </Select>
@@ -423,13 +479,47 @@ export function UploadFileDialog({
 
                   {/* Right column: Calendar (comptable only) */}
                   {fileKind === "comptable" && (
-                    <Calendar
-                      mode="range"
-                      numberOfMonths={1}
-                      selected={dateRange}
-                      onSelect={setDateRange}
-                      className="rounded-lg border border-[#D0E3F5] shadow-sm"
-                    />
+                    <div className="w-[320px] shrink-0">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Select
+                          value={selectedYear.toString()}
+                          onValueChange={(v) => handleYearChange(Number(v))}
+                        >
+                          <SelectTrigger
+                            className="h-8 w-[90px] text-xs border-[#D0E3F5]"
+                            aria-label="Année"
+                          >
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {yearOptions.map((y) => (
+                              <SelectItem key={y} value={y.toString()}>
+                                {y}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleSelectFullYear(selectedYear)}
+                          className="h-8 text-xs border-[#0077C3] text-[#0077C3] hover:bg-[#EBF5FF] flex-1"
+                        >
+                          Toute l&apos;année {selectedYear}
+                        </Button>
+                      </div>
+                      <Calendar
+                        mode="range"
+                        numberOfMonths={1}
+                        locale={fr}
+                        selected={dateRange}
+                        onSelect={setDateRange}
+                        month={calendarMonth}
+                        onMonthChange={setCalendarMonth}
+                        className="rounded-lg border border-[#D0E3F5] shadow-sm [--cell-size:--spacing(8)] [&_.rdp-root]:w-full"
+                      />
+                    </div>
                   )}
                 </div>
               </div>
@@ -439,15 +529,17 @@ export function UploadFileDialog({
                 {/* Client summary header */}
                 <div className="flex items-center gap-3">
                   <div className="w-11 h-11 rounded-full bg-[#EBF5FF] flex items-center justify-center text-base font-bold text-[#0077C3] shrink-0">
-                    {client.name.charAt(0).toUpperCase()}
+                    {selectedClient
+                      ? selectedClient.name.charAt(0).toUpperCase()
+                      : "?"}
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-base font-bold text-[#00122E] truncate">
-                      {client.name}
+                      {selectedClient?.name || "—"}
                     </p>
-                    {client.email && (
+                    {selectedClient?.email && (
                       <p className="text-xs text-[#335890] truncate">
-                        {client.email}
+                        {selectedClient.email}
                       </p>
                     )}
                   </div>

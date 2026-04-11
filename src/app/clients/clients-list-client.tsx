@@ -194,10 +194,10 @@ export default function ClientsListClient({
               />
             </form>
 
-            <Button variant="outline" className="h-10 gap-2 border-[#0077C3] text-[#0077C3]">
+            {/* <Button variant="outline" className="h-10 gap-2 border-[#0077C3] text-[#0077C3]">
               <Download className="w-4 h-4" />
               Exporter
-            </Button>
+            </Button> */}
 
             {canCreateClient && (
               <Link href="/clients/new">
