@@ -169,13 +169,6 @@ export default function ClientDetailsClient({
           </div>
 
           <div className="flex items-center gap-2">
-            <Link href="/clients">
-              <Button variant="outline" className="gap-2 border-[#D0E3F5] text-[#335890]">
-                <ChevronLeft className="w-4 h-4" />
-                Retour aux clients
-              </Button>
-            </Link>
-
             {canDelete && !client.isSelfEntity && (
               <Button
                 variant="outline"
