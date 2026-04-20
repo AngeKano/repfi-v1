@@ -202,8 +202,9 @@ export default function ClientDetailsClient({
 
         {/* Main Layout: Sidebar + Content */}
         <div className="flex gap-6">
-          {/* Left Sidebar Navigation */}
+          {/* Left Sidebar Navigation — sticky */}
           <div className="w-[220px] shrink-0">
+            <div className="sticky top-6">
             <nav className="space-y-1">
               {CLIENT_TABS.map((tab) => {
                 const active = activeTab === tab.id;
@@ -231,6 +232,7 @@ export default function ClientDetailsClient({
                   Retour aux clients
                 </button>
               </Link>
+            </div>
             </div>
           </div>
 
