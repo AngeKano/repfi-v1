@@ -100,7 +100,7 @@ export default function DashboardClient({
 
         {/* Company Card */}
         <div className="flex items-center gap-4 mb-6">
-          <Card className="flex flex-row items-center justify-between gap-8 px-8 py-4 w-full">
+          <Card className="flex flex-row items-center justify-between gap-8 px-8 py-4 w-fit">
             <div className="w-12 h-12 rounded-xl bg-[#EBF5FF] flex items-center justify-center">
               <Image
                 src="/logo-click-insight-unit.png"
@@ -110,7 +110,7 @@ export default function DashboardClient({
                 className="object-contain"
               />
             </div>
-            <div className="flex items-center gap-4">
+            <div className="flex flex-col items-center justify-center">
               <div>
                 <p className="text-xs text-[#0077C3] font-medium">Entreprise</p>
                 <p className="text-base font-bold text-[#00122E]">
@@ -129,9 +129,9 @@ export default function DashboardClient({
         </div>
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-0 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
           {/* Clients */}
-          <div className="flex items-center gap-4 px-6 py-5 border bg-[#EBF5FF] border-[#D0E3F5] rounded-l-xl ">
+          <div className="flex items-center gap-4 px-6 py-5 border bg-[#EBF5FF] rounded-xl">
             <div className="w-12 h-12 rounded-xl bg-white flex items-center justify-center">
               <PiBuildingsDuotone className="w-6 h-6 text-[#0077C3]" />
             </div>
@@ -144,7 +144,7 @@ export default function DashboardClient({
           </div>
 
           {/* Fichiers */}
-          <div className="flex items-center gap-4 px-6 py-5 border-y border-[#D0E3F5]  bg-[#F3E8FF]">
+          <div className="flex items-center gap-4 px-6 py-5 border-y bg-[#F3E8FF] rounded-xl">
             <div className="w-12 h-12 rounded-xl bg-white flex items-center justify-center">
               <FileText className="w-6 h-6 text-[#9333EA]" />
             </div>
@@ -158,7 +158,7 @@ export default function DashboardClient({
 
           {/* Membres */}
           {canViewMembers && (
-            <div className="flex items-center gap-4 px-6 py-5 border border-[#D0E3F5] rounded-r-xl bg-[#DCFCE7]">
+            <div className="flex items-center gap-4 px-6 py-5 border bg-[#DCFCE7] rounded-xl">
               <div className="w-12 h-12 rounded-xl bg-white  flex items-center justify-center">
                 <Users className="w-6 h-6 text-[#16A34A]" />
               </div>
@@ -168,7 +168,6 @@ export default function DashboardClient({
                   {formatNumber(stats.membersCount)}
                 </p>
               </div>
-              <div className="ml-auto w-1 h-12 bg-[#16A34A] rounded-full" />
             </div>
           )}
         </div>

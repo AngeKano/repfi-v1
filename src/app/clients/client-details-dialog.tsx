@@ -229,9 +229,17 @@ export function ClientDetailsDialog({
                       {typeLabel}
                     </Badge>
                   )}
-                  {client.assujettiTVA && !editing && (
-                    <Badge className="text-xs bg-[#DCFCE7] text-[#16A34A] hover:bg-[#DCFCE7]">
-                      TVA
+                  {!editing && (
+                    <Badge
+                      className={`text-xs ${
+                        client.assujettiTVA
+                          ? "bg-[#DCFCE7] text-[#16A34A] hover:bg-[#DCFCE7]"
+                          : "bg-[#FEE2E2] text-[#DC2626] hover:bg-[#FEE2E2]"
+                      }`}
+                    >
+                      {client.assujettiTVA
+                        ? "Assujetti TVA"
+                        : "Non assujetti TVA"}
                     </Badge>
                   )}
                 </div>
