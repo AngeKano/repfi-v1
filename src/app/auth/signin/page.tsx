@@ -33,7 +33,7 @@ export default function SignInPage() {
       });
 
       if (result?.error) {
-        setError(result.error);
+        setError("Email ou mot de passe incorrect.");
         setLoading(false);
         return;
       }
@@ -57,7 +57,7 @@ export default function SignInPage() {
           src="/signin-background.png"
           alt="Click Insight"
           fill
-          className="object-cover"
+          className="object-cover object-right"
           priority
         />
       </div>
@@ -89,7 +89,7 @@ export default function SignInPage() {
 
           {/* Title */}
           <div className="mb-8">
-            <h1 className="text-3xl font-bold text-[#00122E] italic">
+            <h1 className="text-3xl font-bold text-[#00122E]">
               Connectez-vous
             </h1>
             <p className="text-sm text-[#335890] mt-1">
@@ -130,7 +130,7 @@ export default function SignInPage() {
                 <Input
                   id="password"
                   type={showPassword ? "text" : "password"}
-                  placeholder="\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022"
+                  placeholder="Au moins 8 caractères, 1 chiffre, 1 majuscule"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   disabled={loading}
