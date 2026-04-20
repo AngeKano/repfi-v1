@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -28,6 +28,8 @@ import {
   ReportingParamsDialog,
   paramsToQuery,
 } from "./reporting-params-dialog";
+import { NewClientDialog } from "./new-client-dialog";
+import { DeleteClientDialog } from "./delete-client-dialog";
 
 const COMPANY_TYPES = [
   { value: "", label: "Tous les types" },
@@ -76,26 +78,43 @@ export default function ClientsListClient({
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [detailsClient, setDetailsClient] = useState<any | null>(null);
   const [reportingClient, setReportingClient] = useState<any | null>(null);
+  const [showNewClient, setShowNewClient] = useState(false);
+  const [deleteClient, setDeleteClient] = useState<any | null>(null);
 
   const roleLabel = getRoleLabel(session.user.role);
   const roleBadgeVariant = getRoleBadgeVariant(session.user.role);
 
-  const handleSearch = (e: React.FormEvent) => {
-    e.preventDefault();
-    const params = new URLSearchParams(searchParams.toString());
-    params.set("page", "1");
-    if (search) {
-      params.set("search", search);
-    } else {
-      params.delete("search");
-    }
-    if (companyType) {
-      params.set("type", companyType);
-    } else {
-      params.delete("type");
-    }
-    router.push(`/clients?${params.toString()}`);
-  };
+  // Debounced search — triggers automatically after 400ms of inactivity
+  const debounceRef = useRef<NodeJS.Timeout | null>(null);
+
+  const pushSearch = useCallback(
+    (q: string, type: string) => {
+      const params = new URLSearchParams(searchParams.toString());
+      params.set("page", "1");
+      if (q) {
+        params.set("search", q);
+      } else {
+        params.delete("search");
+      }
+      if (type) {
+        params.set("type", type);
+      } else {
+        params.delete("type");
+      }
+      router.push(`/clients?${params.toString()}`);
+    },
+    [router, searchParams],
+  );
+
+  useEffect(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      pushSearch(search, companyType);
+    }, 400);
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+  }, [search, companyType, pushSearch]);
 
   const handlePageChange = (newPage: number) => {
     const params = new URLSearchParams(searchParams.toString());
@@ -154,7 +173,7 @@ export default function ClientsListClient({
             variant="outline"
             size="sm"
             onClick={() => router.refresh()}
-            className="text-[#0077C3] border-[#0077C3] hover:bg-[#EBF5FF]"
+            className="rounded-full bg-[#EBF5FF] text-[#335890] border-[#D0E3F5] hover:bg-[#D0E3F5]"
           >
             <RefreshCw className="w-4 h-4 mr-2" />
             Rafraichir
@@ -168,7 +187,10 @@ export default function ClientsListClient({
                   ? `${session.user.firstName} ${session.user.lastName}`
                   : session.user.name || session.user.email}
               </p>
-              <Badge variant={roleBadgeVariant as any} className="text-xs mt-0.5">
+              <Badge
+                variant={roleBadgeVariant as any}
+                className="text-xs mt-0.5"
+              >
                 {roleLabel}
               </Badge>
             </div>
@@ -184,7 +206,7 @@ export default function ClientsListClient({
 
           <div className="flex items-center gap-3">
             {/* Search */}
-            <form onSubmit={handleSearch} className="relative">
+            <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#94A3B8]" />
               <Input
                 placeholder="Recherche"
@@ -192,7 +214,7 @@ export default function ClientsListClient({
                 onChange={(e) => setSearch(e.target.value)}
                 className="pl-9 h-10 w-[220px] bg-[#F8FAFC] border-[#E2E8F0]"
               />
-            </form>
+            </div>
 
             {/* <Button variant="outline" className="h-10 gap-2 border-[#0077C3] text-[#0077C3]">
               <Download className="w-4 h-4" />
@@ -200,12 +222,13 @@ export default function ClientsListClient({
             </Button> */}
 
             {canCreateClient && (
-              <Link href="/clients/new">
-                <Button className="h-10 bg-gradient-to-r from-[#0077C3] to-[#0095F4] hover:from-[#005992] hover:to-[#0077C3]">
-                  <Plus className="w-4 h-4 mr-2" />
-                  Nouveau client
-                </Button>
-              </Link>
+              <Button
+                onClick={() => setShowNewClient(true)}
+                className="h-10 bg-gradient-to-r from-[#0077C3] to-[#0095F4] hover:from-[#005992] hover:to-[#0077C3]"
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                Nouveau client
+              </Button>
             )}
           </div>
         </div>
@@ -226,6 +249,7 @@ export default function ClientsListClient({
             )}
           </button>
           <button
+            disabled
             onClick={() => setActiveTab("deleted")}
             className={`pb-3 text-sm font-medium transition-colors relative ${
               activeTab === "deleted"
@@ -233,7 +257,7 @@ export default function ClientsListClient({
                 : "text-[#335890] hover:text-[#0077C3]"
             }`}
           >
-            Clients Supprimés (0)
+            Clients Supprimés
             {activeTab === "deleted" && (
               <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#0077C3]" />
             )}
@@ -269,7 +293,11 @@ export default function ClientsListClient({
                   <th className="w-12 px-4 py-3">
                     <input
                       type="checkbox"
-                      checked={selectedIds.length === initialClients.length && initialClients.length > 0}
+                      aria-label="Sélectionner tous les clients"
+                      checked={
+                        selectedIds.length === initialClients.length &&
+                        initialClients.length > 0
+                      }
                       onChange={toggleSelectAll}
                       className="w-4 h-4 rounded border-[#D0E3F5] text-[#0077C3] focus:ring-[#0077C3]"
                     />
@@ -301,13 +329,18 @@ export default function ClientsListClient({
                 {initialClients.map((client, idx) => (
                   <tr
                     key={client.id}
-                    className={`border-b border-[#D0E3F5] last:border-b-0 hover:bg-[#F5F9FF] transition-colors ${
+                    onClick={() => setReportingClient(client)}
+                    className={`border-b border-[#D0E3F5] last:border-b-0 hover:bg-[#F5F9FF] transition-colors cursor-pointer ${
                       idx % 2 === 0 ? "bg-white" : "bg-[#FAFCFF]"
                     }`}
                   >
-                    <td className="w-12 px-4 py-4">
+                    <td
+                      className="w-12 px-4 py-4"
+                      onClick={(e) => e.stopPropagation()}
+                    >
                       <input
                         type="checkbox"
+                        aria-label={`Sélectionner le client ${client.name}`}
                         checked={selectedIds.includes(client.id)}
                         onChange={() => toggleSelect(client.id)}
                         className="w-4 h-4 rounded border-[#D0E3F5] text-[#0077C3] focus:ring-[#0077C3]"
@@ -322,7 +355,9 @@ export default function ClientsListClient({
                           <p className="font-medium text-[#00122E] text-sm">
                             {client.name}
                           </p>
-                          <p className="text-xs text-[#335890]">{client.email}</p>
+                          <p className="text-xs text-[#335890]">
+                            {client.email}
+                          </p>
                         </div>
                       </div>
                     </td>
@@ -356,7 +391,10 @@ export default function ClientsListClient({
                         <span className="text-xs text-[#94A3B8]">-</span>
                       )}
                     </td>
-                    <td className="px-4 py-4">
+                    <td
+                      className="px-4 py-4"
+                      onClick={(e) => e.stopPropagation()}
+                    >
                       <div className="flex items-center justify-center gap-1">
                         <Button
                           variant="ghost"
@@ -367,14 +405,17 @@ export default function ClientsListClient({
                         >
                           <BarChart3 className="w-4 h-4" />
                         </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="text-red-400 hover:text-red-600 hover:bg-red-50 h-8 w-8 p-0"
-                          title="Supprimer"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
+                        {!client.isSelfEntity && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setDeleteClient(client)}
+                            className="text-red-400 hover:text-red-600 hover:bg-red-50 h-8 w-8 p-0"
+                            title="Supprimer"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        )}
                         <Button
                           variant="ghost"
                           size="sm"
@@ -409,6 +450,17 @@ export default function ClientsListClient({
             const qs = paramsToQuery(params);
             router.push(`/clients/${reportingClient.id}?${qs}`);
           }}
+        />
+
+        <NewClientDialog
+          open={showNewClient}
+          onClose={() => setShowNewClient(false)}
+        />
+
+        <DeleteClientDialog
+          client={deleteClient}
+          open={!!deleteClient}
+          onClose={() => setDeleteClient(null)}
         />
 
         {/* Pagination */}

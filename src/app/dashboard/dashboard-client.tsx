@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Building2, Users, FileText, RefreshCw, Eye } from "lucide-react";
+import { PiBuildingsDuotone } from "react-icons/pi";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -67,7 +68,7 @@ export default function DashboardClient({
             variant="outline"
             size="sm"
             onClick={() => router.refresh()}
-            className="text-[#0077C3] border-[#0077C3] hover:bg-[#EBF5FF]"
+            className="rounded-full bg-[#EBF5FF] text-[#335890] border-[#D0E3F5] hover:bg-[#D0E3F5]"
           >
             <RefreshCw className="w-4 h-4 mr-2" />
             Rafraichir
@@ -81,7 +82,10 @@ export default function DashboardClient({
                   ? `${session.user.firstName} ${session.user.lastName}`
                   : session.user.name || session.user.email}
               </p>
-              <Badge variant={roleBadgeVariant as any} className="text-xs mt-0.5">
+              <Badge
+                variant={roleBadgeVariant as any}
+                className="text-xs mt-0.5"
+              >
                 {roleLabel}
               </Badge>
             </div>
@@ -96,7 +100,7 @@ export default function DashboardClient({
 
         {/* Company Card */}
         <div className="flex items-center gap-4 mb-6">
-          <Card className="flex items-center gap-4 px-5 py-4 w-fit">
+          <Card className="flex flex-row items-center justify-between gap-8 px-8 py-4 w-full">
             <div className="w-12 h-12 rounded-xl bg-[#EBF5FF] flex items-center justify-center">
               <Image
                 src="/logo-click-insight-unit.png"
@@ -106,15 +110,19 @@ export default function DashboardClient({
                 className="object-contain"
               />
             </div>
-            <div>
-              <p className="text-xs text-[#0077C3] font-medium">Entreprise</p>
-              <p className="text-base font-bold text-[#00122E]">
-                {session.user.companyName}
-              </p>
+            <div className="flex items-center gap-4">
+              <div>
+                <p className="text-xs text-[#0077C3] font-medium">Entreprise</p>
+                <p className="text-base font-bold text-[#00122E]">
+                  {session.user.companyName}
+                </p>
+              </div>
               <Badge variant="outline" className="text-xs mt-1">
                 {session.user.companyPackType === "ENTREPRISE"
-                  ? "Informatique"
-                  : session.user.companyPackType}
+                  ? "Entreprise"
+                  : session.user.companyPackType === "SIMPLE"
+                    ? "Simple"
+                    : session.user.companyPackType}
               </Badge>
             </div>
           </Card>
@@ -123,9 +131,9 @@ export default function DashboardClient({
         {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-0 mb-8">
           {/* Clients */}
-          <div className="flex items-center gap-4 px-6 py-5 border border-[#D0E3F5] rounded-l-xl bg-white">
-            <div className="w-12 h-12 rounded-xl bg-[#EBF5FF] flex items-center justify-center">
-              <Building2 className="w-6 h-6 text-[#0077C3]" />
+          <div className="flex items-center gap-4 px-6 py-5 border bg-[#EBF5FF] border-[#D0E3F5] rounded-l-xl ">
+            <div className="w-12 h-12 rounded-xl bg-white flex items-center justify-center">
+              <PiBuildingsDuotone className="w-6 h-6 text-[#0077C3]" />
             </div>
             <div>
               <p className="text-sm text-[#335890] font-medium">Clients</p>
@@ -133,12 +141,11 @@ export default function DashboardClient({
                 {formatNumber(stats.clientsCount)}
               </p>
             </div>
-            <div className="ml-auto w-1 h-12 bg-[#0077C3] rounded-full" />
           </div>
 
           {/* Fichiers */}
-          <div className="flex items-center gap-4 px-6 py-5 border-y border-[#D0E3F5] bg-white">
-            <div className="w-12 h-12 rounded-xl bg-[#F3E8FF] flex items-center justify-center">
+          <div className="flex items-center gap-4 px-6 py-5 border-y border-[#D0E3F5]  bg-[#F3E8FF]">
+            <div className="w-12 h-12 rounded-xl bg-white flex items-center justify-center">
               <FileText className="w-6 h-6 text-[#9333EA]" />
             </div>
             <div>
@@ -147,13 +154,12 @@ export default function DashboardClient({
                 {formatNumber(stats.filesCount)}
               </p>
             </div>
-            <div className="ml-auto w-1 h-12 bg-[#9333EA] rounded-full" />
           </div>
 
           {/* Membres */}
           {canViewMembers && (
-            <div className="flex items-center gap-4 px-6 py-5 border border-[#D0E3F5] rounded-r-xl bg-white">
-              <div className="w-12 h-12 rounded-xl bg-[#DCFCE7] flex items-center justify-center">
+            <div className="flex items-center gap-4 px-6 py-5 border border-[#D0E3F5] rounded-r-xl bg-[#DCFCE7]">
+              <div className="w-12 h-12 rounded-xl bg-white  flex items-center justify-center">
                 <Users className="w-6 h-6 text-[#16A34A]" />
               </div>
               <div>

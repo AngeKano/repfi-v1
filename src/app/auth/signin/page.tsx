@@ -44,7 +44,7 @@ export default function SignInPage() {
       }
     } catch (err) {
       setError("Une erreur est survenue. Veuillez réessayer.");
- 
+
       setLoading(false);
     }
   };
@@ -57,7 +57,7 @@ export default function SignInPage() {
           src="/signin-background.png"
           alt="Click Insight"
           fill
-          className="object-cover object-right"
+          className="object-cover object-left"
           priority
         />
       </div>
