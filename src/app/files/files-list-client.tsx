@@ -141,7 +141,7 @@ export default function FilesListClient({
               className="h-10 bg-gradient-to-r from-[#0077C3] to-[#0095F4] hover:from-[#005992] hover:to-[#0077C3]"
             >
               <Plus className="w-4 h-4 mr-2" />
-              Charger un fichier
+              Créer un reporting
             </Button>
           </div>
         </div>
