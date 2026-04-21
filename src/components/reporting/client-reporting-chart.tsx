@@ -80,6 +80,13 @@ import {
   Trophy,
   AlertTriangle,
 } from "lucide-react";
+import {
+  PiCoinsDuotone,
+  PiMoneyWavyDuotone,
+  PiWalletDuotone,
+  PiChartDonutDuotone,
+  PiShoppingCartSimpleDuotone,
+} from "react-icons/pi";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
@@ -1151,8 +1158,8 @@ export default function ClientReportingChart({
                 <CardHeader className="pb-2">
                   <div className="flex items-center justify-between">
                     <CardDescription className="flex items-center gap-1 text-xs">
-                      <DollarSign className="w-4 h-4 text-blue-600" />
-                      CA
+                      <PiCoinsDuotone className="w-4 h-4 text-blue-600" />
+                      Chiffre d&apos;affaires
                     </CardDescription>
                     <VariationBadge
                       value={data.indicateurs.variations.chiffreAffaires}
@@ -1176,8 +1183,8 @@ export default function ClientReportingChart({
                 <CardHeader className="pb-2">
                   <div className="flex items-center justify-between">
                     <CardDescription className="flex items-center gap-1 text-xs">
-                      <Users className="w-4 h-4 text-orange-600" />
-                      Masse Salariale
+                      <PiMoneyWavyDuotone className="w-4 h-4 text-orange-600" />
+                      Masse salariale
                     </CardDescription>
                     <VariationBadge
                       value={data.indicateurs.variations.masseSalariale}
@@ -1199,8 +1206,8 @@ export default function ClientReportingChart({
                 <CardHeader className="pb-2">
                   <div className="flex items-center justify-between">
                     <CardDescription className="flex items-center gap-1 text-xs">
-                      <Activity className="w-4 h-4 text-purple-600" />
-                      Résultat Exploitation
+                      <PiChartDonutDuotone className="w-4 h-4 text-purple-600" />
+                      Résultat d&apos;exploitation
                     </CardDescription>
                     <VariationBadge
                       value={data.indicateurs.variations.resultatExploitation}
@@ -1232,7 +1239,7 @@ export default function ClientReportingChart({
                 <CardHeader className="pb-2">
                   <div className="flex items-center justify-between">
                     <CardDescription className="flex items-center gap-1 text-xs">
-                      <PiggyBank className="w-4 h-4 text-green-600" />
+                      <PiChartDonutDuotone className="w-4 h-4 text-green-600" />
                       Résultat Net
                     </CardDescription>
                     <VariationBadge
@@ -1261,7 +1268,7 @@ export default function ClientReportingChart({
                 <CardHeader className="pb-2">
                   <div className="flex items-center justify-between">
                     <CardDescription className="flex items-center gap-1 text-xs">
-                      <Wallet className="w-4 h-4 text-cyan-600" />
+                      <PiWalletDuotone className="w-4 h-4 text-cyan-600" />
                       Trésorerie
                     </CardDescription>
                     <VariationBadge
@@ -1292,8 +1299,8 @@ export default function ClientReportingChart({
                 <CardHeader className="pb-2">
                   <div className="flex items-center justify-between">
                     <CardDescription className="flex items-center gap-1 text-xs">
-                      <ShoppingCart className="w-4 h-4 text-indigo-600" />
-                      Marge Commerciale
+                      <PiShoppingCartSimpleDuotone className="w-4 h-4 text-indigo-600" />
+                      Marge commerciale
                     </CardDescription>
                     <VariationBadge
                       value={data.indicateurs.variations.margeCommerciale}
@@ -1350,7 +1357,7 @@ export default function ClientReportingChart({
                 <CardHeader className="pb-2">
                   <div className="flex items-center justify-between">
                     <CardDescription className="flex items-center gap-1 text-xs">
-                      <DollarSign className="w-4 h-4 text-blue-600" />
+                      <PiCoinsDuotone className="w-4 h-4 text-blue-600" />
                       Chiffre d&apos;Affaires {yearN}
                       <Badge variant="outline" className="ml-1 text-[10px] px-1 py-0">
                         {data.client.assujettiTVA ? "HT" : "TTC"}
@@ -1371,7 +1378,7 @@ export default function ClientReportingChart({
               <Card>
                 <CardHeader className="pb-2">
                   <CardDescription className="flex items-center gap-1 text-xs">
-                    <DollarSign className="w-4 h-4 text-blue-400" />
+                    <PiCoinsDuotone className="w-4 h-4 text-blue-400" />
                     Chiffre d&apos;Affaires {yearN1}
                     <Badge variant="outline" className="ml-1 text-[10px] px-1 py-0">
                       {data.client.assujettiTVA ? "HT" : "TTC"}
@@ -1555,7 +1562,7 @@ export default function ClientReportingChart({
                 <CardHeader className="pb-2">
                   <div className="flex items-center justify-between">
                     <CardDescription className="flex items-center gap-1 text-xs">
-                      <PiggyBank className="w-4 h-4 text-green-600" />
+                      <PiChartDonutDuotone className="w-4 h-4 text-green-600" />
                       Résultat Net
                     </CardDescription>
                     <VariationBadge
@@ -1623,7 +1630,7 @@ export default function ClientReportingChart({
               <Card>
                 <CardHeader className="pb-2">
                   <CardDescription className="flex items-center gap-1 text-xs">
-                    <DollarSign className="w-4 h-4 text-blue-600" />
+                    <PiCoinsDuotone className="w-4 h-4 text-blue-600" />
                     CA TTC Total (Débit 41*)
                   </CardDescription>
                 </CardHeader>

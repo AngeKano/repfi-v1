@@ -14,13 +14,17 @@ import {
   UserPlus,
   Plus,
   RefreshCw,
-  BarChart3,
-  DollarSign,
-  Target,
-  Receipt,
-  FileText,
   ChevronLeft,
 } from "lucide-react";
+import {
+  PiChartScatterDuotone,
+  PiCoinsDuotone,
+  PiChartDonutDuotone,
+  PiHandCoinsDuotone,
+  PiUsersThreeDuotone,
+  PiChartBarHorizontalDuotone,
+  PiFilesDuotone,
+} from "react-icons/pi";
 import Link from "next/link";
 import FilesTabs from "./files-tabs";
 import DeclarationTabs from "./declaration/declaration-tabs";
@@ -42,13 +46,13 @@ interface ClientDetailsClientProps {
 }
 
 const CLIENT_TABS = [
-  { id: "overview", label: "Synthèse Financière", icon: BarChart3 },
-  { id: "chiffres", label: "Chiffres d'affaires", icon: DollarSign },
-  { id: "resultats", label: "Résultats", icon: Target },
-  { id: "recouvrement", label: "Recouvrement", icon: Receipt },
-  { id: "members", label: "Membres", icon: Users },
-  { id: "declaration", label: "Reporting Financier", icon: FileText },
-  // { id: "files", label: "Autres Fichiers", icon: FileText },
+  { id: "overview", label: "Synthèse Financière", icon: PiChartScatterDuotone },
+  { id: "chiffres", label: "Chiffres d'affaires", icon: PiCoinsDuotone },
+  { id: "resultats", label: "Résultats", icon: PiChartDonutDuotone },
+  { id: "recouvrement", label: "Recouvrement", icon: PiHandCoinsDuotone },
+  { id: "members", label: "Membres", icon: PiUsersThreeDuotone },
+  { id: "declaration", label: "Reporting Financier", icon: PiChartBarHorizontalDuotone },
+  { id: "files", label: "Autres Fichiers", icon: PiFilesDuotone },
 ];
 
 export default function ClientDetailsClient({
@@ -206,26 +210,45 @@ export default function ClientDetailsClient({
           <div className="w-[220px] shrink-0">
             <div className="sticky top-6">
             <nav className="space-y-1">
-              {CLIENT_TABS.map((tab) => {
+              {CLIENT_TABS.map((tab, idx) => {
                 const active = activeTab === tab.id;
+                // Separator before "Membres" (index 4)
+                const showSeparator = idx === 4;
                 return (
-                  <button
-                    key={tab.id}
-                    onClick={() => setActiveTab(tab.id)}
-                    className={`flex items-center gap-3 w-full px-4 py-3 rounded-lg text-sm font-medium transition-colors ${
-                      active
-                        ? "bg-[#0077C3] text-white"
-                        : "text-[#335890] hover:bg-[#EBF5FF] hover:text-[#0077C3]"
-                    }`}
-                  >
-                    <tab.icon className="w-5 h-5" />
-                    {tab.label}
-                  </button>
+                  <div key={tab.id}>
+                    {showSeparator && (
+                      <div className="h-px bg-[#D0E3F5] my-2" />
+                    )}
+                    <button
+                      onClick={() => setActiveTab(tab.id)}
+                      className={`flex items-center gap-3 w-full px-4 py-3 rounded-lg text-sm font-medium transition-colors ${
+                        active
+                          ? "bg-[#0077C3] text-white"
+                          : "text-[#335890] hover:bg-[#EBF5FF] hover:text-[#0077C3]"
+                      }`}
+                    >
+                      <tab.icon className="w-5 h-5" />
+                      {tab.label}
+                    </button>
+                  </div>
                 );
               })}
             </nav>
 
-            <div className="mt-8">
+            {/* Currency info */}
+            <div className="mt-6 px-4 py-3 bg-[#F5F9FF] rounded-lg border border-[#D0E3F5]">
+              <p className="text-[10px] text-[#94A3B8] uppercase mb-0.5">
+                Devise
+              </p>
+              <p className="text-sm font-semibold text-[#00122E]">
+                FCFA{" "}
+                <span className="text-xs font-normal text-[#335890]">
+                  (unité : KFCFA)
+                </span>
+              </p>
+            </div>
+
+            <div className="mt-4">
               <Link href="/clients">
                 <button className="flex items-center gap-3 w-full px-4 py-3 rounded-lg text-sm font-medium text-[#335890] hover:bg-[#EBF5FF] hover:text-[#0077C3] transition-colors">
                   <ChevronLeft className="w-5 h-5" />
