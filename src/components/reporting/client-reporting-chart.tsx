@@ -31,6 +31,7 @@ import {
   XAxis,
   YAxis,
   CartesianGrid,
+  Legend,
 } from "recharts";
 import {
   ContextMenu,
@@ -642,16 +643,12 @@ export default function ClientReportingChart({
   };
 
   const getPeriodLabel = (): string => {
-    if (periodType === "year") return `Année ${year}`;
-    if (periodType === "month") {
-      const month = MONTHS.find((m) => m.value === selectedMonth);
-      return `${month?.label || ""} ${year}`;
-    }
+    if (periodType === "year") return `Janvier - Décembre ${year}`;
     if (periodType === "ytd") {
       const month = MONTHS.find((m) => m.value === selectedMonth);
       return `Janvier - ${month?.label || ""} ${year}`;
     }
-    return year;
+    return `Janvier - Décembre ${year}`;
   };
 
   const getXAxisLabel = (): string => {
@@ -932,6 +929,7 @@ export default function ClientReportingChart({
               barSize={24}
               radius={[4, 4, 0, 0]}
             />
+            <Legend />
           </BarChart>
         </ChartContainer>
       </CardContent>
@@ -1014,6 +1012,7 @@ export default function ClientReportingChart({
                 barSize={18}
                 radius={[0, 4, 4, 0]}
               />
+              <Legend />
             </BarChart>
           </ChartContainer>
 
@@ -1133,6 +1132,7 @@ export default function ClientReportingChart({
               strokeWidth={2}
               dot={{ r: 4 }}
             />
+            <Legend />
           </LineChart>
         </ChartContainer>
       </CardContent>
@@ -1328,96 +1328,6 @@ export default function ClientReportingChart({
             {/* Tunnel de rentabilité */}
             <TunnelRentabilite />
 
-            {/* Périodes déclarées */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Périodes déclarées</CardTitle>
-                <CardDescription>Clic droit pour les actions</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="flex flex-wrap gap-3 max-h-[300px] overflow-y-auto">
-                  {data.periods.map((period) => (
-                    <ContextMenu key={period.batch_id}>
-                      <ContextMenuTrigger>
-                        <div
-                          className={`p-3 border rounded-lg cursor-pointer transition-all hover:shadow-md ${
-                            hiddenPeriods.has(period.id || "")
-                              ? "opacity-40 bg-muted"
-                              : "bg-card hover:bg-accent"
-                          }`}
-                        >
-                          <div className="font-medium text-sm">
-                            {formatPeriodLabel(
-                              period.periodStart,
-                              period.periodEnd,
-                            )}
-                          </div>
-                          <div className="text-xs text-muted-foreground mt-1">
-                            {Number(period.nb_transactions).toLocaleString(
-                              "fr-FR",
-                            )}{" "}
-                            transactions
-                          </div>
-                          <div className="flex gap-2 mt-2">
-                            <Badge
-                              variant="outline"
-                              className="text-xs text-red-600"
-                            >
-                              C: {formatCompactOnly(period.charges)}
-                            </Badge>
-                            <Badge
-                              variant="outline"
-                              className="text-xs text-green-600"
-                            >
-                              P: {formatCompactOnly(period.produits)}
-                            </Badge>
-                          </div>
-                          <div className="flex items-center gap-2 mt-2">
-                            <Badge
-                              variant={
-                                period.status === "COMPLETED"
-                                  ? "default"
-                                  : "secondary"
-                              }
-                            >
-                              {period.status}
-                            </Badge>
-                            {period.produits - period.charges >= 0 ? (
-                              <TrendingUp className="w-4 h-4 text-green-600" />
-                            ) : (
-                              <TrendingDown className="w-4 h-4 text-red-600" />
-                            )}
-                          </div>
-                        </div>
-                      </ContextMenuTrigger>
-                      <ContextMenuContent>
-                        <ContextMenuItem
-                          onClick={() => handleDownloadExcel(period)}
-                        >
-                          <Download className="w-4 h-4 mr-2" /> Télécharger
-                          Excel
-                        </ContextMenuItem>
-                        <ContextMenuItem
-                          onClick={() => handleHidePeriod(period.id || "")}
-                        >
-                          <EyeOff className="w-4 h-4 mr-2" />
-                          {hiddenPeriods.has(period.id || "")
-                            ? "Afficher"
-                            : "Masquer"}
-                        </ContextMenuItem>
-                        <ContextMenuSeparator />
-                        <ContextMenuItem
-                          onClick={() => handleDeletePeriod(period)}
-                          className="text-red-600 focus:text-red-600"
-                        >
-                          <Trash2 className="w-4 h-4 mr-2" /> Supprimer
-                        </ContextMenuItem>
-                      </ContextMenuContent>
-                    </ContextMenu>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
           </div>
         );
 
@@ -1817,6 +1727,7 @@ export default function ClientReportingChart({
                       dot={{ r: 3 }}
                       strokeDasharray="5 5"
                     />
+                    <Legend />
                   </LineChart>
                 </ChartContainer>
               </CardContent>
@@ -1892,6 +1803,7 @@ export default function ClientReportingChart({
                       barSize={24}
                       radius={[4, 4, 0, 0]}
                     />
+                    <Legend />
                   </BarChart>
                 </ChartContainer>
               </CardContent>
@@ -1991,6 +1903,7 @@ export default function ClientReportingChart({
                           fill="hsl(25, 95%, 53%)"
                           radius={[0, 4, 4, 0]}
                         />
+                        <Legend />
                       </BarChart>
                     </ChartContainer>
 
@@ -2149,48 +2062,35 @@ export default function ClientReportingChart({
         {/* Header */}
         {hideNav ? (
           /* Redesigned filter bar for embedded mode */
-          <div className="flex items-center gap-4 mb-6">
+          <div className="flex flex-wrap items-center gap-3 mb-6">
             {activeTab !== "recouvrement" ? (
               <>
-                <div className="flex items-center gap-2 border border-[#D0E3F5] rounded-lg px-4 py-2.5">
+                <div className="flex items-center gap-2 border border-[#D0E3F5] rounded-lg px-4 h-10">
                   <span className="text-xs text-[#335890]">Mode calcul :</span>
-                  <Select value={periodType} onValueChange={(v: string) => setPeriodType(v as PeriodType)}>
-                    <SelectTrigger className="border-0 p-0 h-auto shadow-none min-w-[100px] font-semibold text-[#00122E]">
+                  <Select value={periodType === "ytd" ? "ytd" : "year"} onValueChange={(v: string) => setPeriodType(v as PeriodType)}>
+                    <SelectTrigger className="border-0 p-0 h-auto shadow-none min-w-[90px] font-semibold text-[#00122E]">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="year">Périodique</SelectItem>
-                      <SelectItem value="month">Mensuel</SelectItem>
                       <SelectItem value="ytd">Cumulé</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
-                <div className="flex items-center gap-2 border border-[#D0E3F5] rounded-lg px-4 py-2.5">
-                  <span className="text-xs text-[#335890]">Granularité :</span>
-                  <Select value={periodType === "month" ? "month" : "year"} onValueChange={(v: string) => setPeriodType(v === "month" ? "month" : "year")}>
-                    <SelectTrigger className="border-0 p-0 h-auto shadow-none min-w-[60px] font-semibold text-[#00122E]">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="year">Année</SelectItem>
-                      <SelectItem value="month">Mois</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="flex items-center gap-2 border border-[#D0E3F5] rounded-lg px-4 py-2.5">
+                <div className="flex items-center gap-2 border border-[#D0E3F5] rounded-lg px-4 h-10">
                   <span className="text-xs text-[#335890]">Année :</span>
                   <span className="font-semibold text-[#00122E]">{year}</span>
                   <div className="flex gap-1 ml-1">
                     <button title="Année précédente" onClick={() => handleYearChange("prev")} disabled={data.availableYears.indexOf(year) >= data.availableYears.length - 1} className="text-[#94A3B8] hover:text-[#0077C3] disabled:opacity-30">
                       <ChevronLeft className="w-4 h-4" />
                     </button>
-                    <button  title="Année suivante" onClick={() => handleYearChange("next")} disabled={data.availableYears.indexOf(year) <= 0} className="text-[#94A3B8] hover:text-[#0077C3] disabled:opacity-30">
+                    <button title="Année suivante" onClick={() => handleYearChange("next")} disabled={data.availableYears.indexOf(year) <= 0} className="text-[#94A3B8] hover:text-[#0077C3] disabled:opacity-30">
                       <ChevronRight className="w-4 h-4" />
                     </button>
                   </div>
                 </div>
-                {(periodType === "month" || periodType === "ytd") && (
-                  <div className="flex items-center gap-2 border border-[#D0E3F5] rounded-lg px-4 py-2.5">
+                {periodType === "ytd" && (
+                  <div className="flex items-center gap-2 border border-[#D0E3F5] rounded-lg px-4 h-10">
                     <span className="text-xs text-[#335890]">Mois :</span>
                     <Select value={selectedMonth} onValueChange={setSelectedMonth}>
                       <SelectTrigger className="border-0 p-0 h-auto shadow-none min-w-[80px] font-semibold text-[#00122E]">
@@ -2206,18 +2106,19 @@ export default function ClientReportingChart({
                     </Select>
                   </div>
                 )}
+                {/* Period indicator */}
+                <div className="flex items-center gap-2 bg-[#F5F9FF] rounded-lg px-4 h-10 text-xs text-[#335890]">
+                  <CalendarRange className="w-3.5 h-3.5 text-[#0077C3]" />
+                  <span>{getPeriodLabel()}</span>
+                </div>
               </>
             ) : (
               <>
-                <div className="flex items-center gap-2 border border-[#D0E3F5] rounded-lg px-4 py-2.5">
+                <div className="flex items-center gap-2 border border-[#D0E3F5] rounded-lg px-4 h-10">
                   <span className="text-xs text-[#335890]">Mode calcul :</span>
                   <span className="font-semibold text-[#00122E]">Périodique</span>
                 </div>
-                <div className="flex items-center gap-2 border border-[#D0E3F5] rounded-lg px-4 py-2.5">
-                  <span className="text-xs text-[#335890]">Granularité :</span>
-                  <span className="font-semibold text-[#00122E]">Mois</span>
-                </div>
-                <div className="flex items-center gap-2 border border-[#D0E3F5] rounded-lg px-4 py-2.5">
+                <div className="flex items-center gap-2 border border-[#D0E3F5] rounded-lg px-4 h-10">
                   <span className="text-xs text-[#335890]">Année :</span>
                   <Select value={recouvrementYear} onValueChange={setRecouvrementYear}>
                     <SelectTrigger className="border-0 p-0 h-auto shadow-none min-w-[60px] font-semibold text-[#00122E]">
@@ -2230,7 +2131,7 @@ export default function ClientReportingChart({
                     </SelectContent>
                   </Select>
                 </div>
-                <div className="flex items-center gap-2 border border-[#D0E3F5] rounded-lg px-4 py-2.5">
+                <div className="flex items-center gap-2 border border-[#D0E3F5] rounded-lg px-4 h-10">
                   <span className="text-xs text-[#335890]">Mois :</span>
                   <Select value={recouvrementMonth} onValueChange={setRecouvrementMonth}>
                     <SelectTrigger className="border-0 p-0 h-auto shadow-none min-w-[80px] font-semibold text-[#00122E]">
@@ -2242,6 +2143,11 @@ export default function ClientReportingChart({
                       ))}
                     </SelectContent>
                   </Select>
+                </div>
+                {/* Period indicator */}
+                <div className="flex items-center gap-2 bg-[#F5F9FF] rounded-lg px-4 h-10 text-xs text-[#335890]">
+                  <CalendarRange className="w-3.5 h-3.5 text-[#0077C3]" />
+                  <span>Janvier - {MONTHS.find(m => m.value === recouvrementMonth)?.label} {recouvrementYear}</span>
                 </div>
               </>
             )}
@@ -2263,32 +2169,23 @@ export default function ClientReportingChart({
                   variant={periodType === "year" ? "default" : "ghost"}
                   size="sm"
                   onClick={() => setPeriodType("year")}
-                  className="gap-1"
+                  className="gap-1 h-9"
                 >
                   <Calendar className="w-4 h-4" />
-                  Année
-                </Button>
-                <Button
-                  variant={periodType === "month" ? "default" : "ghost"}
-                  size="sm"
-                  onClick={() => setPeriodType("month")}
-                  className="gap-1"
-                >
-                  <CalendarDays className="w-4 h-4" />
-                  Mois
+                  Périodique
                 </Button>
                 <Button
                   variant={periodType === "ytd" ? "default" : "ghost"}
                   size="sm"
                   onClick={() => setPeriodType("ytd")}
-                  className="gap-1"
+                  className="gap-1 h-9"
                 >
                   <CalendarRange className="w-4 h-4" />
-                  YTD
+                  Cumulé
                 </Button>
               </div>
 
-              {(periodType === "month" || periodType === "ytd") && (
+              {periodType === "ytd" && (
                 <Select value={selectedMonth} onValueChange={setSelectedMonth}>
                   <SelectTrigger className="w-[140px]">
                     <SelectValue placeholder="Mois" />
