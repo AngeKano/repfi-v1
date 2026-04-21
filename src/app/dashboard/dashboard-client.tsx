@@ -176,7 +176,7 @@ export default function DashboardClient({
         <Card className="p-6">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-lg font-semibold text-[#00122E]">
-              Reportings financiers récents
+              Périodes de reporting financier récentes
             </h3>
             {/* <Link href="/clients">
               <Button variant="ghost" size="sm" className="text-[#0077C3]">
