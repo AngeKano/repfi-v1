@@ -86,6 +86,7 @@ import {
   PiWalletDuotone,
   PiChartDonutDuotone,
   PiShoppingCartSimpleDuotone,
+  PiGearDuotone,
 } from "react-icons/pi";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -308,6 +309,49 @@ const INITIAL_TUNNEL_METRICS: TunnelMetric[] = [
   },
 ];
 
+// ==================== KPI CONFIG ====================
+interface KpiItem {
+  id: string;
+  label: string;
+  key: keyof IndicateursFinanciers;
+  variationKey: keyof Variations;
+  color: string;
+  colorNeg?: string;
+  icon: React.ElementType;
+  visible: boolean;
+  order: number;
+}
+
+const DEFAULT_KPI_ITEMS: KpiItem[] = [
+  { id: "ca", label: "Chiffre d'affaires", key: "chiffreAffaires", variationKey: "chiffreAffaires", color: "text-blue-600", icon: PiCoinsDuotone, visible: true, order: 0 },
+  { id: "ms", label: "Masse salariale", key: "masseSalariale", variationKey: "masseSalariale", color: "text-orange-600", icon: PiMoneyWavyDuotone, visible: true, order: 1 },
+  { id: "rex", label: "Résultat d'exploitation", key: "resultatExploitation", variationKey: "resultatExploitation", color: "text-purple-600", colorNeg: "text-red-600", icon: PiChartDonutDuotone, visible: true, order: 2 },
+  { id: "rn", label: "Résultat Net", key: "resultatNet", variationKey: "resultatNet", color: "text-green-600", colorNeg: "text-red-600", icon: PiChartDonutDuotone, visible: true, order: 3 },
+  { id: "treso", label: "Trésorerie", key: "soldeTresorerie", variationKey: "soldeTresorerie", color: "text-cyan-600", colorNeg: "text-red-600", icon: PiWalletDuotone, visible: true, order: 4 },
+  { id: "marge", label: "Marge commerciale", key: "margeCommerciale", variationKey: "margeCommerciale", color: "text-indigo-600", colorNeg: "text-red-600", icon: PiShoppingCartSimpleDuotone, visible: true, order: 5 },
+];
+
+function loadKpiConfig(clientId: string): KpiItem[] {
+  if (typeof window === "undefined") return DEFAULT_KPI_ITEMS;
+  try {
+    const raw = localStorage.getItem(`kpi-config-${clientId}`);
+    if (!raw) return DEFAULT_KPI_ITEMS;
+    const saved = JSON.parse(raw) as Array<{ id: string; visible: boolean; order: number }>;
+    return DEFAULT_KPI_ITEMS.map((d) => {
+      const s = saved.find((x) => x.id === d.id);
+      return s ? { ...d, visible: s.visible, order: s.order } : d;
+    }).sort((a, b) => a.order - b.order);
+  } catch {
+    return DEFAULT_KPI_ITEMS;
+  }
+}
+
+function saveKpiConfig(clientId: string, items: KpiItem[]) {
+  if (typeof window === "undefined") return;
+  const data = items.map((i) => ({ id: i.id, visible: i.visible, order: i.order }));
+  localStorage.setItem(`kpi-config-${clientId}`, JSON.stringify(data));
+}
+
 const chartConfigFlux: ChartConfig = {
   produits: { label: "Produits", color: "hsl(142, 76%, 36%)" },
   charges: { label: "Charges", color: "hsl(0, 84%, 60%)" },
@@ -370,6 +414,64 @@ export default function ClientReportingChart({
   const [expandedNav, setExpandedNav] = useState<Set<TabId>>(
     new Set([initialTab || "synthese"]),
   );
+
+  // KPI configuration state
+  const [kpiItems, setKpiItems] = useState<KpiItem[]>(() =>
+    loadKpiConfig(clientId),
+  );
+  const [kpiEditMode, setKpiEditMode] = useState(false);
+  const [kpiDragId, setKpiDragId] = useState<string | null>(null);
+  const [kpiContextMenu, setKpiContextMenu] = useState<{
+    id: string;
+    x: number;
+    y: number;
+  } | null>(null);
+
+  const updateKpi = (newItems: KpiItem[]) => {
+    const reordered = newItems.map((item, idx) => ({ ...item, order: idx }));
+    setKpiItems(reordered);
+    saveKpiConfig(clientId, reordered);
+  };
+
+  const toggleKpiVisible = (id: string) => {
+    const next = kpiItems.map((k) =>
+      k.id === id ? { ...k, visible: !k.visible } : k,
+    );
+    updateKpi(next);
+  };
+
+  const handleKpiDragStart = (id: string) => {
+    setKpiDragId(id);
+  };
+
+  const handleKpiDragOver = (e: React.DragEvent, targetId: string) => {
+    e.preventDefault();
+    if (!kpiDragId || kpiDragId === targetId) return;
+    const items = [...kpiItems];
+    const fromIdx = items.findIndex((k) => k.id === kpiDragId);
+    const toIdx = items.findIndex((k) => k.id === targetId);
+    if (fromIdx === -1 || toIdx === -1) return;
+    const [moved] = items.splice(fromIdx, 1);
+    items.splice(toIdx, 0, moved);
+    updateKpi(items);
+  };
+
+  const handleKpiDragEnd = () => {
+    setKpiDragId(null);
+  };
+
+  const handleKpiContextMenu = (e: React.MouseEvent, id: string) => {
+    e.preventDefault();
+    setKpiContextMenu({ id, x: e.clientX, y: e.clientY });
+  };
+
+  // Close context menu on click outside
+  useEffect(() => {
+    if (!kpiContextMenu) return;
+    const handler = () => setKpiContextMenu(null);
+    window.addEventListener("click", handler);
+    return () => window.removeEventListener("click", handler);
+  }, [kpiContextMenu]);
 
   // Sync activeTab with initialTab when parent changes it
   useEffect(() => {
@@ -1152,182 +1254,147 @@ export default function ClientReportingChart({
       case "synthese":
         return (
           <div className="space-y-6">
-            {/* KPIs */}
-            <div className="grid grid-cols-3 gap-4">
-              <Card>
-                <CardHeader className="pb-2">
-                  <div className="flex items-center justify-between">
-                    <CardDescription className="flex items-center gap-1 text-xs">
-                      <PiCoinsDuotone className="w-4 h-4 text-blue-600" />
-                      Chiffre d&apos;affaires
-                    </CardDescription>
-                    <VariationBadge
-                      value={data.indicateurs.variations.chiffreAffaires}
-                    />
-                  </div>
-                </CardHeader>
-                <CardContent className="pt-0">
-                  <div className="text-xl font-bold text-blue-600">
-                    {formatCompactOnly(data.indicateurs.anneeN.chiffreAffaires)}
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    {yearN1}:{" "}
-                    {formatCompactOnly(
-                      data.indicateurs.anneeN1.chiffreAffaires,
-                    )}
-                  </p>
-                </CardContent>
-              </Card>
+            {/* KPIs — configurable grid */}
+            <div>
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-4 text-xs text-[#335890]">
+                  <span>
+                    Devise :{" "}
+                    <span className="font-semibold text-[#00122E]">Fcfa</span>
+                  </span>
+                  <span>
+                    Unité :{" "}
+                    <span className="font-semibold text-[#00122E]">K Fcfa</span>
+                  </span>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setKpiEditMode(!kpiEditMode)}
+                  className={cn(
+                    "gap-2 h-9 rounded-lg transition-colors",
+                    kpiEditMode
+                      ? "bg-[#0077C3] text-white border-[#0077C3] hover:bg-[#005992]"
+                      : "border-[#D0E3F5] text-[#335890] hover:bg-[#EBF5FF]",
+                  )}
+                >
+                  <PiGearDuotone className="w-4 h-4" />
+                  {kpiEditMode ? "Terminer" : "Configurer les KPIs"}
+                </Button>
+              </div>
 
-              <Card>
-                <CardHeader className="pb-2">
-                  <div className="flex items-center justify-between">
-                    <CardDescription className="flex items-center gap-1 text-xs">
-                      <PiMoneyWavyDuotone className="w-4 h-4 text-orange-600" />
-                      Masse salariale
-                    </CardDescription>
-                    <VariationBadge
-                      value={data.indicateurs.variations.masseSalariale}
-                    />
-                  </div>
-                </CardHeader>
-                <CardContent className="pt-0">
-                  <div className="text-xl font-bold text-orange-600">
-                    {formatCompactOnly(data.indicateurs.anneeN.masseSalariale)}
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    {yearN1}:{" "}
-                    {formatCompactOnly(data.indicateurs.anneeN1.masseSalariale)}
-                  </p>
-                </CardContent>
-              </Card>
+              <div className="grid grid-cols-3 gap-4">
+                {kpiItems
+                  .filter((k) => kpiEditMode || k.visible)
+                  .map((kpi) => {
+                    const Icon = kpi.icon;
+                    const valueN = data.indicateurs.anneeN[kpi.key] as number;
+                    const valueN1 = data.indicateurs.anneeN1[kpi.key] as number;
+                    const variation = data.indicateurs.variations[
+                      kpi.variationKey
+                    ] as number;
+                    const hasNeg = kpi.colorNeg && valueN < 0;
+                    const colorCls = hasNeg ? kpi.colorNeg! : kpi.color;
+                    const isDragging = kpiDragId === kpi.id;
 
-              <Card>
-                <CardHeader className="pb-2">
-                  <div className="flex items-center justify-between">
-                    <CardDescription className="flex items-center gap-1 text-xs">
-                      <PiChartDonutDuotone className="w-4 h-4 text-purple-600" />
-                      Résultat d&apos;exploitation
-                    </CardDescription>
-                    <VariationBadge
-                      value={data.indicateurs.variations.resultatExploitation}
-                    />
-                  </div>
-                </CardHeader>
-                <CardContent className="pt-0">
-                  <div
-                    className={`text-xl font-bold ${
-                      data.indicateurs.anneeN.resultatExploitation >= 0
-                        ? "text-purple-600"
-                        : "text-red-600"
-                    }`}
-                  >
-                    {formatCompactOnly(
-                      data.indicateurs.anneeN.resultatExploitation,
-                    )}
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    {yearN1}:{" "}
-                    {formatCompactOnly(
-                      data.indicateurs.anneeN1.resultatExploitation,
-                    )}
-                  </p>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader className="pb-2">
-                  <div className="flex items-center justify-between">
-                    <CardDescription className="flex items-center gap-1 text-xs">
-                      <PiChartDonutDuotone className="w-4 h-4 text-green-600" />
-                      Résultat Net
-                    </CardDescription>
-                    <VariationBadge
-                      value={data.indicateurs.variations.resultatNet}
-                    />
-                  </div>
-                </CardHeader>
-                <CardContent className="pt-0">
-                  <div
-                    className={`text-xl font-bold ${
-                      data.indicateurs.anneeN.resultatNet >= 0
-                        ? "text-green-600"
-                        : "text-red-600"
-                    }`}
-                  >
-                    {formatCompactOnly(data.indicateurs.anneeN.resultatNet)}
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    {yearN1}:{" "}
-                    {formatCompactOnly(data.indicateurs.anneeN1.resultatNet)}
-                  </p>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader className="pb-2">
-                  <div className="flex items-center justify-between">
-                    <CardDescription className="flex items-center gap-1 text-xs">
-                      <PiWalletDuotone className="w-4 h-4 text-cyan-600" />
-                      Trésorerie
-                    </CardDescription>
-                    <VariationBadge
-                      value={data.indicateurs.variations.soldeTresorerie}
-                    />
-                  </div>
-                </CardHeader>
-                <CardContent className="pt-0">
-                  <div
-                    className={`text-xl font-bold ${
-                      data.indicateurs.anneeN.soldeTresorerie >= 0
-                        ? "text-cyan-600"
-                        : "text-red-600"
-                    }`}
-                  >
-                    {formatCompactOnly(data.indicateurs.anneeN.soldeTresorerie)}
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    {yearN1}:{" "}
-                    {formatCompactOnly(
-                      data.indicateurs.anneeN1.soldeTresorerie,
-                    )}
-                  </p>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader className="pb-2">
-                  <div className="flex items-center justify-between">
-                    <CardDescription className="flex items-center gap-1 text-xs">
-                      <PiShoppingCartSimpleDuotone className="w-4 h-4 text-indigo-600" />
-                      Marge commerciale
-                    </CardDescription>
-                    <VariationBadge
-                      value={data.indicateurs.variations.margeCommerciale}
-                    />
-                  </div>
-                </CardHeader>
-                <CardContent className="pt-0">
-                  <div
-                    className={`text-xl font-bold ${
-                      data.indicateurs.anneeN.margeCommerciale >= 0
-                        ? "text-indigo-600"
-                        : "text-red-600"
-                    }`}
-                  >
-                    {formatCompactOnly(
-                      data.indicateurs.anneeN.margeCommerciale,
-                    )}
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    {yearN1}:{" "}
-                    {formatCompactOnly(
-                      data.indicateurs.anneeN1.margeCommerciale,
-                    )}
-                  </p>
-                </CardContent>
-              </Card>
+                    return (
+                      <div
+                        key={kpi.id}
+                        draggable={kpiEditMode}
+                        onDragStart={() => handleKpiDragStart(kpi.id)}
+                        onDragOver={(e) => handleKpiDragOver(e, kpi.id)}
+                        onDragEnd={handleKpiDragEnd}
+                        onContextMenu={(e) => handleKpiContextMenu(e, kpi.id)}
+                        className={cn(
+                          "transition-all duration-200",
+                          kpiEditMode && "cursor-grab active:cursor-grabbing",
+                          isDragging && "opacity-50 rotate-2 scale-95",
+                          !kpi.visible && "opacity-40",
+                        )}
+                      >
+                        <Card
+                          className={cn(
+                            "relative overflow-hidden",
+                            kpiEditMode &&
+                              "border-dashed border-[#0077C3] ring-1 ring-[#0077C3]/20",
+                          )}
+                        >
+                          {kpiEditMode && (
+                            <button
+                              onClick={() => toggleKpiVisible(kpi.id)}
+                              className="absolute top-2 right-2 z-10 w-6 h-6 rounded-full flex items-center justify-center bg-white border border-[#D0E3F5] text-[#94A3B8] hover:text-[#0077C3] transition-colors"
+                              title={
+                                kpi.visible ? "Masquer" : "Afficher"
+                              }
+                            >
+                              {kpi.visible ? (
+                                <Eye className="w-3.5 h-3.5" />
+                              ) : (
+                                <EyeOffIcon className="w-3.5 h-3.5" />
+                              )}
+                            </button>
+                          )}
+                          <CardHeader className="pb-2">
+                            <div className="flex items-center justify-between">
+                              <CardDescription className="flex items-center gap-1 text-xs">
+                                <Icon className={`w-4 h-4 ${kpi.color}`} />
+                                {kpi.label}
+                              </CardDescription>
+                              <VariationBadge value={variation} />
+                            </div>
+                          </CardHeader>
+                          <CardContent className="pt-0">
+                            <div
+                              className={`text-xl font-bold ${colorCls}`}
+                            >
+                              {formatCompactOnly(valueN)}
+                            </div>
+                            <p className="text-xs text-muted-foreground">
+                              {yearN1}: {formatCompactOnly(valueN1)}
+                            </p>
+                          </CardContent>
+                        </Card>
+                      </div>
+                    );
+                  })}
+              </div>
             </div>
+
+            {/* KPI context menu */}
+            {kpiContextMenu && (
+              <div
+                className="fixed z-50 bg-white border border-[#D0E3F5] rounded-lg shadow-lg py-1 min-w-[160px]"
+                style={{ top: kpiContextMenu.y, left: kpiContextMenu.x }}
+              >
+                <button
+                  onClick={() => {
+                    toggleKpiVisible(kpiContextMenu.id);
+                    setKpiContextMenu(null);
+                  }}
+                  className="flex items-center gap-2 w-full px-3 py-2 text-sm text-[#335890] hover:bg-[#F5F9FF]"
+                >
+                  {kpiItems.find((k) => k.id === kpiContextMenu.id)
+                    ?.visible ? (
+                    <>
+                      <EyeOff className="w-4 h-4" /> Masquer ce KPI
+                    </>
+                  ) : (
+                    <>
+                      <Eye className="w-4 h-4" /> Afficher ce KPI
+                    </>
+                  )}
+                </button>
+                <button
+                  onClick={() => {
+                    setKpiEditMode(true);
+                    setKpiContextMenu(null);
+                  }}
+                  className="flex items-center gap-2 w-full px-3 py-2 text-sm text-[#335890] hover:bg-[#F5F9FF]"
+                >
+                  <Settings2 className="w-4 h-4" /> Mode réorganisation
+                </button>
+              </div>
+            )}
 
             {/* Evolution Trésorerie */}
             <EvolutionTresorerie />
