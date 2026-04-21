@@ -27,8 +27,6 @@ import {
 import {
   Upload,
   XCircle,
-  FileSpreadsheet,
-  FileText,
   X,
   ChevronLeft,
   ChevronRight,
@@ -37,8 +35,6 @@ import {
   FileCheck,
 } from "lucide-react";
 import { toast } from "sonner";
-
-type FileKind = "comptable" | "autres";
 
 interface ClientOption {
   id: string;
@@ -49,11 +45,8 @@ interface ClientOption {
 interface UploadFileDialogProps {
   open: boolean;
   onClose: () => void;
-  /** Client context when opened from a single-client page. Used as default selection. */
   client?: ClientOption;
-  /** Optional list of clients to populate the selector (used on the /files page). */
   clients?: ClientOption[];
-  /** Default selected client id when opened from a multi-client page. */
   defaultClientId?: string;
 }
 
@@ -64,8 +57,7 @@ const REQUIRED_FILE_TYPES = [
   { type: "CODE_JOURNAL", label: "Code Journal" },
 ];
 
-const MAX_COMPTABLE_FILES = 4;
-const MAX_NORMAL_FILES = 10;
+const MAX_FILES = 4;
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
 
 interface PickedFile {
@@ -94,7 +86,13 @@ const detectFileType = (fileName: string): string | undefined => {
     .trim();
   const keywords: Record<string, string[]> = {
     GRAND_LIVRE: ["grand", "livre", "grandlivre", "gl"],
-    PLAN_COMPTES: ["plan", "compte", "plancompte", "plancomptable", "comptable"],
+    PLAN_COMPTES: [
+      "plan",
+      "compte",
+      "plancompte",
+      "plancomptable",
+      "comptable",
+    ],
     PLAN_TIERS: ["plan", "tiers", "plantiers"],
     CODE_JOURNAL: ["code", "journal", "codejournal", "journaux"],
   };
@@ -109,6 +107,23 @@ const detectFileType = (fileName: string): string | undefined => {
   return best.score > 0 ? best.type : undefined;
 };
 
+/** Parse dd/mm/yyyy to Date or null */
+function parseDateFR(str: string): Date | null {
+  const m = str.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  if (!m) return null;
+  const d = new Date(Number(m[3]), Number(m[2]) - 1, Number(m[1]));
+  return isNaN(d.getTime()) ? null : d;
+}
+
+/** Format Date to dd/mm/yyyy */
+function formatDateFR(d: Date): string {
+  return d.toLocaleDateString("fr-FR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  });
+}
+
 export function UploadFileDialog({
   open,
   onClose,
@@ -119,7 +134,6 @@ export function UploadFileDialog({
   const router = useRouter();
   const currentYear = new Date().getFullYear();
 
-  // Unified list of selectable clients (clients prop wins, else single client).
   const clientList: ClientOption[] = useMemo(() => {
     if (clients && clients.length > 0) return clients;
     if (client) return [client];
@@ -130,9 +144,10 @@ export function UploadFileDialog({
     defaultClientId ?? client?.id ?? clientList[0]?.id ?? "";
 
   const [step, setStep] = useState<1 | 2>(1);
-  const [fileKind, setFileKind] = useState<FileKind>("comptable");
   const [clientId, setClientId] = useState(initialClientId);
   const [dateRange, setDateRange] = useState<DateRange | undefined>();
+  const [startText, setStartText] = useState("");
+  const [endText, setEndText] = useState("");
   const [calendarMonth, setCalendarMonth] = useState<Date>(
     new Date(currentYear, 0),
   );
@@ -145,17 +160,23 @@ export function UploadFileDialog({
     return Array.from({ length: 10 }, (_, i) => currentYear - i);
   }, [currentYear]);
 
-  // Currently selected client object (for step 2 header)
   const selectedClient =
     clientList.find((c) => c.id === clientId) || clientList[0];
 
-  // Reset whenever dialog opens
+  // Sync text inputs with dateRange
+  useEffect(() => {
+    setStartText(dateRange?.from ? formatDateFR(dateRange.from) : "");
+    setEndText(dateRange?.to ? formatDateFR(dateRange.to) : "");
+  }, [dateRange]);
+
+  // Reset on open
   useEffect(() => {
     if (open) {
       setStep(1);
-      setFileKind("comptable");
       setClientId(initialClientId);
       setDateRange(undefined);
+      setStartText("");
+      setEndText("");
       setSelectedYear(currentYear);
       setCalendarMonth(new Date(currentYear, 0));
       setFiles([]);
@@ -176,6 +197,20 @@ export function UploadFileDialog({
     setCalendarMonth(new Date(year, 0));
   };
 
+  const handleStartBlur = () => {
+    const d = parseDateFR(startText);
+    if (d) {
+      setDateRange((prev) => ({ from: d, to: prev?.to }));
+    }
+  };
+
+  const handleEndBlur = () => {
+    const d = parseDateFR(endText);
+    if (d) {
+      setDateRange((prev) => ({ from: prev?.from, to: d }));
+    }
+  };
+
   const periodStart = dateRange?.from
     ? dateRange.from.toISOString().slice(0, 10)
     : "";
@@ -183,19 +218,10 @@ export function UploadFileDialog({
     ? dateRange.to.toISOString().slice(0, 10)
     : "";
 
-  const maxFiles =
-    fileKind === "comptable" ? MAX_COMPTABLE_FILES : MAX_NORMAL_FILES;
+  const canGoNext = !!clientId && !!periodStart && !!periodEnd;
 
-  const canGoNext = useMemo(() => {
-    if (fileKind === "comptable") {
-      return !!clientId && !!periodStart && !!periodEnd;
-    }
-    // "autres" does not require period
-    return !!clientId;
-  }, [fileKind, clientId, periodStart, periodEnd]);
-
-  const allComptableValid = () => {
-    if (files.length !== MAX_COMPTABLE_FILES) return false;
+  const allValid = () => {
+    if (files.length !== MAX_FILES) return false;
     const types = files.map((f) => f.fileType);
     const required = REQUIRED_FILE_TYPES.map((t) => t.type);
     return (
@@ -205,24 +231,22 @@ export function UploadFileDialog({
   };
 
   const canValidate = useMemo(() => {
-    if (files.length === 0) return false;
-    if (fileKind === "comptable") return allComptableValid();
-    return files.every((f) => !f.error);
+    return files.length > 0 && allValid();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [files, fileKind]);
+  }, [files]);
 
   const handleFiles = (incoming: FileList | null) => {
     if (!incoming) return;
     const arr = Array.from(incoming);
-    const slots = maxFiles - files.length;
+    const slots = MAX_FILES - files.length;
     if (slots <= 0) {
-      toast.error(`Maximum ${maxFiles} fichiers.`);
+      toast.error(`Maximum ${MAX_FILES} fichiers.`);
       return;
     }
     const next: PickedFile[] = [];
     for (let i = 0; i < arr.length && i < slots; i++) {
       const f = arr[i];
-      if (fileKind === "comptable" && !isValidExcel(f)) {
+      if (!isValidExcel(f)) {
         toast.error(`${f.name} n'est pas un fichier Excel valide`);
         continue;
       }
@@ -237,11 +261,10 @@ export function UploadFileDialog({
       next.push({
         id: Math.random().toString(36),
         file: f,
-        fileType:
-          fileKind === "comptable" ? detectFileType(f.name) : undefined,
+        fileType: detectFileType(f.name),
       });
     }
-    setFiles((prev) => [...prev, ...next].slice(0, maxFiles));
+    setFiles((prev) => [...prev, ...next].slice(0, MAX_FILES));
   };
 
   const handleDrag = (e: React.DragEvent) => {
@@ -279,60 +302,40 @@ export function UploadFileDialog({
     setUploading(true);
 
     try {
-      if (fileKind === "comptable") {
-        const formData = new FormData();
-        formData.append("clientId", clientId);
-        formData.append("periodStart", periodStart);
-        formData.append("periodEnd", periodEnd);
-        files.forEach((f) => {
-          if (f.fileType) formData.append(f.fileType, f.file);
-        });
+      const formData = new FormData();
+      formData.append("clientId", clientId);
+      formData.append("periodStart", periodStart);
+      formData.append("periodEnd", periodEnd);
+      files.forEach((f) => {
+        if (f.fileType) formData.append(f.fileType, f.file);
+      });
 
-        const uploadRes = await fetch("/api/files/comptable/upload", {
-          method: "POST",
-          body: formData,
-        });
-        const uploadData = await uploadRes.json();
-        if (!uploadRes.ok) {
-          throw new Error(uploadData.error || "Erreur lors de l'upload");
-        }
-
-        const triggerRes = await fetch("/api/files/comptable/trigger-etl", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ batchId: uploadData.batchId }),
-        });
-        const triggerData = await triggerRes.json();
-        if (!triggerRes.ok) {
-          throw new Error(
-            triggerData.error || "Erreur lors du lancement du traitement",
-          );
-        }
-
-        toast.success("Traitement ETL lancé");
-        onClose();
-        router.push(
-          `/clients/${clientId}/declaration/status/${uploadData.batchId}`,
-        );
-      } else {
-        // "autres" — upload each file independently via /normal/upload
-        for (const f of files) {
-          const fd = new FormData();
-          fd.append("clientId", clientId);
-          fd.append("file", f.file);
-          const res = await fetch("/api/files/normal/upload", {
-            method: "POST",
-            body: fd,
-          });
-          if (!res.ok) {
-            const err = await res.json().catch(() => ({}));
-            throw new Error(err.error || `Erreur upload ${f.file.name}`);
-          }
-        }
-        toast.success(`${files.length} fichier(s) téléversé(s)`);
-        onClose();
-        router.refresh();
+      const uploadRes = await fetch("/api/files/comptable/upload", {
+        method: "POST",
+        body: formData,
+      });
+      const uploadData = await uploadRes.json();
+      if (!uploadRes.ok) {
+        throw new Error(uploadData.error || "Erreur lors de l'upload");
       }
+
+      const triggerRes = await fetch("/api/files/comptable/trigger-etl", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ batchId: uploadData.batchId }),
+      });
+      const triggerData = await triggerRes.json();
+      if (!triggerRes.ok) {
+        throw new Error(
+          triggerData.error || "Erreur lors du lancement du traitement",
+        );
+      }
+
+      toast.success("Traitement ETL lancé");
+      onClose();
+      router.push(
+        `/clients/${clientId}/declaration/status/${uploadData.batchId}`,
+      );
     } catch (error: any) {
       toast.error(error.message || "Erreur lors du traitement");
     } finally {
@@ -344,16 +347,18 @@ export function UploadFileDialog({
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
       <DialogContent
         showCloseButton={false}
-        className="p-0 overflow-hidden w-[calc(100vw-2rem)] max-w-[calc(100vw-2rem)] sm:max-w-[820px] max-h-[calc(100vh-2rem)] border border-[#D0E3F5]"
+        className="p-0 overflow-hidden w-[calc(100vw-2rem)] max-w-[calc(100vw-2rem)] sm:max-w-[640px] max-h-[calc(100vh-2rem)] border border-[#D0E3F5]"
       >
         <div className="p-6 pb-4">
           <div className="flex items-start justify-between mb-5">
             <div>
               <DialogTitle className="text-lg font-bold text-[#00122E]">
-                Ajout de fichier
+                Créer un reporting
               </DialogTitle>
-              <DialogDescription className="sr-only">
-                Assistant d&apos;ajout de fichier en deux étapes
+              <DialogDescription className="text-sm text-[#335890]">
+                {step === 1
+                  ? "Sélectionnez le client et la période"
+                  : "Ajoutez les 4 fichiers comptables requis"}
               </DialogDescription>
             </div>
             <button
@@ -365,12 +370,7 @@ export function UploadFileDialog({
             </button>
           </div>
 
-          {/* Step indicator / type banner */}
-          <div className="mb-5 bg-[#F5F9FF] rounded-lg py-2.5 text-center text-sm font-semibold text-[#00122E]">
-            {fileKind === "comptable" ? "Fichiers comptables" : "Autres fichiers"}
-          </div>
-
-          {/* Slider area: fixed min height to avoid layout jumps */}
+          {/* Slider */}
           <div className="relative overflow-hidden">
             <div
               className="flex transition-transform duration-300 ease-out"
@@ -378,163 +378,121 @@ export function UploadFileDialog({
                 transform: `translateX(${step === 1 ? "0%" : "-100%"})`,
               }}
             >
-              {/* STEP 1 */}
-              <div className="w-full shrink-0 px-1">
-                <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-5 items-start">
-                  {/* Left column: Type + Client + Period summary */}
-                  <div className="space-y-4 min-w-0">
-                    <div>
-                      <Label className="block text-sm font-medium text-[#335890] mb-2">
-                        Type de fichier{" "}
-                        <span className="text-red-500">*</span>
-                      </Label>
-                      <div className="grid grid-cols-2 gap-2 rounded-lg border border-[#D0E3F5] p-1 bg-[#F8FAFC]">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setFileKind("comptable");
-                            setFiles([]);
-                          }}
-                          className={`flex items-center justify-center gap-1.5 py-2 px-2 rounded-md text-xs font-medium transition-colors whitespace-nowrap ${
-                            fileKind === "comptable"
-                              ? "bg-white text-[#0077C3] border border-[#0077C3] shadow-sm"
-                              : "text-[#335890] hover:text-[#0077C3]"
-                          }`}
-                        >
-                          <FileSpreadsheet className="w-4 h-4" />
-                          Fichiers comptables
-                        </button>
-                        {/* <button
-                          type="button"
-                          onClick={() => {
-                            setFileKind("autres");
-                            setFiles([]);
-                          }}
-                          className={`flex items-center justify-center gap-1.5 py-2 px-2 rounded-md text-xs font-medium transition-colors whitespace-nowrap ${
-                            fileKind === "autres"
-                              ? "bg-white text-[#0077C3] border border-[#0077C3] shadow-sm"
-                              : "text-[#335890] hover:text-[#0077C3]"
-                          }`}
-                        >
-                          <FileText className="w-4 h-4" />
-                          Autres fichiers
-                        </button> */}
-                      </div>
-                    </div>
+              {/* ===== STEP 1 ===== */}
+              <div className="w-full shrink-0 space-y-4">
+                {/* Client */}
+                <div>
+                  <Label className="block text-sm font-medium text-[#335890] mb-2">
+                    Client <span className="text-red-500">*</span>
+                  </Label>
+                  <Select
+                    value={clientId}
+                    onValueChange={(v) => setClientId(v)}
+                  >
+                    <SelectTrigger className="w-full h-10 border-[#D0E3F5]">
+                      <SelectValue placeholder="Sélectionner un client" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectGroup>
+                        <SelectLabel>Client</SelectLabel>
+                        {clientList.map((c) => (
+                          <SelectItem key={c.id} value={c.id}>
+                            {c.name}
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
+                    </SelectContent>
+                  </Select>
+                </div>
 
-                    <div>
-                      <Label className="block text-sm font-medium text-[#335890] mb-2">
-                        Client <span className="text-red-500">*</span>
-                      </Label>
-                      <Select
-                        value={clientId}
-                        onValueChange={(v) => setClientId(v)}
-                      >
-                        <SelectTrigger className="w-full h-10 border-[#D0E3F5]">
-                          <SelectValue placeholder="Sélectionner un client" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectGroup>
-                            <SelectLabel>Client</SelectLabel>
-                            {clientList.map((c) => (
-                              <SelectItem key={c.id} value={c.id}>
-                                {c.name}
-                              </SelectItem>
-                            ))}
-                          </SelectGroup>
-                        </SelectContent>
-                      </Select>
-                    </div>
+                {/* Period */}
+                <div>
+                  <Label className="block text-sm font-medium text-[#335890] mb-2">
+                    Période <span className="text-red-500">*</span>
+                  </Label>
 
-                    {fileKind === "comptable" && (
-                      <div>
-                        <Label className="block text-sm font-medium text-[#335890] mb-2">
-                          Période <span className="text-red-500">*</span>
-                        </Label>
-                        <div className="space-y-2">
-                          <div className="flex items-center gap-2 px-3 py-2 rounded-lg border border-[#D0E3F5] bg-white text-sm">
-                            <span className="text-[#94A3B8] text-xs">
-                              Début :
-                            </span>
-                            <span className="font-medium text-[#00122E]">
-                              {dateRange?.from
-                                ? dateRange.from.toLocaleDateString("fr-FR")
-                                : "—"}
-                            </span>
-                          </div>
-                          <div className="flex items-center gap-2 px-3 py-2 rounded-lg border border-[#D0E3F5] bg-white text-sm">
-                            <span className="text-[#94A3B8] text-xs">
-                              Fin :
-                            </span>
-                            <span className="font-medium text-[#00122E]">
-                              {dateRange?.to
-                                ? dateRange.to.toLocaleDateString("fr-FR")
-                                : "—"}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Right column: Calendar (comptable only) */}
-                  {fileKind === "comptable" && (
-                    <div className="w-[320px] shrink-0">
-                      <div className="flex items-center gap-2 mb-2">
-                        <Select
-                          value={selectedYear.toString()}
-                          onValueChange={(v) => handleYearChange(Number(v))}
-                        >
-                          <SelectTrigger
-                            className="h-8 w-[90px] text-xs border-[#D0E3F5]"
-                            aria-label="Année"
-                          >
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {yearOptions.map((y) => (
-                              <SelectItem key={y} value={y.toString()}>
-                                {y}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleSelectFullYear(selectedYear)}
-                          className="h-8 text-xs border-[#0077C3] text-[#0077C3] hover:bg-[#EBF5FF] flex-1"
-                        >
-                          Toute l&apos;année {selectedYear}
-                        </Button>
-                      </div>
-                      <Calendar
-                        mode="range"
-                        numberOfMonths={1}
-                        locale={fr}
-                        selected={dateRange}
-                        onSelect={setDateRange}
-                        month={calendarMonth}
-                        onMonthChange={setCalendarMonth}
-                        className="rounded-lg border border-[#D0E3F5] shadow-sm [--cell-size:--spacing(8)] [&_.rdp-root]:w-full"
+                  {/* Editable date inputs */}
+                  <div className="grid grid-cols-2 gap-3 mb-3">
+                    <div className="space-y-1">
+                      <span className="text-[10px] text-[#94A3B8] uppercase">
+                        Début
+                      </span>
+                      <Input
+                        placeholder="jj/mm/aaaa"
+                        value={startText}
+                        onChange={(e) => setStartText(e.target.value)}
+                        onBlur={handleStartBlur}
+                        className="h-10 bg-[#F8FAFC] border-[#D0E3F5] font-medium"
                       />
                     </div>
-                  )}
+                    <div className="space-y-1">
+                      <span className="text-[10px] text-[#94A3B8] uppercase">
+                        Fin
+                      </span>
+                      <Input
+                        placeholder="jj/mm/aaaa"
+                        value={endText}
+                        onChange={(e) => setEndText(e.target.value)}
+                        onBlur={handleEndBlur}
+                        className="h-10 bg-[#F8FAFC] border-[#D0E3F5] font-medium"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Year shortcut + Calendar */}
+                  <div className="flex items-center gap-2 mb-2">
+                    <Select
+                      value={selectedYear.toString()}
+                      onValueChange={(v) => handleYearChange(Number(v))}
+                    >
+                      <SelectTrigger
+                        className="h-8 w-[90px] text-xs border-[#D0E3F5]"
+                        aria-label="Année"
+                      >
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {yearOptions.map((y) => (
+                          <SelectItem key={y} value={y.toString()}>
+                            {y}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleSelectFullYear(selectedYear)}
+                      className="h-8 text-xs border-[#0077C3] text-[#0077C3] hover:bg-[#EBF5FF] flex-1"
+                    >
+                      Toute l&apos;année {selectedYear}
+                    </Button>
+                  </div>
+                  <Calendar
+                    mode="range"
+                    numberOfMonths={1}
+                    locale={fr}
+                    selected={dateRange}
+                    onSelect={setDateRange}
+                    month={calendarMonth}
+                    onMonthChange={setCalendarMonth}
+                    className="rounded-lg border border-[#D0E3F5] shadow-sm [--cell-size:--spacing(8)]"
+                  />
                 </div>
               </div>
 
-              {/* STEP 2 */}
-              <div className="w-full shrink-0 px-1 space-y-3">
-                {/* Client summary header */}
-                <div className="flex items-center gap-3">
-                  <div className="w-11 h-11 rounded-full bg-[#EBF5FF] flex items-center justify-center text-base font-bold text-[#0077C3] shrink-0">
+              {/* ===== STEP 2 ===== */}
+              <div className="w-full shrink-0 space-y-3">
+                {/* Client + period recap */}
+                <div className="flex items-center gap-3 p-3 bg-[#F5F9FF] rounded-lg border border-[#D0E3F5]">
+                  <div className="w-10 h-10 rounded-full bg-[#EBF5FF] flex items-center justify-center text-sm font-bold text-[#0077C3] shrink-0">
                     {selectedClient
                       ? selectedClient.name.charAt(0).toUpperCase()
                       : "?"}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-base font-bold text-[#00122E] truncate">
+                    <p className="text-sm font-bold text-[#00122E] truncate">
                       {selectedClient?.name || "—"}
                     </p>
                     {selectedClient?.email && (
@@ -543,7 +501,7 @@ export function UploadFileDialog({
                       </p>
                     )}
                   </div>
-                  {fileKind === "comptable" && periodStart && periodEnd && (
+                  {periodStart && periodEnd && (
                     <div className="text-right text-xs">
                       <div className="text-[#94A3B8]">Période</div>
                       <div className="font-semibold text-[#00122E]">
@@ -571,52 +529,45 @@ export function UploadFileDialog({
                           <p className="font-medium text-[#00122E] truncate">
                             {f.file.name}
                           </p>
-                          {fileKind === "comptable" && (
-                            <div className="mt-1">
-                              {f.fileType ? (
-                                <Badge variant="default" className="text-xs">
-                                  <FileCheck className="w-3 h-3 mr-1" />
-                                  {
-                                    REQUIRED_FILE_TYPES.find(
-                                      (t) => t.type === f.fileType,
-                                    )?.label
-                                  }
+                          <div className="mt-1">
+                            {f.fileType ? (
+                              <Badge variant="default" className="text-xs">
+                                <FileCheck className="w-3 h-3 mr-1" />
+                                {
+                                  REQUIRED_FILE_TYPES.find(
+                                    (t) => t.type === f.fileType,
+                                  )?.label
+                                }
+                              </Badge>
+                            ) : (
+                              <div className="flex items-center gap-2">
+                                <Badge variant="secondary" className="text-xs">
+                                  <AlertCircle className="w-3 h-3 mr-1" />
+                                  Type non détecté
                                 </Badge>
-                              ) : (
-                                <div className="flex items-center gap-2">
-                                  <Badge
-                                    variant="secondary"
-                                    className="text-xs"
-                                  >
-                                    <AlertCircle className="w-3 h-3 mr-1" />
-                                    Type non détecté
-                                  </Badge>
-                                  <Select
-                                    value={f.fileType || ""}
-                                    onValueChange={(v) =>
-                                      updateFileType(f.id, v)
-                                    }
-                                  >
-                                    <SelectTrigger className="h-7 text-xs w-[170px]">
-                                      <SelectValue placeholder="Choisir le type" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                      {REQUIRED_FILE_TYPES.filter(
-                                        (t) => !usedTypes(f.id).includes(t.type),
-                                      ).map((t) => (
-                                        <SelectItem
-                                          key={t.type}
-                                          value={t.type}
-                                        >
-                                          {t.label}
-                                        </SelectItem>
-                                      ))}
-                                    </SelectContent>
-                                  </Select>
-                                </div>
-                              )}
-                            </div>
-                          )}
+                                <Select
+                                  value={f.fileType || ""}
+                                  onValueChange={(v) =>
+                                    updateFileType(f.id, v)
+                                  }
+                                >
+                                  <SelectTrigger className="h-7 text-xs w-[170px]">
+                                    <SelectValue placeholder="Choisir le type" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {REQUIRED_FILE_TYPES.filter(
+                                      (t) =>
+                                        !usedTypes(f.id).includes(t.type),
+                                    ).map((t) => (
+                                      <SelectItem key={t.type} value={t.type}>
+                                        {t.label}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                            )}
+                          </div>
                           {f.error && (
                             <p className="text-xs text-red-500 mt-1">
                               {f.error}
@@ -659,16 +610,14 @@ export function UploadFileDialog({
                         Glissez-déposez vos fichiers ici
                       </p>
                       <p className="text-xs text-[#335890]">
-                        ou cliquez pour sélectionner (max {maxFiles} fichiers,
+                        ou cliquez pour sélectionner (max {MAX_FILES} fichiers,
                         10MB chacun)
                       </p>
                     </div>
                     <Input
                       type="file"
                       multiple
-                      accept={
-                        fileKind === "comptable" ? ".xlsx,.xls" : undefined
-                      }
+                      accept=".xlsx,.xls"
                       onChange={(e) => handleFiles(e.target.files)}
                       className="hidden"
                       id="upload-dialog-input"
@@ -690,10 +639,13 @@ export function UploadFileDialog({
           </div>
         </div>
 
+        {/* Footer */}
         <div className="flex items-center gap-3 px-6 pb-6">
           <Button
+            type="button"
             variant="outline"
             onClick={onClose}
+            disabled={uploading}
             className="gap-2 text-[#335890] border-[#E2E8F0]"
           >
             <XCircle className="w-4 h-4" />
@@ -701,6 +653,7 @@ export function UploadFileDialog({
           </Button>
           {step === 1 ? (
             <Button
+              type="button"
               onClick={() => setStep(2)}
               disabled={!canGoNext}
               className="gap-2 flex-1 bg-gradient-to-r from-[#0077C3] to-[#0095F4] hover:from-[#005992] hover:to-[#0077C3] disabled:opacity-50"
@@ -711,6 +664,7 @@ export function UploadFileDialog({
           ) : (
             <>
               <Button
+                type="button"
                 variant="outline"
                 onClick={() => setStep(1)}
                 disabled={uploading}
@@ -720,6 +674,7 @@ export function UploadFileDialog({
                 Retour
               </Button>
               <Button
+                type="button"
                 onClick={handleValidate}
                 disabled={!canValidate || uploading}
                 className="gap-2 flex-1 bg-[#EBF5FF] text-[#0077C3] hover:bg-[#D0E3F5] border border-[#0077C3] disabled:opacity-50"

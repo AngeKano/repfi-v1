@@ -30,12 +30,13 @@ import FilesTabs from "./files-tabs";
 import DeclarationTabs from "./declaration/declaration-tabs";
 import ClientReportingChart from "@/components/reporting/client-reporting-chart";
 import { UploadFileDialog } from "./upload-file-dialog";
+import { ClientDetailsDialog } from "@/app/clients/client-details-dialog";
+import { DeleteClientDialog } from "@/app/clients/delete-client-dialog";
 import {
   getRoleLabel,
   getRoleBadgeVariant,
 } from "@/lib/permissions/role-utils";
 import { DashboardLayout } from "@/components/dashboard-layout";
-import { ConfirmDialog } from "@/components/confirm-dialog";
 
 interface ClientDetailsClientProps {
   session: any;
@@ -68,8 +69,9 @@ export default function ClientDetailsClient({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [activeTab, setActiveTab] = useState("overview");
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showUploadDialog, setShowUploadDialog] = useState(false);
+  const [showEditDialog, setShowEditDialog] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
   const initialPeriodType = (() => {
     const qp = searchParams.get("periodType");
@@ -80,27 +82,6 @@ export default function ClientDetailsClient({
   const roleLabel = getRoleLabel(session.user.role);
   const roleBadgeVariant = getRoleBadgeVariant(session.user.role);
 
-  const handleDelete = async () => {
-    setLoading(true);
-    setError("");
-    setShowDeleteConfirm(false);
-
-    try {
-      const response = await fetch(`/api/clients/${client.id}`, {
-        method: "DELETE",
-      });
-
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.error);
-      }
-
-      router.push("/clients");
-    } catch (err: any) {
-      setError(err.message || "Erreur lors de la suppression");
-      setLoading(false);
-    }
-  };
 
   return (
     <DashboardLayout>
@@ -176,9 +157,8 @@ export default function ClientDetailsClient({
             {canDelete && !client.isSelfEntity && (
               <Button
                 variant="outline"
-                className="gap-2 border-red-200 text-red-500 hover:bg-red-50"
-                onClick={() => setShowDeleteConfirm(true)}
-                disabled={loading}
+                className="gap-2 border-red-200 text-red-500 hover:bg-red-50 rounded-full"
+                onClick={() => setShowDeleteDialog(true)}
               >
                 <Trash2 className="w-4 h-4" />
                 Supprimer
@@ -186,20 +166,22 @@ export default function ClientDetailsClient({
             )}
 
             {canEdit && !client.isSelfEntity && (
-              <Link href={`/clients/${client.id}/edit`}>
-                <Button variant="outline" className="gap-2 border-[#D0E3F5] text-[#335890]">
-                  <Edit className="w-4 h-4" />
-                  Modifier
-                </Button>
-              </Link>
+              <Button
+                variant="outline"
+                className="gap-2 border-[#D0E3F5] text-[#335890] rounded-full"
+                onClick={() => setShowEditDialog(true)}
+              >
+                <Edit className="w-4 h-4" />
+                Modifier
+              </Button>
             )}
 
             <Button
               onClick={() => setShowUploadDialog(true)}
-              className="gap-2 bg-gradient-to-r from-[#0077C3] to-[#0095F4] hover:from-[#005992] hover:to-[#0077C3]"
+              className="gap-2 bg-gradient-to-r from-[#0077C3] to-[#0095F4] hover:from-[#005992] hover:to-[#0077C3] rounded-full"
             >
               <Plus className="w-4 h-4" />
-              Charger un fichier
+              Créer un reporting
             </Button>
           </div>
         </div>
@@ -405,17 +387,18 @@ export default function ClientDetailsClient({
         client={{ id: client.id, name: client.name, email: client.email }}
       />
 
-      {/* Delete Confirmation */}
-      <ConfirmDialog
-        open={showDeleteConfirm}
-        onClose={() => setShowDeleteConfirm(false)}
-        onConfirm={handleDelete}
-        title="Attention"
-        message={`Êtes-vous sûr de vouloir supprimer le client "${client.name}" ? Cette action est irréversible.`}
-        confirmLabel="Supprimer"
-        cancelLabel="Annuler"
-        variant="danger"
-        confirmIcon={<Trash2 className="w-4 h-4" />}
+      <ClientDetailsDialog
+        client={client}
+        open={showEditDialog}
+        onClose={() => setShowEditDialog(false)}
+        canEdit={canEdit}
+        canDelete={canDelete}
+      />
+
+      <DeleteClientDialog
+        client={showDeleteDialog ? client : null}
+        open={showDeleteDialog}
+        onClose={() => setShowDeleteDialog(false)}
       />
     </DashboardLayout>
   );
