@@ -38,7 +38,7 @@ import { toast } from "sonner";
 
 interface ClientOption {
   id: string;
-  name: string;
+  name?: string;
   email?: string;
 }
 
@@ -487,7 +487,7 @@ export function UploadFileDialog({
                 {/* Client + period recap */}
                 <div className="flex items-center gap-3 p-3 bg-[#F5F9FF] rounded-lg border border-[#D0E3F5]">
                   <div className="w-10 h-10 rounded-full bg-[#EBF5FF] flex items-center justify-center text-sm font-bold text-[#0077C3] shrink-0">
-                    {selectedClient
+                    {selectedClient?.name
                       ? selectedClient.name.charAt(0).toUpperCase()
                       : "?"}
                   </div>

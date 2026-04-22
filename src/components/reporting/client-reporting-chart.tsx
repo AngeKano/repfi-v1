@@ -1257,16 +1257,6 @@ export default function ClientReportingChart({
             {/* KPIs — configurable grid */}
             <div>
               <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-4 text-xs text-[#335890]">
-                  <span>
-                    Devise :{" "}
-                    <span className="font-semibold text-[#00122E]">Fcfa</span>
-                  </span>
-                  <span>
-                    Unité :{" "}
-                    <span className="font-semibold text-[#00122E]">K Fcfa</span>
-                  </span>
-                </div>
                 <Button
                   variant="outline"
                   size="sm"
