@@ -225,7 +225,7 @@ export default function ClientDetailsClient({
               <p className="text-sm font-semibold text-[#00122E]">
                 FCFA{" "}
                 <span className="text-xs font-normal text-[#335890]">
-                  (unité : KFCFA)
+                  (unité : K FCFA)
                 </span>
               </p>
             </div>
@@ -368,7 +368,7 @@ export default function ClientDetailsClient({
               </Card>
             )}
 
-            {/* Declaration / Reporting Financier */}
+            {/* Reporting Financier */}
             {activeTab === "declaration" && (
               <Tabs value="declaration">
                 <DeclarationTabs clientId={client.id} />
