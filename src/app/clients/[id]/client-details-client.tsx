@@ -187,10 +187,10 @@ export default function ClientDetailsClient({
         </div>
 
         {/* Main Layout: Sidebar + Content */}
-        <div className="flex gap-6">
+        <div className="flex gap-6 items-start">
           {/* Left Sidebar Navigation — sticky */}
-          <div className="w-[220px] shrink-0">
-            <div className="sticky top-6">
+          <div className="w-[220px] shrink-0 self-start">
+            <div className="sticky top-6 max-h-[calc(100vh-3rem)] overflow-y-auto">
             <nav className="space-y-1">
               {CLIENT_TABS.map((tab, idx) => {
                 const active = activeTab === tab.id;
