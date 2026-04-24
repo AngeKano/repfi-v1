@@ -23,11 +23,11 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import Link from "next/link";
-import { FileText, Calendar, Eye, Trash2, Download, Plus } from "lucide-react";
+import { FileText, Calendar, Trash2, Download, Plus, ChevronLeft } from "lucide-react";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import { UploadFileDialog } from "../../upload-file-dialog";
+import StatusComponents from "../status/[batchId]/status";
 
 type PeriodFilter = "all" | "year" | "month";
 
@@ -57,6 +57,7 @@ const DeclarationTabs: React.FC<DeclarationTabsProps> = ({ clientId }) => {
   const [periodToDelete, setPeriodToDelete] = useState<any>(null);
   const [deleting, setDeleting] = useState(false);
   const [showUploadDialog, setShowUploadDialog] = useState(false);
+  const [selectedBatchId, setSelectedBatchId] = useState<string | null>(null);
 
   // Filters
   const [periodFilter, setPeriodFilter] = useState<PeriodFilter>("all");
@@ -163,6 +164,32 @@ const DeclarationTabs: React.FC<DeclarationTabsProps> = ({ clientId }) => {
     return `${new Date(start).toLocaleDateString("fr-FR")} au ${new Date(end).toLocaleDateString("fr-FR")}`;
   };
 
+  if (selectedBatchId) {
+    return (
+      <TabsContent value="declaration">
+        <div className="mb-4">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setSelectedBatchId(null)}
+            className="gap-2 border-[#D0E3F5] text-[#335890] hover:bg-[#EBF5FF] rounded-full"
+          >
+            <ChevronLeft className="w-4 h-4" />
+            Retour à la liste des reporting
+          </Button>
+        </div>
+        <div className="mb-4">
+          <h1 className="text-2xl font-bold text-[#00122E]">
+            Traitement du reporting
+          </h1>
+        </div>
+        <StatusComponents
+          params={Promise.resolve({ clientId, batchId: selectedBatchId })}
+        />
+      </TabsContent>
+    );
+  }
+
   return (
     <>
       <TabsContent value="declaration">
@@ -265,7 +292,8 @@ const DeclarationTabs: React.FC<DeclarationTabsProps> = ({ clientId }) => {
                   {filteredPeriods.map((period: any, idx: number) => (
                     <tr
                       key={period.id}
-                      className={`border-b border-[#D0E3F5] last:border-b-0 hover:bg-[#F5F9FF] transition-colors ${
+                      onClick={() => setSelectedBatchId(period.batchId)}
+                      className={`border-b border-[#D0E3F5] last:border-b-0 hover:bg-[#EBF5FF] transition-colors cursor-pointer ${
                         idx % 2 === 0 ? "bg-white" : "bg-[#FAFCFF]"
                       }`}
                     >
@@ -320,7 +348,7 @@ const DeclarationTabs: React.FC<DeclarationTabsProps> = ({ clientId }) => {
                           {period.status === "FAILED" && "Échec"}
                         </Badge>
                       </td>
-                      <td className="px-4 py-4">
+                      <td className="px-4 py-4" onClick={(e) => e.stopPropagation()}>
                         <div className="flex items-center justify-center gap-1">
                           {period.status === "COMPLETED" &&
                             period.excelFileUrl && (
@@ -334,27 +362,11 @@ const DeclarationTabs: React.FC<DeclarationTabsProps> = ({ clientId }) => {
                                 <Download className="w-4 h-4" />
                               </Button>
                             )}
-                          <Link
-                            href={`/clients/${clientId}/declaration/status/${period.batchId}`}
-                          >
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="text-[#0077C3] hover:text-[#005992] hover:bg-[#EBF5FF] h-8 w-8 p-0"
-                              title="Voir le statut"
-                            >
-                              <Eye className="w-4 h-4" />
-                            </Button>
-                          </Link>
                           <Button
                             variant="ghost"
                             size="sm"
                             className="text-red-400 hover:text-red-600 hover:bg-red-50 h-8 w-8 p-0"
                             onClick={() => handleDeleteClick(period)}
-                            disabled={
-                              period.status === "PROCESSING" ||
-                              period.status === "VALIDATING"
-                            }
                             title="Supprimer"
                           >
                             <Trash2 className="w-4 h-4" />
@@ -397,10 +409,20 @@ const DeclarationTabs: React.FC<DeclarationTabsProps> = ({ clientId }) => {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle className="text-[#DC2626]">
-              Supprimer cette période ?
+              {periodToDelete?.status === "PROCESSING" ||
+              periodToDelete?.status === "VALIDATING"
+                ? "Annuler et supprimer ce traitement en cours ?"
+                : "Supprimer cette période ?"}
             </AlertDialogTitle>
             <AlertDialogDescription asChild>
               <div>
+                {(periodToDelete?.status === "PROCESSING" ||
+                  periodToDelete?.status === "VALIDATING") && (
+                  <p className="mb-2 text-sm font-medium text-[#991B1B]">
+                    ⚠️ Ce traitement est en cours. La suppression arrête le
+                    pipeline ETL et supprime tous les fichiers.
+                  </p>
+                )}
                 <p className="text-sm text-[#335890]">
                   Cette action est irréversible. Tous les fichiers seront
                   supprimés de :

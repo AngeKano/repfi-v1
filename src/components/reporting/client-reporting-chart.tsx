@@ -410,6 +410,7 @@ export default function ClientReportingChart({
   const [tunnelMetrics, setTunnelMetrics] = useState<TunnelMetric[]>(
     INITIAL_TUNNEL_METRICS,
   );
+  const [tunnelEditMode, setTunnelEditMode] = useState(false);
   const [activeTab, setActiveTab] = useState<TabId>(initialTab || "synthese");
   const [expandedNav, setExpandedNav] = useState<Set<TabId>>(
     new Set([initialTab || "synthese"]),
@@ -856,65 +857,73 @@ export default function ClientReportingChart({
               Décomposition du résultat - Base 100% = Chiffre d&apos;affaires
             </CardDescription>
           </div>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm" className="gap-2">
-                <Settings2 className="w-4 h-4" />
-                Configurer
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-64">
-              {[...tunnelMetrics]
-                .sort((a, b) => a.order - b.order)
-                .map((metric, index) => (
-                  <div
-                    key={metric.id}
-                    className="flex items-center gap-2 px-2 py-1.5"
-                  >
-                    <div className="flex flex-col gap-0.5">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-4 w-4"
-                        onClick={() => moveMetric(metric.id, "up")}
-                        disabled={index === 0}
-                      >
-                        <ArrowUp className="h-3 w-3" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-4 w-4"
-                        onClick={() => moveMetric(metric.id, "down")}
-                        disabled={index === tunnelMetrics.length - 1}
-                      >
-                        <ArrowDown className="h-3 w-3" />
-                      </Button>
-                    </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setTunnelEditMode(!tunnelEditMode)}
+            className={cn(
+              "gap-2 h-9 rounded-lg transition-colors",
+              tunnelEditMode
+                ? "bg-[#0077C3] text-white border-[#0077C3] hover:bg-[#005992]"
+                : "border-[#D0E3F5] text-[#335890] hover:bg-[#EBF5FF]",
+            )}
+          >
+            <PiGearDuotone className="w-4 h-4" />
+            {tunnelEditMode ? "Terminer" : "Configurer le tunnel"}
+          </Button>
+        </div>
+        {tunnelEditMode && (
+          <div className="mt-4 border border-dashed border-[#0077C3] ring-1 ring-[#0077C3]/20 rounded-lg p-3 space-y-2">
+            {[...tunnelMetrics]
+              .sort((a, b) => a.order - b.order)
+              .map((metric, index) => (
+                <div
+                  key={metric.id}
+                  className={cn(
+                    "flex items-center gap-2 px-2 py-1.5 rounded-md bg-white border border-[#D0E3F5]",
+                    !metric.visible && "opacity-40",
+                  )}
+                >
+                  <div className="flex flex-col gap-0.5">
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="h-6 w-6"
-                      onClick={() => toggleMetricVisibility(metric.id)}
+                      className="h-5 w-5 text-[#335890]"
+                      onClick={() => moveMetric(metric.id, "up")}
+                      disabled={index === 0}
                     >
-                      {metric.visible ? (
-                        <Eye className="h-4 w-4" />
-                      ) : (
-                        <EyeOffIcon className="h-4 w-4 text-muted-foreground" />
-                      )}
+                      <ArrowUp className="h-3.5 w-3.5" />
                     </Button>
-                    <span
-                      className={`text-sm flex-1 ${
-                        !metric.visible ? "text-muted-foreground" : ""
-                      }`}
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-5 w-5 text-[#335890]"
+                      onClick={() => moveMetric(metric.id, "down")}
+                      disabled={index === tunnelMetrics.length - 1}
                     >
-                      {metric.label}
-                    </span>
+                      <ArrowDown className="h-3.5 w-3.5" />
+                    </Button>
                   </div>
-                ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
+                  <span className="text-sm flex-1 text-[#00122E]">
+                    {metric.label}
+                  </span>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7 rounded-full border border-[#D0E3F5] text-[#94A3B8] hover:text-[#0077C3]"
+                    onClick={() => toggleMetricVisibility(metric.id)}
+                    title={metric.visible ? "Masquer" : "Afficher"}
+                  >
+                    {metric.visible ? (
+                      <Eye className="h-3.5 w-3.5" />
+                    ) : (
+                      <EyeOffIcon className="h-3.5 w-3.5" />
+                    )}
+                  </Button>
+                </div>
+              ))}
+          </div>
+        )}
       </CardHeader>
       <CardContent>
         <div className="space-y-3">
@@ -987,7 +996,7 @@ export default function ClientReportingChart({
 
   // Légende personnalisée N vs N-1 (coin supérieur droit de la carte)
   const LegendLine = ({ color, dashed }: { color: string; dashed?: boolean }) => (
-    <svg width="64" height="3" viewBox="0 0 199 3" fill="none" aria-hidden>
+    <svg width="120" height="4" viewBox="0 0 199 3" fill="none" aria-hidden preserveAspectRatio="none">
       <path
         d="M1.5 1.5H197.5"
         stroke={color}
@@ -1001,21 +1010,23 @@ export default function ClientReportingChart({
   const ChartLegend = ({
     labelN,
     labelN1,
-    color = "#000000",
+    colorN = "#000000",
+    colorN1,
   }: {
     labelN: string | number;
     labelN1: string | number;
-    color?: string;
+    colorN?: string;
+    colorN1?: string;
   }) => (
-    <div className="flex flex-col gap-1 shrink-0">
-      <span className="text-sm font-semibold text-[#335890]">Légende</span>
-      <div className="flex items-center gap-2">
-        <LegendLine color={color} />
-        <span className="text-sm font-medium text-[#0077C3]">{labelN}</span>
+    <div className="flex flex-col gap-2 shrink-0">
+      <span className="text-base font-semibold text-[#335890]">Légende</span>
+      <div className="flex items-center gap-3">
+        <LegendLine color={colorN} />
+        <span className="text-base font-medium text-[#0077C3]">{labelN}</span>
       </div>
-      <div className="flex items-center gap-2">
-        <LegendLine color={color} dashed />
-        <span className="text-sm font-medium text-[#0077C3]">{labelN1}</span>
+      <div className="flex items-center gap-3">
+        <LegendLine color={colorN1 ?? colorN} dashed />
+        <span className="text-base font-medium text-[#0077C3]">{labelN1}</span>
       </div>
     </div>
   );
@@ -1030,7 +1041,12 @@ export default function ClientReportingChart({
             Comparaison {yearN} vs {yearN1} - par {getXAxisLabel().toLowerCase()}
           </CardDescription>
         </div>
-        <ChartLegend labelN={yearN} labelN1={yearN1} />
+        <ChartLegend
+          labelN={yearN}
+          labelN1={yearN1}
+          colorN="#2463eb"
+          colorN1="#81a5f3"
+        />
       </CardHeader>
       <CardContent>
         <ChartContainer config={chartConfigCA} className="h-[400px] w-full">
@@ -1103,7 +1119,12 @@ export default function ClientReportingChart({
               </CardDescription>
             </div>
           </div>
-          <ChartLegend labelN={yearN} labelN1={yearN1} />
+          <ChartLegend
+            labelN={yearN}
+            labelN1={yearN1}
+            colorN="#2463eb"
+            colorN1="#81a5f3"
+          />
         </CardHeader>
         <CardContent>
           <ChartContainer config={chartConfigCANature} className="w-full" style={{ height: `${chartHeight}px` }}>
@@ -1228,7 +1249,7 @@ export default function ClientReportingChart({
             Solde cumulé {yearN} vs {yearN1} - par {getXAxisLabel().toLowerCase()}
           </CardDescription>
         </div>
-        <ChartLegend labelN={yearN} labelN1={yearN1} color="#5FC7B9" />
+        <ChartLegend labelN={yearN} labelN1={yearN1} colorN="#5FC7B9" />
       </CardHeader>
       <CardContent>
         <ChartContainer
@@ -1727,63 +1748,103 @@ export default function ClientReportingChart({
             <div className="grid grid-cols-3 gap-4">
               <Card>
                 <CardHeader className="pb-2">
-                  <CardDescription className="flex items-center gap-1 text-xs">
-                    <Percent className="w-4 h-4 text-violet-600" />
+                  <CardDescription className="text-sm font-medium">
                     Taux de Recouvrement (12 mois)
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="pt-0">
-                  <div className="text-2xl font-bold text-violet-600">
-                    {recouvrementData.totals.tauxRecouvrement.toFixed(1)}%
+                  <div className="flex items-end justify-between gap-2">
+                    <div className="min-w-0">
+                      <div
+                        className={cn(
+                          "text-3xl font-bold truncate",
+                          recouvrementData.totals.tauxRecouvrement < 0
+                            ? "text-red-600"
+                            : "text-[#00122E]",
+                        )}
+                      >
+                        {recouvrementData.totals.tauxRecouvrement.toFixed(1)}%
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Sur la période sélectionnée
+                      </p>
+                    </div>
+                    <Percent className="w-8 h-8 shrink-0 text-violet-600" />
                   </div>
-                  <p className="text-xs text-muted-foreground">
-                    Sur la période sélectionnée
-                  </p>
                 </CardContent>
               </Card>
 
               <Card>
                 <CardHeader className="pb-2">
-                  <CardDescription className="flex items-center gap-1 text-xs">
-                    <PiCoinsDuotone className="w-4 h-4 text-blue-600" />
+                  <CardDescription className="text-sm font-medium">
                     CA TTC Total (Débit 41*)
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="pt-0">
-                  <div className="text-2xl font-bold text-blue-600">
-                    {formatCompactOnly(recouvrementData.totals.caTTCTotal)}
+                  <div className="flex items-end justify-between gap-2">
+                    <div className="min-w-0">
+                      <div
+                        className={cn(
+                          "text-3xl font-bold truncate",
+                          recouvrementData.totals.caTTCTotal < 0
+                            ? "text-red-600"
+                            : "text-[#00122E]",
+                        )}
+                      >
+                        {formatCompactOnly(recouvrementData.totals.caTTCTotal)}
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Somme des débits comptes clients
+                      </p>
+                    </div>
+                    <PiCoinsDuotone className="w-8 h-8 shrink-0 text-blue-600" />
                   </div>
-                  <p className="text-xs text-muted-foreground">
-                    Somme des débits comptes clients
-                  </p>
                 </CardContent>
               </Card>
 
               <Card>
                 <CardHeader className="pb-2">
-                  <CardDescription className="flex items-center gap-1 text-xs">
-                    <Wallet className="w-4 h-4 text-green-600" />
+                  <CardDescription className="text-sm font-medium">
                     CA Encaissé TTC (Crédit 41*)
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="pt-0">
-                  <div className="text-2xl font-bold text-green-600">
-                    {formatCompactOnly(recouvrementData.totals.caEncaisseTTC)}
+                  <div className="flex items-end justify-between gap-2">
+                    <div className="min-w-0">
+                      <div
+                        className={cn(
+                          "text-3xl font-bold truncate",
+                          recouvrementData.totals.caEncaisseTTC < 0
+                            ? "text-red-600"
+                            : "text-[#00122E]",
+                        )}
+                      >
+                        {formatCompactOnly(recouvrementData.totals.caEncaisseTTC)}
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Somme des crédits comptes clients
+                      </p>
+                    </div>
+                    <Wallet className="w-8 h-8 shrink-0 text-green-600" />
                   </div>
-                  <p className="text-xs text-muted-foreground">
-                    Somme des crédits comptes clients
-                  </p>
                 </CardContent>
               </Card>
             </div>
 
             {/* Graphique Evolution Taux de Recouvrement - 12 derniers mois */}
             <Card>
-              <CardHeader>
-                <CardTitle>Évolution du Taux de Recouvrement</CardTitle>
-                <CardDescription>
-                  12 derniers mois - (CA Encaissé TTC / CA TTC Total) × 100
-                </CardDescription>
+              <CardHeader className="flex flex-row items-start justify-between gap-4">
+                <div>
+                  <CardTitle>Évolution du Taux de Recouvrement</CardTitle>
+                  <CardDescription>
+                    12 derniers mois - (CA Encaissé TTC / CA TTC Total) × 100
+                  </CardDescription>
+                </div>
+                <ChartLegend
+                  labelN="Taux mensuel"
+                  labelN1="Taux cumulé"
+                  colorN="#5FC7B9"
+                />
               </CardHeader>
               <CardContent>
                 <ChartContainer
@@ -1849,7 +1910,6 @@ export default function ClientReportingChart({
                       dot={{ r: 3 }}
                       strokeDasharray="5 5"
                     />
-                    <Legend />
                   </LineChart>
                 </ChartContainer>
               </CardContent>
@@ -1857,11 +1917,19 @@ export default function ClientReportingChart({
 
             {/* Graphique CA TTC vs CA Encaissé */}
             <Card>
-              <CardHeader>
-                <CardTitle>CA TTC Total vs CA Encaissé TTC</CardTitle>
-                <CardDescription>
-                  Comparaison mensuelle des montants
-                </CardDescription>
+              <CardHeader className="flex flex-row items-start justify-between gap-4">
+                <div>
+                  <CardTitle>CA TTC Total vs CA Encaissé TTC</CardTitle>
+                  <CardDescription>
+                    Comparaison mensuelle des montants
+                  </CardDescription>
+                </div>
+                <ChartLegend
+                  labelN="CA TTC Total"
+                  labelN1="CA Encaissé"
+                  colorN="#2463eb"
+                  colorN1="#81a5f3"
+                />
               </CardHeader>
               <CardContent>
                 <ChartContainer
@@ -1925,7 +1993,6 @@ export default function ClientReportingChart({
                       barSize={24}
                       radius={[4, 4, 0, 0]}
                     />
-                    <Legend />
                   </BarChart>
                 </ChartContainer>
               </CardContent>
