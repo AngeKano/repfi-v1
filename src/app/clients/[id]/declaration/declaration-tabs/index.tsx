@@ -171,80 +171,71 @@ const DeclarationTabs: React.FC<DeclarationTabsProps> = ({ clientId }) => {
             <h2 className="text-lg font-semibold text-[#00122E]">
               Périodes de reporting financier
             </h2>
-            <Button
-              onClick={() => setShowUploadDialog(true)}
-              size="sm"
-              className="gap-2 bg-gradient-to-r from-[#0077C3] to-[#0095F4] hover:from-[#005992] hover:to-[#0077C3] rounded-full"
-            >
-              <Plus className="w-4 h-4" />
-              Créer un reporting
-            </Button>
-          </div>
-
-          {/* Filters */}
-          <div className="flex flex-wrap items-center gap-3 mb-4">
-            <div className="flex items-center gap-2 border border-[#D0E3F5] rounded-lg px-3 h-9">
-              <span className="text-xs text-[#335890]">Période :</span>
-              <Select
-                value={periodFilter}
-                onValueChange={(v) => {
-                  setPeriodFilter(v as PeriodFilter);
-                  if (v === "year") setFilterMonth("all");
-                }}
-              >
-                <SelectTrigger className="border-0 p-0 h-auto shadow-none min-w-[80px] font-semibold text-[#00122E] text-sm">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Toutes</SelectItem>
-                  <SelectItem value="year">Année complète</SelectItem>
-                  <SelectItem value="month">Mois</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="flex items-center gap-2 border border-[#D0E3F5] rounded-lg px-3 h-9">
-              <span className="text-xs text-[#335890]">Année :</span>
-              <Select value={filterYear} onValueChange={setFilterYear}>
-                <SelectTrigger className="border-0 p-0 h-auto shadow-none min-w-[60px] font-semibold text-[#00122E] text-sm">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Toutes</SelectItem>
-                  {availableYears.map((y) => (
-                    <SelectItem key={y} value={y}>
-                      {y}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            {periodFilter === "month" && (
+            {/* Filters */}
+            <div className="flex flex-wrap items-center gap-3 mb-4">
               <div className="flex items-center gap-2 border border-[#D0E3F5] rounded-lg px-3 h-9">
-                <span className="text-xs text-[#335890]">Mois :</span>
-                <Select value={filterMonth} onValueChange={setFilterMonth}>
+                <span className="text-xs text-[#335890]">Période :</span>
+                <Select
+                  value={periodFilter}
+                  onValueChange={(v) => {
+                    setPeriodFilter(v as PeriodFilter);
+                    if (v === "year") setFilterMonth("all");
+                  }}
+                >
                   <SelectTrigger className="border-0 p-0 h-auto shadow-none min-w-[80px] font-semibold text-[#00122E] text-sm">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">Tous</SelectItem>
-                    {MONTHS.map((m) => (
-                      <SelectItem key={m.value} value={m.value}>
-                        {m.label}
+                    <SelectItem value="all">Toutes</SelectItem>
+                    <SelectItem value="year">Année complète</SelectItem>
+                    <SelectItem value="month">Mois</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="flex items-center gap-2 border border-[#D0E3F5] rounded-lg px-3 h-9">
+                <span className="text-xs text-[#335890]">Année :</span>
+                <Select value={filterYear} onValueChange={setFilterYear}>
+                  <SelectTrigger className="border-0 p-0 h-auto shadow-none min-w-[60px] font-semibold text-[#00122E] text-sm">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Toutes</SelectItem>
+                    {availableYears.map((y) => (
+                      <SelectItem key={y} value={y}>
+                        {y}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
-            )}
 
-            <Badge
-              variant="outline"
-              className="text-xs text-[#335890] border-[#D0E3F5]"
-            >
-              {filteredPeriods.length} période(s)
-            </Badge>
+              {periodFilter === "month" && (
+                <div className="flex items-center gap-2 border border-[#D0E3F5] rounded-lg px-3 h-9">
+                  <span className="text-xs text-[#335890]">Mois :</span>
+                  <Select value={filterMonth} onValueChange={setFilterMonth}>
+                    <SelectTrigger className="border-0 p-0 h-auto shadow-none min-w-[80px] font-semibold text-[#00122E] text-sm">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Tous</SelectItem>
+                      {MONTHS.map((m) => (
+                        <SelectItem key={m.value} value={m.value}>
+                          {m.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
+              <Badge
+                variant="outline"
+                className="text-xs text-[#335890] border-[#D0E3F5]"
+              >
+                {filteredPeriods.length} période(s)
+              </Badge>
+            </div>
           </div>
 
           {/* Periods table */}
@@ -274,7 +265,7 @@ const DeclarationTabs: React.FC<DeclarationTabsProps> = ({ clientId }) => {
                   {filteredPeriods.map((period: any, idx: number) => (
                     <tr
                       key={period.id}
-                      className={`border-b border-[#D0E3F5] last:border-b-0 hover:bg-[#F5F9FF] transition-colors group ${
+                      className={`border-b border-[#D0E3F5] last:border-b-0 hover:bg-[#F5F9FF] transition-colors ${
                         idx % 2 === 0 ? "bg-white" : "bg-[#FAFCFF]"
                       }`}
                     >
@@ -284,10 +275,7 @@ const DeclarationTabs: React.FC<DeclarationTabsProps> = ({ clientId }) => {
                             <Calendar className="w-4 h-4 text-[#0077C3]" />
                           </div>
                           <span className="font-medium text-[#00122E] text-sm">
-                            {formatPeriod(
-                              period.periodStart,
-                              period.periodEnd,
-                            )}
+                            {formatPeriod(period.periodStart, period.periodEnd)}
                           </span>
                         </div>
                       </td>
@@ -295,16 +283,22 @@ const DeclarationTabs: React.FC<DeclarationTabsProps> = ({ clientId }) => {
                         {period.year}
                       </td>
                       <td className="px-4 py-4 text-sm text-[#335890]">
-                        {new Date(period.createdAt).toLocaleDateString("fr-FR", {
-                          day: "2-digit",
-                          month: "2-digit",
-                          year: "numeric",
-                        })}
+                        {new Date(period.createdAt).toLocaleDateString(
+                          "fr-FR",
+                          {
+                            day: "2-digit",
+                            month: "2-digit",
+                            year: "numeric",
+                          },
+                        )}
                         {", "}
-                        {new Date(period.createdAt).toLocaleTimeString("fr-FR", {
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })}
+                        {new Date(period.createdAt).toLocaleTimeString(
+                          "fr-FR",
+                          {
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          },
+                        )}
                       </td>
                       <td className="px-4 py-4 text-center">
                         <Badge
@@ -355,7 +349,7 @@ const DeclarationTabs: React.FC<DeclarationTabsProps> = ({ clientId }) => {
                           <Button
                             variant="ghost"
                             size="sm"
-                            className="text-red-400 hover:text-red-600 hover:bg-red-50 h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                            className="text-red-400 hover:text-red-600 hover:bg-red-50 h-8 w-8 p-0"
                             onClick={() => handleDeleteClick(period)}
                             disabled={
                               period.status === "PROCESSING" ||

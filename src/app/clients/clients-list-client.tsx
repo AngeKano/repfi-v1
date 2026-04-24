@@ -405,6 +405,15 @@ export default function ClientsListClient({
                         >
                           <BarChart3 className="w-4 h-4" />
                         </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setDetailsClient(client)}
+                          className="text-[#0077C3] hover:text-[#005992] hover:bg-[#EBF5FF] h-8 w-8 p-0"
+                          title="Voir les détails"
+                        >
+                          <Eye className="w-4 h-4" />
+                        </Button>
                         {!client.isSelfEntity && (
                           <Button
                             variant="ghost"
@@ -416,15 +425,6 @@ export default function ClientsListClient({
                             <Trash2 className="w-4 h-4" />
                           </Button>
                         )}
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => setDetailsClient(client)}
-                          className="text-[#0077C3] hover:text-[#005992] hover:bg-[#EBF5FF] h-8 w-8 p-0"
-                          title="Voir les détails"
-                        >
-                          <Eye className="w-4 h-4" />
-                        </Button>
                       </div>
                     </td>
                   </tr>

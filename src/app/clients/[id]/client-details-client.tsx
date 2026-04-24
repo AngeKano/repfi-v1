@@ -85,113 +85,41 @@ export default function ClientDetailsClient({
 
   return (
     <DashboardLayout>
-      <div className="px-8 py-6">
-        {/* Top Bar */}
-        <div className="flex items-center justify-between mb-6">
+      <div className="h-screen flex overflow-hidden">
+        {/* ===== LEFT: Locked nav column ===== */}
+        <aside className="w-[260px] shrink-0 border-r border-[#D0E3F5] flex flex-col px-6 py-6 overflow-y-auto">
           <Button
             variant="outline"
             size="sm"
             onClick={() => router.refresh()}
-            className="rounded-full bg-[#EBF5FF] text-[#335890] border-[#D0E3F5] hover:bg-[#D0E3F5]"
+            className="rounded-full bg-[#EBF5FF] text-[#335890] border-[#D0E3F5] hover:bg-[#D0E3F5] w-fit mb-6"
           >
             <RefreshCw className="w-4 h-4 mr-2" />
             Rafraichir
           </Button>
 
-          <h2 className="text-xl font-bold text-[#00122E]">
-            {CLIENT_TABS.find((t) => t.id === activeTab)?.label || "Synthèse Financière"}
-          </h2>
-
-          <div className="flex items-center gap-3">
-            <div className="text-right">
-              <p className="text-xs text-[#335890]">Utilisateur</p>
-              <p className="text-sm font-semibold text-[#00122E]">
-                {session.user.firstName && session.user.lastName
-                  ? `${session.user.firstName} ${session.user.lastName}`
-                  : session.user.name || session.user.email}
-              </p>
-              <Badge variant={roleBadgeVariant as any} className="text-xs mt-0.5">
-                {roleLabel}
-              </Badge>
-            </div>
-            <div className="w-10 h-10 rounded-full bg-[#EBF5FF] flex items-center justify-center overflow-hidden">
-              <Users className="w-5 h-5 text-[#0077C3]" />
-            </div>
-          </div>
-        </div>
-
-        {error && (
-          <Alert variant="destructive" className="mb-6">
-            <AlertDescription>{error}</AlertDescription>
-          </Alert>
-        )}
-
-        {/* Client Info Header */}
-        <div className="flex items-center justify-between mb-8">
-          <div className="flex items-center gap-4">
-            <div className="w-16 h-16 rounded-full bg-[#EBF5FF] flex items-center justify-center text-2xl font-bold text-[#0077C3]">
+          {/* Client Info */}
+          <div className="flex items-center gap-3 mb-6">
+            <div className="w-12 h-12 rounded-full bg-[#EBF5FF] flex items-center justify-center text-xl font-bold text-[#0077C3] shrink-0">
               {client.name.charAt(0).toUpperCase()}
             </div>
-            <div>
-              <h1 className="text-2xl font-bold text-[#00122E]">{client.name}</h1>
-              <p className="text-sm text-[#335890]">{client.email}</p>
-              <div className="flex items-center gap-2 mt-1">
+            <div className="min-w-0">
+              <h1 className="text-lg font-bold text-[#00122E] truncate">{client.name}</h1>
+              <p className="text-xs text-[#335890] truncate">{client.email}</p>
+              <div className="flex flex-wrap items-center gap-1 mt-1">
                 {client.denomination && (
-                  <Badge variant="outline" className="text-xs">
+                  <Badge variant="outline" className="text-[10px] px-1.5 py-0">
                     {client.denomination}
                   </Badge>
                 )}
-                <Badge variant="outline" className="text-xs">
+                <Badge variant="outline" className="text-[10px] px-1.5 py-0">
                   {client.companyType}
-                </Badge>
-                <Badge
-                  className="text-xs bg-[#DCFCE7] text-[#16A34A] hover:bg-[#DCFCE7]"
-                >
-                  Actif
                 </Badge>
               </div>
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
-            {canDelete && !client.isSelfEntity && (
-              <Button
-                variant="outline"
-                className="gap-2 border-red-200 text-red-500 hover:bg-red-50 rounded-full"
-                onClick={() => setShowDeleteDialog(true)}
-              >
-                <Trash2 className="w-4 h-4" />
-                Supprimer
-              </Button>
-            )}
-
-            {canEdit && !client.isSelfEntity && (
-              <Button
-                variant="outline"
-                className="gap-2 border-[#D0E3F5] text-[#335890] rounded-full"
-                onClick={() => setShowEditDialog(true)}
-              >
-                <Edit className="w-4 h-4" />
-                Modifier
-              </Button>
-            )}
-
-            <Button
-              onClick={() => setShowUploadDialog(true)}
-              className="gap-2 bg-gradient-to-r from-[#0077C3] to-[#0095F4] hover:from-[#005992] hover:to-[#0077C3] rounded-full"
-            >
-              <Plus className="w-4 h-4" />
-              Créer un reporting
-            </Button>
-          </div>
-        </div>
-
-        {/* Main Layout: Sidebar + Content */}
-        <div className="flex gap-6 items-start">
-          {/* Left Sidebar Navigation — sticky */}
-          <div className="w-[220px] shrink-0 self-start">
-            <div className="sticky top-6 max-h-[calc(100vh-3rem)] overflow-y-auto">
-            <nav className="space-y-1">
+          <nav className="space-y-1">
               {CLIENT_TABS.map((tab, idx) => {
                 const active = activeTab === tab.id;
                 // Separator before "Membres" (index 4)
@@ -238,11 +166,74 @@ export default function ClientDetailsClient({
                 </button>
               </Link>
             </div>
-            </div>
-          </div>
+        </aside>
 
-          {/* Content Area */}
-          <div className="flex-1 min-w-0">
+        {/* ===== RIGHT: Scrollable content ===== */}
+        <main className="flex-1 min-w-0 overflow-y-auto">
+          <div className="px-8 py-6">
+            {/* Top bar: title + user */}
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-xl font-bold text-[#00122E]">
+                {CLIENT_TABS.find((t) => t.id === activeTab)?.label || "Synthèse Financière"}
+              </h2>
+              <div className="flex items-center gap-3">
+                <div className="text-right">
+                  <p className="text-xs text-[#335890]">Utilisateur</p>
+                  <p className="text-sm font-semibold text-[#00122E]">
+                    {session.user.firstName && session.user.lastName
+                      ? `${session.user.firstName} ${session.user.lastName}`
+                      : session.user.name || session.user.email}
+                  </p>
+                  <Badge variant={roleBadgeVariant as any} className="text-xs mt-0.5">
+                    {roleLabel}
+                  </Badge>
+                </div>
+                <div className="w-10 h-10 rounded-full bg-[#EBF5FF] flex items-center justify-center overflow-hidden">
+                  <Users className="w-5 h-5 text-[#0077C3]" />
+                </div>
+              </div>
+            </div>
+
+            {error && (
+              <Alert variant="destructive" className="mb-6">
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
+            )}
+
+            {/* Action buttons */}
+            <div className="flex items-center justify-end gap-2 mb-6">
+              {canDelete && !client.isSelfEntity && (
+                <Button
+                  variant="outline"
+                  className="gap-2 border-red-200 text-red-500 hover:bg-red-50 rounded-full"
+                  onClick={() => setShowDeleteDialog(true)}
+                >
+                  <Trash2 className="w-4 h-4" />
+                  Supprimer
+                </Button>
+              )}
+
+              {canEdit && !client.isSelfEntity && (
+                <Button
+                  variant="outline"
+                  className="gap-2 border-[#D0E3F5] text-[#335890] rounded-full"
+                  onClick={() => setShowEditDialog(true)}
+                >
+                  <Edit className="w-4 h-4" />
+                  Modifier
+                </Button>
+              )}
+
+              <Button
+                onClick={() => setShowUploadDialog(true)}
+                className="gap-2 bg-gradient-to-r from-[#0077C3] to-[#0095F4] hover:from-[#005992] hover:to-[#0077C3] rounded-full"
+              >
+                <Plus className="w-4 h-4" />
+                Créer un reporting
+              </Button>
+            </div>
+
+          <div className="min-w-0">
             {/* Financial tabs - delegated to ClientReportingChart */}
             {activeTab === "overview" && (
               <ClientReportingChart
@@ -378,7 +369,8 @@ export default function ClientDetailsClient({
             {/* Files */}
             {activeTab === "files" && <FilesTabs clientId={client.id} />}
           </div>
-        </div>
+          </div>
+        </main>
       </div>
 
       <UploadFileDialog
