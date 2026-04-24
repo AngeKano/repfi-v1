@@ -347,7 +347,7 @@ export function UploadFileDialog({
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
       <DialogContent
         showCloseButton={false}
-        className="p-0 overflow-hidden w-[calc(100vw-2rem)] max-w-[calc(100vw-2rem)] sm:max-w-[640px] max-h-[calc(100vh-2rem)] border border-[#D0E3F5]"
+        className="p-0 overflow-hidden w-[calc(100vw-2rem)] max-w-[calc(100vw-2rem)] sm:max-w-[820px] max-h-[calc(100vh-2rem)] border border-[#D0E3F5]"
       >
         <div className="p-6 pb-4">
           <div className="flex items-start justify-between mb-5">
@@ -379,67 +379,72 @@ export function UploadFileDialog({
               }}
             >
               {/* ===== STEP 1 ===== */}
-              <div className="w-full shrink-0 space-y-4">
-                {/* Client */}
-                <div>
-                  <Label className="block text-sm font-medium text-[#335890] mb-2">
-                    Client <span className="text-red-500">*</span>
-                  </Label>
-                  <Select
-                    value={clientId}
-                    onValueChange={(v) => setClientId(v)}
-                  >
-                    <SelectTrigger className="w-full h-10 border-[#D0E3F5]">
-                      <SelectValue placeholder="Sélectionner un client" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectGroup>
-                        <SelectLabel>Client</SelectLabel>
-                        {clientList.map((c) => (
-                          <SelectItem key={c.id} value={c.id}>
-                            {c.name}
-                          </SelectItem>
-                        ))}
-                      </SelectGroup>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {/* Period */}
-                <div>
-                  <Label className="block text-sm font-medium text-[#335890] mb-2">
-                    Période <span className="text-red-500">*</span>
-                  </Label>
-
-                  {/* Editable date inputs */}
-                  <div className="grid grid-cols-2 gap-3 mb-3">
-                    <div className="space-y-1">
-                      <span className="text-[10px] text-[#94A3B8] uppercase">
-                        Début
-                      </span>
-                      <Input
-                        placeholder="jj/mm/aaaa"
-                        value={startText}
-                        onChange={(e) => setStartText(e.target.value)}
-                        onBlur={handleStartBlur}
-                        className="h-10 bg-[#F8FAFC] border-[#D0E3F5] font-medium"
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <span className="text-[10px] text-[#94A3B8] uppercase">
-                        Fin
-                      </span>
-                      <Input
-                        placeholder="jj/mm/aaaa"
-                        value={endText}
-                        onChange={(e) => setEndText(e.target.value)}
-                        onBlur={handleEndBlur}
-                        className="h-10 bg-[#F8FAFC] border-[#D0E3F5] font-medium"
-                      />
-                    </div>
+              <div className="w-full flex flex-row shrink-0 gap-5">
+                {/* Part I */}
+                <div className="flex-1 min-w-0 space-y-4">
+                  {/* Client */}
+                  <div>
+                    <Label className="block text-sm font-medium text-[#335890] mb-2">
+                      Client <span className="text-red-500">*</span>
+                    </Label>
+                    <Select
+                      value={clientId}
+                      onValueChange={(v) => setClientId(v)}
+                    >
+                      <SelectTrigger className="w-full h-10 border-[#D0E3F5]">
+                        <SelectValue placeholder="Sélectionner un client" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectGroup>
+                          <SelectLabel>Client</SelectLabel>
+                          {clientList.map((c) => (
+                            <SelectItem key={c.id} value={c.id}>
+                              {c.name}
+                            </SelectItem>
+                          ))}
+                        </SelectGroup>
+                      </SelectContent>
+                    </Select>
                   </div>
 
-                  {/* Year shortcut + Calendar */}
+                  {/* Period */}
+                  <div>
+                    <Label className="block text-sm font-medium text-[#335890] mb-2">
+                      Période <span className="text-red-500">*</span>
+                    </Label>
+
+                    {/* Editable date inputs */}
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1">
+                        <span className="text-[10px] text-[#94A3B8] uppercase">
+                          Début
+                        </span>
+                        <Input
+                          placeholder="jj/mm/aaaa"
+                          value={startText}
+                          onChange={(e) => setStartText(e.target.value)}
+                          onBlur={handleStartBlur}
+                          className="h-10 bg-[#F8FAFC] border-[#D0E3F5] font-medium"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <span className="text-[10px] text-[#94A3B8] uppercase">
+                          Fin
+                        </span>
+                        <Input
+                          placeholder="jj/mm/aaaa"
+                          value={endText}
+                          onChange={(e) => setEndText(e.target.value)}
+                          onBlur={handleEndBlur}
+                          className="h-10 bg-[#F8FAFC] border-[#D0E3F5] font-medium"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                {/* Part II */}
+                <div className="shrink-0">
+                  {/* Year shortcut */}
                   <div className="flex items-center gap-2 mb-2">
                     <Select
                       value={selectedYear.toString()}
@@ -464,11 +469,12 @@ export function UploadFileDialog({
                       variant="outline"
                       size="sm"
                       onClick={() => handleSelectFullYear(selectedYear)}
-                      className="h-8 text-xs border-[#0077C3] text-[#0077C3] hover:bg-[#EBF5FF] flex-1"
+                      className="h-8 text-xs border-[#0077C3] text-[#0077C3] hover:bg-[#EBF5FF] w-fit"
                     >
                       Toute l&apos;année {selectedYear}
                     </Button>
                   </div>
+                  {/* Calendar */}
                   <Calendar
                     mode="range"
                     numberOfMonths={1}
@@ -547,17 +553,14 @@ export function UploadFileDialog({
                                 </Badge>
                                 <Select
                                   value={f.fileType || ""}
-                                  onValueChange={(v) =>
-                                    updateFileType(f.id, v)
-                                  }
+                                  onValueChange={(v) => updateFileType(f.id, v)}
                                 >
                                   <SelectTrigger className="h-7 text-xs w-[170px]">
                                     <SelectValue placeholder="Choisir le type" />
                                   </SelectTrigger>
                                   <SelectContent>
                                     {REQUIRED_FILE_TYPES.filter(
-                                      (t) =>
-                                        !usedTypes(f.id).includes(t.type),
+                                      (t) => !usedTypes(f.id).includes(t.type),
                                     ).map((t) => (
                                       <SelectItem key={t.type} value={t.type}>
                                         {t.label}

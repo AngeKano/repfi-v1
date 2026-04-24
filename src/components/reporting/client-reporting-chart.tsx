@@ -985,14 +985,32 @@ export default function ClientReportingChart({
     </Card>
   );
 
+  // Légende personnalisée N vs N-1 (coin supérieur droit de la carte)
+  const ChartLegend = ({ labelN, labelN1 }: { labelN: string | number; labelN1: string | number }) => (
+    <div className="flex flex-col gap-1 shrink-0">
+      <span className="text-sm font-semibold text-[#335890]">Légende</span>
+      <div className="flex items-center gap-2">
+        <img src="/legende-line.svg" alt="" aria-hidden className="w-16 h-[3px]" />
+        <span className="text-sm font-medium text-[#0077C3]">{labelN}</span>
+      </div>
+      <div className="flex items-center gap-2">
+        <img src="/legende-line-dashed.svg" alt="" aria-hidden className="w-16 h-[3px]" />
+        <span className="text-sm font-medium text-[#0077C3]">{labelN1}</span>
+      </div>
+    </div>
+  );
+
   // Composant Evolution CA
   const EvolutionCA = () => (
     <Card>
-      <CardHeader>
-        <CardTitle>Évolution du Chiffre d&apos;Affaires</CardTitle>
-        <CardDescription>
-          Comparaison {yearN} vs {yearN1} - par {getXAxisLabel().toLowerCase()}
-        </CardDescription>
+      <CardHeader className="flex flex-row items-start justify-between gap-4">
+        <div>
+          <CardTitle>Évolution du Chiffre d&apos;Affaires</CardTitle>
+          <CardDescription>
+            Comparaison {yearN} vs {yearN1} - par {getXAxisLabel().toLowerCase()}
+          </CardDescription>
+        </div>
+        <ChartLegend labelN={yearN} labelN1={yearN1} />
       </CardHeader>
       <CardContent>
         <ChartContainer config={chartConfigCA} className="h-[400px] w-full">
@@ -1038,7 +1056,6 @@ export default function ClientReportingChart({
               barSize={24}
               radius={[4, 4, 0, 0]}
             />
-            <Legend />
           </BarChart>
         </ChartContainer>
       </CardContent>
@@ -1056,7 +1073,7 @@ export default function ClientReportingChart({
 
     return (
       <Card>
-        <CardHeader>
+        <CardHeader className="flex flex-row items-start justify-between gap-4">
           <div className="flex items-center gap-2">
             <BarChart3 className="w-5 h-5 text-blue-600" />
             <div>
@@ -1066,6 +1083,7 @@ export default function ClientReportingChart({
               </CardDescription>
             </div>
           </div>
+          <ChartLegend labelN={yearN} labelN1={yearN1} />
         </CardHeader>
         <CardContent>
           <ChartContainer config={chartConfigCANature} className="w-full" style={{ height: `${chartHeight}px` }}>
@@ -1121,7 +1139,6 @@ export default function ClientReportingChart({
                 barSize={18}
                 radius={[0, 4, 4, 0]}
               />
-              <Legend />
             </BarChart>
           </ChartContainer>
 
@@ -1184,11 +1201,14 @@ export default function ClientReportingChart({
   // Composant Evolution Trésorerie
   const EvolutionTresorerie = () => (
     <Card>
-      <CardHeader>
-        <CardTitle>Évolution de la Trésorerie</CardTitle>
-        <CardDescription>
-          Solde cumulé {yearN} vs {yearN1} - par {getXAxisLabel().toLowerCase()}
-        </CardDescription>
+      <CardHeader className="flex flex-row items-start justify-between gap-4">
+        <div>
+          <CardTitle>Évolution de la Trésorerie</CardTitle>
+          <CardDescription>
+            Solde cumulé {yearN} vs {yearN1} - par {getXAxisLabel().toLowerCase()}
+          </CardDescription>
+        </div>
+        <ChartLegend labelN={yearN} labelN1={yearN1} />
       </CardHeader>
       <CardContent>
         <ChartContainer
@@ -1241,7 +1261,6 @@ export default function ClientReportingChart({
               strokeWidth={2}
               dot={{ r: 4 }}
             />
-            <Legend />
           </LineChart>
         </ChartContainer>
       </CardContent>
