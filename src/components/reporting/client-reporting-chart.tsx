@@ -986,15 +986,35 @@ export default function ClientReportingChart({
   );
 
   // Légende personnalisée N vs N-1 (coin supérieur droit de la carte)
-  const ChartLegend = ({ labelN, labelN1 }: { labelN: string | number; labelN1: string | number }) => (
+  const LegendLine = ({ color, dashed }: { color: string; dashed?: boolean }) => (
+    <svg width="64" height="3" viewBox="0 0 199 3" fill="none" aria-hidden>
+      <path
+        d="M1.5 1.5H197.5"
+        stroke={color}
+        strokeWidth="3"
+        strokeLinecap="round"
+        strokeDasharray={dashed ? "6 6" : undefined}
+      />
+    </svg>
+  );
+
+  const ChartLegend = ({
+    labelN,
+    labelN1,
+    color = "#000000",
+  }: {
+    labelN: string | number;
+    labelN1: string | number;
+    color?: string;
+  }) => (
     <div className="flex flex-col gap-1 shrink-0">
       <span className="text-sm font-semibold text-[#335890]">Légende</span>
       <div className="flex items-center gap-2">
-        <img src="/legende-line.svg" alt="" aria-hidden className="w-16 h-[3px]" />
+        <LegendLine color={color} />
         <span className="text-sm font-medium text-[#0077C3]">{labelN}</span>
       </div>
       <div className="flex items-center gap-2">
-        <img src="/legende-line-dashed.svg" alt="" aria-hidden className="w-16 h-[3px]" />
+        <LegendLine color={color} dashed />
         <span className="text-sm font-medium text-[#0077C3]">{labelN1}</span>
       </div>
     </div>
@@ -1208,7 +1228,7 @@ export default function ClientReportingChart({
             Solde cumulé {yearN} vs {yearN1} - par {getXAxisLabel().toLowerCase()}
           </CardDescription>
         </div>
-        <ChartLegend labelN={yearN} labelN1={yearN1} />
+        <ChartLegend labelN={yearN} labelN1={yearN1} color="#5FC7B9" />
       </CardHeader>
       <CardContent>
         <ChartContainer
