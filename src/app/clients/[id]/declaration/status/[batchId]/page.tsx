@@ -67,7 +67,7 @@ export default async function StatusPage({
 
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-[#00122E]">
-            Statut du traitement ETL
+            Traitement du reporting
           </h1>
           <p className="text-sm text-[#335890] mt-1">{client.name}</p>
         </div>

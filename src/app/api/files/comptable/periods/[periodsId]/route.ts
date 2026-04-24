@@ -74,12 +74,13 @@ export async function DELETE(
       );
     }
 
-    // Ne pas permettre la suppression si en cours de traitement
+    // Marquer la période comme annulée pour que le worker ETL arrête le pipeline
+    // avant que ses ressources soient supprimées (soft-cancel via status).
     if (period.status === "PROCESSING" || period.status === "VALIDATING") {
-      return NextResponse.json(
-        { error: "Impossible de supprimer une période en cours de traitement" },
-        { status: 400 },
-      );
+      await prisma.comptablePeriod.update({
+        where: { id: periodId },
+        data: { status: "FAILED" },
+      });
     }
 
     const bucket = process.env.AWS_S3_BUCKET_NAME!;
