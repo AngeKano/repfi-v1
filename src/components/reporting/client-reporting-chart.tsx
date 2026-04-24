@@ -325,7 +325,7 @@ interface KpiItem {
 const DEFAULT_KPI_ITEMS: KpiItem[] = [
   { id: "ca", label: "Chiffre d'affaires", key: "chiffreAffaires", variationKey: "chiffreAffaires", color: "text-blue-600", icon: PiCoinsDuotone, visible: true, order: 0 },
   { id: "ms", label: "Masse salariale", key: "masseSalariale", variationKey: "masseSalariale", color: "text-orange-600", icon: PiMoneyWavyDuotone, visible: true, order: 1 },
-  { id: "rex", label: "Résultat d'exploitation", key: "resultatExploitation", variationKey: "resultatExploitation", color: "text-purple-600", colorNeg: "text-red-600", icon: PiChartDonutDuotone, visible: true, order: 2 },
+  { id: "rex", label: "Résultat d'exploitation", key: "resultatExploitation", variationKey: "resultatExploitation", color: "text-fuchsia-500", colorNeg: "text-red-600", icon: PiChartDonutDuotone, visible: true, order: 2 },
   { id: "rn", label: "Résultat Net", key: "resultatNet", variationKey: "resultatNet", color: "text-green-600", colorNeg: "text-red-600", icon: PiChartDonutDuotone, visible: true, order: 3 },
   { id: "treso", label: "Trésorerie", key: "soldeTresorerie", variationKey: "soldeTresorerie", color: "text-cyan-600", colorNeg: "text-red-600", icon: PiWalletDuotone, visible: true, order: 4 },
   { id: "marge", label: "Marge commerciale", key: "margeCommerciale", variationKey: "margeCommerciale", color: "text-indigo-600", colorNeg: "text-red-600", icon: PiShoppingCartSimpleDuotone, visible: true, order: 5 },
@@ -1326,22 +1326,29 @@ export default function ClientReportingChart({
                           )}
                           <CardHeader className="pb-2">
                             <div className="flex items-center justify-between">
-                              <CardDescription className="flex items-center gap-1 text-xs">
-                                <Icon className={`w-4 h-4 ${kpi.color}`} />
+                              <CardDescription className="text-sm font-medium">
                                 {kpi.label}
                               </CardDescription>
                               <VariationBadge value={variation} />
                             </div>
                           </CardHeader>
                           <CardContent className="pt-0">
-                            <div
-                              className={`text-xl font-bold ${colorCls}`}
-                            >
-                              {formatCompactOnly(valueN)}
+                            <div className="flex items-end justify-between gap-2">
+                              <div className="min-w-0">
+                                <div
+                                  className={cn(
+                                    "text-3xl font-bold truncate",
+                                    valueN < 0 ? "text-red-600" : "text-[#00122E]",
+                                  )}
+                                >
+                                  {formatCompactOnly(valueN)}
+                                </div>
+                                <p className="text-xs text-muted-foreground mt-1">
+                                  {yearN1}: {formatCompactOnly(valueN1)}
+                                </p>
+                              </div>
+                              <Icon className={`w-8 h-8 shrink-0 ${kpi.color}`} />
                             </div>
-                            <p className="text-xs text-muted-foreground">
-                              {yearN1}: {formatCompactOnly(valueN1)}
-                            </p>
                           </CardContent>
                         </Card>
                       </div>
@@ -1549,8 +1556,7 @@ export default function ClientReportingChart({
               <Card>
                 <CardHeader className="pb-2">
                   <div className="flex items-center justify-between">
-                    <CardDescription className="flex items-center gap-1 text-xs">
-                      <Activity className="w-4 h-4 text-purple-600" />
+                    <CardDescription className="text-sm font-medium">
                       Rex
                     </CardDescription>
                     <VariationBadge
@@ -1559,58 +1565,68 @@ export default function ClientReportingChart({
                   </div>
                 </CardHeader>
                 <CardContent className="pt-0">
-                  <div
-                    className={`text-xl font-bold ${
-                      data.indicateurs.anneeN.resultatExploitation >= 0
-                        ? "text-purple-600"
-                        : "text-red-600"
-                    }`}
-                  >
-                    {formatCompactOnly(
-                      data.indicateurs.anneeN.resultatExploitation,
-                    )}
+                  <div className="flex items-end justify-between gap-2">
+                    <div
+                      className={cn(
+                        "text-3xl font-bold truncate",
+                        data.indicateurs.anneeN.resultatExploitation < 0
+                          ? "text-red-600"
+                          : "text-[#00122E]",
+                      )}
+                    >
+                      {formatCompactOnly(
+                        data.indicateurs.anneeN.resultatExploitation,
+                      )}
+                    </div>
+                    <PiChartDonutDuotone className="w-8 h-8 shrink-0 text-fuchsia-500" />
                   </div>
                 </CardContent>
               </Card>
 
               <Card>
                 <CardHeader className="pb-2">
-                  <CardDescription className="flex items-center gap-1 text-xs">
-                    <Receipt className="w-4 h-4 text-amber-600" />
+                  <CardDescription className="text-sm font-medium">
                     Résultat Financier
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="pt-0">
-                  <div
-                    className={`text-xl font-bold ${
-                      data.indicateurs.anneeN.resultatFinancier >= 0
-                        ? "text-amber-600"
-                        : "text-red-600"
-                    }`}
-                  >
-                    {formatCompactOnly(
-                      data.indicateurs.anneeN.resultatFinancier,
-                    )}
+                  <div className="flex items-end justify-between gap-2">
+                    <div
+                      className={cn(
+                        "text-3xl font-bold truncate",
+                        data.indicateurs.anneeN.resultatFinancier < 0
+                          ? "text-red-600"
+                          : "text-[#00122E]",
+                      )}
+                    >
+                      {formatCompactOnly(
+                        data.indicateurs.anneeN.resultatFinancier,
+                      )}
+                    </div>
+                    <Receipt className="w-8 h-8 shrink-0 text-amber-600" />
                   </div>
                 </CardContent>
               </Card>
 
               <Card>
                 <CardHeader className="pb-2">
-                  <CardDescription className="flex items-center gap-1 text-xs">
-                    <BarChart3 className="w-4 h-4 text-slate-600" />
+                  <CardDescription className="text-sm font-medium">
                     Résultat HAO
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="pt-0">
-                  <div
-                    className={`text-xl font-bold ${
-                      data.indicateurs.anneeN.resultatHAO >= 0
-                        ? "text-slate-600"
-                        : "text-red-600"
-                    }`}
-                  >
-                    {formatCompactOnly(data.indicateurs.anneeN.resultatHAO)}
+                  <div className="flex items-end justify-between gap-2">
+                    <div
+                      className={cn(
+                        "text-3xl font-bold truncate",
+                        data.indicateurs.anneeN.resultatHAO < 0
+                          ? "text-red-600"
+                          : "text-[#00122E]",
+                      )}
+                    >
+                      {formatCompactOnly(data.indicateurs.anneeN.resultatHAO)}
+                    </div>
+                    <PiChartDonutDuotone className="w-8 h-8 shrink-0 text-green-500" />
                   </div>
                 </CardContent>
               </Card>
@@ -1618,8 +1634,7 @@ export default function ClientReportingChart({
               <Card>
                 <CardHeader className="pb-2">
                   <div className="flex items-center justify-between">
-                    <CardDescription className="flex items-center gap-1 text-xs">
-                      <PiChartDonutDuotone className="w-4 h-4 text-green-600" />
+                    <CardDescription className="text-sm font-medium">
                       Résultat Net
                     </CardDescription>
                     <VariationBadge
@@ -1628,14 +1643,18 @@ export default function ClientReportingChart({
                   </div>
                 </CardHeader>
                 <CardContent className="pt-0">
-                  <div
-                    className={`text-xl font-bold ${
-                      data.indicateurs.anneeN.resultatNet >= 0
-                        ? "text-green-600"
-                        : "text-red-600"
-                    }`}
-                  >
-                    {formatCompactOnly(data.indicateurs.anneeN.resultatNet)}
+                  <div className="flex items-end justify-between gap-2">
+                    <div
+                      className={cn(
+                        "text-3xl font-bold truncate",
+                        data.indicateurs.anneeN.resultatNet < 0
+                          ? "text-red-600"
+                          : "text-[#00122E]",
+                      )}
+                    >
+                      {formatCompactOnly(data.indicateurs.anneeN.resultatNet)}
+                    </div>
+                    <PiChartDonutDuotone className="w-8 h-8 shrink-0 text-green-600" />
                   </div>
                 </CardContent>
               </Card>
@@ -2131,13 +2150,18 @@ export default function ClientReportingChart({
               <>
                 <div className="flex items-center gap-2 border border-[#D0E3F5] rounded-lg px-4 h-10">
                   <span className="text-xs text-[#335890]">Mode calcul :</span>
-                  <Select value={periodType === "ytd" ? "ytd" : "year"} onValueChange={(v: string) => setPeriodType(v as PeriodType)}>
+                  <Select
+                    value={periodType === "ytd" ? "cumule" : "periodique"}
+                    onValueChange={(v: string) =>
+                      setPeriodType(v === "cumule" ? "ytd" : "year")
+                    }
+                  >
                     <SelectTrigger className="border-0 p-0 h-auto shadow-none min-w-[90px] font-semibold text-[#00122E]">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="year">Périodique</SelectItem>
-                      <SelectItem value="ytd">Cumulé</SelectItem>
+                      <SelectItem value="periodique">Périodique</SelectItem>
+                      <SelectItem value="cumule">Cumulé</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -2153,7 +2177,26 @@ export default function ClientReportingChart({
                     </button>
                   </div>
                 </div>
-                {periodType === "ytd" && (
+                {periodType !== "ytd" && (
+                  <div className="flex items-center gap-2 border border-[#D0E3F5] rounded-lg px-4 h-10">
+                    <span className="text-xs text-[#335890]">Granularité :</span>
+                    <Select
+                      value={periodType === "month" ? "month" : "year"}
+                      onValueChange={(v: string) =>
+                        setPeriodType(v as PeriodType)
+                      }
+                    >
+                      <SelectTrigger className="border-0 p-0 h-auto shadow-none min-w-[80px] font-semibold text-[#00122E]">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="year">Année</SelectItem>
+                        <SelectItem value="month">Mois</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+                {(periodType === "ytd" || periodType === "month") && (
                   <div className="flex items-center gap-2 border border-[#D0E3F5] rounded-lg px-4 h-10">
                     <span className="text-xs text-[#335890]">Mois :</span>
                     <Select value={selectedMonth} onValueChange={setSelectedMonth}>
