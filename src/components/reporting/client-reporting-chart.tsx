@@ -323,12 +323,70 @@ interface KpiItem {
 }
 
 const DEFAULT_KPI_ITEMS: KpiItem[] = [
-  { id: "ca", label: "Chiffre d'affaires", key: "chiffreAffaires", variationKey: "chiffreAffaires", color: "text-blue-600", icon: PiCoinsDuotone, visible: true, order: 0 },
-  { id: "ms", label: "Masse salariale", key: "masseSalariale", variationKey: "masseSalariale", color: "text-orange-600", icon: PiMoneyWavyDuotone, visible: true, order: 1 },
-  { id: "rex", label: "Résultat d'exploitation", key: "resultatExploitation", variationKey: "resultatExploitation", color: "text-fuchsia-500", colorNeg: "text-red-600", icon: PiChartDonutDuotone, visible: true, order: 2 },
-  { id: "rn", label: "Résultat Net", key: "resultatNet", variationKey: "resultatNet", color: "text-green-600", colorNeg: "text-red-600", icon: PiChartDonutDuotone, visible: true, order: 3 },
-  { id: "treso", label: "Trésorerie", key: "soldeTresorerie", variationKey: "soldeTresorerie", color: "text-cyan-600", colorNeg: "text-red-600", icon: PiWalletDuotone, visible: true, order: 4 },
-  { id: "marge", label: "Marge commerciale", key: "margeCommerciale", variationKey: "margeCommerciale", color: "text-indigo-600", colorNeg: "text-red-600", icon: PiShoppingCartSimpleDuotone, visible: true, order: 5 },
+  {
+    id: "ca",
+    label: "Chiffre d'affaires",
+    key: "chiffreAffaires",
+    variationKey: "chiffreAffaires",
+    color: "text-blue-600",
+    icon: PiCoinsDuotone,
+    visible: true,
+    order: 0,
+  },
+  {
+    id: "ms",
+    label: "Masse salariale",
+    key: "masseSalariale",
+    variationKey: "masseSalariale",
+    color: "text-orange-600",
+    icon: PiMoneyWavyDuotone,
+    visible: true,
+    order: 1,
+  },
+  {
+    id: "rex",
+    label: "Résultat d'exploitation",
+    key: "resultatExploitation",
+    variationKey: "resultatExploitation",
+    color: "text-fuchsia-500",
+    colorNeg: "text-red-600",
+    icon: PiChartDonutDuotone,
+    visible: true,
+    order: 2,
+  },
+  {
+    id: "rn",
+    label: "Résultat Net",
+    key: "resultatNet",
+    variationKey: "resultatNet",
+    color: "text-green-600",
+    colorNeg: "text-red-600",
+    icon: PiChartDonutDuotone,
+    visible: true,
+    order: 3,
+  },
+  {
+    id: "treso",
+    label: "Trésorerie",
+    key: "soldeTresorerie",
+    variationKey: "soldeTresorerie",
+    color: "text-cyan-600",
+    colorNeg: "text-red-600",
+    icon: PiWalletDuotone,
+    visible: true,
+    order: 4,
+  },
+  {
+    id: "marge",
+    label: "Marge commerciale",
+    key: "margeCommerciale",
+    variationKey: "margeCommerciale",
+    color: "text-indigo-600",
+    colorNeg: "text-red-600",
+    icon: PiShoppingCartSimpleDuotone,
+    visible: true,
+    order: 5,
+  },
 ];
 
 function loadKpiConfig(clientId: string): KpiItem[] {
@@ -336,7 +394,11 @@ function loadKpiConfig(clientId: string): KpiItem[] {
   try {
     const raw = localStorage.getItem(`kpi-config-${clientId}`);
     if (!raw) return DEFAULT_KPI_ITEMS;
-    const saved = JSON.parse(raw) as Array<{ id: string; visible: boolean; order: number }>;
+    const saved = JSON.parse(raw) as Array<{
+      id: string;
+      visible: boolean;
+      order: number;
+    }>;
     return DEFAULT_KPI_ITEMS.map((d) => {
       const s = saved.find((x) => x.id === d.id);
       return s ? { ...d, visible: s.visible, order: s.order } : d;
@@ -348,7 +410,11 @@ function loadKpiConfig(clientId: string): KpiItem[] {
 
 function saveKpiConfig(clientId: string, items: KpiItem[]) {
   if (typeof window === "undefined") return;
-  const data = items.map((i) => ({ id: i.id, visible: i.visible, order: i.order }));
+  const data = items.map((i) => ({
+    id: i.id,
+    visible: i.visible,
+    order: i.order,
+  }));
   localStorage.setItem(`kpi-config-${clientId}`, JSON.stringify(data));
 }
 
@@ -995,8 +1061,21 @@ export default function ClientReportingChart({
   );
 
   // Légende personnalisée N vs N-1 (coin supérieur droit de la carte)
-  const LegendLine = ({ color, dashed }: { color: string; dashed?: boolean }) => (
-    <svg width="120" height="4" viewBox="0 0 199 3" fill="none" aria-hidden preserveAspectRatio="none">
+  const LegendLine = ({
+    color,
+    dashed,
+  }: {
+    color: string;
+    dashed?: boolean;
+  }) => (
+    <svg
+      width="120"
+      height="4"
+      viewBox="0 0 199 3"
+      fill="none"
+      aria-hidden
+      preserveAspectRatio="none"
+    >
       <path
         d="M1.5 1.5H197.5"
         stroke={color}
@@ -1012,20 +1091,22 @@ export default function ClientReportingChart({
     labelN1,
     colorN = "#000000",
     colorN1,
+    solid = false,
   }: {
     labelN: string | number;
     labelN1: string | number;
     colorN?: string;
     colorN1?: string;
+    solid?: boolean;
   }) => (
-    <div className="flex flex-col gap-2 shrink-0">
+    <div className="flex flex-col gap-1 shrink-0">
       <span className="text-base font-semibold text-[#335890]">Légende</span>
       <div className="flex items-center gap-3">
         <LegendLine color={colorN} />
         <span className="text-base font-medium text-[#0077C3]">{labelN}</span>
       </div>
       <div className="flex items-center gap-3">
-        <LegendLine color={colorN1 ?? colorN} dashed />
+        <LegendLine color={colorN1 ?? colorN} dashed={!solid} />
         <span className="text-base font-medium text-[#0077C3]">{labelN1}</span>
       </div>
     </div>
@@ -1038,7 +1119,8 @@ export default function ClientReportingChart({
         <div>
           <CardTitle>Évolution du Chiffre d&apos;Affaires</CardTitle>
           <CardDescription>
-            Comparaison {yearN} vs {yearN1} - par {getXAxisLabel().toLowerCase()}
+            Comparaison {yearN} vs {yearN1} - par{" "}
+            {getXAxisLabel().toLowerCase()}
           </CardDescription>
         </div>
         <ChartLegend
@@ -1046,6 +1128,7 @@ export default function ClientReportingChart({
           labelN1={yearN1}
           colorN="#2463eb"
           colorN1="#81a5f3"
+          solid
         />
       </CardHeader>
       <CardContent>
@@ -1124,10 +1207,15 @@ export default function ClientReportingChart({
             labelN1={yearN1}
             colorN="#2463eb"
             colorN1="#81a5f3"
+            solid
           />
         </CardHeader>
         <CardContent>
-          <ChartContainer config={chartConfigCANature} className="w-full" style={{ height: `${chartHeight}px` }}>
+          <ChartContainer
+            config={chartConfigCANature}
+            className="w-full"
+            style={{ height: `${chartHeight}px` }}
+          >
             <BarChart
               data={natureData}
               layout="vertical"
@@ -1142,7 +1230,8 @@ export default function ClientReportingChart({
                 fontSize={12}
                 tickFormatter={(value) => {
                   const absVal = Math.abs(value);
-                  if (absVal >= 1000000) return `${(value / 1000000).toFixed(0)}M`;
+                  if (absVal >= 1000000)
+                    return `${(value / 1000000).toFixed(0)}M`;
                   if (absVal >= 1000) return `${(value / 1000).toFixed(0)}K`;
                   return value.toString();
                 }}
@@ -1188,19 +1277,34 @@ export default function ClientReportingChart({
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b">
-                  <th className="text-left py-2 font-medium text-muted-foreground">Compte</th>
-                  <th className="text-right py-2 font-medium text-muted-foreground">{yearN}</th>
-                  <th className="text-right py-2 font-medium text-muted-foreground">{yearN1}</th>
-                  <th className="text-right py-2 font-medium text-muted-foreground">Variation</th>
+                  <th className="text-left py-2 font-medium text-muted-foreground">
+                    Compte
+                  </th>
+                  <th className="text-right py-2 font-medium text-muted-foreground">
+                    {yearN}
+                  </th>
+                  <th className="text-right py-2 font-medium text-muted-foreground">
+                    {yearN1}
+                  </th>
+                  <th className="text-right py-2 font-medium text-muted-foreground">
+                    Variation
+                  </th>
                 </tr>
               </thead>
               <tbody>
                 {natureData.map((item) => (
-                  <tr key={item.compte} className="border-b last:border-0 hover:bg-muted/50">
+                  <tr
+                    key={item.compte}
+                    className="border-b last:border-0 hover:bg-muted/50"
+                  >
                     <td className="py-2.5">
                       <div className="flex items-center gap-2">
-                        <span className="font-mono text-xs text-muted-foreground">{item.compte}</span>
-                        <span className="font-medium">{item.intituleCompte}</span>
+                        <span className="font-mono text-xs text-muted-foreground">
+                          {item.compte}
+                        </span>
+                        <span className="font-medium">
+                          {item.intituleCompte}
+                        </span>
                       </div>
                     </td>
                     <td className="text-right py-2.5 font-semibold">
@@ -1219,16 +1323,18 @@ export default function ClientReportingChart({
                   <td className="py-2.5">Total CA</td>
                   <td className="text-right py-2.5 text-blue-600">
                     {formatCompactOnly(
-                      natureData.reduce((sum, item) => sum + item.montantN, 0)
+                      natureData.reduce((sum, item) => sum + item.montantN, 0),
                     )}
                   </td>
                   <td className="text-right py-2.5 text-muted-foreground">
                     {formatCompactOnly(
-                      natureData.reduce((sum, item) => sum + item.montantN1, 0)
+                      natureData.reduce((sum, item) => sum + item.montantN1, 0),
                     )}
                   </td>
                   <td className="text-right py-2.5">
-                    <VariationBadge value={data?.indicateurs.variations.chiffreAffaires ?? 0} />
+                    <VariationBadge
+                      value={data?.indicateurs.variations.chiffreAffaires ?? 0}
+                    />
                   </td>
                 </tr>
               </tbody>
@@ -1246,7 +1352,8 @@ export default function ClientReportingChart({
         <div>
           <CardTitle>Évolution de la Trésorerie</CardTitle>
           <CardDescription>
-            Solde cumulé {yearN} vs {yearN1} - par {getXAxisLabel().toLowerCase()}
+            Solde cumulé {yearN} vs {yearN1} - par{" "}
+            {getXAxisLabel().toLowerCase()}
           </CardDescription>
         </div>
         <ChartLegend labelN={yearN} labelN1={yearN1} colorN="#5FC7B9" />
@@ -1373,9 +1480,7 @@ export default function ClientReportingChart({
                             <button
                               onClick={() => toggleKpiVisible(kpi.id)}
                               className="absolute top-2 right-2 z-10 w-6 h-6 rounded-full flex items-center justify-center bg-white border border-[#D0E3F5] text-[#94A3B8] hover:text-[#0077C3] transition-colors"
-                              title={
-                                kpi.visible ? "Masquer" : "Afficher"
-                              }
+                              title={kpi.visible ? "Masquer" : "Afficher"}
                             >
                               {kpi.visible ? (
                                 <Eye className="w-3.5 h-3.5" />
@@ -1398,7 +1503,9 @@ export default function ClientReportingChart({
                                 <div
                                   className={cn(
                                     "text-3xl font-bold truncate",
-                                    valueN < 0 ? "text-red-600" : "text-[#00122E]",
+                                    valueN < 0
+                                      ? "text-red-600"
+                                      : "text-[#00122E]",
                                   )}
                                 >
                                   {formatCompactOnly(valueN)}
@@ -1407,7 +1514,9 @@ export default function ClientReportingChart({
                                   {yearN1}: {formatCompactOnly(valueN1)}
                                 </p>
                               </div>
-                              <Icon className={`w-8 h-8 shrink-0 ${kpi.color}`} />
+                              <Icon
+                                className={`w-8 h-8 shrink-0 ${kpi.color}`}
+                              />
                             </div>
                           </CardContent>
                         </Card>
@@ -1430,8 +1539,7 @@ export default function ClientReportingChart({
                   }}
                   className="flex items-center gap-2 w-full px-3 py-2 text-sm text-[#335890] hover:bg-[#F5F9FF]"
                 >
-                  {kpiItems.find((k) => k.id === kpiContextMenu.id)
-                    ?.visible ? (
+                  {kpiItems.find((k) => k.id === kpiContextMenu.id)?.visible ? (
                     <>
                       <EyeOff className="w-4 h-4" /> Masquer ce KPI
                     </>
@@ -1458,7 +1566,6 @@ export default function ClientReportingChart({
 
             {/* Tunnel de rentabilité */}
             <TunnelRentabilite />
-
           </div>
         );
 
@@ -1470,7 +1577,8 @@ export default function ClientReportingChart({
               <div className="flex items-center gap-2 p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800">
                 <AlertTriangle className="w-4 h-4 shrink-0" />
                 <span>
-                  Client non assujetti TVA — Le CA est calcule sur les comptes clients (41*) au lieu des comptes de ventes (70*).
+                  Client non assujetti TVA — Le CA est calcule sur les comptes
+                  clients (41*) au lieu des comptes de ventes (70*).
                 </span>
               </div>
             )}
@@ -1480,10 +1588,12 @@ export default function ClientReportingChart({
               <Card>
                 <CardHeader className="pb-2">
                   <div className="flex items-center justify-between">
-                    <CardDescription className="flex items-center gap-1 text-xs">
-                      <PiCoinsDuotone className="w-4 h-4 text-blue-600" />
+                    <CardDescription className="flex items-center gap-2 text-sm font-medium">
                       Chiffre d&apos;Affaires {yearN}
-                      <Badge variant="outline" className="ml-1 text-[10px] px-1 py-0">
+                      <Badge
+                        variant="outline"
+                        className="text-[10px] px-1 py-0"
+                      >
                         {data.client.assujettiTVA ? "HT" : "TTC"}
                       </Badge>
                     </CardDescription>
@@ -1493,27 +1603,52 @@ export default function ClientReportingChart({
                   </div>
                 </CardHeader>
                 <CardContent className="pt-0">
-                  <div className="text-2xl font-bold text-blue-600">
-                    {formatCompactOnly(data.indicateurs.anneeN.chiffreAffaires)}
+                  <div className="flex items-end justify-between gap-2">
+                    <div className="min-w-0">
+                      <div
+                        className={cn(
+                          "text-3xl font-bold truncate",
+                          data.indicateurs.anneeN.chiffreAffaires < 0
+                            ? "text-red-600"
+                            : "text-[#00122E]",
+                        )}
+                      >
+                        {formatCompactOnly(
+                          data.indicateurs.anneeN.chiffreAffaires,
+                        )}
+                      </div>
+                    </div>
+                    <PiCoinsDuotone className="w-8 h-8 shrink-0 text-blue-600" />
                   </div>
                 </CardContent>
               </Card>
 
               <Card>
                 <CardHeader className="pb-2">
-                  <CardDescription className="flex items-center gap-1 text-xs">
-                    <PiCoinsDuotone className="w-4 h-4 text-blue-400" />
+                  <CardDescription className="flex items-center gap-2 text-sm font-medium">
                     Chiffre d&apos;Affaires {yearN1}
-                    <Badge variant="outline" className="ml-1 text-[10px] px-1 py-0">
+                    <Badge variant="outline" className="text-[10px] px-1 py-0">
                       {data.client.assujettiTVA ? "HT" : "TTC"}
                     </Badge>
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="pt-0">
-                  <div className="text-2xl font-bold text-blue-400">
-                    {formatCompactOnly(
-                      data.indicateurs.anneeN1.chiffreAffaires,
-                    )}
+                  <div className="flex items-end justify-between gap-2">
+                    <div className="min-w-0">
+                      <div
+                        className={cn(
+                          "text-3xl font-bold truncate",
+                          data.indicateurs.anneeN1.chiffreAffaires < 0
+                            ? "text-red-600"
+                            : "text-[#00122E]",
+                        )}
+                      >
+                        {formatCompactOnly(
+                          data.indicateurs.anneeN1.chiffreAffaires,
+                        )}
+                      </div>
+                    </div>
+                    <PiCoinsDuotone className="w-8 h-8 shrink-0 text-blue-400" />
                   </div>
                 </CardContent>
               </Card>
@@ -1819,7 +1954,9 @@ export default function ClientReportingChart({
                             : "text-[#00122E]",
                         )}
                       >
-                        {formatCompactOnly(recouvrementData.totals.caEncaisseTTC)}
+                        {formatCompactOnly(
+                          recouvrementData.totals.caEncaisseTTC,
+                        )}
                       </div>
                       <p className="text-xs text-muted-foreground mt-1">
                         Somme des crédits comptes clients
@@ -1843,7 +1980,8 @@ export default function ClientReportingChart({
                 <ChartLegend
                   labelN="Taux mensuel"
                   labelN1="Taux cumulé"
-                  colorN="#5FC7B9"
+                  colorN="hsl(262, 83%, 58%)"
+                  colorN1="hsl(262, 83%, 78%)"
                 />
               </CardHeader>
               <CardContent>
@@ -1927,8 +2065,9 @@ export default function ClientReportingChart({
                 <ChartLegend
                   labelN="CA TTC Total"
                   labelN1="CA Encaissé"
-                  colorN="#2463eb"
-                  colorN1="#81a5f3"
+                  colorN="hsl(221, 83%, 53%)"
+                  colorN1="hsl(142, 76%, 36%)"
+                  solid
                 />
               </CardHeader>
               <CardContent>
@@ -2275,17 +2414,32 @@ export default function ClientReportingChart({
                   <span className="text-xs text-[#335890]">Année :</span>
                   <span className="font-semibold text-[#00122E]">{year}</span>
                   <div className="flex gap-1 ml-1">
-                    <button title="Année précédente" onClick={() => handleYearChange("prev")} disabled={data.availableYears.indexOf(year) >= data.availableYears.length - 1} className="text-[#94A3B8] hover:text-[#0077C3] disabled:opacity-30">
+                    <button
+                      title="Année précédente"
+                      onClick={() => handleYearChange("prev")}
+                      disabled={
+                        data.availableYears.indexOf(year) >=
+                        data.availableYears.length - 1
+                      }
+                      className="text-[#94A3B8] hover:text-[#0077C3] disabled:opacity-30"
+                    >
                       <ChevronLeft className="w-4 h-4" />
                     </button>
-                    <button title="Année suivante" onClick={() => handleYearChange("next")} disabled={data.availableYears.indexOf(year) <= 0} className="text-[#94A3B8] hover:text-[#0077C3] disabled:opacity-30">
+                    <button
+                      title="Année suivante"
+                      onClick={() => handleYearChange("next")}
+                      disabled={data.availableYears.indexOf(year) <= 0}
+                      className="text-[#94A3B8] hover:text-[#0077C3] disabled:opacity-30"
+                    >
                       <ChevronRight className="w-4 h-4" />
                     </button>
                   </div>
                 </div>
                 {periodType !== "ytd" && (
                   <div className="flex items-center gap-2 border border-[#D0E3F5] rounded-lg px-4 h-10">
-                    <span className="text-xs text-[#335890]">Granularité :</span>
+                    <span className="text-xs text-[#335890]">
+                      Granularité :
+                    </span>
                     <Select
                       value={periodType === "month" ? "month" : "year"}
                       onValueChange={(v: string) =>
@@ -2305,7 +2459,10 @@ export default function ClientReportingChart({
                 {(periodType === "ytd" || periodType === "month") && (
                   <div className="flex items-center gap-2 border border-[#D0E3F5] rounded-lg px-4 h-10">
                     <span className="text-xs text-[#335890]">Mois :</span>
-                    <Select value={selectedMonth} onValueChange={setSelectedMonth}>
+                    <Select
+                      value={selectedMonth}
+                      onValueChange={setSelectedMonth}
+                    >
                       <SelectTrigger className="border-0 p-0 h-auto shadow-none min-w-[80px] font-semibold text-[#00122E]">
                         <SelectValue placeholder="Mois" />
                       </SelectTrigger>
@@ -2329,30 +2486,42 @@ export default function ClientReportingChart({
               <>
                 <div className="flex items-center gap-2 border border-[#D0E3F5] rounded-lg px-4 h-10">
                   <span className="text-xs text-[#335890]">Mode calcul :</span>
-                  <span className="font-semibold text-[#00122E]">Périodique</span>
+                  <span className="font-semibold text-[#00122E]">
+                    Périodique
+                  </span>
                 </div>
                 <div className="flex items-center gap-2 border border-[#D0E3F5] rounded-lg px-4 h-10">
                   <span className="text-xs text-[#335890]">Année :</span>
-                  <Select value={recouvrementYear} onValueChange={setRecouvrementYear}>
+                  <Select
+                    value={recouvrementYear}
+                    onValueChange={setRecouvrementYear}
+                  >
                     <SelectTrigger className="border-0 p-0 h-auto shadow-none min-w-[60px] font-semibold text-[#00122E]">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
                       {data.availableYears.map((y) => (
-                        <SelectItem key={y} value={y}>{y}</SelectItem>
+                        <SelectItem key={y} value={y}>
+                          {y}
+                        </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                 </div>
                 <div className="flex items-center gap-2 border border-[#D0E3F5] rounded-lg px-4 h-10">
                   <span className="text-xs text-[#335890]">Mois :</span>
-                  <Select value={recouvrementMonth} onValueChange={setRecouvrementMonth}>
+                  <Select
+                    value={recouvrementMonth}
+                    onValueChange={setRecouvrementMonth}
+                  >
                     <SelectTrigger className="border-0 p-0 h-auto shadow-none min-w-[80px] font-semibold text-[#00122E]">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
                       {MONTHS.map((month) => (
-                        <SelectItem key={month.value} value={month.value}>{month.label}</SelectItem>
+                        <SelectItem key={month.value} value={month.value}>
+                          {month.label}
+                        </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
@@ -2360,46 +2529,99 @@ export default function ClientReportingChart({
                 {/* Period indicator */}
                 <div className="flex items-center gap-2 bg-[#F5F9FF] rounded-lg px-4 h-10 text-xs text-[#335890]">
                   <CalendarRange className="w-3.5 h-3.5 text-[#0077C3]" />
-                  <span>Janvier - {MONTHS.find(m => m.value === recouvrementMonth)?.label} {recouvrementYear}</span>
+                  <span>
+                    Janvier -{" "}
+                    {MONTHS.find((m) => m.value === recouvrementMonth)?.label}{" "}
+                    {recouvrementYear}
+                  </span>
                 </div>
               </>
             )}
           </div>
         ) : (
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h2 className="text-2xl font-bold">{data.client.name}</h2>
-            <p className="text-muted-foreground">
-              Reporting comptable - Année{" "}
-              {activeTab === "recouvrement" ? recouvrementYear : year}
-            </p>
-            <p>Devise : K FCFA</p>
-          </div>
-          {activeTab !== "recouvrement" ? (
-            <div className="flex items-center gap-4">
-              <div className="flex items-center gap-1 bg-muted rounded-lg p-1">
+          <div className="flex items-center justify-between mb-6">
+            <div>
+              <h2 className="text-2xl font-bold">{data.client.name}</h2>
+              <p className="text-muted-foreground">
+                Reporting comptable - Année{" "}
+                {activeTab === "recouvrement" ? recouvrementYear : year}
+              </p>
+              <p>Devise : K FCFA</p>
+            </div>
+            {activeTab !== "recouvrement" ? (
+              <div className="flex items-center gap-4">
+                <div className="flex items-center gap-1 bg-muted rounded-lg p-1">
+                  <Button
+                    variant={periodType === "year" ? "default" : "ghost"}
+                    size="sm"
+                    onClick={() => setPeriodType("year")}
+                    className="gap-1 h-9"
+                  >
+                    <Calendar className="w-4 h-4" />
+                    Périodique
+                  </Button>
+                  <Button
+                    variant={periodType === "ytd" ? "default" : "ghost"}
+                    size="sm"
+                    onClick={() => setPeriodType("ytd")}
+                    className="gap-1 h-9"
+                  >
+                    <CalendarRange className="w-4 h-4" />
+                    Cumulé
+                  </Button>
+                </div>
+
+                {periodType === "ytd" && (
+                  <Select
+                    value={selectedMonth}
+                    onValueChange={setSelectedMonth}
+                  >
+                    <SelectTrigger className="w-[140px]">
+                      <SelectValue placeholder="Mois" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {MONTHS.map((month) => (
+                        <SelectItem key={month.value} value={month.value}>
+                          {month.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+
                 <Button
-                  variant={periodType === "year" ? "default" : "ghost"}
-                  size="sm"
-                  onClick={() => setPeriodType("year")}
-                  className="gap-1 h-9"
+                  variant="outline"
+                  size="icon"
+                  onClick={() => handleYearChange("prev")}
+                  disabled={
+                    data.availableYears.indexOf(year) >=
+                    data.availableYears.length - 1
+                  }
                 >
-                  <Calendar className="w-4 h-4" />
-                  Périodique
+                  <ChevronLeft className="w-4 h-4" />
                 </Button>
+                <span className="text-xl font-semibold min-w-[80px] text-center">
+                  {year}
+                </span>
                 <Button
-                  variant={periodType === "ytd" ? "default" : "ghost"}
-                  size="sm"
-                  onClick={() => setPeriodType("ytd")}
-                  className="gap-1 h-9"
+                  variant="outline"
+                  size="icon"
+                  onClick={() => handleYearChange("next")}
+                  disabled={data.availableYears.indexOf(year) <= 0}
                 >
-                  <CalendarRange className="w-4 h-4" />
-                  Cumulé
+                  <ChevronRight className="w-4 h-4" />
                 </Button>
               </div>
-
-              {periodType === "ytd" && (
-                <Select value={selectedMonth} onValueChange={setSelectedMonth}>
+            ) : (
+              <div className="flex items-center gap-2">
+                <Calendar className="w-4 h-4 text-muted-foreground" />
+                <span className="text-sm text-muted-foreground">
+                  Période d&apos;analyse :
+                </span>
+                <Select
+                  value={recouvrementMonth}
+                  onValueChange={setRecouvrementMonth}
+                >
                   <SelectTrigger className="w-[140px]">
                     <SelectValue placeholder="Mois" />
                   </SelectTrigger>
@@ -2411,70 +2633,24 @@ export default function ClientReportingChart({
                     ))}
                   </SelectContent>
                 </Select>
-              )}
-
-              <Button
-                variant="outline"
-                size="icon"
-                onClick={() => handleYearChange("prev")}
-                disabled={
-                  data.availableYears.indexOf(year) >=
-                  data.availableYears.length - 1
-                }
-              >
-                <ChevronLeft className="w-4 h-4" />
-              </Button>
-              <span className="text-xl font-semibold min-w-[80px] text-center">
-                {year}
-              </span>
-              <Button
-                variant="outline"
-                size="icon"
-                onClick={() => handleYearChange("next")}
-                disabled={data.availableYears.indexOf(year) <= 0}
-              >
-                <ChevronRight className="w-4 h-4" />
-              </Button>
-            </div>
-          ) : (
-            <div className="flex items-center gap-2">
-              <Calendar className="w-4 h-4 text-muted-foreground" />
-              <span className="text-sm text-muted-foreground">
-                Période d&apos;analyse :
-              </span>
-              <Select
-                value={recouvrementMonth}
-                onValueChange={setRecouvrementMonth}
-              >
-                <SelectTrigger className="w-[140px]">
-                  <SelectValue placeholder="Mois" />
-                </SelectTrigger>
-                <SelectContent>
-                  {MONTHS.map((month) => (
-                    <SelectItem key={month.value} value={month.value}>
-                      {month.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Select
-                value={recouvrementYear}
-                onValueChange={setRecouvrementYear}
-              >
-                <SelectTrigger className="w-[100px]">
-                  <SelectValue placeholder="Année" />
-                </SelectTrigger>
-                <SelectContent>
-                  {recouvrementYearOptions.map((y) => (
-                    <SelectItem key={y} value={y}>
-                      {y}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          )}
-        </div>
+                <Select
+                  value={recouvrementYear}
+                  onValueChange={setRecouvrementYear}
+                >
+                  <SelectTrigger className="w-[100px]">
+                    <SelectValue placeholder="Année" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {recouvrementYearOptions.map((y) => (
+                      <SelectItem key={y} value={y}>
+                        {y}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+          </div>
         )}
 
         {/* Tab Content */}
