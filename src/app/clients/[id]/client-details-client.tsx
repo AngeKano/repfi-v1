@@ -234,42 +234,27 @@ export default function ClientDetailsClient({
             </div>
 
           <div className="min-w-0">
-            {/* Financial tabs - delegated to ClientReportingChart */}
-            {activeTab === "overview" && (
-              <ClientReportingChart
-                clientId={client.id}
-                initialTab="synthese"
-                initialPeriodType={initialPeriodType}
-                hideNav
-              />
-            )}
-
-            {activeTab === "chiffres" && (
-              <ClientReportingChart
-                clientId={client.id}
-                initialTab="chiffre-affaires"
-                initialPeriodType={initialPeriodType}
-                hideNav
-              />
-            )}
-
-            {activeTab === "resultats" && (
-              <ClientReportingChart
-                clientId={client.id}
-                initialTab="resultat"
-                initialPeriodType={initialPeriodType}
-                hideNav
-              />
-            )}
-
-            {activeTab === "recouvrement" && (
-              <ClientReportingChart
-                clientId={client.id}
-                initialTab="recouvrement"
-                initialPeriodType={initialPeriodType}
-                hideNav
-              />
-            )}
+            {/* Onglets financiers — instance unique pour préserver les filtres
+                entre Synthèse / Chiffres / Résultats. Recouvrement a ses
+                propres filtres internes. */}
+            {(() => {
+              const map: Record<string, "synthese" | "chiffre-affaires" | "resultat" | "recouvrement" | undefined> = {
+                overview: "synthese",
+                chiffres: "chiffre-affaires",
+                resultats: "resultat",
+                recouvrement: "recouvrement",
+              };
+              const internalTab = map[activeTab];
+              if (!internalTab) return null;
+              return (
+                <ClientReportingChart
+                  clientId={client.id}
+                  activeTab={internalTab}
+                  initialPeriodType={initialPeriodType}
+                  hideNav
+                />
+              );
+            })()}
 
             {/* Members */}
             {activeTab === "members" && (
