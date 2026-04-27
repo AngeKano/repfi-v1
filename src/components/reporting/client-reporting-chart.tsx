@@ -34,33 +34,12 @@ import {
   Legend,
 } from "recharts";
 import {
-  ContextMenu,
-  ContextMenuContent,
-  ContextMenuItem,
-  ContextMenuSeparator,
-  ContextMenuTrigger,
-} from "@/components/ui/context-menu";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import {
   ChevronLeft,
   ChevronRight,
-  Download,
-  Trash2,
-  EyeOff,
   Loader2,
   TrendingUp,
   TrendingDown,
   Minus,
-  DollarSign,
-  Users,
-  Activity,
-  Wallet,
-  PiggyBank,
-  ShoppingCart,
   Calendar,
   CalendarDays,
   CalendarRange,
@@ -79,6 +58,7 @@ import {
   Building2,
   Trophy,
   AlertTriangle,
+  EyeOff,
 } from "lucide-react";
 import {
   PiCoinsDuotone,
