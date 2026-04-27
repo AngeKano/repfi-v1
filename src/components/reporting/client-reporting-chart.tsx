@@ -87,6 +87,7 @@ import {
   PiChartDonutDuotone,
   PiShoppingCartSimpleDuotone,
   PiGearDuotone,
+  PiPercentDuotone,
 } from "react-icons/pi";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -1904,7 +1905,7 @@ export default function ClientReportingChart({
                         Sur la période sélectionnée
                       </p>
                     </div>
-                    <Percent className="w-8 h-8 shrink-0 text-violet-600" />
+                    <PiPercentDuotone className="w-8 h-8 shrink-0 text-violet-600" />
                   </div>
                 </CardContent>
               </Card>
@@ -1962,7 +1963,7 @@ export default function ClientReportingChart({
                         Somme des crédits comptes clients
                       </p>
                     </div>
-                    <Wallet className="w-8 h-8 shrink-0 text-green-600" />
+                    <PiWalletDuotone className="w-8 h-8 shrink-0 text-green-600" />
                   </div>
                 </CardContent>
               </Card>
