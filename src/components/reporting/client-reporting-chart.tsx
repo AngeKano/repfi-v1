@@ -286,7 +286,7 @@ const INITIAL_TUNNEL_METRICS: TunnelMetric[] = [
   },
   {
     id: "rex",
-    label: "Résultat Exploitation",
+    label: "Rés. Exploitation",
     key: "resultatExploitation",
     visible: true,
     order: 3,
@@ -461,11 +461,18 @@ const MONTHS = [
 export default function ClientReportingChart({
   clientId,
   initialTab,
+  activeTab: activeTabProp,
   initialPeriodType,
   hideNav = false,
 }: {
   clientId: string;
   initialTab?: TabId;
+  /**
+   * Onglet contrôlé par le parent. Quand fourni, on conserve l'état des
+   * filtres (année, mode, mois) entre les changements d'onglet : seul le
+   * rendu du contenu change. Si absent, l'onglet est géré localement.
+   */
+  activeTab?: TabId;
   initialPeriodType?: PeriodType;
   hideNav?: boolean;
 }) {
@@ -482,9 +489,16 @@ export default function ClientReportingChart({
     INITIAL_TUNNEL_METRICS,
   );
   const [tunnelEditMode, setTunnelEditMode] = useState(false);
-  const [activeTab, setActiveTab] = useState<TabId>(initialTab || "synthese");
+  const [activeTabState, setActiveTabState] = useState<TabId>(
+    activeTabProp || initialTab || "synthese",
+  );
+  // Lorsqu'on est en mode contrôlé, l'onglet vient du parent.
+  const activeTab: TabId = activeTabProp ?? activeTabState;
+  const setActiveTab = (t: TabId) => {
+    if (activeTabProp === undefined) setActiveTabState(t);
+  };
   const [expandedNav, setExpandedNav] = useState<Set<TabId>>(
-    new Set([initialTab || "synthese"]),
+    new Set([activeTabProp || initialTab || "synthese"]),
   );
 
   // KPI configuration state
@@ -2391,7 +2405,10 @@ export default function ClientReportingChart({
       <div className={hideNav ? "" : "flex-1 p-6 overflow-auto"}>
         {/* Header */}
         {hideNav ? (
-          /* Redesigned filter bar for embedded mode */
+          /* Barre de filtres globaux (Synthèse / Chiffres / Résultats) — l'état
+             est partagé donc une modification sur n'importe lequel de ces
+             onglets s'applique aux autres. Recouvrement conserve sa propre
+             barre dédiée car son calcul impose le mode périodique. */
           <div className="flex flex-wrap items-center gap-3 mb-6">
             {activeTab !== "recouvrement" ? (
               <>
