@@ -279,7 +279,7 @@ export default function StatusComponents({
   );
 
   return (
-    <div className="max-w-4xl">
+    <div className="w-full">
       <Card className="p-6 border-[#D0E3F5]">
         {/* Message animé en haut */}
 

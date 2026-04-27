@@ -88,6 +88,10 @@ import {
   PiShoppingCartSimpleDuotone,
   PiGearDuotone,
   PiPercentDuotone,
+  PiReceiptDuotone,
+  PiCalculatorDuotone,
+  PiChartPieDuotone,
+  PiWarningDuotone,
 } from "react-icons/pi";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -1194,14 +1198,11 @@ export default function ClientReportingChart({
     return (
       <Card>
         <CardHeader className="flex flex-row items-start justify-between gap-4">
-          <div className="flex items-center gap-2">
-            <BarChart3 className="w-5 h-5 text-blue-600" />
-            <div>
-              <CardTitle>CA par Nature</CardTitle>
-              <CardDescription>
-                Détail des comptes (rubrique TC) — {yearN} vs {yearN1}
-              </CardDescription>
-            </div>
+          <div>
+            <CardTitle>CA par Nature</CardTitle>
+            <CardDescription>
+              Détail des comptes (rubrique TC) — {yearN} vs {yearN1}
+            </CardDescription>
           </div>
           <ChartLegend
             labelN={yearN}
@@ -1753,7 +1754,7 @@ export default function ClientReportingChart({
                 <CardHeader className="pb-2">
                   <div className="flex items-center justify-between">
                     <CardDescription className="text-sm font-medium">
-                      Rex
+                      Résultat Exploitation
                     </CardDescription>
                     <VariationBadge
                       value={data.indicateurs.variations.resultatExploitation}
@@ -1799,7 +1800,7 @@ export default function ClientReportingChart({
                         data.indicateurs.anneeN.resultatFinancier,
                       )}
                     </div>
-                    <Receipt className="w-8 h-8 shrink-0 text-amber-600" />
+                    <PiReceiptDuotone className="w-8 h-8 shrink-0 text-amber-600" />
                   </div>
                 </CardContent>
               </Card>
@@ -1822,7 +1823,7 @@ export default function ClientReportingChart({
                     >
                       {formatCompactOnly(data.indicateurs.anneeN.resultatHAO)}
                     </div>
-                    <PiChartDonutDuotone className="w-8 h-8 shrink-0 text-green-500" />
+                    <PiCalculatorDuotone className="w-8 h-8 shrink-0 text-yellow-500" />
                   </div>
                 </CardContent>
               </Card>
@@ -1850,7 +1851,7 @@ export default function ClientReportingChart({
                     >
                       {formatCompactOnly(data.indicateurs.anneeN.resultatNet)}
                     </div>
-                    <PiChartDonutDuotone className="w-8 h-8 shrink-0 text-green-600" />
+                    <PiChartDonutDuotone className="w-8 h-8   shrink-0 text-green-500" />
                   </div>
                 </CardContent>
               </Card>
@@ -2142,7 +2143,7 @@ export default function ClientReportingChart({
             <Card>
               <CardHeader>
                 <div className="flex items-center gap-2">
-                  <AlertTriangle className="w-5 h-5 text-orange-500" />
+                  <PiWarningDuotone className="w-5 h-5 text-orange-500" />
                   <div>
                     <CardTitle>Analyse des Créances - Top 10</CardTitle>
                     <CardDescription>
