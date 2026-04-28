@@ -1093,7 +1093,7 @@ export default function ClientReportingChart({
     solid = false,
   }: {
     labelN: string | number;
-    labelN1: string | number;
+    labelN1?: string | number;
     colorN?: string;
     colorN1?: string;
     solid?: boolean;
@@ -1104,10 +1104,12 @@ export default function ClientReportingChart({
         <LegendLine color={colorN} />
         <span className="text-base font-medium text-[#0077C3]">{labelN}</span>
       </div>
-      <div className="flex items-center gap-3">
-        <LegendLine color={colorN1 ?? colorN} dashed={!solid} />
-        <span className="text-base font-medium text-[#0077C3]">{labelN1}</span>
-      </div>
+      {labelN1 !== undefined && (
+        <div className="flex items-center gap-3">
+          <LegendLine color={colorN1 ?? colorN} dashed={!solid} />
+          <span className="text-base font-medium text-[#0077C3]">{labelN1}</span>
+        </div>
+      )}
     </div>
   );
 
@@ -1974,8 +1976,8 @@ export default function ClientReportingChart({
                   </CardDescription>
                 </div>
                 <ChartLegend
-                  labelN="Taux mensuel"
-                  labelN1="Taux cumulé"
+                  labelN="Taux périodique"
+                  labelN1="Taux mensuel"
                   colorN="hsl(262, 83%, 58%)"
                   colorN1="hsl(262, 83%, 78%)"
                 />
@@ -1983,12 +1985,12 @@ export default function ClientReportingChart({
               <CardContent>
                 <ChartContainer
                   config={{
-                    tauxRecouvrement: {
-                      label: "Taux mensuel",
+                    tauxRecouvrementCumule: {
+                      label: "Taux périodique",
                       color: "hsl(262, 83%, 58%)",
                     },
-                    tauxRecouvrementCumule: {
-                      label: "Taux cumulé",
+                    tauxRecouvrement: {
+                      label: "Taux mensuel",
                       color: "hsl(262, 83%, 78%)",
                     },
                   }}
@@ -2020,25 +2022,25 @@ export default function ClientReportingChart({
                         <ChartTooltipContent
                           formatter={(value, name) => [
                             `${(value as number).toFixed(1)}%`,
-                            name === "Taux mensuel"
-                              ? "Taux mensuel"
-                              : "Taux cumulé",
+                            name === "Taux périodique"
+                              ? "Taux périodique"
+                              : "Taux mensuel",
                           ]}
                         />
                       }
                     />
                     <Line
                       type="monotone"
-                      dataKey="tauxRecouvrement"
-                      name="Taux mensuel"
+                      dataKey="tauxRecouvrementCumule"
+                      name="Taux périodique"
                       stroke="hsl(262, 83%, 58%)"
                       strokeWidth={2}
                       dot={{ r: 4 }}
                     />
                     <Line
                       type="monotone"
-                      dataKey="tauxRecouvrementCumule"
-                      name="Taux cumulé"
+                      dataKey="tauxRecouvrement"
+                      name="Taux mensuel"
                       stroke="hsl(262, 83%, 78%)"
                       strokeWidth={2}
                       dot={{ r: 3 }}
@@ -2135,7 +2137,7 @@ export default function ClientReportingChart({
 
             {/* Top 10 Créances - Analyse des créances clients */}
             <Card>
-              <CardHeader>
+              <CardHeader className="flex flex-row items-start justify-between gap-4">
                 <div className="flex items-center gap-2">
                   <PiWarningDuotone className="w-5 h-5 text-orange-500" />
                   <div>
@@ -2146,6 +2148,10 @@ export default function ClientReportingChart({
                     </CardDescription>
                   </div>
                 </div>
+                <ChartLegend
+                  labelN="Solde créance"
+                  colorN="hsl(25, 95%, 53%)"
+                />
               </CardHeader>
               <CardContent>
                 {recouvrementData.topCreances &&
@@ -2159,12 +2165,19 @@ export default function ClientReportingChart({
                           color: "hsl(25, 95%, 53%)",
                         },
                       }}
-                      className="h-[220px] w-full"
+                      className="w-full"
+                      style={{
+                        height: `${Math.max(
+                          recouvrementData.topCreances.length * 48 + 40,
+                          280,
+                        )}px`,
+                      }}
                     >
                       <BarChart
                         data={recouvrementData.topCreances}
                         layout="vertical"
                         margin={{ top: 10, right: 30, left: 15, bottom: 10 }}
+                        barCategoryGap="40%"
                       >
                         <CartesianGrid
                           strokeDasharray="3 3"
@@ -2226,8 +2239,8 @@ export default function ClientReportingChart({
                           name="Solde créance"
                           fill="hsl(25, 95%, 53%)"
                           radius={[0, 4, 4, 0]}
+                          barSize={22}
                         />
-                        <Legend />
                       </BarChart>
                     </ChartContainer>
 
