@@ -3,7 +3,7 @@
  * Routes Client individuel
  * GET /api/clients/:id - Détails d'un client
  * PATCH /api/clients/:id - Modifier un client
- * DELETE /api/clients/:id - Supprimer un client (soft delete)
+ * DELETE /api/clients/:id - Supprimer un client (hard delete + S3 cleanup)
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -17,6 +17,19 @@ import {
   getMappedRole,
   CLIENTS_ACTIONS,
 } from "@/lib/permissions";
+import {
+  S3Client,
+  DeleteObjectsCommand,
+  ListObjectsV2Command,
+} from "@aws-sdk/client-s3";
+
+const s3Client = new S3Client({
+  region: process.env.AWS_REGION!,
+  credentials: {
+    accessKeyId: process.env.AWS_ACCESS_KEY_ID!,
+    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY!,
+  },
+});
 
 // Schéma de validation pour la mise à jour
 const updateClientSchema = z.object({
@@ -42,6 +55,7 @@ const updateClientSchema = z.object({
   website: z.string().url().optional().nullable().or(z.literal("")),
   description: z.string().max(1000).optional().nullable(),
   denomination: z.string().max(100).optional().nullable(),
+  assujettiTVA: z.boolean().optional(),
   socialNetworks: z
     .array(
       z.object({
@@ -105,6 +119,104 @@ async function checkClientAccess(
   }
 
   return { hasAccess: true, client, error: null };
+}
+
+/**
+ * Supprimer tous les objets S3 d'un client
+ */
+async function deleteClientS3Files(clientId: string) {
+  const bucket = process.env.AWS_S3_BUCKET;
+  if (!bucket) return;
+
+  // Récupérer tous les s3Key des fichiers normaux et comptables
+  const [normalFiles, comptableFiles] = await Promise.all([
+    prisma.normalFile.findMany({
+      where: { clientId },
+      select: { s3Key: true },
+    }),
+    prisma.comptableFile.findMany({
+      where: { clientId },
+      select: { s3Key: true },
+    }),
+  ]);
+
+  const allKeys = [
+    ...normalFiles.map((f) => f.s3Key),
+    ...comptableFiles.map((f) => f.s3Key),
+  ].filter(Boolean);
+
+  if (allKeys.length === 0) return;
+
+  // S3 DeleteObjects accepte max 1000 objets par requête
+  const chunks: string[][] = [];
+  for (let i = 0; i < allKeys.length; i += 1000) {
+    chunks.push(allKeys.slice(i, i + 1000));
+  }
+
+  for (const chunk of chunks) {
+    try {
+      await s3Client.send(
+        new DeleteObjectsCommand({
+          Bucket: bucket,
+          Delete: {
+            Objects: chunk.map((Key) => ({ Key })),
+            Quiet: true,
+          },
+        }),
+      );
+    } catch (err) {
+      console.error("S3 delete error for client", clientId, err);
+    }
+  }
+
+  // Aussi supprimer les dossiers de résultats Excel (comptable periods)
+  const periods = await prisma.comptablePeriod.findMany({
+    where: { clientId },
+    select: { batchId: true, excelFileUrl: true },
+  });
+
+  for (const period of periods) {
+    try {
+      // Lister et supprimer les objets dans le prefix du batchId
+      const prefix = `comptable/${clientId}/${period.batchId}/`;
+      let continuationToken: string | undefined;
+
+      do {
+        const listRes = await s3Client.send(
+          new ListObjectsV2Command({
+            Bucket: bucket,
+            Prefix: prefix,
+            ContinuationToken: continuationToken,
+          }),
+        );
+
+        const keys =
+          listRes.Contents?.map((obj) => obj.Key).filter(Boolean) || [];
+
+        if (keys.length > 0) {
+          await s3Client.send(
+            new DeleteObjectsCommand({
+              Bucket: bucket,
+              Delete: {
+                Objects: keys.map((Key) => ({ Key: Key! })),
+                Quiet: true,
+              },
+            }),
+          );
+        }
+
+        continuationToken = listRes.IsTruncated
+          ? listRes.NextContinuationToken
+          : undefined;
+      } while (continuationToken);
+    } catch (err) {
+      console.error(
+        "S3 period cleanup error",
+        period.batchId,
+        err,
+      );
+    }
+  }
 }
 
 /**
@@ -293,6 +405,7 @@ export async function PATCH(
         companyType: data.companyType,
         denomination: data.denomination,
         description: data.description,
+        assujettiTVA: data.assujettiTVA,
         updatedAt: new Date(),
       },
     });
@@ -347,7 +460,9 @@ export async function PATCH(
 
 /**
  * DELETE /api/clients/:id
- * Supprimer un client (soft delete)
+ * Supprimer définitivement un client :
+ * 1. Supprimer les fichiers S3 (normaux + comptables + résultats)
+ * 2. Cascade DB : assignments, fichiers, périodes, réseaux sociaux, dossiers
  */
 
 export async function DELETE(
@@ -384,23 +499,53 @@ export async function DELETE(
     // Vérifier que ce n'est pas la self entity
     const client = await prisma.client.findUnique({
       where: { id: clientId },
-      select: { isSelfEntity: true },
+      select: { isSelfEntity: true, name: true },
     });
 
     if (client?.isSelfEntity) {
       return NextResponse.json(
-        { error: "Impossible de supprimer l'entité self" },
+        {
+          error:
+            "Impossible de supprimer l'entité entreprise. Utilisez les paramètres pour supprimer le compte.",
+        },
         { status: 403 },
       );
     }
 
-    // Suppression effective du client
+    // 1. Supprimer les fichiers de S3
+    await deleteClientS3Files(clientId);
+
+    // 2. Supprimer l'historique des fichiers (pas de cascade)
+    const normalFileIds = (
+      await prisma.normalFile.findMany({
+        where: { clientId },
+        select: { id: true },
+      })
+    ).map((f) => f.id);
+
+    const comptableFileIds = (
+      await prisma.comptableFile.findMany({
+        where: { clientId },
+        select: { id: true },
+      })
+    ).map((f) => f.id);
+
+    await Promise.all([
+      prisma.normalFileHistory.deleteMany({
+        where: { fileId: { in: normalFileIds } },
+      }),
+      prisma.comptableFileHistory.deleteMany({
+        where: { fileId: { in: comptableFileIds } },
+      }),
+    ]);
+
+    // 3. Supprimer le client (cascade : assignments, fichiers, périodes, réseaux sociaux, dossiers)
     await prisma.client.delete({
       where: { id: clientId },
     });
 
     return NextResponse.json({
-      message: "Client supprimé avec succès",
+      message: `Client "${client?.name}" supprimé définitivement`,
     });
   } catch (error) {
     console.error("DELETE /api/clients/:id error:", error);

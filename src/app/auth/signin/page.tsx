@@ -6,11 +6,11 @@ import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Building2, ArrowRight } from "lucide-react";
+import { Eye, EyeOff } from "lucide-react";
 import Link from "next/link";
+import Image from "next/image";
 
 export default function SignInPage() {
   const router = useRouter();
@@ -18,6 +18,7 @@ export default function SignInPage() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -32,7 +33,7 @@ export default function SignInPage() {
       });
 
       if (result?.error) {
-        setError(result.error);
+        setError("Email ou mot de passe incorrect.");
         setLoading(false);
         return;
       }
@@ -43,130 +44,146 @@ export default function SignInPage() {
       }
     } catch (err) {
       setError("Une erreur est survenue. Veuillez réessayer.");
+
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-white to-purple-50 p-4">
-      <Card className="w-full max-w-md p-8 shadow-xl">
-        {/* Header */}
-        <div className="mb-8 text-center">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-blue-100 mb-4">
-            <Building2 className="w-8 h-8 text-blue-600" />
-          </div>
-          <h1 className="text-3xl font-bold text-gray-900">Connexion</h1>
-          <p className="text-sm text-gray-600 mt-2">
-            Accédez à votre espace de gestion comptable
-          </p>
+    <div className="min-h-screen flex">
+      {/* Left Side - Background Image */}
+      <div className="hidden lg:flex lg:w-1/2 relative">
+        <Image
+          src="/signin-background.png"
+          alt="Click Insight"
+          fill
+          className="object-cover object-left"
+          priority
+        />
+      </div>
+
+      {/* Right Side - Login Form */}
+      <div className="w-full lg:w-1/2 flex items-center justify-center px-6 py-12 bg-white relative overflow-hidden">
+        {/* Background watermark */}
+        <div className="absolute inset-0 flex items-center justify-center opacity-[0.03] pointer-events-none">
+          <Image
+            src="/logo-click-insight-light.png"
+            alt=""
+            width={600}
+            height={600}
+            className="object-contain"
+          />
         </div>
 
-        {/* Error Alert */}
-        {error && (
-          <Alert variant="destructive" className="mb-6">
-            <AlertDescription>{error}</AlertDescription>
-          </Alert>
-        )}
-
-        {/* Login Form */}
-        <form onSubmit={handleSubmit} className="space-y-5">
-          <div className="space-y-2">
-            <Label htmlFor="email" className="text-sm font-medium">
-              Email
-            </Label>
-            <Input
-              id="email"
-              type="email"
-              placeholder="admin@entreprise.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              disabled={loading}
-              required
-              className="h-11"
+        <div className="w-full max-w-md relative z-10">
+          {/* Logo */}
+          <div className="flex justify-center mb-8">
+            <Image
+              src="/logo-click-insight.png"
+              alt="Click Insight"
+              width={180}
+              height={80}
+              className="object-contain"
             />
           </div>
 
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <Label htmlFor="password" className="text-sm font-medium">
-                Mot de passe
+          {/* Title */}
+          <div className="mb-8">
+            <h1 className="text-3xl font-bold text-[#00122E]">
+              Connectez-vous
+            </h1>
+            <p className="text-sm text-[#335890] mt-1">
+              pour accéder à votre espace de gestion comptable
+            </p>
+          </div>
+
+          {/* Error Alert */}
+          {error && (
+            <Alert variant="destructive" className="mb-6">
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          )}
+
+          {/* Login Form */}
+          <form onSubmit={handleSubmit} className="space-y-5">
+            <div className="space-y-2">
+              <Label htmlFor="email" className="text-sm font-medium">
+                Email <span className="text-red-500">*</span>
               </Label>
-              <Link
-                href="/auth/forgot-password"
-                className="text-xs text-blue-600 hover:text-blue-700"
-              >
-                Mot de passe oublié ?
-              </Link>
+              <Input
+                id="email"
+                type="email"
+                placeholder="admin@entreprise.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                disabled={loading}
+                required
+                className="h-12 bg-[#F8FAFC] border-[#E2E8F0]"
+              />
             </div>
-            <Input
-              id="password"
-              type="password"
-              placeholder="••••••••"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              disabled={loading}
-              required
-              className="h-11"
-            />
-          </div>
 
-          <Button
-            type="submit"
-            className="w-full h-11 text-base"
-            disabled={loading}
-          >
-            {loading ? (
-              <>
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
-                Connexion en cours...
-              </>
-            ) : (
-              <>
-                Se connecter
-                <ArrowRight className="ml-2 w-4 h-4" />
-              </>
-            )}
-          </Button>
-        </form>
+            <div className="space-y-2">
+              <Label htmlFor="password" className="text-sm font-medium">
+                Mot de passe <span className="text-red-500">*</span>
+              </Label>
+              <div className="relative">
+                <Input
+                  id="password"
+                  type={showPassword ? "text" : "password"}
+                  placeholder="Au moins 8 caractères, 1 chiffre, 1 majuscule"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  disabled={loading}
+                  required
+                  className="h-12 bg-[#F8FAFC] border-[#E2E8F0] pr-12"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-[#94A3B8] hover:text-[#64748B] transition-colors"
+                >
+                  {showPassword ? (
+                    <EyeOff className="w-5 h-5" />
+                  ) : (
+                    <Eye className="w-5 h-5" />
+                  )}
+                </button>
+              </div>
+            </div>
 
-        {/* Divider */}
-        <div className="relative my-8">
-          <div className="absolute inset-0 flex items-center">
-            <span className="w-full border-t" />
-          </div>
-          <div className="relative flex justify-center text-xs uppercase">
-            <span className="bg-white px-2 text-gray-500">
-              Nouveau sur la plateforme ?
-            </span>
-          </div>
-        </div>
-
-        {/* Sign Up Link */}
-        <div className="space-y-3">
-          <Link href="/auth/signup">
             <Button
-              variant="outline"
-              className="w-full h-11"
+              type="submit"
+              className="w-full h-12 text-base bg-gradient-to-r from-[#0077C3] to-[#0095F4] hover:from-[#005992] hover:to-[#0077C3] rounded-full mt-8"
               disabled={loading}
             >
-              <Building2 className="mr-2 w-4 h-4" />
-              Créer un compte entreprise
+              {loading ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
+                  Connexion en cours...
+                </>
+              ) : (
+                "Se connecter"
+              )}
             </Button>
-          </Link>
+          </form>
 
-          <p className="text-xs text-center text-gray-500">
-            En vous connectant, vous acceptez nos{" "}
-            <Link href="/terms" className="text-blue-600 hover:underline">
-              conditions d'utilisation
-            </Link>{" "}
-            et notre{" "}
-            <Link href="/privacy" className="text-blue-600 hover:underline">
-              politique de confidentialité
+          {/* Sign Up Link */}
+          <div className="mt-8 text-center">
+            <p className="text-sm text-[#335890] mb-4">
+              Nouveau sur la plateforme ?
+            </p>
+            <Link href="/auth/signup">
+              <Button
+                variant="outline"
+                className="w-full h-12 rounded-full border-[#0077C3] text-[#0077C3] hover:bg-[#EBF5FF]"
+                disabled={loading}
+              >
+                Créer un compte
+              </Button>
             </Link>
-            .
-          </p>
+          </div>
         </div>
-      </Card>
+      </div>
     </div>
   );
 }

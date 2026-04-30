@@ -25,18 +25,9 @@ import { Input } from "@/components/ui/input";
 import UploadFilesDialog from "@/components/files/upload-files-dialog";
 import { useRouter } from "next/navigation";
 
-// Helper function for download
-const handleDownload = async (id: string, fileName: string) => {
-  const res = await fetch(`/api/files/normal/download/${id}`);
-  if (!res.ok) return alert("Erreur lors du téléchargement du fichier.");
-  const blob = await res.blob();
-  const url = window.URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = fileName;
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
+// Helper function for download — l'API streame le fichier directement
+const handleDownload = (id: string, _fileName: string) => {
+  window.location.href = `/api/files/normal/download/${id}`;
 };
 
 interface FilesTabsProps {

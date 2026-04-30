@@ -10,6 +10,12 @@
 !.yarn/releases
 !.yarn/versions
 
+# claude
+.claude/
+
+# claude worktrees
+.claude/worktrees/
+
 # testing
 /coverage
 

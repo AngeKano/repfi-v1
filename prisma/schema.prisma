@@ -66,6 +66,7 @@ model Client {
   website          String?
   companyId        String
   isSelfEntity     Boolean            @default(false)
+  assujettiTVA     Boolean            @default(true)
   createdById      String
   modifiedById     String?
   createdAt        DateTime           @default(now())

@@ -81,6 +81,11 @@ interface IndicateursFinanciers {
   tauxRecouvrement: number;
   caTTCTotal: number;
   caEncaisseTTC: number;
+  // CA par Nature (rubriques OHADA)
+  caTA: number; // Ventes de marchandises
+  caTB: number; // Ventes de produits fabriqués
+  caTC: number; // Travaux et services vendus
+  caTD: number; // Production stockée
 }
 
 interface DataPoint {
@@ -268,6 +273,80 @@ async function recupererRubriquesParJour(
   return result;
 }
 
+// ============================================================================
+// CA COMPTES 70* — Somme directe credit-debit sur les comptes 70
+// ============================================================================
+
+async function recupererCA70ParMois(
+  dbName: string,
+  batchIds: string[],
+): Promise<Map<string, number>> {
+  const result = new Map<string, number>();
+  if (batchIds.length === 0) return result;
+
+  const data = await clickhouseClient.query({
+    query: `
+      SELECT
+        substring(date_transaction, 4, 2) as period,
+        sum(credit - debit) as ca70
+      FROM ${dbName}.grand_livre
+      WHERE batch_id IN ({batchIds:Array(String)})
+        AND startsWith(compte, '70')
+      GROUP BY period
+      ORDER BY period
+    `,
+    query_params: { batchIds },
+    format: "JSONEachRow",
+  });
+
+  const rows = (await data.json()) as Array<{
+    period: string;
+    ca70: string;
+  }>;
+
+  for (const row of rows) {
+    result.set(row.period, parseFloat(row.ca70) || 0);
+  }
+
+  return result;
+}
+
+async function recupererCA70ParJour(
+  dbName: string,
+  batchIds: string[],
+  monthFilter: string,
+): Promise<Map<string, number>> {
+  const result = new Map<string, number>();
+  if (batchIds.length === 0) return result;
+
+  const data = await clickhouseClient.query({
+    query: `
+      SELECT
+        substring(date_transaction, 1, 2) as period,
+        sum(credit - debit) as ca70
+      FROM ${dbName}.grand_livre
+      WHERE batch_id IN ({batchIds:Array(String)})
+        AND substring(date_transaction, 4, 2) = {monthFilter:String}
+        AND startsWith(compte, '70')
+      GROUP BY period
+      ORDER BY period
+    `,
+    query_params: { batchIds, monthFilter },
+    format: "JSONEachRow",
+  });
+
+  const rows = (await data.json()) as Array<{
+    period: string;
+    ca70: string;
+  }>;
+
+  for (const row of rows) {
+    result.set(row.period, parseFloat(row.ca70) || 0);
+  }
+
+  return result;
+}
+
 async function recupererTresorerieParMois(
   dbName: string,
   batchIds: string[],
@@ -430,6 +509,114 @@ async function recupererRecouvrementParJour(
 }
 
 // ============================================================================
+// CA PAR NATURE - Détail des comptes de la rubrique TC (Travaux & services)
+// ============================================================================
+
+interface CAParNatureItem {
+  compte: string;
+  intituleCompte: string;
+  montantN: number;
+  montantN1: number;
+  variation: number;
+}
+
+async function recupererCAParNature(
+  dbName: string,
+  batchIdsN: string[],
+  batchIdsN1: string[],
+  periodType?: string,
+  selectedMonth?: string,
+): Promise<CAParNatureItem[]> {
+  // Construire le filtre de période
+  let periodFilter = "";
+  const baseParams: Record<string, unknown> = {};
+
+  if (periodType === "month" && selectedMonth) {
+    periodFilter = `AND substring(date_transaction, 4, 2) = {monthFilter:String}`;
+    baseParams.monthFilter = selectedMonth;
+  } else if (periodType === "ytd" && selectedMonth) {
+    periodFilter = `AND substring(date_transaction, 4, 2) <= {monthFilter:String}`;
+    baseParams.monthFilter = selectedMonth;
+  }
+
+  // Requête pour N
+  const fetchComptes = async (batchIds: string[]): Promise<Map<string, { intitule: string; montant: number }>> => {
+    const result = new Map<string, { intitule: string; montant: number }>();
+    if (batchIds.length === 0) return result;
+
+    const data = await clickhouseClient.query({
+      query: `
+        SELECT
+          compte,
+          any(intitule_compte) as intitule_compte,
+          sum(credit - debit) as montant
+        FROM ${dbName}.grand_livre
+        WHERE batch_id IN ({batchIds:Array(String)})
+          AND rubrique = 'TC'
+          ${periodFilter}
+        GROUP BY compte
+        ORDER BY montant DESC
+      `,
+      query_params: { ...baseParams, batchIds },
+      format: "JSONEachRow",
+    });
+
+    const rows = (await data.json()) as Array<{
+      compte: string;
+      intitule_compte: string;
+      montant: string;
+    }>;
+
+    for (const row of rows) {
+      result.set(row.compte, {
+        intitule: row.intitule_compte || row.compte,
+        montant: parseFloat(row.montant) || 0,
+      });
+    }
+    return result;
+  };
+
+  const [comptesN, comptesN1] = await Promise.all([
+    fetchComptes(batchIdsN),
+    fetchComptes(batchIdsN1),
+  ]);
+
+  // Fusionner les comptes N et N-1
+  const allComptes = new Set([...comptesN.keys(), ...comptesN1.keys()]);
+  const items: CAParNatureItem[] = [];
+
+  for (const compte of allComptes) {
+    const n = comptesN.get(compte);
+    const n1 = comptesN1.get(compte);
+    const montantN = n?.montant ?? 0;
+    const montantN1 = n1?.montant ?? 0;
+
+    // Ignorer les comptes à 0 des deux côtés
+    if (montantN === 0 && montantN1 === 0) continue;
+
+    const variation =
+      montantN1 !== 0
+        ? ((montantN - montantN1) / Math.abs(montantN1)) * 100
+        : montantN !== 0
+          ? 100
+          : 0;
+
+    items.push({
+      compte,
+      intituleCompte: n?.intitule ?? n1?.intitule ?? compte,
+      montantN,
+      montantN1,
+      variation,
+    });
+  }
+
+  // Trier par montant N décroissant
+  items.sort((a, b) => b.montantN - a.montantN);
+
+  return items;
+}
+
+// ============================================================================
 // TOP 10 CLIENTS - Clients avec le plus fort impact sur le CA
 // ============================================================================
 
@@ -445,6 +632,7 @@ async function recupererTop10Clients(
   batchIds: string[],
   periodType?: string,
   selectedMonth?: string,
+  assujettiTVA: boolean = true,
 ): Promise<TopClient[]> {
   if (batchIds.length === 0) return [];
 
@@ -454,78 +642,113 @@ async function recupererTop10Clients(
   const queryParams: Record<string, unknown> = { batchIds };
 
   if (periodType === "month" && selectedMonth) {
-    // Mode mois : filtrer sur le mois exact
     periodFilter = `AND substring(date_transaction, 4, 2) = {monthFilter:String}`;
     queryParams.monthFilter = selectedMonth;
   } else if (periodType === "ytd" && selectedMonth) {
-    // Mode YTD : filtrer du mois 01 jusqu'au mois sélectionné inclus
     periodFilter = `AND substring(date_transaction, 4, 2) <= {monthFilter:String}`;
     queryParams.monthFilter = selectedMonth;
   }
-  // Mode "year" : pas de filtre supplémentaire (toute l'année via batchIds)
 
-  // Calcul basé sur la rubrique TC (CA HT) au lieu des comptes 41 (TTC)
-  // Les lignes TC n'ont pas de n_tiers/intitule_tiers,
-  // on les retrouve via rapprochement sur numero_piece + date_transaction
-  const data = await clickhouseClient.query({
-    query: `
-      WITH ventes_ht AS (
+  let rows: Array<{ numero_client: string; nom_client: string; ca_client: string }>;
+  let caTotal: number;
+
+  if (assujettiTVA) {
+    // ============================================================
+    // ASSUJETTI TVA : CA basé sur rubrique TC (comptes 70*, CA HT)
+    // Rapprochement numero_piece + date_transaction pour trouver le tiers
+    // ============================================================
+    const data = await clickhouseClient.query({
+      query: `
+        WITH ventes_ht AS (
+          SELECT
+            numero_piece,
+            date_transaction,
+            (credit - debit) AS montant_ht
+          FROM ${dbName}.grand_livre
+          WHERE batch_id IN ({batchIds:Array(String)})
+            AND rubrique = 'TC'
+            ${periodFilter}
+        ),
+        correspondances AS (
+          SELECT
+            c.n_tiers,
+            c.intitule_tiers,
+            v.montant_ht
+          FROM ventes_ht v
+          INNER JOIN ${dbName}.grand_livre c
+            ON c.numero_piece = v.numero_piece
+            AND c.date_transaction = v.date_transaction
+            AND c.batch_id IN ({batchIds:Array(String)})
+            AND c.n_tiers != ''
+            AND c.intitule_tiers != ''
+        )
         SELECT
-          numero_piece,
-          date_transaction,
-          (credit - debit) AS montant_ht
+          n_tiers AS numero_client,
+          intitule_tiers AS nom_client,
+          sum(montant_ht) AS ca_client
+        FROM correspondances
+        GROUP BY n_tiers, intitule_tiers
+        ORDER BY ca_client DESC
+        LIMIT 10
+      `,
+      query_params: queryParams,
+      format: "JSONEachRow",
+    });
+    rows = (await data.json()) as typeof rows;
+
+    const totalQuery = await clickhouseClient.query({
+      query: `
+        SELECT sum(credit - debit) as ca_total
         FROM ${dbName}.grand_livre
         WHERE batch_id IN ({batchIds:Array(String)})
           AND rubrique = 'TC'
           ${periodFilter}
-      ),
-      correspondances AS (
+      `,
+      query_params: queryParams,
+      format: "JSONEachRow",
+    });
+    const totalRows = (await totalQuery.json()) as Array<{ ca_total: string }>;
+    caTotal = parseFloat(totalRows[0]?.ca_total) || 0;
+  } else {
+    // ============================================================
+    // NON ASSUJETTI TVA : CA basé sur comptes 41* (clients, TTC)
+    // CA d'un client = somme des débits du compte 411XXXX du tiers
+    // Pas de rapprochement nécessaire : chaque 411XXXX est un tiers
+    // ============================================================
+    const data = await clickhouseClient.query({
+      query: `
         SELECT
-          c.n_tiers,
-          c.intitule_tiers,
-          v.montant_ht
-        FROM ventes_ht v
-        INNER JOIN ${dbName}.grand_livre c
-          ON c.numero_piece = v.numero_piece
-          AND c.date_transaction = v.date_transaction
-          AND c.batch_id IN ({batchIds:Array(String)})
-          AND c.n_tiers != ''
-          AND c.intitule_tiers != ''
-      )
-      SELECT
-        n_tiers AS numero_client,
-        intitule_tiers AS nom_client,
-        sum(montant_ht) AS ca_client
-      FROM correspondances
-      GROUP BY n_tiers, intitule_tiers
-      ORDER BY ca_client DESC
-      LIMIT 10
-    `,
-    query_params: queryParams,
-    format: "JSONEachRow",
-  });
+          n_tiers AS numero_client,
+          intitule_tiers AS nom_client,
+          sum(debit) AS ca_client
+        FROM ${dbName}.grand_livre
+        WHERE batch_id IN ({batchIds:Array(String)})
+          AND startsWith(compte, '41')
+          AND n_tiers != ''
+          ${periodFilter}
+        GROUP BY n_tiers, intitule_tiers
+        ORDER BY ca_client DESC
+        LIMIT 10
+      `,
+      query_params: queryParams,
+      format: "JSONEachRow",
+    });
+    rows = (await data.json()) as typeof rows;
 
-  const rows = (await data.json()) as Array<{
-    numero_client: string;
-    nom_client: string;
-    ca_client: string;
-  }>;
-
-  // CA HT total (rubrique TC) pour les pourcentages (même filtre de période)
-  const totalQuery = await clickhouseClient.query({
-    query: `
-      SELECT sum(credit - debit) as ca_total
-      FROM ${dbName}.grand_livre
-      WHERE batch_id IN ({batchIds:Array(String)})
-        AND rubrique = 'TC'
-        ${periodFilter}
-    `,
-    query_params: queryParams,
-    format: "JSONEachRow",
-  });
-
-  const totalRows = (await totalQuery.json()) as Array<{ ca_total: string }>;
-  const caTotal = parseFloat(totalRows[0]?.ca_total) || 0;
+    const totalQuery = await clickhouseClient.query({
+      query: `
+        SELECT sum(debit) as ca_total
+        FROM ${dbName}.grand_livre
+        WHERE batch_id IN ({batchIds:Array(String)})
+          AND startsWith(compte, '41')
+          ${periodFilter}
+      `,
+      query_params: queryParams,
+      format: "JSONEachRow",
+    });
+    const totalRows = (await totalQuery.json()) as Array<{ ca_total: string }>;
+    caTotal = parseFloat(totalRows[0]?.ca_total) || 0;
+  }
 
   return rows.map((row) => {
     const montantCA = parseFloat(row.ca_client) || 0;
@@ -707,6 +930,7 @@ function calculerIndicateursPeriode(
     { caTTCTotal: number; caEncaisseTTC: number }
   >,
   periodesToInclude: string[],
+  assujettiTVA: boolean = true,
 ): IndicateursFinanciers {
   const rubriquesAgregees = { ...RUBRIQUES_VIDES };
   let tresorerieTotal = 0;
@@ -735,8 +959,11 @@ function calculerIndicateursPeriode(
   const tauxRecouvrement =
     caTTCTotalSum !== 0 ? (caEncaisseTTCSum / caTTCTotalSum) * 100 : 0;
 
+  // CA : comptes 70* (XB) si assujetti TVA, comptes 41* (débits) sinon
+  const chiffreAffaires = assujettiTVA ? sig.XB : caTTCTotalSum;
+
   return {
-    chiffreAffaires: sig.XB,
+    chiffreAffaires,
     masseSalariale: Math.abs(rubriquesAgregees.RK),
     resultatExploitation: sig.XE,
     resultatNet: sig.XI,
@@ -749,6 +976,11 @@ function calculerIndicateursPeriode(
     tauxRecouvrement,
     caTTCTotal: caTTCTotalSum,
     caEncaisseTTC: caEncaisseTTCSum,
+    // CA par Nature (rubriques OHADA individuelles)
+    caTA: rubriquesAgregees.TA,
+    caTB: rubriquesAgregees.TB,
+    caTC: rubriquesAgregees.TC,
+    caTD: rubriquesAgregees.TD,
   };
 }
 
@@ -774,7 +1006,7 @@ export async function GET(
 
     const client = await prisma.client.findUnique({
       where: { id },
-      select: { id: true, name: true, companyId: true },
+      select: { id: true, name: true, companyId: true, assujettiTVA: true },
     });
 
     if (!client) {
@@ -907,6 +1139,16 @@ export async function GET(
         batchIdsN1,
         selectedMonth,
       );
+      const ca70ParJourN = await recupererCA70ParJour(
+        dbName,
+        batchIds,
+        selectedMonth,
+      );
+      const ca70ParJourN1 = await recupererCA70ParJour(
+        dbName,
+        batchIdsN1,
+        selectedMonth,
+      );
 
       let cumulativeBalanceN = 0;
       let cumulativeTresoN = 0;
@@ -914,6 +1156,8 @@ export async function GET(
       let cumulativeCaTTCN = 0;
       let cumulativeCaEncaisseN = 0;
       let cumulativeCaTTCN1 = 0;
+      let cumulativeCA70N = 0;
+      let cumulativeCA70N1 = 0;
       let cumulativeCaEncaisseN1 = 0;
 
       for (let d = 1; d <= maxDays; d++) {
@@ -957,6 +1201,10 @@ export async function GET(
         cumulativeCaTTCN1 += recouvrementN1Jour.caTTCTotal;
         cumulativeCaEncaisseN1 += recouvrementN1Jour.caEncaisseTTC;
 
+        // CA comptes 70*
+        cumulativeCA70N += ca70ParJourN.get(dayStr) || 0;
+        cumulativeCA70N1 += ca70ParJourN1.get(dayStr) || 0;
+
         const tauxRecouvrementN =
           cumulativeCaTTCN !== 0
             ? (cumulativeCaEncaisseN / cumulativeCaTTCN) * 100
@@ -975,8 +1223,8 @@ export async function GET(
           resultat: resultatN,
           cumulativeBalance: cumulativeBalanceN,
           nbTransactions: fluxN.nbTransactions,
-          chiffreAffaires: sigN.XB,
-          chiffreAffairesN1: sigN1.XB,
+          chiffreAffaires: cumulativeCA70N,
+          chiffreAffairesN1: cumulativeCA70N1,
           soldeTresorerie: cumulativeTresoN,
           soldeTresorerieN1: cumulativeTresoN1,
           margeCommerciale: sigN.XA,
@@ -996,12 +1244,14 @@ export async function GET(
         tresorerieParJourN,
         recouvrementParJourN,
         periodsToIncludeN,
+        client.assujettiTVA,
       );
       const indicateursN1 = calculerIndicateursPeriode(
         rubriquesParJourN1,
         tresorerieParJourN1,
         recouvrementParJourN1,
         periodsToIncludeN1,
+        client.assujettiTVA,
       );
 
       const variations = {
@@ -1044,6 +1294,10 @@ export async function GET(
         ),
         tauxRecouvrement:
           indicateursN.tauxRecouvrement - indicateursN1.tauxRecouvrement,
+        caTA: calculerVariation(indicateursN.caTA, indicateursN1.caTA),
+        caTB: calculerVariation(indicateursN.caTB, indicateursN1.caTB),
+        caTC: calculerVariation(indicateursN.caTC, indicateursN1.caTC),
+        caTD: calculerVariation(indicateursN.caTD, indicateursN1.caTD),
       };
 
       const totals = chartData.reduce(
@@ -1058,10 +1312,13 @@ export async function GET(
       const periods = await enrichirPeriodes(postgresPeriodsData, dbName);
 
       // Top 10 clients par CA (filtré par mois sélectionné)
-      const topClients = await recupererTop10Clients(dbName, batchIds, periodType, selectedMonth ?? undefined);
+      const topClients = await recupererTop10Clients(dbName, batchIds, periodType, selectedMonth ?? undefined, client.assujettiTVA);
+
+      // CA par Nature — détail des comptes TC
+      const caParNature = await recupererCAParNature(dbName, batchIds, batchIdsN1, periodType, selectedMonth ?? undefined);
 
       return NextResponse.json({
-        client: { id: client.id, name: client.name },
+        client: { id: client.id, name: client.name, assujettiTVA: client.assujettiTVA },
         year,
         yearN1: yearN1.toString(),
         periodType,
@@ -1079,6 +1336,7 @@ export async function GET(
           variations,
         },
         topClients,
+        caParNature,
       });
     }
 
@@ -1107,6 +1365,8 @@ export async function GET(
       dbName,
       batchIdsN1,
     );
+    const ca70ParMoisN = await recupererCA70ParMois(dbName, batchIds);
+    const ca70ParMoisN1 = await recupererCA70ParMois(dbName, batchIdsN1);
 
     let cumulativeBalance = 0;
     let cumulativeTresorerieN = 0;
@@ -1115,6 +1375,8 @@ export async function GET(
     let cumulativeCaEncaisseN = 0;
     let cumulativeCaTTCN1 = 0;
     let cumulativeCaEncaisseN1 = 0;
+    let cumulativeCA70N = 0;
+    let cumulativeCA70N1 = 0;
 
     const endMonth =
       periodType === "ytd" && selectedMonth ? parseInt(selectedMonth) : 12;
@@ -1160,6 +1422,10 @@ export async function GET(
       cumulativeCaTTCN1 += recouvrementN1Mois.caTTCTotal;
       cumulativeCaEncaisseN1 += recouvrementN1Mois.caEncaisseTTC;
 
+      // CA comptes 70*
+      cumulativeCA70N += ca70ParMoisN.get(monthStr) || 0;
+      cumulativeCA70N1 += ca70ParMoisN1.get(monthStr) || 0;
+
       const tauxRecouvrementN =
         cumulativeCaTTCN !== 0
           ? (cumulativeCaEncaisseN / cumulativeCaTTCN) * 100
@@ -1178,8 +1444,8 @@ export async function GET(
         resultat,
         cumulativeBalance,
         nbTransactions: fluxN.nbTransactions,
-        chiffreAffaires: sigN.XB,
-        chiffreAffairesN1: sigN1.XB,
+        chiffreAffaires: cumulativeCA70N,
+        chiffreAffairesN1: cumulativeCA70N1,
         soldeTresorerie: cumulativeTresorerieN,
         soldeTresorerieN1: cumulativeTresorerieN1,
         margeCommerciale: sigN.XA,
@@ -1204,12 +1470,14 @@ export async function GET(
       tresorerieParMoisN,
       recouvrementParMoisN,
       periodsToIncludeN,
+      client.assujettiTVA,
     );
     const indicateursN1 = calculerIndicateursPeriode(
       rubriquesParMoisN1,
       tresorerieParMoisN1,
       recouvrementParMoisN1,
       periodsToIncludeN1,
+      client.assujettiTVA,
     );
 
     const variations = {
@@ -1252,6 +1520,10 @@ export async function GET(
       ),
       tauxRecouvrement:
         indicateursN.tauxRecouvrement - indicateursN1.tauxRecouvrement,
+      caTA: calculerVariation(indicateursN.caTA, indicateursN1.caTA),
+      caTB: calculerVariation(indicateursN.caTB, indicateursN1.caTB),
+      caTC: calculerVariation(indicateursN.caTC, indicateursN1.caTC),
+      caTD: calculerVariation(indicateursN.caTD, indicateursN1.caTD),
     };
 
     const totals = chartData.reduce(
@@ -1266,10 +1538,13 @@ export async function GET(
     const periods = await enrichirPeriodes(postgresPeriodsData, dbName);
 
     // Top 10 clients par CA (filtré par période sélectionnée)
-    const topClients = await recupererTop10Clients(dbName, batchIds, periodType, selectedMonth ?? undefined);
+    const topClients = await recupererTop10Clients(dbName, batchIds, periodType, selectedMonth ?? undefined, client.assujettiTVA);
+
+    // CA par Nature — détail des comptes TC
+    const caParNature = await recupererCAParNature(dbName, batchIds, batchIdsN1, periodType, selectedMonth ?? undefined);
 
     return NextResponse.json({
-      client: { id: client.id, name: client.name },
+      client: { id: client.id, name: client.name, assujettiTVA: client.assujettiTVA },
       year,
       yearN1: yearN1.toString(),
       periodType,
@@ -1283,6 +1558,7 @@ export async function GET(
       },
       indicateurs: { anneeN: indicateursN, anneeN1: indicateursN1, variations },
       topClients,
+      caParNature,
     });
   } catch (error) {
     console.error("Reporting API error:", error);

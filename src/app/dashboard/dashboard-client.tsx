@@ -1,28 +1,19 @@
 // app/dashboard/dashboard-client.tsx
 "use client";
 
-import { signOut } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import {
-  Building2,
-  Users,
-  FileText,
-  FolderOpen,
-  LogOut,
-  Plus,
-  Settings,
-  TrendingUp,
-  Download,
-} from "lucide-react";
+import { Building2, Users, FileText, RefreshCw, Eye } from "lucide-react";
+import { PiBuildingsDuotone } from "react-icons/pi";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
-import { toast } from "sonner";
 import {
   getRoleLabel,
   getRoleBadgeVariant,
 } from "@/lib/permissions/role-utils";
+import { DashboardLayout } from "@/components/dashboard-layout";
+import Image from "next/image";
 
 interface DashboardClientProps {
   session: any;
@@ -31,344 +22,275 @@ interface DashboardClientProps {
     filesCount: number;
     membersCount: number;
   };
-  recentClients: any[];
-  recentFiles: any[];
+  recentReportings: any[];
   canViewMembers: boolean;
   canCreateClient: boolean;
 }
 
+const STATUS_LABELS: Record<string, { label: string; className: string }> = {
+  PENDING: { label: "En attente", className: "bg-[#FEF3C7] text-[#B45309]" },
+  VALIDATING: { label: "Validation", className: "bg-[#DBEAFE] text-[#1D4ED8]" },
+  PROCESSING: { label: "En cours", className: "bg-[#E0E7FF] text-[#4338CA]" },
+  COMPLETED: { label: "Complété", className: "bg-[#DCFCE7] text-[#16A34A]" },
+  FAILED: { label: "Échec", className: "bg-[#FEE2E2] text-[#DC2626]" },
+};
+
 export default function DashboardClient({
   session,
   stats,
-  recentClients,
-  recentFiles,
+  recentReportings,
   canViewMembers,
-  canCreateClient,
 }: DashboardClientProps) {
   const router = useRouter();
-
-  const handleSignOut = async () => {
-    await signOut({ redirect: false });
-    router.push("/auth/signin");
-  };
-
-  const handleDownload = async (fileId: string, fileName: string) => {
-    try {
-      // Appeler l'API pour obtenir l'URL signee
-      const response = await fetch(`/api/files/download/normal/${fileId}`);
-
-      if (!response.ok) {
-        throw new Error("Erreur lors du telechargement");
-      }
-
-      const data = await response.json();
-
-      // Telecharger le fichier avec l'URL signee
-      const link = document.createElement("a");
-      link.href = data.url;
-      link.download = fileName;
-      link.target = "_blank";
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-
-      toast.success("Telechargement demarre");
-    } catch (error) {
-      console.error("Erreur telechargement:", error);
-      toast.error("Erreur lors du telechargement du fichier");
-    }
-  };
 
   const roleLabel = getRoleLabel(session.user.role);
   const roleBadgeVariant = getRoleBadgeVariant(session.user.role);
 
+  const formatNumber = (n: number) => String(n).padStart(2, "0");
+
+  const formatPeriod = (start: string | Date, end: string | Date) => {
+    const s = new Date(start);
+    const e = new Date(end);
+    const opts: Intl.DateTimeFormatOptions = {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+    };
+    return `${s.toLocaleDateString("fr-FR", opts)} - ${e.toLocaleDateString("fr-FR", opts)}`;
+  };
+
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-white border-b">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
-            <div className="flex items-center gap-3">
-              <Building2 className="w-8 h-8 text-blue-600" />
-              <div>
-                <h1 className="text-xl font-bold text-gray-900">
-                  {session.user.companyName}
-                </h1>
-                <p className="text-xs text-gray-500">
-                  {session.user.companyPackType}
-                </p>
-              </div>
-            </div>
+    <DashboardLayout>
+      <div className="px-8 py-6">
+        {/* Top Bar */}
+        <div className="flex items-center justify-between mb-8">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => router.refresh()}
+            className="rounded-full bg-[#EBF5FF] text-[#335890] border-[#D0E3F5] hover:bg-[#D0E3F5]"
+          >
+            <RefreshCw className="w-4 h-4 mr-2" />
+            Rafraichir
+          </Button>
 
-            <div className="flex items-center gap-4">
-              <div className="text-right">
-                <p className="text-sm font-medium text-gray-900">
-                  {session.user.name || session.user.email}
-                </p>
-                <Badge variant={roleBadgeVariant as any} className="text-xs">
-                  {roleLabel}
-                </Badge>
-              </div>
-
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => router.push("/settings")}
+          <div className="flex items-center gap-3">
+            <div className="text-right">
+              <p className="text-xs text-[#335890]">Utilisateur</p>
+              <p className="text-sm font-semibold text-[#00122E]">
+                {session.user.firstName && session.user.lastName
+                  ? `${session.user.firstName} ${session.user.lastName}`
+                  : session.user.name || session.user.email}
+              </p>
+              <Badge
+                variant={roleBadgeVariant as any}
+                className="text-xs mt-0.5"
               >
-                <Settings className="w-5 h-5" />
-              </Button>
-
-              <Button variant="ghost" size="icon" onClick={handleSignOut}>
-                <LogOut className="w-5 h-5" />
-              </Button>
+                {roleLabel}
+              </Badge>
+            </div>
+            <div className="w-10 h-10 rounded-full bg-[#EBF5FF] flex items-center justify-center overflow-hidden">
+              <Users className="w-5 h-5 text-[#0077C3]" />
             </div>
           </div>
         </div>
-      </header>
 
-      {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Welcome Section */}
-        <div className="mb-8">
-          <h2 className="text-3xl font-bold text-gray-900 mb-2">
-            Bienvenue{" "}
-            {session.user.firstName
-              ? session.user.firstName
-              : session.user.name}{" "}
-          </h2>
-          <p className="text-gray-600">
-            Voici un apercu de votre activite comptable
-          </p>
+        {/* Overview Title */}
+        <h1 className="text-3xl font-bold text-[#00122E] mb-6">Overview</h1>
+
+        {/* Company Card */}
+        <div className="flex items-center gap-4 mb-6">
+          <Card className="flex flex-row items-center justify-between gap-8 px-8 py-4 w-fit">
+            <div className="w-12 h-12 rounded-xl bg-[#EBF5FF] flex items-center justify-center">
+              <Image
+                src="/logo-click-insight-unit.png"
+                alt=""
+                width={32}
+                height={32}
+                className="object-contain"
+              />
+            </div>
+            <div className="flex flex-col items-center justify-center">
+              <div>
+                <p className="text-xs text-[#0077C3] font-medium">Entreprise</p>
+                <p className="text-base font-bold text-[#00122E]">
+                  {session.user.companyName}
+                </p>
+              </div>
+              <Badge variant="outline" className="text-xs mt-1">
+                {session.user.companyPackType === "ENTREPRISE"
+                  ? "Entreprise"
+                  : session.user.companyPackType === "SIMPLE"
+                    ? "Simple"
+                    : session.user.companyPackType}
+              </Badge>
+            </div>
+          </Card>
         </div>
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <Card className="p-6">
-            <div className="flex items-center justify-between mb-4">
-              <div className="p-3 bg-blue-100 rounded-lg">
-                <FolderOpen className="w-6 h-6 text-blue-600" />
-              </div>
-              <TrendingUp className="w-5 h-5 text-green-500" />
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+          {/* Clients */}
+          <div className="flex items-center gap-4 px-6 py-5 border bg-[#EBF5FF] rounded-xl">
+            <div className="w-12 h-12 rounded-xl bg-white flex items-center justify-center">
+              <PiBuildingsDuotone className="w-6 h-6 text-[#0077C3]" />
             </div>
-            <h3 className="text-2xl font-bold text-gray-900 mb-1">
-              {stats.clientsCount}
-            </h3>
-            <p className="text-sm text-gray-600">
-              {stats.clientsCount > 1 ? "Clients" : "Client"}
-            </p>
-          </Card>
-
-          <Card className="p-6">
-            <div className="flex items-center justify-between mb-4">
-              <div className="p-3 bg-purple-100 rounded-lg">
-                <FileText className="w-6 h-6 text-purple-600" />
-              </div>
-              <TrendingUp className="w-5 h-5 text-green-500" />
-            </div>
-            <h3 className="text-2xl font-bold text-gray-900 mb-1">
-              {stats.filesCount}
-            </h3>
-            <p className="text-sm text-gray-600">
-              {stats.filesCount > 1 ? "Fichiers" : "Fichier"}
-            </p>
-          </Card>
-
-          {canViewMembers && (
-            <Card className="p-6">
-              <div className="flex items-center justify-between mb-4">
-                <div className="p-3 bg-green-100 rounded-lg">
-                  <Users className="w-6 h-6 text-green-600" />
-                </div>
-                <TrendingUp className="w-5 h-5 text-green-500" />
-              </div>
-              <h3 className="text-2xl font-bold text-gray-900 mb-1">
-                {stats.membersCount}
-              </h3>
-              <p className="text-sm text-gray-600">
-                {stats.membersCount > 1 ? "Membres" : "Membre"}
+            <div>
+              <p className="text-sm text-[#335890] font-medium">Clients</p>
+              <p className="text-3xl font-bold text-[#00122E]">
+                {formatNumber(stats.clientsCount)}
               </p>
-            </Card>
-          )}
-        </div>
-
-        {/* Quick Actions */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-          <Card className="p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">
-              Actions rapides
-            </h3>
-            <div className="space-y-3">
-              {canCreateClient && (
-                <Link href="/clients/new">
-                  <Button className="w-full justify-start" variant="outline">
-                    <Plus className="w-4 h-4 mr-2" />
-                    Creer un nouveau client
-                  </Button>
-                </Link>
-              )}
-
-              <Link href="/clients">
-                <Button className="w-full justify-start" variant="outline">
-                  <FolderOpen className="w-4 h-4 mr-2" />
-                  Voir tous les clients
-                </Button>
-              </Link>
-
-              {canViewMembers && (
-                <Link href="/users">
-                  <Button className="w-full justify-start" variant="outline">
-                    <Users className="w-4 h-4 mr-2" />
-                    Gerer les membres
-                  </Button>
-                </Link>
-              )}
             </div>
-          </Card>
-
-          <Card className="p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">
-              Informations entreprise
-            </h3>
-            <div className="space-y-3">
-              <div>
-                <p className="text-sm text-gray-500">Nom</p>
-                <p className="font-medium">{session.user.companyName}</p>
-              </div>
-              <div>
-                <p className="text-sm text-gray-500">Type de pack</p>
-                <Badge variant="outline">{session.user.companyPackType}</Badge>
-              </div>
-              <div>
-                <p className="text-sm text-gray-500">Votre role</p>
-                <Badge variant={roleBadgeVariant as any}>{roleLabel}</Badge>
-              </div>
-            </div>
-          </Card>
-        </div>
-
-        {/* Recent Clients */}
-        <Card className="p-6 mb-8">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold text-gray-900">
-              Clients recents
-            </h3>
-            <Link href="/clients">
-              <Button variant="ghost" size="sm">
-                Voir tout
-              </Button>
-            </Link>
           </div>
 
-          {recentClients.length === 0 ? (
-            <p className="text-gray-500 text-center py-8">
-              Aucun client pour le moment
-            </p>
-          ) : (
-            <div className="space-y-3">
-              {recentClients.map((client) => (
-                <Link
-                  key={client.id}
-                  href={`/clients/${client.id}`}
-                  className="block"
-                >
-                  <div className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 transition-colors">
-                    <div className="flex items-center gap-3">
-                      <div className="p-2 bg-blue-100 rounded">
-                        <Building2 className="w-5 h-5 text-blue-600" />
-                      </div>
-                      <div>
-                        <p className="font-medium text-gray-900">
-                          {client.name}
-                          {client.isSelfEntity && (
-                            <Badge variant="secondary" className="ml-2 text-xs">
-                              Entreprise
-                            </Badge>
-                          )}
-                        </p>
-                        <p className="text-sm text-gray-500">{client.email}</p>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-xs text-gray-500">
-                        {new Date(client.createdAt).toLocaleDateString("fr-FR")}
-                      </p>
-                      <Badge variant="outline" className="text-xs mt-1">
-                        {client.companyType}
-                      </Badge>
-                    </div>
-                  </div>
-                </Link>
-              ))}
+          {/* Fichiers */}
+          <div className="flex items-center gap-4 px-6 py-5 border-y bg-[#F3E8FF] rounded-xl">
+            <div className="w-12 h-12 rounded-xl bg-white flex items-center justify-center">
+              <FileText className="w-6 h-6 text-[#9333EA]" />
+            </div>
+            <div>
+              <p className="text-sm text-[#335890] font-medium">Fichiers</p>
+              <p className="text-3xl font-bold text-[#00122E]">
+                {formatNumber(stats.filesCount)}
+              </p>
+            </div>
+          </div>
+
+          {/* Membres */}
+          {canViewMembers && (
+            <div className="flex items-center gap-4 px-6 py-5 border bg-[#DCFCE7] rounded-xl">
+              <div className="w-12 h-12 rounded-xl bg-white  flex items-center justify-center">
+                <Users className="w-6 h-6 text-[#16A34A]" />
+              </div>
+              <div>
+                <p className="text-sm text-[#335890] font-medium">Membres</p>
+                <p className="text-3xl font-bold text-[#00122E]">
+                  {formatNumber(stats.membersCount)}
+                </p>
+              </div>
             </div>
           )}
-        </Card>
+        </div>
 
-        {/* Recent Files */}
+        {/* Recent Reporting Financier */}
         <Card className="p-6">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold text-gray-900">
-              Fichiers recents
+            <h3 className="text-lg font-semibold text-[#00122E]">
+              Périodes de reporting financier récentes
             </h3>
+            {/* <Link href="/clients">
+              <Button variant="ghost" size="sm" className="text-[#0077C3]">
+                Voir tout
+              </Button>
+            </Link> */}
           </div>
 
-          {recentFiles.length === 0 ? (
-            <p className="text-gray-500 text-center py-8">
-              Aucun fichier pour le moment
+          {recentReportings.length === 0 ? (
+            <p className="text-[#335890] text-center py-8">
+              Aucun reporting financier pour le moment
             </p>
           ) : (
-            <div className="space-y-3">
-              {recentFiles.map((file) => (
-                <div
-                  key={file.id}
-                  className="flex items-center justify-between p-4 border rounded-lg"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 bg-purple-100 rounded">
-                      <FileText className="w-5 h-5 text-purple-600" />
-                    </div>
-                    <div>
-                      <p className="font-medium text-gray-900">
-                        {file.fileName}
-                      </p>
-                      <p className="text-sm text-gray-500">
-                        {file.client.name} •{" "}
-                        {file.uploadedBy.firstName || file.uploadedBy.email}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <div className="text-right">
-                      <Badge
-                        variant={
-                          file.status === "SUCCES"
-                            ? "default"
-                            : file.status === "ERROR"
-                              ? "destructive"
-                              : "secondary"
-                        }
+            <div className="border border-[#D0E3F5] rounded-xl overflow-hidden">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-[#D0E3F5] bg-[#F5F9FF]">
+                    <th className="text-left px-4 py-3 text-xs font-semibold text-[#335890] uppercase tracking-wider">
+                      Client
+                    </th>
+                    <th className="text-left px-4 py-3 text-xs font-semibold text-[#335890] uppercase tracking-wider">
+                      Période
+                    </th>
+                    <th className="text-center px-4 py-3 text-xs font-semibold text-[#335890] uppercase tracking-wider">
+                      Année
+                    </th>
+                    <th className="text-center px-4 py-3 text-xs font-semibold text-[#335890] uppercase tracking-wider">
+                      Fichiers
+                    </th>
+                    <th className="text-center px-4 py-3 text-xs font-semibold text-[#335890] uppercase tracking-wider">
+                      Statut
+                    </th>
+                    <th className="text-left px-4 py-3 text-xs font-semibold text-[#335890] uppercase tracking-wider">
+                      Créé le
+                    </th>
+                    <th className="text-center px-4 py-3 text-xs font-semibold text-[#335890] uppercase tracking-wider">
+                      Actions
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {recentReportings.map((r, idx) => {
+                    const statusMeta = STATUS_LABELS[r.status] || {
+                      label: r.status,
+                      className: "bg-[#F1F5F9] text-[#335890]",
+                    };
+                    return (
+                      <tr
+                        key={r.id}
+                        className={`border-b border-[#D0E3F5] last:border-b-0 hover:bg-[#F5F9FF] transition-colors ${
+                          idx % 2 === 0 ? "bg-white" : "bg-[#FAFCFF]"
+                        }`}
                       >
-                        {file.status}
-                      </Badge>
-                      <p className="text-xs text-gray-500 mt-1">
-                        {new Date(file.uploadedAt).toLocaleDateString("fr-FR")}
-                      </p>
-                    </div>
-                    {file.status === "SUCCES" && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleDownload(file.id, file.fileName)}
-                      >
-                        <Download className="w-4 h-4" />
-                      </Button>
-                    )}
-                  </div>
-                </div>
-              ))}
+                        <td className="px-4 py-4">
+                          <div className="flex items-center gap-3">
+                            <div className="w-9 h-9 rounded-full bg-[#EBF5FF] flex items-center justify-center text-sm font-semibold text-[#0077C3] shrink-0">
+                              {r.client.name.charAt(0).toUpperCase()}
+                            </div>
+                            <div>
+                              <p className="font-medium text-[#00122E] text-sm">
+                                {r.client.name}
+                              </p>
+                              <p className="text-xs text-[#335890]">
+                                {r.client.email}
+                              </p>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-4 py-4 text-sm text-[#335890]">
+                          {formatPeriod(r.periodStart, r.periodEnd)}
+                        </td>
+                        <td className="px-4 py-4 text-center text-sm font-medium text-[#00122E]">
+                          {r.year}
+                        </td>
+                        <td className="px-4 py-4 text-center text-sm font-medium text-[#00122E]">
+                          {r._count?.files ?? 0}
+                        </td>
+                        <td className="px-4 py-4 text-center">
+                          <span
+                            className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${statusMeta.className}`}
+                          >
+                            {statusMeta.label}
+                          </span>
+                        </td>
+                        <td className="px-4 py-4 text-sm text-[#335890]">
+                          {new Date(r.createdAt).toLocaleDateString("fr-FR", {
+                            day: "2-digit",
+                            month: "2-digit",
+                            year: "numeric",
+                          })}
+                        </td>
+                        <td className="px-4 py-4">
+                          <div className="flex items-center justify-center">
+                            <Link href={`/clients/${r.client.id}`}>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="text-[#0077C3] hover:text-[#005992] hover:bg-[#EBF5FF] h-8 w-8 p-0"
+                                title="Voir"
+                              >
+                                <Eye className="w-4 h-4" />
+                              </Button>
+                            </Link>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
             </div>
           )}
         </Card>
-      </main>
-    </div>
+      </div>
+    </DashboardLayout>
   );
 }

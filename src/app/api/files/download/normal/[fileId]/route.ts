@@ -1,11 +1,7 @@
-// app/api/files/download/[fileId]/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
-
 import { S3Client, GetObjectCommand } from "@aws-sdk/client-s3";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
-import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
-
 import { prisma } from "@/lib/prisma";
 
 const s3Client = new S3Client({
@@ -25,15 +21,14 @@ export async function GET(
     if (!session?.user) {
       return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
     }
+
     const { fileId } = await params;
+
     const file = await prisma.normalFile.findFirst({
       where: {
         id: fileId,
         client: { companyId: session.user.companyId },
         deletedAt: null,
-      },
-      include: {
-        client: true,
       },
     });
 
@@ -51,25 +46,29 @@ export async function GET(
       );
     }
 
-    // Générer une URL signée valide pour 1 heure pour le téléchargement S3
-    const command = new GetObjectCommand({
-      Bucket: process.env.AWS_S3_BUCKET_NAME!,
-      Key: file.s3Key,
-    });
+    // Streamer le fichier directement depuis S3
+    const s3Response = await s3Client.send(
+      new GetObjectCommand({
+        Bucket: process.env.AWS_S3_BUCKET_NAME!,
+        Key: file.s3Key,
+      }),
+    );
 
-    const signedUrl = await getSignedUrl(s3Client, command, {
-      expiresIn: 3600,
-    });
+    const stream = s3Response.Body as ReadableStream;
 
-    return NextResponse.json({
-      url: signedUrl,
-      fileName: file.fileName,
-      mimeType: file.mimeType,
+    return new NextResponse(stream, {
+      headers: {
+        "Content-Type": file.mimeType || "application/octet-stream",
+        "Content-Disposition": `attachment; filename="${encodeURIComponent(file.fileName)}"`,
+        ...(s3Response.ContentLength
+          ? { "Content-Length": String(s3Response.ContentLength) }
+          : {}),
+      },
     });
   } catch (error) {
-    console.error("Erreur génération URL signée:", error);
+    console.error("Erreur téléchargement S3 (normal):", error);
     return NextResponse.json(
-      { error: "Erreur lors de la génération du lien de téléchargement" },
+      { error: "Erreur lors du téléchargement" },
       { status: 500 },
     );
   }
