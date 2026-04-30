@@ -14,24 +14,29 @@ import {
   UserPlus,
   Plus,
   RefreshCw,
-  BarChart3,
-  DollarSign,
-  Target,
-  Receipt,
-  FileText,
   ChevronLeft,
 } from "lucide-react";
+import {
+  PiChartScatterDuotone,
+  PiCoinsDuotone,
+  PiChartDonutDuotone,
+  PiHandCoinsDuotone,
+  PiUsersThreeDuotone,
+  PiChartBarHorizontalDuotone,
+  PiFilesDuotone,
+} from "react-icons/pi";
 import Link from "next/link";
 import FilesTabs from "./files-tabs";
 import DeclarationTabs from "./declaration/declaration-tabs";
 import ClientReportingChart from "@/components/reporting/client-reporting-chart";
 import { UploadFileDialog } from "./upload-file-dialog";
+import { ClientDetailsDialog } from "@/app/clients/client-details-dialog";
+import { DeleteClientDialog } from "@/app/clients/delete-client-dialog";
 import {
   getRoleLabel,
   getRoleBadgeVariant,
 } from "@/lib/permissions/role-utils";
 import { DashboardLayout } from "@/components/dashboard-layout";
-import { ConfirmDialog } from "@/components/confirm-dialog";
 
 interface ClientDetailsClientProps {
   session: any;
@@ -42,13 +47,13 @@ interface ClientDetailsClientProps {
 }
 
 const CLIENT_TABS = [
-  { id: "overview", label: "Synthèse Financière", icon: BarChart3 },
-  { id: "chiffres", label: "Chiffres d'affaires", icon: DollarSign },
-  { id: "resultats", label: "Résultats", icon: Target },
-  { id: "recouvrement", label: "Recouvrement", icon: Receipt },
-  { id: "members", label: "Membres", icon: Users },
-  { id: "declaration", label: "Reporting Financier", icon: FileText },
-  // { id: "files", label: "Autres Fichiers", icon: FileText },
+  { id: "overview", label: "Synthèse Financière", icon: PiChartScatterDuotone },
+  { id: "chiffres", label: "Chiffres d'affaires", icon: PiCoinsDuotone },
+  { id: "resultats", label: "Résultats", icon: PiChartDonutDuotone },
+  { id: "recouvrement", label: "Recouvrement", icon: PiHandCoinsDuotone },
+  { id: "members", label: "Membres", icon: PiUsersThreeDuotone },
+  { id: "declaration", label: "Reporting Financier", icon: PiChartBarHorizontalDuotone },
+  { id: "files", label: "Autres Fichiers", icon: PiFilesDuotone },
 ];
 
 export default function ClientDetailsClient({
@@ -64,8 +69,9 @@ export default function ClientDetailsClient({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [activeTab, setActiveTab] = useState("overview");
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showUploadDialog, setShowUploadDialog] = useState(false);
+  const [showEditDialog, setShowEditDialog] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
   const initialPeriodType = (() => {
     const qp = searchParams.get("periodType");
@@ -76,162 +82,83 @@ export default function ClientDetailsClient({
   const roleLabel = getRoleLabel(session.user.role);
   const roleBadgeVariant = getRoleBadgeVariant(session.user.role);
 
-  const handleDelete = async () => {
-    setLoading(true);
-    setError("");
-    setShowDeleteConfirm(false);
-
-    try {
-      const response = await fetch(`/api/clients/${client.id}`, {
-        method: "DELETE",
-      });
-
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.error);
-      }
-
-      router.push("/clients");
-    } catch (err: any) {
-      setError(err.message || "Erreur lors de la suppression");
-      setLoading(false);
-    }
-  };
 
   return (
     <DashboardLayout>
-      <div className="px-8 py-6">
-        {/* Top Bar */}
-        <div className="flex items-center justify-between mb-6">
+      <div className="h-screen flex overflow-hidden">
+        {/* ===== LEFT: Locked nav column ===== */}
+        <aside className="w-[260px] shrink-0 border-r border-[#D0E3F5] flex flex-col px-6 py-6 overflow-y-auto">
           <Button
             variant="outline"
             size="sm"
             onClick={() => router.refresh()}
-            className="text-[#0077C3] border-[#0077C3] hover:bg-[#EBF5FF]"
+            className="rounded-full bg-[#EBF5FF] text-[#335890] border-[#D0E3F5] hover:bg-[#D0E3F5] w-fit mb-6"
           >
             <RefreshCw className="w-4 h-4 mr-2" />
             Rafraichir
           </Button>
 
-          <h2 className="text-xl font-bold text-[#00122E]">
-            {CLIENT_TABS.find((t) => t.id === activeTab)?.label || "Synthèse Financière"}
-          </h2>
-
-          <div className="flex items-center gap-3">
-            <div className="text-right">
-              <p className="text-xs text-[#335890]">Utilisateur</p>
-              <p className="text-sm font-semibold text-[#00122E]">
-                {session.user.firstName && session.user.lastName
-                  ? `${session.user.firstName} ${session.user.lastName}`
-                  : session.user.name || session.user.email}
-              </p>
-              <Badge variant={roleBadgeVariant as any} className="text-xs mt-0.5">
-                {roleLabel}
-              </Badge>
-            </div>
-            <div className="w-10 h-10 rounded-full bg-[#EBF5FF] flex items-center justify-center overflow-hidden">
-              <Users className="w-5 h-5 text-[#0077C3]" />
-            </div>
-          </div>
-        </div>
-
-        {error && (
-          <Alert variant="destructive" className="mb-6">
-            <AlertDescription>{error}</AlertDescription>
-          </Alert>
-        )}
-
-        {/* Client Info Header */}
-        <div className="flex items-center justify-between mb-8">
-          <div className="flex items-center gap-4">
-            <div className="w-16 h-16 rounded-full bg-[#EBF5FF] flex items-center justify-center text-2xl font-bold text-[#0077C3]">
+          {/* Client Info */}
+          <div className="flex items-center gap-3 mb-6">
+            <div className="w-12 h-12 rounded-full bg-[#EBF5FF] flex items-center justify-center text-xl font-bold text-[#0077C3] shrink-0">
               {client.name.charAt(0).toUpperCase()}
             </div>
-            <div>
-              <h1 className="text-2xl font-bold text-[#00122E]">{client.name}</h1>
-              <p className="text-sm text-[#335890]">{client.email}</p>
-              <div className="flex items-center gap-2 mt-1">
+            <div className="min-w-0">
+              <h1 className="text-lg font-bold text-[#00122E] truncate">{client.name}</h1>
+              <p className="text-xs text-[#335890] truncate">{client.email}</p>
+              <div className="flex flex-wrap items-center gap-1 mt-1">
                 {client.denomination && (
-                  <Badge variant="outline" className="text-xs">
+                  <Badge variant="outline" className="text-[10px] px-1.5 py-0">
                     {client.denomination}
                   </Badge>
                 )}
-                <Badge variant="outline" className="text-xs">
+                <Badge variant="outline" className="text-[10px] px-1.5 py-0">
                   {client.companyType}
-                </Badge>
-                <Badge
-                  className="text-xs bg-[#DCFCE7] text-[#16A34A] hover:bg-[#DCFCE7]"
-                >
-                  Actif
                 </Badge>
               </div>
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
-            <Link href="/clients">
-              <Button variant="outline" className="gap-2 border-[#D0E3F5] text-[#335890]">
-                <ChevronLeft className="w-4 h-4" />
-                Retour aux clients
-              </Button>
-            </Link>
-
-            {canDelete && !client.isSelfEntity && (
-              <Button
-                variant="outline"
-                className="gap-2 border-red-200 text-red-500 hover:bg-red-50"
-                onClick={() => setShowDeleteConfirm(true)}
-                disabled={loading}
-              >
-                <Trash2 className="w-4 h-4" />
-                Supprimer
-              </Button>
-            )}
-
-            {canEdit && !client.isSelfEntity && (
-              <Link href={`/clients/${client.id}/edit`}>
-                <Button variant="outline" className="gap-2 border-[#D0E3F5] text-[#335890]">
-                  <Edit className="w-4 h-4" />
-                  Modifier
-                </Button>
-              </Link>
-            )}
-
-            <Button
-              onClick={() => setShowUploadDialog(true)}
-              className="gap-2 bg-gradient-to-r from-[#0077C3] to-[#0095F4] hover:from-[#005992] hover:to-[#0077C3]"
-            >
-              <Plus className="w-4 h-4" />
-              Charger un fichier
-            </Button>
-          </div>
-        </div>
-
-        {/* Main Layout: Sidebar + Content */}
-        <div className="flex gap-6">
-          {/* Left Sidebar Navigation */}
-          <div className="w-[220px] shrink-0">
-            <nav className="space-y-1">
-              {CLIENT_TABS.map((tab) => {
+          <nav className="space-y-1">
+              {CLIENT_TABS.map((tab, idx) => {
                 const active = activeTab === tab.id;
+                // Separator before "Membres" (index 4)
+                const showSeparator = idx === 4;
                 return (
-                  <button
-                    key={tab.id}
-                    onClick={() => setActiveTab(tab.id)}
-                    className={`flex items-center gap-3 w-full px-4 py-3 rounded-lg text-sm font-medium transition-colors ${
-                      active
-                        ? "bg-[#0077C3] text-white"
-                        : "text-[#335890] hover:bg-[#EBF5FF] hover:text-[#0077C3]"
-                    }`}
-                  >
-                    <tab.icon className="w-5 h-5" />
-                    {tab.label}
-                  </button>
+                  <div key={tab.id}>
+                    {showSeparator && (
+                      <div className="h-px bg-[#D0E3F5] my-2" />
+                    )}
+                    <button
+                      onClick={() => setActiveTab(tab.id)}
+                      className={`flex items-center gap-3 w-full px-4 py-3 rounded-lg text-sm font-medium transition-colors ${
+                        active
+                          ? "bg-[#0077C3] text-white"
+                          : "text-[#335890] hover:bg-[#EBF5FF] hover:text-[#0077C3]"
+                      }`}
+                    >
+                      <tab.icon className="w-5 h-5" />
+                      {tab.label}
+                    </button>
+                  </div>
                 );
               })}
             </nav>
 
-            <div className="mt-8">
+            {/* Currency info */}
+            <div className="mt-6 px-4 py-3 bg-[#F5F9FF] rounded-lg border border-[#D0E3F5]">
+              <p className="text-[10px] text-[#94A3B8] uppercase mb-0.5">
+                Devise
+              </p>
+              <p className="text-sm font-semibold text-[#00122E]">
+                FCFA{" "}
+                <span className="text-xs font-normal text-[#335890]">
+                  (unité : K FCFA)
+                </span>
+              </p>
+            </div>
+
+            <div className="mt-4">
               <Link href="/clients">
                 <button className="flex items-center gap-3 w-full px-4 py-3 rounded-lg text-sm font-medium text-[#335890] hover:bg-[#EBF5FF] hover:text-[#0077C3] transition-colors">
                   <ChevronLeft className="w-5 h-5" />
@@ -239,46 +166,95 @@ export default function ClientDetailsClient({
                 </button>
               </Link>
             </div>
-          </div>
+        </aside>
 
-          {/* Content Area */}
-          <div className="flex-1 min-w-0">
-            {/* Financial tabs - delegated to ClientReportingChart */}
-            {activeTab === "overview" && (
-              <ClientReportingChart
-                clientId={client.id}
-                initialTab="synthese"
-                initialPeriodType={initialPeriodType}
-                hideNav
-              />
+        {/* ===== RIGHT: Scrollable content ===== */}
+        <main className="flex-1 min-w-0 overflow-y-auto">
+          <div className="px-8 py-6">
+            {/* Top bar: title + user */}
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-xl font-bold text-[#00122E]">
+                {CLIENT_TABS.find((t) => t.id === activeTab)?.label || "Synthèse Financière"}
+              </h2>
+              <div className="flex items-center gap-3">
+                <div className="text-right">
+                  <p className="text-xs text-[#335890]">Utilisateur</p>
+                  <p className="text-sm font-semibold text-[#00122E]">
+                    {session.user.firstName && session.user.lastName
+                      ? `${session.user.firstName} ${session.user.lastName}`
+                      : session.user.name || session.user.email}
+                  </p>
+                  <Badge variant={roleBadgeVariant as any} className="text-xs mt-0.5">
+                    {roleLabel}
+                  </Badge>
+                </div>
+                <div className="w-10 h-10 rounded-full bg-[#EBF5FF] flex items-center justify-center overflow-hidden">
+                  <Users className="w-5 h-5 text-[#0077C3]" />
+                </div>
+              </div>
+            </div>
+
+            {error && (
+              <Alert variant="destructive" className="mb-6">
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
             )}
 
-            {activeTab === "chiffres" && (
-              <ClientReportingChart
-                clientId={client.id}
-                initialTab="chiffre-affaires"
-                initialPeriodType={initialPeriodType}
-                hideNav
-              />
-            )}
+            {/* Action buttons */}
+            <div className="flex items-center justify-end gap-2 mb-6">
+              {canDelete && !client.isSelfEntity && (
+                <Button
+                  variant="outline"
+                  className="gap-2 border-red-200 text-red-500 hover:bg-red-50 rounded-full"
+                  onClick={() => setShowDeleteDialog(true)}
+                >
+                  <Trash2 className="w-4 h-4" />
+                  Supprimer
+                </Button>
+              )}
 
-            {activeTab === "resultats" && (
-              <ClientReportingChart
-                clientId={client.id}
-                initialTab="resultat"
-                initialPeriodType={initialPeriodType}
-                hideNav
-              />
-            )}
+              {canEdit && !client.isSelfEntity && (
+                <Button
+                  variant="outline"
+                  className="gap-2 border-[#D0E3F5] text-[#335890] rounded-full"
+                  onClick={() => setShowEditDialog(true)}
+                >
+                  <Edit className="w-4 h-4" />
+                  Modifier
+                </Button>
+              )}
 
-            {activeTab === "recouvrement" && (
-              <ClientReportingChart
-                clientId={client.id}
-                initialTab="recouvrement"
-                initialPeriodType={initialPeriodType}
-                hideNav
-              />
-            )}
+              <Button
+                onClick={() => setShowUploadDialog(true)}
+                className="gap-2 bg-gradient-to-r from-[#0077C3] to-[#0095F4] hover:from-[#005992] hover:to-[#0077C3] rounded-full"
+              >
+                <Plus className="w-4 h-4" />
+                Créer un reporting
+              </Button>
+            </div>
+
+          <div className="min-w-0">
+            {/* Onglets financiers — instance unique pour préserver les filtres
+                entre Synthèse / Chiffres / Résultats. Recouvrement a ses
+                propres filtres internes. */}
+            {(() => {
+              const map: Record<string, "synthese" | "chiffre-affaires" | "resultat" | "recouvrement" | undefined> = {
+                overview: "synthese",
+                chiffres: "chiffre-affaires",
+                resultats: "resultat",
+                recouvrement: "recouvrement",
+              };
+              const internalTab = map[activeTab];
+              if (!internalTab) return null;
+              return (
+                <ClientReportingChart
+                  clientId={client.id}
+                  activeTab={internalTab}
+                  initialPeriodType={initialPeriodType}
+                  hideNav
+                />
+              );
+            })()}
 
             {/* Members */}
             {activeTab === "members" && (
@@ -368,7 +344,7 @@ export default function ClientDetailsClient({
               </Card>
             )}
 
-            {/* Declaration / Reporting Financier */}
+            {/* Reporting Financier */}
             {activeTab === "declaration" && (
               <Tabs value="declaration">
                 <DeclarationTabs clientId={client.id} />
@@ -378,7 +354,8 @@ export default function ClientDetailsClient({
             {/* Files */}
             {activeTab === "files" && <FilesTabs clientId={client.id} />}
           </div>
-        </div>
+          </div>
+        </main>
       </div>
 
       <UploadFileDialog
@@ -387,17 +364,18 @@ export default function ClientDetailsClient({
         client={{ id: client.id, name: client.name, email: client.email }}
       />
 
-      {/* Delete Confirmation */}
-      <ConfirmDialog
-        open={showDeleteConfirm}
-        onClose={() => setShowDeleteConfirm(false)}
-        onConfirm={handleDelete}
-        title="Attention"
-        message={`Êtes-vous sûr de vouloir supprimer le client "${client.name}" ? Cette action est irréversible.`}
-        confirmLabel="Supprimer"
-        cancelLabel="Annuler"
-        variant="danger"
-        confirmIcon={<Trash2 className="w-4 h-4" />}
+      <ClientDetailsDialog
+        client={client}
+        open={showEditDialog}
+        onClose={() => setShowEditDialog(false)}
+        canEdit={canEdit}
+        canDelete={canDelete}
+      />
+
+      <DeleteClientDialog
+        client={showDeleteDialog ? client : null}
+        open={showDeleteDialog}
+        onClose={() => setShowDeleteDialog(false)}
       />
     </DashboardLayout>
   );

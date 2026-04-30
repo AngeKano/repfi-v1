@@ -18,12 +18,11 @@ import {
 import { BarChart3, Check, XCircle } from "lucide-react";
 
 export type CalcMode = "periodique" | "cumule";
-export type Granularity = "mois" | "annee";
 
 interface ReportingParamsDialogProps {
   open: boolean;
   onClose: () => void;
-  onValidate: (params: { mode: CalcMode; granularity: Granularity }) => void;
+  onValidate: (params: { mode: CalcMode }) => void;
   clientName?: string;
 }
 
@@ -34,10 +33,9 @@ export function ReportingParamsDialog({
   clientName,
 }: ReportingParamsDialogProps) {
   const [mode, setMode] = useState<CalcMode>("periodique");
-  const [granularity, setGranularity] = useState<Granularity>("mois");
 
   const handleValidate = () => {
-    onValidate({ mode, granularity });
+    onValidate({ mode });
   };
 
   return (
@@ -59,7 +57,7 @@ export function ReportingParamsDialog({
                 <DialogDescription className="text-sm text-[#335890]">
                   {clientName
                     ? `Visualisation pour ${clientName}`
-                    : "Choisissez le mode et la granularité"}
+                    : "Choisissez le mode de calcul"}
                 </DialogDescription>
               </div>
             </div>
@@ -88,31 +86,8 @@ export function ReportingParamsDialog({
               </Select>
               <p className="text-xs text-[#94A3B8] mt-1">
                 {mode === "periodique"
-                  ? "Affiche les valeurs de chaque période indépendamment."
-                  : "Affiche les valeurs cumulées jusqu'à la période sélectionnée."}
-              </p>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-[#335890] mb-2">
-                Granularité <span className="text-red-500">*</span>
-              </label>
-              <Select
-                value={granularity}
-                onValueChange={(v) => setGranularity(v as Granularity)}
-              >
-                <SelectTrigger className="w-full h-11 border-[#D0E3F5]">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="mois">Mois</SelectItem>
-                  <SelectItem value="annee">Année</SelectItem>
-                </SelectContent>
-              </Select>
-              <p className="text-xs text-[#94A3B8] mt-1">
-                {granularity === "mois"
-                  ? "Découpage mensuel des indicateurs."
-                  : "Vue annuelle agrégée des indicateurs."}
+                  ? "Affiche les valeurs sur l'année complète (Janvier → Décembre)."
+                  : "Affiche les valeurs cumulées du début de l'année au mois sélectionné."}
               </p>
             </div>
           </div>
@@ -140,23 +115,10 @@ export function ReportingParamsDialog({
   );
 }
 
-export function paramsToQuery(params: {
-  mode: CalcMode;
-  granularity: Granularity;
-}): string {
-  // Map to the existing periodType accepted by ClientReportingChart:
-  // - Granularity "annee"             → year
-  // - Granularity "mois" + periodique → month
-  // - Granularity "mois" + cumule     → ytd
-  let periodType: "year" | "month" | "ytd" = "year";
-  if (params.granularity === "mois") {
-    periodType = params.mode === "cumule" ? "ytd" : "month";
-  } else {
-    periodType = "year";
-  }
+export function paramsToQuery(params: { mode: CalcMode }): string {
+  const periodType = params.mode === "cumule" ? "ytd" : "year";
   const sp = new URLSearchParams();
   sp.set("mode", params.mode);
-  sp.set("granularity", params.granularity);
   sp.set("periodType", periodType);
   return sp.toString();
 }

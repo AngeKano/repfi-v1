@@ -46,9 +46,16 @@ const bottomNavItems = [
   },
 ];
 
+// Le sidebar se réduit automatiquement sur les pages détail client `/clients/<id>`.
+export function isCollapsedRoute(pathname: string | null): boolean {
+  if (!pathname) return false;
+  return /^\/clients\/[^/]+(?:\/.*)?$/.test(pathname) && pathname !== "/clients/new";
+}
+
 export function Sidebar() {
   const pathname = usePathname();
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const collapsed = isCollapsedRoute(pathname);
 
   const handleSignOut = async () => {
     await signOut({ redirect: false });
@@ -57,25 +64,29 @@ export function Sidebar() {
 
   const isActive = (href: string) => {
     if (href === "/dashboard") return pathname === "/dashboard";
-    return pathname.startsWith(href);
+    return pathname?.startsWith(href) ?? false;
   };
 
   return (
     <>
-      <aside className="fixed left-0 top-0 bottom-0 w-[220px] bg-[#F5F9FF] flex flex-col z-50">
+      <aside
+        className={`fixed left-0 top-0 bottom-0 ${
+          collapsed ? "w-[72px]" : "w-[220px]"
+        } bg-[#F5F9FF] flex flex-col z-50 transition-[width] duration-200`}
+      >
         {/* Logo */}
-        <div className="px-5 pt-6 pb-8">
+        <div className={`pt-6 pb-8 ${collapsed ? "px-2 flex justify-center" : "px-5"}`}>
           <Image
             src="/logo-click-insight-light.png"
             alt="Click Insight"
-            width={120}
-            height={55}
+            width={collapsed ? 40 : 120}
+            height={collapsed ? 40 : 55}
             className="object-contain"
           />
         </div>
 
         {/* Main Navigation */}
-        <nav className="flex-1 px-3">
+        <nav className={`flex-1 ${collapsed ? "px-2" : "px-3"}`}>
           <ul className="space-y-1">
             {mainNavItems.map((item) => {
               const active = isActive(item.href);
@@ -83,14 +94,17 @@ export function Sidebar() {
                 <li key={item.href}>
                   <Link
                     href={item.href}
-                    className={`flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors ${
+                    title={collapsed ? item.label : undefined}
+                    className={`flex items-center ${
+                      collapsed ? "justify-center px-0 py-3" : "gap-3 px-4 py-3"
+                    } rounded-lg text-sm font-medium transition-colors ${
                       active
                         ? "bg-[#EBF5FF] text-[#0077C3]"
                         : "text-[#335890] hover:bg-[#EBF5FF]/50 hover:text-[#0077C3]"
                     }`}
                   >
-                    <item.icon className="w-5 h-5" />
-                    {item.label}
+                    <item.icon className="w-5 h-5 shrink-0" />
+                    {!collapsed && <span>{item.label}</span>}
                   </Link>
                 </li>
               );
@@ -99,7 +113,7 @@ export function Sidebar() {
         </nav>
 
         {/* Bottom Navigation */}
-        <div className="px-3 pb-4">
+        <div className={`pb-4 ${collapsed ? "px-2" : "px-3"}`}>
           <ul className="space-y-1">
             {bottomNavItems.map((item) => {
               const active = isActive(item.href);
@@ -107,14 +121,17 @@ export function Sidebar() {
                 <li key={item.href}>
                   <Link
                     href={item.href}
-                    className={`flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors ${
+                    title={collapsed ? item.label : undefined}
+                    className={`flex items-center ${
+                      collapsed ? "justify-center px-0 py-3" : "gap-3 px-4 py-3"
+                    } rounded-lg text-sm font-medium transition-colors ${
                       active
                         ? "bg-[#EBF5FF] text-[#0077C3]"
                         : "text-[#335890] hover:bg-[#EBF5FF]/50 hover:text-[#0077C3]"
                     }`}
                   >
-                    <item.icon className="w-5 h-5" />
-                    {item.label}
+                    <item.icon className="w-5 h-5 shrink-0" />
+                    {!collapsed && <span>{item.label}</span>}
                   </Link>
                 </li>
               );
@@ -122,15 +139,20 @@ export function Sidebar() {
             <li>
               <button
                 onClick={() => setShowLogoutConfirm(true)}
-                className="flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium text-[#335890] hover:bg-[#EBF5FF]/50 hover:text-[#0077C3] transition-colors w-full"
+                title={collapsed ? "Se déconnecter" : undefined}
+                className={`flex items-center ${
+                  collapsed ? "justify-center px-0 py-3" : "gap-3 px-4 py-3"
+                } rounded-lg text-sm font-medium text-[#335890] hover:bg-[#EBF5FF]/50 hover:text-[#0077C3] transition-colors w-full`}
               >
-                <LogOut className="w-5 h-5" />
-                Se déconnecter
+                <LogOut className="w-5 h-5 shrink-0" />
+                {!collapsed && <span>Se déconnecter</span>}
               </button>
             </li>
           </ul>
 
-          <p className="text-xs text-[#94A3B8] px-4 mt-4">Version V 0.0.1</p>
+          {!collapsed && (
+            <p className="text-xs text-[#94A3B8] px-4 mt-4">Version V 0.0.1</p>
+          )}
         </div>
       </aside>
 

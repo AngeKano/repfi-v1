@@ -154,7 +154,7 @@ export default function SignUpPage() {
           src="/signin-background.png"
           alt="Click Insight"
           fill
-          className="object-cover"
+          className="object-cover object-right"
           priority
         />
       </div>
@@ -186,9 +186,10 @@ export default function SignUpPage() {
 
           {/* Title */}
           <div className="mb-6">
-            <h1 className="text-3xl font-bold text-[#00122E] italic">
+            <h1 className="text-3xl font-bold text-[#00122E]">
               Créez votre compte
             </h1>
+
             {/* Step indicator */}
             <div className="flex items-center gap-3 mt-4">
               <div className="flex items-center gap-2">
@@ -268,28 +269,50 @@ export default function SignUpPage() {
                 />
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="companyType">
-                  Type d&apos;entreprise{" "}
-                  <span className="text-red-500">*</span>
-                </Label>
-                <Select
-                  value={companyType}
-                  onValueChange={setCompanyType}
-                  disabled={loading}
-                  required
-                >
-                  <SelectTrigger className="h-12 bg-[#F8FAFC] border-[#E2E8F0]">
-                    <SelectValue placeholder="Sélectionner" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {COMPANY_TYPES.map((type) => (
-                      <SelectItem key={type.value} value={type.value}>
-                        {type.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="companyType">
+                    Type d&apos;entreprise{" "}
+                    <span className="text-red-500">*</span>
+                  </Label>
+                  <Select
+                    value={companyType}
+                    onValueChange={setCompanyType}
+                    disabled={loading}
+                    required
+                  >
+                    <SelectTrigger className="h-12 bg-[#F8FAFC] border-[#E2E8F0]">
+                      <SelectValue placeholder="Sélectionner" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {COMPANY_TYPES.map((type) => (
+                        <SelectItem key={type.value} value={type.value}>
+                          {type.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="packType">
+                    Type de pack <span className="text-red-500">*</span>
+                  </Label>
+                  <Select
+                    value={packType}
+                    onValueChange={setPackType}
+                    disabled={loading}
+                    required
+                  >
+                    <SelectTrigger className="h-12 bg-[#F8FAFC] border-[#E2E8F0]">
+                      <SelectValue placeholder="Sélectionner" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="ENTREPRISE">Entreprise</SelectItem>
+                      <SelectItem value="SIMPLE">Simple</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
 
               <div className="space-y-2">
@@ -380,7 +403,7 @@ export default function SignUpPage() {
                   <Input
                     id="adminPassword"
                     type={showPassword ? "text" : "password"}
-                    placeholder="\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022"
+                    placeholder="Au moins 8 caractères, 1 chiffre, 1 majuscule"
                     value={adminPassword}
                     onChange={(e) => setAdminPassword(e.target.value)}
                     disabled={loading}
@@ -410,7 +433,7 @@ export default function SignUpPage() {
                   <Input
                     id="adminPasswordConfirm"
                     type={showPasswordConfirm ? "text" : "password"}
-                    placeholder="\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022"
+                    placeholder="* * * * * * * *"
                     value={adminPasswordConfirm}
                     onChange={(e) => setAdminPasswordConfirm(e.target.value)}
                     disabled={loading}

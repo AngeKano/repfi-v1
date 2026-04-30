@@ -103,7 +103,7 @@ export default function FilesListClient({
             variant="outline"
             size="sm"
             onClick={() => router.refresh()}
-            className="text-[#0077C3] border-[#0077C3] hover:bg-[#EBF5FF]"
+            className="rounded-full bg-[#EBF5FF] text-[#335890] border-[#D0E3F5] hover:bg-[#D0E3F5]"
           >
             <RefreshCw className="w-4 h-4 mr-2" />
             Rafraichir
@@ -141,7 +141,7 @@ export default function FilesListClient({
               className="h-10 bg-gradient-to-r from-[#0077C3] to-[#0095F4] hover:from-[#005992] hover:to-[#0077C3]"
             >
               <Plus className="w-4 h-4 mr-2" />
-              Charger un fichier
+              Créer un reporting
             </Button>
           </div>
         </div>
@@ -258,7 +258,10 @@ export default function FilesListClient({
                       checked={selectedIds.length === filteredFiles.length && filteredFiles.length > 0}
                       onChange={toggleSelectAll}
                       className="w-4 h-4 rounded border-[#D0E3F5] text-[#0077C3] focus:ring-[#0077C3]"
+                      aria-label="Sélectionner tous les fichiers"
+                      title="Sélectionner tous les fichiers"
                     />
+              
                   </th>
                   <th className="text-left px-4 py-3 text-xs font-semibold text-[#335890] uppercase tracking-wider">
                     Nom du fichier
@@ -294,7 +297,10 @@ export default function FilesListClient({
                         checked={selectedIds.includes(file.id)}
                         onChange={() => toggleSelect(file.id)}
                         className="w-4 h-4 rounded border-[#D0E3F5] text-[#0077C3] focus:ring-[#0077C3]"
+                        aria-label={`Sélectionner le fichier ${file.fileName}`}
+                        title={`Sélectionner le fichier ${file.fileName}`}
                       />
+                
                     </td>
                     <td className="px-4 py-4">
                       <p className="text-sm font-medium text-[#00122E]">

@@ -279,7 +279,7 @@ export default function StatusComponents({
   );
 
   return (
-    <div className="max-w-4xl">
+    <div className="w-full">
       <Card className="p-6 border-[#D0E3F5]">
         {/* Message animé en haut */}
 
@@ -337,9 +337,10 @@ export default function StatusComponents({
           <div className="mb-6 flex">
             <Button
               size="sm"
+              variant="outline"
               onClick={handleDownloadExcel}
               disabled={downloading}
-              className="gap-2 bg-gradient-to-r from-[#0077C3] to-[#0095F4] hover:from-[#005992] hover:to-[#0077C3]"
+              className="gap-2 text-[#0077C3] border-[#D0E3F5] hover:text-[#005992] hover:bg-[#EBF5FF]"
             >
               <Download className="w-4 h-4" />
               {downloading ? "Téléchargement..." : "Télécharger l'export Excel"}
