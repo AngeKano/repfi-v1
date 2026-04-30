@@ -15,6 +15,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
 import { ArrowLeft, CheckCircle2, Building2 } from "lucide-react";
 import Link from "next/link";
 
@@ -61,6 +62,7 @@ export default function EditClientPage() {
   const [city, setCity] = useState("");
   const [postalCode, setPostalCode] = useState("");
   const [country, setCountry] = useState("");
+  const [assujettiTVA, setAssujettiTVA] = useState(true);
 
   // Social networks
   const [socialNetworks, setSocialNetworks] = useState<
@@ -91,6 +93,7 @@ export default function EditClientPage() {
       setCity(client.city || "");
       setPostalCode(client.postalCode || "");
       setCountry(client.country || "");
+      setAssujettiTVA(client.assujettiTVA ?? true);
       setSocialNetworks(
         client.socialNetworks?.map((s: any) => ({
           type: s.type,
@@ -137,6 +140,7 @@ export default function EditClientPage() {
       city: city || null,
       postalCode: postalCode || null,
       country: country || null,
+      assujettiTVA,
       socialNetworks: socialNetworks.length > 0 ? socialNetworks : undefined,
     };
 
@@ -299,6 +303,24 @@ export default function EditClientPage() {
                     id="denomination"
                     value={denomination}
                     onChange={(e) => setDenomination(e.target.value)}
+                    disabled={saving}
+                  />
+                </div>
+
+                <div className="flex items-center justify-between p-4 border rounded-lg md:col-span-2">
+                  <div className="space-y-0.5">
+                    <Label htmlFor="assujettiTVA" className="text-sm font-medium">
+                      Assujetti a la TVA
+                    </Label>
+                    <p className="text-xs text-gray-500">
+                      Si active, le CA est calcule sur les comptes 70 (ventes HT).
+                      Sinon, sur les comptes 41 (clients TTC).
+                    </p>
+                  </div>
+                  <Switch
+                    id="assujettiTVA"
+                    checked={assujettiTVA}
+                    onCheckedChange={setAssujettiTVA}
                     disabled={saving}
                   />
                 </div>

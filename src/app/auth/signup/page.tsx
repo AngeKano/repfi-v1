@@ -5,7 +5,6 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
@@ -15,9 +14,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
-import { Building2, User, ArrowLeft, CheckCircle2 } from "lucide-react";
+import { CheckCircle2, ArrowLeft, Eye, EyeOff } from "lucide-react";
 import Link from "next/link";
+import Image from "next/image";
 
 const COMPANY_TYPES = [
   { value: "TECHNOLOGIE", label: "Technologie" },
@@ -39,8 +38,11 @@ export default function SignUpPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
+  const [step, setStep] = useState(1);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showPasswordConfirm, setShowPasswordConfirm] = useState(false);
 
-  // Company fields
+  // Company fields (Step 1)
   const [companyName, setCompanyName] = useState("");
   const [companyEmail, setCompanyEmail] = useState("");
   const [companyType, setCompanyType] = useState("");
@@ -49,19 +51,28 @@ export default function SignUpPage() {
   const [companyWebsite, setCompanyWebsite] = useState("");
   const [companyDescription, setCompanyDescription] = useState("");
 
-  // Admin fields
+  // Admin fields (Step 2)
   const [adminEmail, setAdminEmail] = useState("");
   const [adminPassword, setAdminPassword] = useState("");
   const [adminPasswordConfirm, setAdminPasswordConfirm] = useState("");
   const [adminFirstName, setAdminFirstName] = useState("");
   const [adminLastName, setAdminLastName] = useState("");
 
+  const handleNextStep = (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+    if (!companyName || !companyEmail || !companyType) {
+      setError("Veuillez remplir tous les champs obligatoires");
+      return;
+    }
+    setStep(2);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError("");
 
-    // Validation
     if (adminPassword !== adminPasswordConfirm) {
       setError("Les mots de passe ne correspondent pas");
       setLoading(false);
@@ -116,49 +127,103 @@ export default function SignUpPage() {
 
   if (success) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-green-50 via-white to-blue-50 p-4">
-        <Card className="w-full max-w-md p-8 text-center">
+      <div className="min-h-screen flex items-center justify-center bg-white p-4">
+        <div className="w-full max-w-md text-center">
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-green-100 mb-4">
             <CheckCircle2 className="w-8 h-8 text-green-600" />
           </div>
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">
+          <h2 className="text-2xl font-bold text-[#00122E] mb-2">
             Inscription réussie !
           </h2>
-          <p className="text-gray-600 mb-4">
+          <p className="text-[#335890] mb-4">
             Votre entreprise a été créée avec succès.
           </p>
-          <p className="text-sm text-gray-500">
+          <p className="text-sm text-[#335890]">
             Redirection vers la page de connexion...
           </p>
-        </Card>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 py-12 px-4">
-      <div className="max-w-3xl mx-auto">
-        {/* Back Button */}
-        <Link
-          href="/auth/signin"
-          className="inline-flex items-center text-sm text-gray-600 hover:text-gray-900 mb-6"
-        >
-          <ArrowLeft className="w-4 h-4 mr-2" />
-          Retour à la connexion
-        </Link>
+    <div className="min-h-screen flex">
+      {/* Left Side - Background Image */}
+      <div className="hidden lg:flex lg:w-1/2 relative">
+        <Image
+          src="/signin-background.png"
+          alt="Click Insight"
+          fill
+          className="object-cover object-right"
+          priority
+        />
+      </div>
 
-        <Card className="p-8 shadow-xl">
-          {/* Header */}
-          <div className="mb-8 text-center">
-            <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-blue-100 mb-4">
-              <Building2 className="w-8 h-8 text-blue-600" />
-            </div>
-            <h1 className="text-3xl font-bold text-gray-900">
-              Créer un compte entreprise
+      {/* Right Side - Signup Form */}
+      <div className="w-full lg:w-1/2 flex items-center justify-center px-6 py-12 bg-white relative overflow-hidden">
+        {/* Background watermark */}
+        <div className="absolute inset-0 flex items-center justify-center opacity-[0.03] pointer-events-none">
+          <Image
+            src="/logo-click-insight-light.png"
+            alt=""
+            width={600}
+            height={600}
+            className="object-contain"
+          />
+        </div>
+
+        <div className="w-full max-w-md relative z-10">
+          {/* Logo */}
+          <div className="flex justify-center mb-6">
+            <Image
+              src="/logo-click-insight.png"
+              alt="Click Insight"
+              width={160}
+              height={70}
+              className="object-contain"
+            />
+          </div>
+
+          {/* Title */}
+          <div className="mb-6">
+            <h1 className="text-3xl font-bold text-[#00122E]">
+              Créez votre compte
             </h1>
-            <p className="text-sm text-gray-600 mt-2">
-              Commencez à gérer votre comptabilité dès aujourd'hui
-            </p>
+
+            {/* Step indicator */}
+            <div className="flex items-center gap-3 mt-4">
+              <div className="flex items-center gap-2">
+                <div
+                  className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold ${
+                    step >= 1
+                      ? "bg-[#0077C3] text-white"
+                      : "bg-[#E2E8F0] text-[#94A3B8]"
+                  }`}
+                >
+                  1
+                </div>
+                <span className="text-sm text-[#335890]">Entreprise</span>
+              </div>
+              <div className="flex-1 h-0.5 bg-[#E2E8F0]">
+                <div
+                  className={`h-full transition-all duration-300 ${
+                    step >= 2 ? "w-full bg-[#0077C3]" : "w-0"
+                  }`}
+                />
+              </div>
+              <div className="flex items-center gap-2">
+                <div
+                  className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold ${
+                    step >= 2
+                      ? "bg-[#0077C3] text-white"
+                      : "bg-[#E2E8F0] text-[#94A3B8]"
+                  }`}
+                >
+                  2
+                </div>
+                <span className="text-sm text-[#335890]">Administrateur</span>
+              </div>
+            </div>
           </div>
 
           {/* Error Alert */}
@@ -168,61 +233,47 @@ export default function SignUpPage() {
             </Alert>
           )}
 
-          <form onSubmit={handleSubmit} className="space-y-8">
-            {/* Company Information */}
-            <div className="space-y-4">
-              <div className="flex items-center gap-2 pb-2 border-b">
-                <Building2 className="w-5 h-5 text-blue-600" />
-                <h2 className="text-xl font-semibold">
-                  Informations de l'entreprise
-                </h2>
+          {/* Step 1 - Company Information */}
+          {step === 1 && (
+            <form onSubmit={handleNextStep} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="companyName">
+                  Nom de l&apos;entreprise{" "}
+                  <span className="text-red-500">*</span>
+                </Label>
+                <Input
+                  id="companyName"
+                  placeholder="Cabinet Comptable XYZ"
+                  value={companyName}
+                  onChange={(e) => setCompanyName(e.target.value)}
+                  disabled={loading}
+                  required
+                  className="h-12 bg-[#F8FAFC] border-[#E2E8F0]"
+                />
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2 md:col-span-2">
-                  <Label htmlFor="companyName">
-                    Nom de l'entreprise <span className="text-red-500">*</span>
-                  </Label>
-                  <Input
-                    id="companyName"
-                    placeholder="Cabinet Comptable XYZ"
-                    value={companyName}
-                    onChange={(e) => setCompanyName(e.target.value)}
-                    disabled={loading}
-                    required
-                  />
-                </div>
+              <div className="space-y-2">
+                <Label htmlFor="companyEmail">
+                  Email de l&apos;entreprise{" "}
+                  <span className="text-red-500">*</span>
+                </Label>
+                <Input
+                  id="companyEmail"
+                  type="email"
+                  placeholder="contact@entreprise.com"
+                  value={companyEmail}
+                  onChange={(e) => setCompanyEmail(e.target.value)}
+                  disabled={loading}
+                  required
+                  className="h-12 bg-[#F8FAFC] border-[#E2E8F0]"
+                />
+              </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="companyEmail">
-                    Email entreprise <span className="text-red-500">*</span>
-                  </Label>
-                  <Input
-                    id="companyEmail"
-                    type="email"
-                    placeholder="contact@entreprise.com"
-                    value={companyEmail}
-                    onChange={(e) => setCompanyEmail(e.target.value)}
-                    disabled={loading}
-                    required
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="companyPhone">Téléphone</Label>
-                  <Input
-                    id="companyPhone"
-                    type="tel"
-                    placeholder="+225 1 23 45 67 89"
-                    value={companyPhone}
-                    onChange={(e) => setCompanyPhone(e.target.value)}
-                    disabled={loading}
-                  />
-                </div>
-
+              <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="companyType">
-                    Type d'entreprise <span className="text-red-500">*</span>
+                    Type d&apos;entreprise{" "}
+                    <span className="text-red-500">*</span>
                   </Label>
                   <Select
                     value={companyType}
@@ -230,7 +281,7 @@ export default function SignUpPage() {
                     disabled={loading}
                     required
                   >
-                    <SelectTrigger>
+                    <SelectTrigger className="h-12 bg-[#F8FAFC] border-[#E2E8F0]">
                       <SelectValue placeholder="Sélectionner" />
                     </SelectTrigger>
                     <SelectContent>
@@ -251,161 +302,196 @@ export default function SignUpPage() {
                     value={packType}
                     onValueChange={setPackType}
                     disabled={loading}
+                    required
                   >
-                    <SelectTrigger>
-                      <SelectValue />
+                    <SelectTrigger className="h-12 bg-[#F8FAFC] border-[#E2E8F0]">
+                      <SelectValue placeholder="Sélectionner" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="ENTREPRISE">
-                        Entreprise (Gestion de clients)
-                      </SelectItem>
-                      <SelectItem value="SIMPLE">
-                        Simple (Auto-entreprise)
-                      </SelectItem>
+                      <SelectItem value="ENTREPRISE">Entreprise</SelectItem>
+                      <SelectItem value="SIMPLE">Simple</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
-
-                <div className="space-y-2 md:col-span-2">
-                  <Label htmlFor="companyWebsite">Site web</Label>
-                  <Input
-                    id="companyWebsite"
-                    type="url"
-                    placeholder="https://www.entreprise.com"
-                    value={companyWebsite}
-                    onChange={(e) => setCompanyWebsite(e.target.value)}
-                    disabled={loading}
-                  />
-                </div>
-
-                <div className="space-y-2 md:col-span-2">
-                  <Label htmlFor="companyDescription">Description</Label>
-                  <Textarea
-                    id="companyDescription"
-                    placeholder="Description de votre activité..."
-                    value={companyDescription}
-                    onChange={(e) => setCompanyDescription(e.target.value)}
-                    disabled={loading}
-                    rows={3}
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* Admin Information */}
-            <div className="space-y-4">
-              <div className="flex items-center gap-2 pb-2 border-b">
-                <User className="w-5 h-5 text-blue-600" />
-                <h2 className="text-xl font-semibold">
-                  Administrateur principal
-                </h2>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="adminFirstName">Prénom</Label>
-                  <Input
-                    id="adminFirstName"
-                    placeholder="Jean"
-                    value={adminFirstName}
-                    onChange={(e) => setAdminFirstName(e.target.value)}
-                    disabled={loading}
-                  />
-                </div>
+              <div className="space-y-2">
+                <Label htmlFor="companyPhone">Téléphone</Label>
+                <Input
+                  id="companyPhone"
+                  type="tel"
+                  placeholder="+225 1 23 45 67 89"
+                  value={companyPhone}
+                  onChange={(e) => setCompanyPhone(e.target.value)}
+                  disabled={loading}
+                  className="h-12 bg-[#F8FAFC] border-[#E2E8F0]"
+                />
+              </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="adminLastName">Nom</Label>
-                  <Input
-                    id="adminLastName"
-                    placeholder="Dupont"
-                    value={adminLastName}
-                    onChange={(e) => setAdminLastName(e.target.value)}
-                    disabled={loading}
-                  />
-                </div>
+              <Button
+                type="submit"
+                className="w-full h-12 text-base bg-gradient-to-r from-[#0077C3] to-[#0095F4] hover:from-[#005992] hover:to-[#0077C3] rounded-full mt-6"
+                disabled={loading}
+              >
+                Continuer
+              </Button>
 
-                <div className="space-y-2 md:col-span-2">
-                  <Label htmlFor="adminEmail">
-                    Email administrateur <span className="text-red-500">*</span>
-                  </Label>
-                  <Input
-                    id="adminEmail"
-                    type="email"
-                    placeholder="admin@entreprise.com"
-                    value={adminEmail}
-                    onChange={(e) => setAdminEmail(e.target.value)}
-                    disabled={loading}
-                    required
-                  />
-                </div>
+              <div className="text-center mt-4">
+                <Link
+                  href="/auth/signin"
+                  className="text-sm text-[#0077C3] hover:text-[#005992]"
+                >
+                  Déjà un compte ? Se connecter
+                </Link>
+              </div>
+            </form>
+          )}
 
-                <div className="space-y-2">
-                  <Label htmlFor="adminPassword">
-                    Mot de passe <span className="text-red-500">*</span>
-                  </Label>
+          {/* Step 2 - Admin Information */}
+          {step === 2 && (
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="adminLastName">
+                  Nom de l&apos;administrateur
+                </Label>
+                <Input
+                  id="adminLastName"
+                  placeholder="Dupont"
+                  value={adminLastName}
+                  onChange={(e) => setAdminLastName(e.target.value)}
+                  disabled={loading}
+                  className="h-12 bg-[#F8FAFC] border-[#E2E8F0]"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="adminFirstName">
+                  Prénom de l&apos;administrateur
+                </Label>
+                <Input
+                  id="adminFirstName"
+                  placeholder="Jean"
+                  value={adminFirstName}
+                  onChange={(e) => setAdminFirstName(e.target.value)}
+                  disabled={loading}
+                  className="h-12 bg-[#F8FAFC] border-[#E2E8F0]"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="adminEmail">
+                  Email de l&apos;administrateur{" "}
+                  <span className="text-red-500">*</span>
+                </Label>
+                <Input
+                  id="adminEmail"
+                  type="email"
+                  placeholder="admin@entreprise.com"
+                  value={adminEmail}
+                  onChange={(e) => setAdminEmail(e.target.value)}
+                  disabled={loading}
+                  required
+                  className="h-12 bg-[#F8FAFC] border-[#E2E8F0]"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="adminPassword">
+                  Mot de passe <span className="text-red-500">*</span>
+                </Label>
+                <div className="relative">
                   <Input
                     id="adminPassword"
-                    type="password"
-                    placeholder="••••••••"
+                    type={showPassword ? "text" : "password"}
+                    placeholder="Au moins 8 caractères, 1 chiffre, 1 majuscule"
                     value={adminPassword}
                     onChange={(e) => setAdminPassword(e.target.value)}
                     disabled={loading}
                     required
+                    className="h-12 bg-[#F8FAFC] border-[#E2E8F0] pr-12"
                   />
-                  <p className="text-xs text-gray-500">
-                    Min 8 caractères, 1 majuscule, 1 minuscule, 1 chiffre
-                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-[#94A3B8] hover:text-[#64748B]"
+                  >
+                    {showPassword ? (
+                      <EyeOff className="w-5 h-5" />
+                    ) : (
+                      <Eye className="w-5 h-5" />
+                    )}
+                  </button>
                 </div>
+              </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="adminPasswordConfirm">
-                    Confirmer le mot de passe{" "}
-                    <span className="text-red-500">*</span>
-                  </Label>
+              <div className="space-y-2">
+                <Label htmlFor="adminPasswordConfirm">
+                  Confirmation du mot de passe{" "}
+                  <span className="text-red-500">*</span>
+                </Label>
+                <div className="relative">
                   <Input
                     id="adminPasswordConfirm"
-                    type="password"
-                    placeholder="••••••••"
+                    type={showPasswordConfirm ? "text" : "password"}
+                    placeholder="* * * * * * * *"
                     value={adminPasswordConfirm}
                     onChange={(e) => setAdminPasswordConfirm(e.target.value)}
                     disabled={loading}
                     required
+                    className="h-12 bg-[#F8FAFC] border-[#E2E8F0] pr-12"
                   />
+                  <button
+                    type="button"
+                    onClick={() => setShowPasswordConfirm(!showPasswordConfirm)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-[#94A3B8] hover:text-[#64748B]"
+                  >
+                    {showPasswordConfirm ? (
+                      <EyeOff className="w-5 h-5" />
+                    ) : (
+                      <Eye className="w-5 h-5" />
+                    )}
+                  </button>
                 </div>
               </div>
-            </div>
 
-            {/* Submit Button */}
-            <div className="space-y-4">
-              <Button
-                type="submit"
-                className="w-full h-12 text-base"
-                disabled={loading}
-              >
-                {loading ? (
-                  <>
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
-                    Création en cours...
-                  </>
-                ) : (
-                  "Créer mon compte entreprise"
-                )}
-              </Button>
+              <div className="flex gap-3 mt-6">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="h-12 rounded-full px-6"
+                  onClick={() => setStep(1)}
+                  disabled={loading}
+                >
+                  <ArrowLeft className="w-4 h-4 mr-2" />
+                  Retour
+                </Button>
+                <Button
+                  type="submit"
+                  className="flex-1 h-12 text-base bg-gradient-to-r from-[#0077C3] to-[#0095F4] hover:from-[#005992] hover:to-[#0077C3] rounded-full"
+                  disabled={loading}
+                >
+                  {loading ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
+                      Création...
+                    </>
+                  ) : (
+                    "Créer le compte"
+                  )}
+                </Button>
+              </div>
 
-              <p className="text-xs text-center text-gray-500">
-                En créant un compte, vous acceptez nos{" "}
-                <Link href="/terms" className="text-blue-600 hover:underline">
-                  conditions d'utilisation
-                </Link>{" "}
-                et notre{" "}
-                <Link href="/privacy" className="text-blue-600 hover:underline">
-                  politique de confidentialité
+              <div className="text-center mt-4">
+                <Link
+                  href="/auth/signin"
+                  className="text-sm text-[#0077C3] hover:text-[#005992]"
+                >
+                  Retour à la connexion
                 </Link>
-                .
-              </p>
-            </div>
-          </form>
-        </Card>
+              </div>
+            </form>
+          )}
+        </div>
       </div>
     </div>
   );

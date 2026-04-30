@@ -40,6 +40,7 @@ const createClientSchema = z.object({
   website: z.string().url().optional().or(z.literal("")),
   description: z.string().max(1000).optional(),
   denomination: z.string().max(100).optional(),
+  assujettiTVA: z.boolean().default(true),
   socialNetworks: z
     .array(
       z.object({
@@ -263,6 +264,7 @@ export async function POST(req: NextRequest) {
         companyId: user.companyId,
         createdById: user.id,
         isSelfEntity: false,
+        assujettiTVA: data.assujettiTVA,
       },
     });
 

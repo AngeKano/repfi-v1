@@ -1,30 +1,35 @@
-
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  Building2,
   Search,
   Plus,
   Users,
-  FileText,
-  ArrowLeft,
   ChevronLeft,
   ChevronRight,
+  Eye,
+  Trash2,
+  BarChart3,
+  RefreshCw,
+  Download,
 } from "lucide-react";
 import Link from "next/link";
+import { DashboardLayout } from "@/components/dashboard-layout";
+import {
+  getRoleLabel,
+  getRoleBadgeVariant,
+} from "@/lib/permissions/role-utils";
+import { ClientDetailsDialog } from "./client-details-dialog";
+import {
+  ReportingParamsDialog,
+  paramsToQuery,
+} from "./reporting-params-dialog";
+import { NewClientDialog } from "./new-client-dialog";
+import { DeleteClientDialog } from "./delete-client-dialog";
 
 const COMPANY_TYPES = [
   { value: "", label: "Tous les types" },
@@ -57,6 +62,7 @@ interface ClientsListClientProps {
 }
 
 export default function ClientsListClient({
+  session,
   initialClients,
   pagination,
   initialSearch,
@@ -68,24 +74,47 @@ export default function ClientsListClient({
 
   const [search, setSearch] = useState(initialSearch);
   const [companyType, setCompanyType] = useState(initialType);
-  const [showFilters, setShowFilters] = useState(false);
+  const [activeTab, setActiveTab] = useState<"active" | "deleted">("active");
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [detailsClient, setDetailsClient] = useState<any | null>(null);
+  const [reportingClient, setReportingClient] = useState<any | null>(null);
+  const [showNewClient, setShowNewClient] = useState(false);
+  const [deleteClient, setDeleteClient] = useState<any | null>(null);
 
-  const handleSearch = (e: React.FormEvent) => {
-    e.preventDefault();
-    const params = new URLSearchParams(searchParams.toString());
-    params.set("page", "1");
-    if (search) {
-      params.set("search", search);
-    } else {
-      params.delete("search");
-    }
-    if (companyType) {
-      params.set("type", companyType);
-    } else {
-      params.delete("type");
-    }
-    router.push(`/clients?${params.toString()}`);
-  };
+  const roleLabel = getRoleLabel(session.user.role);
+  const roleBadgeVariant = getRoleBadgeVariant(session.user.role);
+
+  // Debounced search — triggers automatically after 400ms of inactivity
+  const debounceRef = useRef<NodeJS.Timeout | null>(null);
+
+  const pushSearch = useCallback(
+    (q: string, type: string) => {
+      const params = new URLSearchParams(searchParams.toString());
+      params.set("page", "1");
+      if (q) {
+        params.set("search", q);
+      } else {
+        params.delete("search");
+      }
+      if (type) {
+        params.set("type", type);
+      } else {
+        params.delete("type");
+      }
+      router.push(`/clients?${params.toString()}`);
+    },
+    [router, searchParams],
+  );
+
+  useEffect(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      pushSearch(search, companyType);
+    }, 400);
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+  }, [search, companyType, pushSearch]);
 
   const handlePageChange = (newPage: number) => {
     const params = new URLSearchParams(searchParams.toString());
@@ -97,100 +126,152 @@ export default function ClientsListClient({
     return COMPANY_TYPES.find((t) => t.value === type)?.label || type;
   };
 
+  const toggleSelectAll = () => {
+    if (selectedIds.length === initialClients.length) {
+      setSelectedIds([]);
+    } else {
+      setSelectedIds(initialClients.map((c) => c.id));
+    }
+  };
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds((prev) =>
+      prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id],
+    );
+  };
+
+  // Generate page numbers for pagination
+  const getPageNumbers = () => {
+    const pages: (number | string)[] = [];
+    const total = pagination.totalPages;
+    const current = pagination.page;
+
+    if (total <= 5) {
+      for (let i = 1; i <= total; i++) pages.push(i);
+    } else {
+      pages.push(1);
+      if (current > 3) pages.push("...");
+      for (
+        let i = Math.max(2, current - 1);
+        i <= Math.min(total - 1, current + 1);
+        i++
+      ) {
+        pages.push(i);
+      }
+      if (current < total - 2) pages.push("...");
+      pages.push(total);
+    }
+    return pages;
+  };
+
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-white border-b">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
-            <div className="flex items-center gap-3">
-              <Link href="/dashboard">
-                <Button variant="ghost" size="icon">
-                  <ArrowLeft className="w-5 h-5" />
-                </Button>
-              </Link>
-              <div>
-                <h1 className="text-2xl font-bold text-gray-900">Clients</h1>
-                <p className="text-sm text-gray-500">
-                  {pagination.total} client{pagination.total > 1 ? "s" : ""}
-                </p>
-              </div>
+    <DashboardLayout>
+      <div className="px-8 py-6">
+        {/* Top Bar */}
+        <div className="flex items-center justify-between mb-8">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => router.refresh()}
+            className="rounded-full bg-[#EBF5FF] text-[#335890] border-[#D0E3F5] hover:bg-[#D0E3F5]"
+          >
+            <RefreshCw className="w-4 h-4 mr-2" />
+            Rafraichir
+          </Button>
+
+          <div className="flex items-center gap-3">
+            <div className="text-right">
+              <p className="text-xs text-[#335890]">Utilisateur</p>
+              <p className="text-sm font-semibold text-[#00122E]">
+                {session.user.firstName && session.user.lastName
+                  ? `${session.user.firstName} ${session.user.lastName}`
+                  : session.user.name || session.user.email}
+              </p>
+              <Badge
+                variant={roleBadgeVariant as any}
+                className="text-xs mt-0.5"
+              >
+                {roleLabel}
+              </Badge>
+            </div>
+            <div className="w-10 h-10 rounded-full bg-[#EBF5FF] flex items-center justify-center overflow-hidden">
+              <Users className="w-5 h-5 text-[#0077C3]" />
+            </div>
+          </div>
+        </div>
+
+        {/* Header */}
+        <div className="flex items-center justify-between mb-6">
+          <h1 className="text-3xl font-bold text-[#00122E]">Clients</h1>
+
+          <div className="flex items-center gap-3">
+            {/* Search */}
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#94A3B8]" />
+              <Input
+                placeholder="Recherche"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="pl-9 h-10 w-[220px] bg-[#F8FAFC] border-[#E2E8F0]"
+              />
             </div>
 
+            {/* <Button variant="outline" className="h-10 gap-2 border-[#0077C3] text-[#0077C3]">
+              <Download className="w-4 h-4" />
+              Exporter
+            </Button> */}
+
             {canCreateClient && (
-              <Link href="/clients/new">
-                <Button>
-                  <Plus className="w-4 h-4 mr-2" />
-                  Nouveau client
-                </Button>
-              </Link>
+              <Button
+                onClick={() => setShowNewClient(true)}
+                className="h-10 bg-gradient-to-r from-[#0077C3] to-[#0095F4] hover:from-[#005992] hover:to-[#0077C3]"
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                Nouveau client
+              </Button>
             )}
           </div>
         </div>
-      </header>
 
-      {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Search and Filters */}
-        <Card className="p-4 mb-6">
-          <form onSubmit={handleSearch} className="space-y-4">
-            <div className="flex gap-3">
-              <div className="flex-1 relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                <Input
-                  placeholder="Rechercher par nom, email ou dénomination..."
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  className="pl-10"
-                />
-              </div>
-
-              {/* <Button
-                type="button"
-                variant="outline"
-                onClick={() => setShowFilters(!showFilters)}
-              >
-                <Filter className="w-4 h-4 mr-2" />
-                Filtres
-              </Button> */}
-
-              <Button type="submit">Rechercher</Button>
-            </div>
-
-            {showFilters && (
-              <div className="pt-3 border-t">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="text-sm font-medium mb-2 block">
-                      Type d'entreprise
-                    </label>
-                    <Select value={companyType} onValueChange={setCompanyType}>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {COMPANY_TYPES.map((type) => (
-                          <SelectItem key={type.value} value={type.value}>
-                            {type.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-              </div>
+        {/* Tabs */}
+        <div className="flex items-center gap-6 mb-6 border-b border-[#D0E3F5]">
+          <button
+            onClick={() => setActiveTab("active")}
+            className={`pb-3 text-sm font-medium transition-colors relative ${
+              activeTab === "active"
+                ? "text-[#0077C3]"
+                : "text-[#335890] hover:text-[#0077C3]"
+            }`}
+          >
+            Clients actifs ({pagination.total})
+            {activeTab === "active" && (
+              <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#0077C3]" />
             )}
-          </form>
-        </Card>
+          </button>
+          <button
+            disabled
+            onClick={() => setActiveTab("deleted")}
+            className={`pb-3 text-sm font-medium transition-colors relative ${
+              activeTab === "deleted"
+                ? "text-[#0077C3]"
+                : "text-[#335890] hover:text-[#0077C3]"
+            }`}
+          >
+            Clients Supprimés
+            {activeTab === "deleted" && (
+              <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#0077C3]" />
+            )}
+          </button>
+        </div>
 
-        {/* Clients List */}
+        {/* Clients Table */}
         {initialClients.length === 0 ? (
-          <Card className="p-12 text-center">
-            <Building2 className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">
+          <div className="text-center py-16 border border-[#D0E3F5] rounded-xl bg-white">
+            <Users className="w-16 h-16 text-[#D0E3F5] mx-auto mb-4" />
+            <h3 className="text-lg font-semibold text-[#00122E] mb-2">
               Aucun client trouvé
             </h3>
-            <p className="text-gray-600 mb-6">
+            <p className="text-[#335890] mb-6">
               {search || companyType
                 ? "Essayez de modifier vos critères de recherche"
                 : "Commencez par créer votre premier client"}
@@ -203,129 +284,233 @@ export default function ClientsListClient({
                 </Button>
               </Link>
             )}
-          </Card>
+          </div>
         ) : (
-          <div className="space-y-4">
-            {initialClients.map((client) => (
-              <Link key={client.id} href={`/clients/${client.id}`}>
-                <Card className="p-6 hover:shadow-lg transition-shadow cursor-pointer">
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-start gap-4 flex-1">
-                      <div className="p-3 bg-blue-100 rounded-lg">
-                        <Building2 className="w-6 h-6 text-blue-600" />
-                      </div>
-
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-1">
-                          <h3 className="text-lg font-semibold text-gray-900">
+          <div className="border border-[#D0E3F5] rounded-xl overflow-hidden bg-white">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-[#D0E3F5] bg-[#F5F9FF]">
+                  <th className="w-12 px-4 py-3">
+                    <input
+                      type="checkbox"
+                      aria-label="Sélectionner tous les clients"
+                      checked={
+                        selectedIds.length === initialClients.length &&
+                        initialClients.length > 0
+                      }
+                      onChange={toggleSelectAll}
+                      className="w-4 h-4 rounded border-[#D0E3F5] text-[#0077C3] focus:ring-[#0077C3]"
+                    />
+                  </th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-[#335890] uppercase tracking-wider">
+                    Nom du client
+                  </th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-[#335890] uppercase tracking-wider">
+                    Type d&apos;entreprise
+                  </th>
+                  <th className="text-center px-4 py-3 text-xs font-semibold text-[#335890] uppercase tracking-wider">
+                    Membres
+                  </th>
+                  <th className="text-center px-4 py-3 text-xs font-semibold text-[#335890] uppercase tracking-wider">
+                    Fichiers
+                  </th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-[#335890] uppercase tracking-wider">
+                    Date d&apos;ajout
+                  </th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-[#335890] uppercase tracking-wider">
+                    Dénomination
+                  </th>
+                  <th className="text-center px-4 py-3 text-xs font-semibold text-[#335890] uppercase tracking-wider">
+                    Actions
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {initialClients.map((client, idx) => (
+                  <tr
+                    key={client.id}
+                    onClick={() => setReportingClient(client)}
+                    className={`border-b border-[#D0E3F5] last:border-b-0 hover:bg-[#F5F9FF] transition-colors cursor-pointer ${
+                      idx % 2 === 0 ? "bg-white" : "bg-[#FAFCFF]"
+                    }`}
+                  >
+                    <td
+                      className="w-12 px-4 py-4"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <input
+                        type="checkbox"
+                        aria-label={`Sélectionner le client ${client.name}`}
+                        checked={selectedIds.includes(client.id)}
+                        onChange={() => toggleSelect(client.id)}
+                        className="w-4 h-4 rounded border-[#D0E3F5] text-[#0077C3] focus:ring-[#0077C3]"
+                      />
+                    </td>
+                    <td className="px-4 py-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-9 h-9 rounded-full bg-[#EBF5FF] flex items-center justify-center text-sm font-semibold text-[#0077C3] shrink-0">
+                          {client.name.charAt(0).toUpperCase()}
+                        </div>
+                        <div>
+                          <p className="font-medium text-[#00122E] text-sm">
                             {client.name}
-                          </h3>
-                          {client.isSelfEntity && (
-                            <Badge variant="secondary">Entreprise</Badge>
-                          )}
-                        </div>
-
-                        <p className="text-sm text-gray-600 mb-3">
-                          {client.email}
-                          {client.phone && ` • ${client.phone}`}
-                        </p>
-
-                        <div className="flex items-center gap-4 text-sm text-gray-500">
-                          <div className="flex items-center gap-1">
-                            <FileText className="w-4 h-4" />
-                            <span>
-                              {client._count.normalFiles} fichier
-                              {client._count.normalFiles > 1 ? "s" : ""}
-                            </span>
-                          </div>
-
-                          {client.assignedMembers && (
-                            <div className="flex items-center gap-1">
-                              <Users className="w-4 h-4" />
-                              <span>
-                                {client._count.assignments} membre
-                                {client._count.assignments > 1 ? "s" : ""}
-                              </span>
-                            </div>
-                          )}
-
-                          <Badge variant="outline">
-                            {getCompanyTypeLabel(client.companyType)}
-                          </Badge>
-                        </div>
-
-                        {client.description && (
-                          <p className="text-sm text-gray-500 mt-3 line-clamp-2">
-                            {client.description}
                           </p>
-                        )}
+                          <p className="text-xs text-[#335890]">
+                            {client.email}
+                          </p>
+                        </div>
                       </div>
-                    </div>
-
-                    <div className="text-right text-sm text-gray-500">
-                      <p>
-                        {new Date(client.createdAt).toLocaleDateString("fr-FR")}
-                      </p>
-                      {client.denomination && (
-                        <Badge variant="outline" className="mt-2">
+                    </td>
+                    <td className="px-4 py-4 text-sm text-[#335890]">
+                      {getCompanyTypeLabel(client.companyType)}
+                    </td>
+                    <td className="px-4 py-4 text-center text-sm font-medium text-[#00122E]">
+                      {client._count.assignments}
+                    </td>
+                    <td className="px-4 py-4 text-center text-sm font-medium text-[#00122E]">
+                      {client._count.normalFiles}
+                    </td>
+                    <td className="px-4 py-4 text-sm text-[#335890]">
+                      {new Date(client.createdAt).toLocaleDateString("fr-FR", {
+                        day: "2-digit",
+                        month: "2-digit",
+                        year: "numeric",
+                      })}
+                      {", "}
+                      {new Date(client.createdAt).toLocaleTimeString("fr-FR", {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
+                    </td>
+                    <td className="px-4 py-4">
+                      {client.denomination ? (
+                        <Badge variant="outline" className="text-xs">
                           {client.denomination}
                         </Badge>
+                      ) : (
+                        <span className="text-xs text-[#94A3B8]">-</span>
                       )}
-                    </div>
-                  </div>
-
-                  {/* Assigned Members Preview */}
-                  {client.assignedMembers &&
-                    client.assignedMembers.length > 0 && (
-                      <div className="mt-4 pt-4 border-t">
-                        <p className="text-xs text-gray-500 mb-2">
-                          Membres assignés :
-                        </p>
-                        <div className="flex flex-wrap gap-2">
-                          {client.assignedMembers
-                            .slice(0, 3)
-                            .map((member: any) => (
-                              <Badge key={member.id} variant="secondary">
-                                {member.firstName && member.lastName
-                                  ? `${member.firstName} ${member.lastName}`
-                                  : member.email}
-                              </Badge>
-                            ))}
-                          {client.assignedMembers.length > 3 && (
-                            <Badge variant="secondary">
-                              +{client.assignedMembers.length - 3}
-                            </Badge>
-                          )}
-                        </div>
+                    </td>
+                    <td
+                      className="px-4 py-4"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <div className="flex items-center justify-center gap-1">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setReportingClient(client)}
+                          className="text-[#0077C3] hover:text-[#005992] hover:bg-[#EBF5FF] h-8 w-8 p-0"
+                          title="Reporting"
+                        >
+                          <BarChart3 className="w-4 h-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setDetailsClient(client)}
+                          className="text-[#0077C3] hover:text-[#005992] hover:bg-[#EBF5FF] h-8 w-8 p-0"
+                          title="Voir les détails"
+                        >
+                          <Eye className="w-4 h-4" />
+                        </Button>
+                        {!client.isSelfEntity && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setDeleteClient(client)}
+                            className="text-red-400 hover:text-red-600 hover:bg-red-50 h-8 w-8 p-0"
+                            title="Supprimer"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        )}
                       </div>
-                    )}
-                </Card>
-              </Link>
-            ))}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         )}
 
+        <ClientDetailsDialog
+          client={detailsClient}
+          open={!!detailsClient}
+          onClose={() => setDetailsClient(null)}
+          getCompanyTypeLabel={getCompanyTypeLabel}
+        />
+
+        <ReportingParamsDialog
+          open={!!reportingClient}
+          clientName={reportingClient?.name}
+          onClose={() => setReportingClient(null)}
+          onValidate={(params) => {
+            if (!reportingClient) return;
+            const qs = paramsToQuery(params);
+            router.push(`/clients/${reportingClient.id}?${qs}`);
+          }}
+        />
+
+        <NewClientDialog
+          open={showNewClient}
+          onClose={() => setShowNewClient(false)}
+        />
+
+        <DeleteClientDialog
+          client={deleteClient}
+          open={!!deleteClient}
+          onClose={() => setDeleteClient(null)}
+        />
+
         {/* Pagination */}
         {pagination.totalPages > 1 && (
-          <div className="mt-8 flex items-center justify-between">
-            <p className="text-sm text-gray-600">
-              Page {pagination.page} sur {pagination.totalPages}
-            </p>
+          <div className="mt-6 flex items-center justify-between">
+            <div className="flex items-center gap-2 text-sm text-[#335890]">
+              <span>5</span>
+              <span>Lignes par page</span>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-[#335890]">Page</span>
+              {getPageNumbers().map((p, i) =>
+                typeof p === "string" ? (
+                  <span key={i} className="text-sm text-[#94A3B8] px-1">
+                    ...
+                  </span>
+                ) : (
+                  <button
+                    key={i}
+                    onClick={() => handlePageChange(p)}
+                    className={`w-8 h-8 rounded text-sm font-medium transition-colors ${
+                      p === pagination.page
+                        ? "bg-[#0077C3] text-white"
+                        : "text-[#335890] hover:bg-[#EBF5FF]"
+                    }`}
+                  >
+                    {p}
+                  </button>
+                ),
+              )}
+            </div>
 
             <div className="flex gap-2">
               <Button
                 variant="outline"
+                size="sm"
                 onClick={() => handlePageChange(pagination.page - 1)}
                 disabled={pagination.page === 1}
+                className="text-[#335890]"
               >
                 <ChevronLeft className="w-4 h-4 mr-1" />
                 Précédent
               </Button>
-
               <Button
                 variant="outline"
+                size="sm"
                 onClick={() => handlePageChange(pagination.page + 1)}
                 disabled={pagination.page === pagination.totalPages}
+                className="text-[#335890]"
               >
                 Suivant
                 <ChevronRight className="w-4 h-4 ml-1" />
@@ -333,7 +518,7 @@ export default function ClientsListClient({
             </div>
           </div>
         )}
-      </main>
-    </div>
+      </div>
+    </DashboardLayout>
   );
 }

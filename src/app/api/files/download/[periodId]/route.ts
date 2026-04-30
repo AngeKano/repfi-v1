@@ -1,11 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
-
 import { S3Client, GetObjectCommand } from "@aws-sdk/client-s3";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
-import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
-
-// PrismaClient should ideally be a singleton, but for API route, it's OK.
 import { prisma } from "@/lib/prisma";
 
 const s3Client = new S3Client({
@@ -16,7 +12,6 @@ const s3Client = new S3Client({
   },
 });
 
-// Correct handling of context in Next.js API routes for both sync/async context
 export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ periodId: string }> },
@@ -24,13 +19,11 @@ export async function GET(
   try {
     const { periodId } = await params;
 
-    // Retrieve session and check authorization
     const session = await getServerSession(authOptions);
     if (!session?.user) {
       return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
     }
 
-    // Fetch the period, making sure the user belongs to the right company
     const period = await prisma.comptablePeriod.findFirst({
       where: {
         id: periodId,
@@ -64,32 +57,33 @@ export async function GET(
     const bucket = s3UrlMatch[1];
     const s3Key = s3UrlMatch[2];
 
-    // Générer une URL signée S3 pour 1 heure
-    const command = new GetObjectCommand({
-      Bucket: bucket,
-      Key: s3Key,
-    });
-    const signedUrl = await getSignedUrl(s3Client, command, {
-      expiresIn: 3600,
-    });
-
-    // Nom du fichier exporté (extraction du nom originel si possible)
     let fileName = s3Key.split("/").pop();
     if (!fileName) fileName = `export-comptable-${period.id}.xlsx`;
 
-    return NextResponse.json({
-      url: signedUrl,
-      fileName,
-      mimeType:
-        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    // Streamer le fichier directement depuis S3
+    const s3Response = await s3Client.send(
+      new GetObjectCommand({
+        Bucket: bucket,
+        Key: s3Key,
+      }),
+    );
+
+    const stream = s3Response.Body as ReadableStream;
+
+    return new NextResponse(stream, {
+      headers: {
+        "Content-Type":
+          "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "Content-Disposition": `attachment; filename="${encodeURIComponent(fileName)}"`,
+        ...(s3Response.ContentLength
+          ? { "Content-Length": String(s3Response.ContentLength) }
+          : {}),
+      },
     });
   } catch (error) {
-    console.error(
-      "Erreur lors de la génération du lien de téléchargement S3 (excelFileUrl):",
-      error,
-    );
+    console.error("Erreur téléchargement S3 (excelFileUrl):", error);
     return NextResponse.json(
-      { error: "Erreur lors de la génération du lien de téléchargement Excel" },
+      { error: "Erreur lors du téléchargement du fichier Excel" },
       { status: 500 },
     );
   }

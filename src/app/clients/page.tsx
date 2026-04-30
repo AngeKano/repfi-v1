@@ -88,6 +88,7 @@ export default async function ClientsPage({
         companyType: true,
         denomination: true,
         description: true,
+        assujettiTVA: true,
         isSelfEntity: true,
         createdAt: true,
         updatedAt: true,

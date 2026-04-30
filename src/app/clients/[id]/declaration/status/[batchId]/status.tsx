@@ -63,85 +63,15 @@ export default function StatusComponents({
   const messageIndexRef = useRef(0);
   const progressIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Download Excel handler
-  const handleDownloadExcel = async () => {
+  // Download Excel handler — l'API streame le fichier directement (pas de CORS)
+  const handleDownloadExcel = () => {
     if (!status?.periodId) return;
-    setDownloading(true);
-    try {
-      const res = await fetch(
-        `/api/files/download/${encodeURIComponent(status.periodId)}`,
-        { method: "GET" },
-      );
-      let data;
-      try {
-        data = await res.json();
-      } catch {
-        data = {};
-      }
-      if (!res.ok) {
-        throw new Error(data.error || "Erreur lors du téléchargement");
-      }
-      if (data?.url) {
-        window.open(data.url, "_blank");
-      } else {
-        throw new Error("Lien de téléchargement indisponible");
-      }
-    } catch (error: any) {
-      toast.error(
-        <>
-          <div className="font-semibold">Erreur de téléchargement</div>
-          <div>{error.message}</div>
-        </>,
-      );
-    } finally {
-      setDownloading(false);
-    }
+    window.location.href = `/api/files/download/${encodeURIComponent(status.periodId)}`;
   };
 
-  const handleDownloadExcelFile = async (batchId: string, fileName: string) => {
+  const handleDownloadExcelFile = (batchId: string, fileName: string) => {
     if (!batchId || !fileName) return;
-    setDownloading(true);
-    try {
-      const res = await fetch(
-        `/api/files/download/comptable?batchId=${encodeURIComponent(
-          batchId,
-        )}&fileName=${encodeURIComponent(fileName)}`,
-        { method: "GET" },
-      );
-      let data: any = {};
-      try {
-        data = await res.json();
-      } catch (_e) {}
-      if (!res.ok || data?.error) {
-        throw new Error(
-          data?.error
-            ? data.error
-            : "Erreur lors du téléchargement du fichier.",
-        );
-      }
-      if (data?.url) {
-        const link = document.createElement("a");
-        link.href = data.url;
-        link.target = "_blank";
-        if (data.fileName) {
-          link.download = data.fileName;
-        }
-        document.body.appendChild(link);
-        link.click();
-        link.remove();
-      } else {
-        throw new Error("Lien de téléchargement indisponible.");
-      }
-    } catch (error: any) {
-      toast.error(
-        <>
-          <div className="font-semibold">Erreur de téléchargement</div>
-          <div>{error.message || "Une erreur inconnue est survenue."}</div>
-        </>,
-      );
-    } finally {
-      setDownloading(false);
-    }
+    window.location.href = `/api/files/download/comptable?batchId=${encodeURIComponent(batchId)}&fileName=${encodeURIComponent(fileName)}`;
   };
 
   // Handler for relancer le traitement ETL si Echec
@@ -292,47 +222,53 @@ export default function StatusComponents({
 
   if (loading) {
     return (
-      <div className="flex flex-col items-center justify-center h-64 gap-4">
-        <p className="text-gray-600 animate-pulse">Chargement...</p>
-        <Loader2 className="w-8 h-8 animate-spin" />
-      </div>
+      <Card className="p-12 border-[#D0E3F5]">
+        <div className="flex flex-col items-center justify-center gap-4">
+          <Loader2 className="w-8 h-8 animate-spin text-[#0077C3]" />
+          <p className="text-[#335890] animate-pulse">Chargement...</p>
+        </div>
+      </Card>
     );
   }
 
   if (!status) {
-    return <div>Période non trouvée</div>;
+    return (
+      <Card className="p-12 border-[#D0E3F5] text-center">
+        <p className="text-[#335890]">Période non trouvée</p>
+      </Card>
+    );
   }
 
   const statusConfig = {
     PENDING: {
       icon: Clock,
-      color: "text-gray-500",
+      color: "text-[#94A3B8]",
       label: "En attente",
-      bgColor: "bg-gray-100",
+      bgColor: "bg-[#F1F5F9]",
     },
     VALIDATING: {
       icon: Loader2,
-      color: "text-blue-500",
+      color: "text-[#0077C3]",
       label: "Validation",
-      bgColor: "bg-blue-50",
+      bgColor: "bg-[#EBF5FF]",
     },
     PROCESSING: {
       icon: Loader2,
-      color: "text-blue-500",
+      color: "text-[#0077C3]",
       label: "Traitement",
-      bgColor: "bg-blue-50",
+      bgColor: "bg-[#EBF5FF]",
     },
     COMPLETED: {
       icon: CheckCircle,
-      color: "text-green-500",
+      color: "text-[#16A34A]",
       label: "Terminé",
-      bgColor: "bg-green-50",
+      bgColor: "bg-[#DCFCE7]",
     },
     FAILED: {
       icon: XCircle,
-      color: "text-red-500",
+      color: "text-[#DC2626]",
       label: "Échec",
-      bgColor: "bg-red-50",
+      bgColor: "bg-[#FEE2E2]",
     },
   };
 
@@ -343,20 +279,26 @@ export default function StatusComponents({
   );
 
   return (
-    <div className="container mx-auto py-8 max-w-4xl">
-      <Card className="p-6">
+    <div className="w-full">
+      <Card className="p-6 border-[#D0E3F5]">
         {/* Message animé en haut */}
 
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-3">
-            <Icon
-              className={`w-8 h-8 ${config.color} ${
-                isProcessing ? "animate-spin" : ""
-              }`}
-            />
+            <div
+              className={`w-12 h-12 rounded-xl ${config.bgColor} flex items-center justify-center`}
+            >
+              <Icon
+                className={`w-6 h-6 ${config.color} ${
+                  isProcessing ? "animate-spin" : ""
+                }`}
+              />
+            </div>
             <div>
-              <h2 className="text-xl font-semibold">{config.label}</h2>
-              <p className="text-sm text-gray-500">
+              <h2 className="text-xl font-bold text-[#00122E]">
+                {config.label}
+              </h2>
+              <p className="text-sm text-[#335890]">
                 Période:{" "}
                 {status.periodStart
                   ? new Date(status.periodStart).toLocaleDateString("fr-FR")
@@ -376,17 +318,18 @@ export default function StatusComponents({
                   ? "destructive"
                   : "secondary"
             }
+            className="text-sm"
           >
             {Math.round(animatedProgress)}%
           </Badge>
         </div>
-        <div className="flex flex-col gap-2">
+        <div className="flex flex-col gap-2 mb-6">
           {(isProcessing || currentMessage === "Traitement terminé !") && (
-            <p className={`font-medium text-gray-800 animate-pulse`}>
+            <p className="font-medium text-[#335890] animate-pulse">
               {currentMessage}
             </p>
           )}
-          <Progress value={animatedProgress} className="mb-3" />
+          <Progress value={animatedProgress} />
         </div>
 
         {/* Button Download Only if Terminé */}
@@ -394,9 +337,10 @@ export default function StatusComponents({
           <div className="mb-6 flex">
             <Button
               size="sm"
+              variant="outline"
               onClick={handleDownloadExcel}
               disabled={downloading}
-              className="gap-2 cursor-pointer"
+              className="gap-2 text-[#0077C3] border-[#D0E3F5] hover:text-[#005992] hover:bg-[#EBF5FF]"
             >
               <Download className="w-4 h-4" />
               {downloading ? "Téléchargement..." : "Télécharger l'export Excel"}
@@ -412,7 +356,7 @@ export default function StatusComponents({
               variant="outline"
               onClick={handleRetryETL}
               disabled={reprocessing}
-              className="gap-2 text-red-600 border-red-200 hover:bg-red-50 cursor-pointer"
+              className="gap-2 text-[#DC2626] border-[#FCA5A5] hover:bg-[#FEE2E2]"
             >
               <RotateCw
                 className={`w-4 h-4 ${reprocessing ? "animate-spin" : ""}`}
@@ -423,51 +367,57 @@ export default function StatusComponents({
         )}
 
         <div className="space-y-3">
-          <h3 className="font-semibold">Fichiers traités</h3>
+          <h3 className="font-semibold text-[#00122E]">Fichiers traités</h3>
           {status.files && status.files.length > 0 ? (
-            status.files.map((file: any) => (
-              <div
-                key={file.id}
-                className="flex items-center justify-between p-3 border rounded"
-              >
-                <div>
-                  <p className="font-medium">{file.fileName}</p>
-                  <p className="text-sm text-gray-500">{file.fileType}</p>
-                </div>
-                <div className="flex flex-row gap-x-3 items-center">
-                  <Badge
-                    variant={
-                      file.processingStatus === "COMPLETED"
-                        ? "default"
-                        : file.processingStatus === "FAILED"
-                          ? "destructive"
-                          : "secondary"
-                    }
-                  >
-                    {file.processingStatus}
-                  </Badge>
-                  {status.status === "COMPLETED" && (
-                    <Button
-                      size="sm"
-                      onClick={() =>
-                        handleDownloadExcelFile(
-                          params?.batchId ?? "",
-                          file.fileName,
-                        )
+            <div className="border border-[#D0E3F5] rounded-xl overflow-hidden">
+              {status.files.map((file: any, idx: number) => (
+                <div
+                  key={file.id}
+                  className={`flex items-center justify-between p-4 ${
+                    idx !== status.files.length - 1
+                      ? "border-b border-[#D0E3F5]"
+                      : ""
+                  } ${idx % 2 === 0 ? "bg-white" : "bg-[#FAFCFF]"}`}
+                >
+                  <div>
+                    <p className="font-medium text-[#00122E]">{file.fileName}</p>
+                    <p className="text-sm text-[#335890]">{file.fileType}</p>
+                  </div>
+                  <div className="flex flex-row gap-x-3 items-center">
+                    <Badge
+                      variant={
+                        file.processingStatus === "COMPLETED"
+                          ? "default"
+                          : file.processingStatus === "FAILED"
+                            ? "destructive"
+                            : "secondary"
                       }
-                      disabled={downloading}
-                      className="cursor-pointer"
-                      title="Télécharger le fichier Excel"
-                      variant="outline"
                     >
-                      <Download className="w-4 h-4" />
-                    </Button>
-                  )}
+                      {file.processingStatus}
+                    </Badge>
+                    {status.status === "COMPLETED" && (
+                      <Button
+                        size="sm"
+                        onClick={() =>
+                          handleDownloadExcelFile(
+                            params?.batchId ?? "",
+                            file.fileName,
+                          )
+                        }
+                        disabled={downloading}
+                        title="Télécharger le fichier Excel"
+                        variant="outline"
+                        className="border-[#0077C3] text-[#0077C3] hover:bg-[#EBF5FF]"
+                      >
+                        <Download className="w-4 h-4" />
+                      </Button>
+                    )}
+                  </div>
                 </div>
-              </div>
-            ))
+              ))}
+            </div>
           ) : (
-            <p className="text-gray-500">
+            <p className="text-[#335890]">
               Aucun fichier traité pour cette période
             </p>
           )}
