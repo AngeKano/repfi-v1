@@ -102,8 +102,8 @@ export function DeleteClientDialog({
             </p>
             <ul className="text-xs text-[#991B1B] space-y-1 list-disc pl-4">
               <li>
-                Tous les <strong>fichiers</strong> (normaux et comptables) seront
-                supprimés de S3
+                Tous les <strong>fichiers</strong> (normaux et comptables)
+                seront supprimés de S3
               </li>
               <li>
                 Tous les <strong>reportings financiers</strong> (périodes et
