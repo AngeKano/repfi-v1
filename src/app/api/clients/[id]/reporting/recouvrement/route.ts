@@ -42,28 +42,22 @@ const MONTH_NAMES = [
   "Déc",
 ];
 
-// Génère les 12 derniers mois à partir d'un mois/année donné (inclus)
-function getLast12Months(
+// Génère les mois de Janvier (01) jusqu'au mois sélectionné, dans l'année
+// sélectionnée uniquement. Pas de débordement sur l'année précédente.
+//   - endMonth = 12 → 12 mois (Jan → Déc)
+//   - endMonth = 3  → 3 mois  (Jan → Mar)
+function getYearToDateMonths(
   endYear: number,
   endMonth: number,
 ): { year: number; month: number; label: string }[] {
   const months: { year: number; month: number; label: string }[] = [];
 
-  let currentYear = endYear;
-  let currentMonth = endMonth;
-
-  for (let i = 0; i < 12; i++) {
-    months.unshift({
-      year: currentYear,
-      month: currentMonth,
-      label: `${MONTH_NAMES[currentMonth - 1]} ${currentYear}`,
+  for (let m = 1; m <= endMonth; m++) {
+    months.push({
+      year: endYear,
+      month: m,
+      label: `${MONTH_NAMES[m - 1]} ${endYear}`,
     });
-
-    currentMonth--;
-    if (currentMonth === 0) {
-      currentMonth = 12;
-      currentYear--;
-    }
   }
 
   return months;
@@ -135,38 +129,18 @@ async function recupererTop10Creances(
 ): Promise<TopCreance[]> {
   if (batchIds.length === 0) return [];
 
-  // Construire le filtre de période pour les 12 derniers mois
+  // Filtre YTD borné à l'année sélectionnée : Janvier (01) → endMonth de endYear.
+  // Pas de débordement sur l'année précédente.
   // date_transaction format: DD/MM/YYYY
   let periodFilter = "";
   const queryParams: Record<string, unknown> = { batchIds };
 
   if (endYear && endMonth) {
-    // Calculer le mois de début (12 mois avant endMonth/endYear inclus)
-    let startMonth = endMonth + 1;
-    let startYear = endYear - 1;
-    if (startMonth > 12) {
-      startMonth = 1;
-      startYear = endYear;
-    }
-    // Filtre : (year > startYear) OR (year = startYear AND month >= startMonth)
-    // ET (year < endYear) OR (year = endYear AND month <= endMonth)
-    const startYearStr = startYear.toString();
-    const startMonthStr = startMonth.toString().padStart(2, "0");
-    const endYearStr = endYear.toString();
-    const endMonthStr = endMonth.toString().padStart(2, "0");
-    queryParams.startYear = startYearStr;
-    queryParams.startMonth = startMonthStr;
-    queryParams.endYear = endYearStr;
-    queryParams.endMonth = endMonthStr;
+    queryParams.endYear = endYear.toString();
+    queryParams.endMonth = endMonth.toString().padStart(2, "0");
     periodFilter = `
-      AND (
-        (substring(date_transaction, 7, 4) > {startYear:String})
-        OR (substring(date_transaction, 7, 4) = {startYear:String} AND substring(date_transaction, 4, 2) >= {startMonth:String})
-      )
-      AND (
-        (substring(date_transaction, 7, 4) < {endYear:String})
-        OR (substring(date_transaction, 7, 4) = {endYear:String} AND substring(date_transaction, 4, 2) <= {endMonth:String})
-      )
+      AND substring(date_transaction, 7, 4) = {endYear:String}
+      AND substring(date_transaction, 4, 2) <= {endMonth:String}
     `;
   }
 
@@ -279,8 +253,8 @@ export async function GET(
 
     const dbName = getClickhouseDbName(id);
 
-    // Générer les 12 derniers mois
-    const last12Months = getLast12Months(endYear, endMonth);
+    // Générer les mois Janvier → mois sélectionné de l'année courante uniquement
+    const ytdMonths = getYearToDateMonths(endYear, endMonth);
 
     // Récupérer toutes les périodes disponibles pour ce client
     const allPeriods = await prisma.comptablePeriod.findMany({
@@ -303,7 +277,7 @@ export async function GET(
     let cumulativeCaTTC = 0;
     let cumulativeCaEncaisse = 0;
 
-    for (const monthInfo of last12Months) {
+    for (const monthInfo of ytdMonths) {
       const key = `${monthInfo.year}-${monthInfo.month.toString().padStart(2, "0")}`;
       const data = recouvrementData.get(key) || {
         caTTCTotal: 0,
@@ -364,8 +338,8 @@ export async function GET(
       chartData,
       totals,
       periodRange: {
-        start: last12Months[0],
-        end: last12Months[last12Months.length - 1],
+        start: ytdMonths[0],
+        end: ytdMonths[ytdMonths.length - 1],
       },
       topCreances,
       totalCreances,
