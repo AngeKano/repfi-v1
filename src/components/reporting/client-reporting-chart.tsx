@@ -1882,7 +1882,7 @@ export default function ClientReportingChart({
               <Card>
                 <CardHeader className="pb-2">
                   <CardDescription className="text-sm font-medium">
-                    Taux de Recouvrement (12 mois)
+                    Taux de Recouvrement
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="pt-0">
@@ -1966,13 +1966,13 @@ export default function ClientReportingChart({
               </Card>
             </div>
 
-            {/* Graphique Evolution Taux de Recouvrement - 12 derniers mois */}
+            {/* Graphique Evolution Taux de Recouvrement - YTD année courante */}
             <Card>
               <CardHeader className="flex flex-row items-start justify-between gap-4">
                 <div>
                   <CardTitle>Évolution du Taux de Recouvrement</CardTitle>
                   <CardDescription>
-                    12 derniers mois - (CA Encaissé TTC / CA TTC Total) × 100
+                    Janvier → mois sélectionné — (CA Encaissé TTC / CA TTC Total) × 100
                   </CardDescription>
                 </div>
                 <ChartLegend
