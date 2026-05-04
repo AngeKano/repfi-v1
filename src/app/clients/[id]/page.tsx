@@ -144,6 +144,13 @@ export default async function ClientDetailsPage({
     }
   }
 
+  // Un "reporting" est considéré disponible dès qu'au moins une période est
+  // marquée COMPLETED. Sert à savoir s'il faut demander le filtre / afficher
+  // l'empty state d'invitation à créer un reporting.
+  const completedReportingCount = await prisma.comptablePeriod.count({
+    where: { clientId: id, status: "COMPLETED" },
+  });
+
   // Formater les données pour le composant client
   const clientData = {
     ...client,
@@ -163,6 +170,7 @@ export default async function ClientDetailsPage({
       canEdit={canEdit}
       canDelete={canDelete}
       canAssignMembers={canAssignMembers}
+      hasReporting={completedReportingCount > 0}
     />
   );
 }

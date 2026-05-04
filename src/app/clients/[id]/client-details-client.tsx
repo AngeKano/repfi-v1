@@ -2,6 +2,10 @@
 
 import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import {
+  ReportingParamsDialog,
+  paramsToQuery,
+} from "@/app/clients/reporting-params-dialog";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -44,6 +48,7 @@ interface ClientDetailsClientProps {
   canEdit: boolean;
   canDelete: boolean;
   canAssignMembers: boolean;
+  hasReporting: boolean;
 }
 
 const CLIENT_TABS = [
@@ -66,6 +71,7 @@ export default function ClientDetailsClient({
   canEdit,
   canDelete,
   canAssignMembers,
+  hasReporting,
 }: ClientDetailsClientProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -82,6 +88,13 @@ export default function ClientDetailsClient({
     if (qp === "year" || qp === "month" || qp === "ytd") return qp;
     return undefined;
   })();
+
+  // Si un reporting existe mais que l'URL n'a pas encore de filtre défini,
+  // on ouvre automatiquement le dialog de paramètres au premier chargement.
+  // Si un filtre est déjà présent, on ne le redemande pas.
+  const [showParamsDialog, setShowParamsDialog] = useState(
+    hasReporting && !initialPeriodType,
+  );
 
   const roleLabel = getRoleLabel(session.user.role);
   const roleBadgeVariant = getRoleBadgeVariant(session.user.role);
@@ -260,6 +273,38 @@ export default function ClientDetailsClient({
                 };
                 const internalTab = map[activeTab];
                 if (!internalTab) return null;
+
+                // Aucun reporting créé pour le client : on masque
+                // Synthèse / Chiffres / Résultats au profit d'un empty state
+                // qui invite à créer un reporting. Recouvrement reste affiché
+                // (« autres métriques »).
+                if (
+                  !hasReporting &&
+                  internalTab !== "recouvrement"
+                ) {
+                  return (
+                    <Card className="p-12 border-[#D0E3F5] text-center">
+                      <div className="mx-auto w-14 h-14 rounded-full bg-[#EBF5FF] flex items-center justify-center mb-4">
+                        <Plus className="w-6 h-6 text-[#0077C3]" />
+                      </div>
+                      <h3 className="text-lg font-semibold text-[#00122E] mb-1">
+                        Aucun reporting financier
+                      </h3>
+                      <p className="text-sm text-[#335890] mb-6">
+                        Créez un premier reporting pour visualiser la synthèse,
+                        le chiffre d&apos;affaires et les résultats de ce client.
+                      </p>
+                      <Button
+                        onClick={() => setShowUploadDialog(true)}
+                        className="gap-2 bg-gradient-to-r from-[#0077C3] to-[#0095F4] hover:from-[#005992] hover:to-[#0077C3] rounded-full"
+                      >
+                        <Plus className="w-4 h-4" />
+                        Créer un reporting
+                      </Button>
+                    </Card>
+                  );
+                }
+
                 return (
                   <ClientReportingChart
                     clientId={client.id}
@@ -397,6 +442,19 @@ export default function ClientDetailsClient({
         client={showDeleteDialog ? client : null}
         open={showDeleteDialog}
         onClose={() => setShowDeleteDialog(false)}
+      />
+
+      {/* Demande de filtre au premier chargement quand un reporting existe et
+          qu'aucun filtre n'a encore été défini dans l'URL. */}
+      <ReportingParamsDialog
+        open={showParamsDialog}
+        clientName={client.name}
+        onClose={() => setShowParamsDialog(false)}
+        onValidate={(params) => {
+          const qs = paramsToQuery(params);
+          setShowParamsDialog(false);
+          router.replace(`/clients/${client.id}?${qs}`);
+        }}
       />
     </DashboardLayout>
   );
