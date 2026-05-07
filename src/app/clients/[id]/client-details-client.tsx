@@ -1,10 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   ReportingParamsDialog,
   paramsToQuery,
+  getStoredReportingParams,
+  saveReportingParams,
 } from "@/app/clients/reporting-params-dialog";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -65,6 +67,10 @@ const CLIENT_TABS = [
   { id: "files", label: "Autres Fichiers", icon: PiFilesDuotone },
 ];
 
+// Onglets de reporting financier qui dépendent de la présence d'au moins
+// un reporting. Ils sont grisés tant qu'aucun reporting n'existe.
+const REPORTING_TAB_IDS = new Set(["chiffres", "resultats", "recouvrement"]);
+
 export default function ClientDetailsClient({
   session,
   initialClient,
@@ -89,15 +95,38 @@ export default function ClientDetailsClient({
     return undefined;
   })();
 
-  // Si un reporting existe mais que l'URL n'a pas encore de filtre défini,
-  // on ouvre automatiquement le dialog de paramètres au premier chargement.
-  // Si un filtre est déjà présent, on ne le redemande pas.
-  const [showParamsDialog, setShowParamsDialog] = useState(
-    hasReporting && !initialPeriodType,
-  );
+  // Les paramètres de reporting ne sont demandés qu'une seule fois par client.
+  // Si l'URL contient déjà un filtre, ou si on a mémorisé un choix précédent,
+  // on ne redemande pas. Sinon (et seulement si un reporting existe),
+  // on ouvre la dialog au premier chargement.
+  const [showParamsDialog, setShowParamsDialog] = useState(false);
+
+  // Au montage : si pas de filtre dans l'URL mais des paramètres mémorisés,
+  // on les ré-applique silencieusement à l'URL. Sinon, on ouvre la dialog.
+  useEffect(() => {
+    if (initialPeriodType) return;
+    if (!hasReporting) return;
+    const stored = getStoredReportingParams(client.id);
+    if (stored) {
+      router.replace(`/clients/${client.id}?${stored}`);
+      return;
+    }
+    setShowParamsDialog(true);
+    // On ne dépend pas de router/searchParams pour éviter de boucler
+    // après le router.replace qui modifiera initialPeriodType au refresh.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [client.id, hasReporting, initialPeriodType]);
 
   const roleLabel = getRoleLabel(session.user.role);
   const roleBadgeVariant = getRoleBadgeVariant(session.user.role);
+
+  // Si l'utilisateur tente d'accéder à un onglet grisé (par exemple via
+  // l'URL), on le ramène automatiquement sur la Synthèse Financière.
+  useEffect(() => {
+    if (!hasReporting && REPORTING_TAB_IDS.has(activeTab)) {
+      setActiveTab("overview");
+    }
+  }, [hasReporting, activeTab]);
 
   return (
     <DashboardLayout>
@@ -142,15 +171,29 @@ export default function ClientDetailsClient({
               const active = activeTab === tab.id;
               // Separator before "Membres" (index 4)
               const showSeparator = idx === 4;
+              const disabled =
+                REPORTING_TAB_IDS.has(tab.id) && !hasReporting;
               return (
                 <div key={tab.id}>
                   {showSeparator && <div className="h-px bg-[#D0E3F5] my-2" />}
                   <button
-                    onClick={() => setActiveTab(tab.id)}
+                    onClick={() => {
+                      if (disabled) return;
+                      setActiveTab(tab.id);
+                    }}
+                    disabled={disabled}
+                    title={
+                      disabled
+                        ? "Créez d'abord un reporting financier pour activer cet onglet"
+                        : undefined
+                    }
+                    aria-disabled={disabled}
                     className={`flex items-center gap-3 w-full px-4 py-3 rounded-lg text-sm font-medium transition-colors ${
                       active
                         ? "bg-[#0077C3] text-white"
-                        : "text-[#335890] hover:bg-[#EBF5FF] hover:text-[#0077C3]"
+                        : disabled
+                          ? "text-[#94A3B8] cursor-not-allowed opacity-60"
+                          : "text-[#335890] hover:bg-[#EBF5FF] hover:text-[#0077C3]"
                     }`}
                   >
                     <tab.icon className="w-5 h-5" />
@@ -274,14 +317,12 @@ export default function ClientDetailsClient({
                 const internalTab = map[activeTab];
                 if (!internalTab) return null;
 
-                // Aucun reporting créé pour le client : on masque
-                // Synthèse / Chiffres / Résultats au profit d'un empty state
-                // qui invite à créer un reporting. Recouvrement reste affiché
-                // (« autres métriques »).
-                if (
-                  !hasReporting &&
-                  internalTab !== "recouvrement"
-                ) {
+                // Aucun reporting créé pour le client : on masque tous les
+                // onglets de reporting (Synthèse / Chiffres / Résultats /
+                // Recouvrement) au profit d'un empty state qui invite à
+                // créer un reporting. Les autres onglets sont par ailleurs
+                // grisés dans la nav.
+                if (!hasReporting) {
                   return (
                     <Card className="p-12 border-[#D0E3F5] text-center">
                       <div className="mx-auto w-14 h-14 rounded-full bg-[#EBF5FF] flex items-center justify-center mb-4">
@@ -445,13 +486,15 @@ export default function ClientDetailsClient({
       />
 
       {/* Demande de filtre au premier chargement quand un reporting existe et
-          qu'aucun filtre n'a encore été défini dans l'URL. */}
+          qu'aucun filtre n'a encore été défini dans l'URL ni mémorisé. */}
       <ReportingParamsDialog
         open={showParamsDialog}
         clientName={client.name}
         onClose={() => setShowParamsDialog(false)}
         onValidate={(params) => {
           const qs = paramsToQuery(params);
+          // Mémoriser les paramètres : on ne redemandera plus pour ce client.
+          saveReportingParams(client.id, qs);
           setShowParamsDialog(false);
           router.replace(`/clients/${client.id}?${qs}`);
         }}
