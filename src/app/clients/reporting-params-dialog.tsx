@@ -122,3 +122,35 @@ export function paramsToQuery(params: { mode: CalcMode }): string {
   sp.set("periodType", periodType);
   return sp.toString();
 }
+
+// Persistance des paramètres de reporting par client. Une fois choisis, on
+// ne redemande plus : on réutilise les paramètres mémorisés au prochain
+// clic sur le client.
+const STORAGE_PREFIX = "repfi:reporting-params:";
+
+export function getStoredReportingParams(clientId: string): string | null {
+  if (typeof window === "undefined") return null;
+  try {
+    return window.localStorage.getItem(STORAGE_PREFIX + clientId);
+  } catch {
+    return null;
+  }
+}
+
+export function saveReportingParams(clientId: string, query: string): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(STORAGE_PREFIX + clientId, query);
+  } catch {
+    // ignore quota / private mode errors
+  }
+}
+
+export function clearReportingParams(clientId: string): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.removeItem(STORAGE_PREFIX + clientId);
+  } catch {
+    // ignore
+  }
+}
