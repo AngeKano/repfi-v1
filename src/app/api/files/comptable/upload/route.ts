@@ -35,6 +35,9 @@ const uploadComptableSchema = z.object({
 // - PLAN_COMPTES: Plan comptable
 // - PLAN_TIERS: Plan des tiers (clients/fournisseurs)
 // - CODE_JOURNAL: Codes journaux
+//
+// ALTERNATIVE : un fichier .pnm (PNM) à lui seul remplace les 4 fichiers
+// Excel. Si un PNM est fourni, on ne réclame plus les 4 autres.
 // ============================================================
 const REQUIRED_FILE_TYPES = [
   FileType.GRAND_LIVRE, // Nouveau: fichier unifié
@@ -49,6 +52,7 @@ const FILE_TYPE_LABELS: Record<string, string> = {
   [FileType.PLAN_COMPTES]: "Plan Comptable",
   [FileType.PLAN_TIERS]: "Plan Tiers",
   [FileType.CODE_JOURNAL]: "Codes Journaux",
+  [FileType.PNM]: "Fichier PNM",
 };
 
 function formatDateYYYYMMDD(date: Date): string {
@@ -120,8 +124,12 @@ export async function POST(req: NextRequest) {
     const periodStartStr = formData.get("periodStart") as string;
     const periodEndStr = formData.get("periodEnd") as string;
 
-    // Récupérer les 4 fichiers requis
+    // Le fichier PNM est accepté seul ou en complément des 4 fichiers Excel.
+    // S'il est seul, les 4 fichiers Excel ne sont plus exigés.
+    const pnmFile = formData.get(FileType.PNM) as File | null;
+
     const files: { file: File; fileType: FileType }[] = [];
+    const excelFiles: { file: File; fileType: FileType }[] = [];
     const missingFiles: string[] = [];
 
     for (const fileType of REQUIRED_FILE_TYPES) {
@@ -129,14 +137,21 @@ export async function POST(req: NextRequest) {
       if (!file) {
         missingFiles.push(FILE_TYPE_LABELS[fileType] || fileType);
       } else {
-        files.push({ file, fileType });
+        excelFiles.push({ file, fileType });
       }
     }
 
-    if (missingFiles.length > 0) {
+    const hasAllExcel = excelFiles.length === REQUIRED_FILE_TYPES.length;
+
+    // Combinaisons acceptées :
+    //   - 4 fichiers Excel (parcours ETL standard)
+    //   - PNM présent → on accepte n'importe quelle combinaison (0/n Excel)
+    //     Dans ce cas, le trigger-ETL ré-utilisera les fichiers d'une
+    //     période précédente déjà traitée pour ce client (mode "démo").
+    if (!hasAllExcel && !pnmFile) {
       return NextResponse.json(
         {
-          error: `Fichier(s) manquant(s): ${missingFiles.join(", ")}`,
+          error: `Fichier(s) manquant(s): ${missingFiles.join(", ")}. Vous pouvez aussi fournir un fichier .pnm à la place.`,
           missingFiles,
           requiredFiles: REQUIRED_FILE_TYPES.map((ft) => ({
             type: ft,
@@ -145,6 +160,11 @@ export async function POST(req: NextRequest) {
         },
         { status: 400 },
       );
+    }
+
+    files.push(...excelFiles);
+    if (pnmFile) {
+      files.push({ file: pnmFile, fileType: FileType.PNM });
     }
 
     // Validation du schéma
@@ -186,13 +206,25 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Client non trouvé" }, { status: 404 });
     }
 
-    // Vérifier que tous les fichiers sont Excel
+    // Vérifier que tous les fichiers sont Excel — sauf PNM qui doit avoir
+    // l'extension .pnm
     const validExcelTypes = [
       "application/vnd.ms-excel",
       "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     ];
 
     for (const { file, fileType } of files) {
+      if (fileType === FileType.PNM) {
+        if (!file.name.toLowerCase().endsWith(".pnm")) {
+          return NextResponse.json(
+            {
+              error: `Le fichier PNM (${file.name}) doit avoir l'extension .pnm`,
+            },
+            { status: 400 },
+          );
+        }
+        continue;
+      }
       if (!validExcelTypes.includes(file.type)) {
         return NextResponse.json(
           {

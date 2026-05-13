@@ -57,7 +57,11 @@ const REQUIRED_FILE_TYPES = [
   { type: "CODE_JOURNAL", label: "Code Journal" },
 ];
 
-const MAX_FILES = 4;
+const PNM_LABEL = "Fichier PNM";
+
+// 4 Excel + 1 PNM optionnel = 5 slots possibles. Le fichier .pnm peut aussi
+// être déposé seul (sans les 4 Excel) : c'est alors une alternative complète.
+const MAX_FILES = 5;
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
 
 interface PickedFile {
@@ -66,6 +70,8 @@ interface PickedFile {
   fileType?: string;
   error?: string;
 }
+
+const isPnm = (file: File) => file.name.toLowerCase().endsWith(".pnm");
 
 const isValidExcel = (file: File) => {
   const validTypes = [
@@ -79,7 +85,10 @@ const isValidExcel = (file: File) => {
   );
 };
 
+const isAcceptedFile = (file: File) => isValidExcel(file) || isPnm(file);
+
 const detectFileType = (fileName: string): string | undefined => {
+  if (fileName.toLowerCase().endsWith(".pnm")) return "PNM";
   const normalized = fileName
     .toLowerCase()
     .replace(/[0-9_\-.]/g, " ")
@@ -221,13 +230,19 @@ export function UploadFileDialog({
   const canGoNext = !!clientId && !!periodStart && !!periodEnd;
 
   const allValid = () => {
-    if (files.length !== MAX_FILES) return false;
+    if (files.length === 0) return false;
+    if (files.some((f) => f.error)) return false;
+    if (files.some((f) => !f.fileType)) return false;
+
     const types = files.map((f) => f.fileType);
+    const hasPnm = types.includes("PNM");
     const required = REQUIRED_FILE_TYPES.map((t) => t.type);
-    return (
-      required.every((t) => types.includes(t)) &&
-      files.every((f) => f.fileType && !f.error)
-    );
+    const hasAll4Excel = required.every((t) => types.includes(t));
+
+    // Format accepté :
+    //  - PNM seul
+    //  - 4 fichiers Excel (avec ou sans PNM additionnel)
+    return hasPnm || hasAll4Excel;
   };
 
   const canValidate = useMemo(() => {
@@ -246,8 +261,10 @@ export function UploadFileDialog({
     const next: PickedFile[] = [];
     for (let i = 0; i < arr.length && i < slots; i++) {
       const f = arr[i];
-      if (!isValidExcel(f)) {
-        toast.error(`${f.name} n'est pas un fichier Excel valide`);
+      if (!isAcceptedFile(f)) {
+        toast.error(
+          `${f.name} n'est pas accepté (formats : .xlsx / .xls / .pnm)`,
+        );
         continue;
       }
       if (f.size > MAX_FILE_SIZE) {
@@ -358,7 +375,7 @@ export function UploadFileDialog({
               <DialogDescription className="text-sm text-[#335890]">
                 {step === 1
                   ? "Sélectionnez le client et la période"
-                  : "Ajoutez les 4 fichiers comptables requis"}
+                  : "Ajoutez les 4 fichiers comptables ou un fichier .pnm"}
               </DialogDescription>
             </div>
             <button
@@ -539,11 +556,11 @@ export function UploadFileDialog({
                             {f.fileType ? (
                               <Badge variant="default" className="text-xs">
                                 <FileCheck className="w-3 h-3 mr-1" />
-                                {
-                                  REQUIRED_FILE_TYPES.find(
-                                    (t) => t.type === f.fileType,
-                                  )?.label
-                                }
+                                {f.fileType === "PNM"
+                                  ? PNM_LABEL
+                                  : REQUIRED_FILE_TYPES.find(
+                                      (t) => t.type === f.fileType,
+                                    )?.label}
                               </Badge>
                             ) : (
                               <div className="flex items-center gap-2">
@@ -566,6 +583,11 @@ export function UploadFileDialog({
                                         {t.label}
                                       </SelectItem>
                                     ))}
+                                    {!usedTypes(f.id).includes("PNM") && (
+                                      <SelectItem value="PNM">
+                                        {PNM_LABEL}
+                                      </SelectItem>
+                                    )}
                                   </SelectContent>
                                 </Select>
                               </div>
@@ -613,14 +635,14 @@ export function UploadFileDialog({
                         Glissez-déposez vos fichiers ici
                       </p>
                       <p className="text-xs text-[#335890]">
-                        ou cliquez pour sélectionner (max {MAX_FILES} fichiers,
-                        10MB chacun)
+                        ou cliquez pour sélectionner — 4 fichiers Excel
+                        (.xlsx/.xls) ou un fichier .pnm (10MB max chacun)
                       </p>
                     </div>
                     <Input
                       type="file"
                       multiple
-                      accept=".xlsx,.xls"
+                      accept=".xlsx,.xls,.pnm"
                       onChange={(e) => handleFiles(e.target.files)}
                       className="hidden"
                       id="upload-dialog-input"

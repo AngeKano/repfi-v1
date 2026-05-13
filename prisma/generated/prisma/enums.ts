@@ -55,7 +55,8 @@ export const FileType = {
   GRAND_LIVRE: 'GRAND_LIVRE',
   PLAN_COMPTES: 'PLAN_COMPTES',
   PLAN_TIERS: 'PLAN_TIERS',
-  CODE_JOURNAL: 'CODE_JOURNAL'
+  CODE_JOURNAL: 'CODE_JOURNAL',
+  PNM: 'PNM'
 } as const
 
 export type FileType = (typeof FileType)[keyof typeof FileType]

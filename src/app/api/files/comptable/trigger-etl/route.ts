@@ -127,14 +127,19 @@ export async function POST(req: NextRequest) {
       where: { batchId },
     });
 
-    if (files.length !== 4) {
+    const hasPnm = files.some((f) => f.fileType === "PNM");
+    const excelFiles = files.filter((f) => f.fileType !== "PNM");
+
+    // Si pas de PNM, on attend strictement les 4 fichiers Excel.
+    if (!hasPnm && excelFiles.length !== 4) {
       return NextResponse.json(
-        { error: `Fichiers invalides: ${files.length}/4` },
+        {
+          error: `Fichiers invalides : ${excelFiles.length}/4 fichiers Excel`,
+        },
         { status: 400 },
       );
     }
 
-    const year = comptablePeriod.periodStart.getFullYear();
     const formatDate = (d: Date) =>
       `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, "0")}${String(
         d.getDate(),
@@ -151,10 +156,59 @@ export async function POST(req: NextRequest) {
     const companyName = company
       ? company.name.replace(/\s+/g, "_").replace(/[^\w\-]/g, "")
       : "";
-    const periodFolder = `periode-${formatDate(
-      comptablePeriod.periodStart,
-    )}-${formatDate(comptablePeriod.periodEnd)}`;
-    const s3Prefix = `${companyName}_${companyId}/${clientName}_${comptablePeriod.clientId}/declaration/${year}/${periodFolder}/`;
+
+    // Construit le préfixe S3 d'une période donnée.
+    const buildS3Prefix = (period: {
+      periodStart: Date;
+      periodEnd: Date;
+    }): string => {
+      const periodYear = period.periodStart.getFullYear();
+      const periodFolder = `periode-${formatDate(period.periodStart)}-${formatDate(period.periodEnd)}`;
+      return `${companyName}_${companyId}/${clientName}_${comptablePeriod.clientId}/declaration/${periodYear}/${periodFolder}/`;
+    };
+
+    let s3Prefix = buildS3Prefix(comptablePeriod);
+    let fakeFromPeriodId: string | null = null;
+
+    // MODE DÉMO : un PNM dans le batch déclenche un "faux" traitement —
+    // Airflow est appelé avec le s3Prefix de la dernière période COMPLETED
+    // de ce client, pas avec le préfixe de la nouvelle période. Les fichiers
+    // qu'on vient d'uploader ne sont donc pas traités, mais le pipeline
+    // tourne et la nouvelle période recevra des données.
+    if (hasPnm) {
+      const previousCompleted = await prisma.comptablePeriod.findFirst({
+        where: {
+          clientId: comptablePeriod.clientId,
+          status: ProcessingStatus.COMPLETED,
+          id: { not: comptablePeriod.id },
+        },
+        orderBy: { periodEnd: "desc" },
+        select: { id: true, periodStart: true, periodEnd: true },
+      });
+
+      if (previousCompleted) {
+        s3Prefix = buildS3Prefix(previousCompleted);
+        fakeFromPeriodId = previousCompleted.id;
+      } else {
+        // Pas de période antérieure traitée : on marque simplement COMPLETED
+        // sans appeler Airflow (rien à rejouer).
+        await prisma.comptablePeriod.update({
+          where: { id: comptablePeriod.id },
+          data: { status: ProcessingStatus.COMPLETED },
+        });
+        await prisma.comptableFile.updateMany({
+          where: { batchId },
+          data: { processingStatus: ProcessingStatus.COMPLETED },
+        });
+        return NextResponse.json({
+          message:
+            "Fichier PNM enregistré (aucune période antérieure à rejouer pour ce client).",
+          batchId,
+          status: ProcessingStatus.COMPLETED,
+          skipped: true,
+        });
+      }
+    }
 
     const dagRunId = await triggerAirflowDAG(
       batchId,
@@ -178,7 +232,9 @@ export async function POST(req: NextRequest) {
           fileId: file.id,
           fileName: file.fileName,
           action: "ETL_TRIGGERED",
-          details: `DAG Run: ${dagRunId}`,
+          details: fakeFromPeriodId
+            ? `DAG Run: ${dagRunId} — mode démo, rejoué depuis la période ${fakeFromPeriodId}`
+            : `DAG Run: ${dagRunId}`,
           userId: user.id,
           userEmail: user.email ?? "",
         },
@@ -186,11 +242,14 @@ export async function POST(req: NextRequest) {
     }
 
     return NextResponse.json({
-      message: "ETL déclenché",
+      message: fakeFromPeriodId
+        ? "ETL déclenché en mode démo (rejouer des données d'une période antérieure)"
+        : "ETL déclenché",
       batchId,
       dagRunId,
       status: ProcessingStatus.PROCESSING,
       s3Prefix,
+      fakeFromPeriodId,
     });
   } catch (error: any) {
     console.error("Trigger ETL error:", error);

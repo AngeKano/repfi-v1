@@ -299,6 +299,9 @@ enum FileType {
   PLAN_COMPTES
   PLAN_TIERS
   CODE_JOURNAL
+  // Fichier balance comptable consolidé (.pnm). Alternative aux 4 fichiers
+  // Excel : si un PNM est fourni, les 4 fichiers Excel ne sont plus exigés.
+  PNM
 }
 
 enum ProcessingStatus {
