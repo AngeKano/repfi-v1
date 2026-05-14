@@ -1,7 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import {
+  ReportingParamsDialog,
+  paramsToQuery,
+  getStoredReportingParams,
+  saveReportingParams,
+} from "@/app/clients/reporting-params-dialog";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -44,6 +50,7 @@ interface ClientDetailsClientProps {
   canEdit: boolean;
   canDelete: boolean;
   canAssignMembers: boolean;
+  hasReporting: boolean;
 }
 
 const CLIENT_TABS = [
@@ -52,9 +59,17 @@ const CLIENT_TABS = [
   { id: "resultats", label: "Résultats", icon: PiChartDonutDuotone },
   { id: "recouvrement", label: "Recouvrement", icon: PiHandCoinsDuotone },
   { id: "members", label: "Membres", icon: PiUsersThreeDuotone },
-  { id: "declaration", label: "Reporting Financier", icon: PiChartBarHorizontalDuotone },
+  {
+    id: "declaration",
+    label: "Reporting Financier",
+    icon: PiChartBarHorizontalDuotone,
+  },
   { id: "files", label: "Autres Fichiers", icon: PiFilesDuotone },
 ];
+
+// Onglets de reporting financier qui dépendent de la présence d'au moins
+// un reporting. Ils sont grisés tant qu'aucun reporting n'existe.
+const REPORTING_TAB_IDS = new Set(["chiffres", "resultats", "recouvrement"]);
 
 export default function ClientDetailsClient({
   session,
@@ -62,6 +77,7 @@ export default function ClientDetailsClient({
   canEdit,
   canDelete,
   canAssignMembers,
+  hasReporting,
 }: ClientDetailsClientProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -79,9 +95,38 @@ export default function ClientDetailsClient({
     return undefined;
   })();
 
+  // Les paramètres de reporting ne sont demandés qu'une seule fois par client.
+  // Si l'URL contient déjà un filtre, ou si on a mémorisé un choix précédent,
+  // on ne redemande pas. Sinon (et seulement si un reporting existe),
+  // on ouvre la dialog au premier chargement.
+  const [showParamsDialog, setShowParamsDialog] = useState(false);
+
+  // Au montage : si pas de filtre dans l'URL mais des paramètres mémorisés,
+  // on les ré-applique silencieusement à l'URL. Sinon, on ouvre la dialog.
+  useEffect(() => {
+    if (initialPeriodType) return;
+    if (!hasReporting) return;
+    const stored = getStoredReportingParams(client.id);
+    if (stored) {
+      router.replace(`/clients/${client.id}?${stored}`);
+      return;
+    }
+    setShowParamsDialog(true);
+    // On ne dépend pas de router/searchParams pour éviter de boucler
+    // après le router.replace qui modifiera initialPeriodType au refresh.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [client.id, hasReporting, initialPeriodType]);
+
   const roleLabel = getRoleLabel(session.user.role);
   const roleBadgeVariant = getRoleBadgeVariant(session.user.role);
 
+  // Si l'utilisateur tente d'accéder à un onglet grisé (par exemple via
+  // l'URL), on le ramène automatiquement sur la Synthèse Financière.
+  useEffect(() => {
+    if (!hasReporting && REPORTING_TAB_IDS.has(activeTab)) {
+      setActiveTab("overview");
+    }
+  }, [hasReporting, activeTab]);
 
   return (
     <DashboardLayout>
@@ -104,7 +149,9 @@ export default function ClientDetailsClient({
               {client.name.charAt(0).toUpperCase()}
             </div>
             <div className="min-w-0">
-              <h1 className="text-lg font-bold text-[#00122E] truncate">{client.name}</h1>
+              <h1 className="text-lg font-bold text-[#00122E] truncate">
+                {client.name}
+              </h1>
               <p className="text-xs text-[#335890] truncate">{client.email}</p>
               <div className="flex flex-wrap items-center gap-1 mt-1">
                 {client.denomination && (
@@ -120,52 +167,64 @@ export default function ClientDetailsClient({
           </div>
 
           <nav className="space-y-1">
-              {CLIENT_TABS.map((tab, idx) => {
-                const active = activeTab === tab.id;
-                // Separator before "Membres" (index 4)
-                const showSeparator = idx === 4;
-                return (
-                  <div key={tab.id}>
-                    {showSeparator && (
-                      <div className="h-px bg-[#D0E3F5] my-2" />
-                    )}
-                    <button
-                      onClick={() => setActiveTab(tab.id)}
-                      className={`flex items-center gap-3 w-full px-4 py-3 rounded-lg text-sm font-medium transition-colors ${
-                        active
-                          ? "bg-[#0077C3] text-white"
+            {CLIENT_TABS.map((tab, idx) => {
+              const active = activeTab === tab.id;
+              // Separator before "Membres" (index 4)
+              const showSeparator = idx === 4;
+              const disabled =
+                REPORTING_TAB_IDS.has(tab.id) && !hasReporting;
+              return (
+                <div key={tab.id}>
+                  {showSeparator && <div className="h-px bg-[#D0E3F5] my-2" />}
+                  <button
+                    onClick={() => {
+                      if (disabled) return;
+                      setActiveTab(tab.id);
+                    }}
+                    disabled={disabled}
+                    title={
+                      disabled
+                        ? "Créez d'abord un reporting financier pour activer cet onglet"
+                        : undefined
+                    }
+                    aria-disabled={disabled}
+                    className={`flex items-center gap-3 w-full px-4 py-3 rounded-lg text-sm font-medium transition-colors ${
+                      active
+                        ? "bg-[#0077C3] text-white"
+                        : disabled
+                          ? "text-[#94A3B8] cursor-not-allowed opacity-60"
                           : "text-[#335890] hover:bg-[#EBF5FF] hover:text-[#0077C3]"
-                      }`}
-                    >
-                      <tab.icon className="w-5 h-5" />
-                      {tab.label}
-                    </button>
-                  </div>
-                );
-              })}
-            </nav>
+                    }`}
+                  >
+                    <tab.icon className="w-5 h-5" />
+                    {tab.label}
+                  </button>
+                </div>
+              );
+            })}
+          </nav>
 
-            {/* Currency info */}
-            <div className="mt-6 px-4 py-3 bg-[#F5F9FF] rounded-lg border border-[#D0E3F5]">
-              <p className="text-[10px] text-[#94A3B8] uppercase mb-0.5">
-                Devise
-              </p>
-              <p className="text-sm font-semibold text-[#00122E]">
-                FCFA{" "}
-                <span className="text-xs font-normal text-[#335890]">
-                  (unité : K FCFA)
-                </span>
-              </p>
-            </div>
+          {/* Currency info */}
+          <div className="mt-6 px-4 py-3 bg-[#F5F9FF] rounded-lg border border-[#D0E3F5]">
+            <p className="text-[10px] text-[#94A3B8] uppercase mb-0.5">
+              Devise
+            </p>
+            <p className="text-sm font-semibold text-[#00122E]">
+              FCFA{" "}
+              <span className="text-xs font-normal text-[#335890]">
+                (unité : K FCFA)
+              </span>
+            </p>
+          </div>
 
-            <div className="mt-4">
-              <Link href="/clients">
-                <button className="flex items-center gap-3 w-full px-4 py-3 rounded-lg text-sm font-medium text-[#335890] hover:bg-[#EBF5FF] hover:text-[#0077C3] transition-colors">
-                  <ChevronLeft className="w-5 h-5" />
-                  Retour aux clients
-                </button>
-              </Link>
-            </div>
+          <div className="mt-4">
+            <Link href="/clients">
+              <button className="flex items-center gap-3 w-full px-4 py-3 rounded-lg text-sm font-medium text-[#335890] hover:bg-[#EBF5FF] hover:text-[#0077C3] transition-colors">
+                <ChevronLeft className="w-5 h-5" />
+                Retour aux clients
+              </button>
+            </Link>
+          </div>
         </aside>
 
         {/* ===== RIGHT: Scrollable content ===== */}
@@ -174,7 +233,8 @@ export default function ClientDetailsClient({
             {/* Top bar: title + user */}
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-xl font-bold text-[#00122E]">
-                {CLIENT_TABS.find((t) => t.id === activeTab)?.label || "Synthèse Financière"}
+                {CLIENT_TABS.find((t) => t.id === activeTab)?.label ||
+                  "Synthèse Financière"}
               </h2>
               <div className="flex items-center gap-3">
                 <div className="text-right">
@@ -184,7 +244,10 @@ export default function ClientDetailsClient({
                       ? `${session.user.firstName} ${session.user.lastName}`
                       : session.user.name || session.user.email}
                   </p>
-                  <Badge variant={roleBadgeVariant as any} className="text-xs mt-0.5">
+                  <Badge
+                    variant={roleBadgeVariant as any}
+                    className="text-xs mt-0.5"
+                  >
                     {roleLabel}
                   </Badge>
                 </div>
@@ -233,127 +296,171 @@ export default function ClientDetailsClient({
               </Button>
             </div>
 
-          <div className="min-w-0">
-            {/* Onglets financiers — instance unique pour préserver les filtres
+            <div className="min-w-0">
+              {/* Onglets financiers — instance unique pour préserver les filtres
                 entre Synthèse / Chiffres / Résultats. Recouvrement a ses
                 propres filtres internes. */}
-            {(() => {
-              const map: Record<string, "synthese" | "chiffre-affaires" | "resultat" | "recouvrement" | undefined> = {
-                overview: "synthese",
-                chiffres: "chiffre-affaires",
-                resultats: "resultat",
-                recouvrement: "recouvrement",
-              };
-              const internalTab = map[activeTab];
-              if (!internalTab) return null;
-              return (
-                <ClientReportingChart
-                  clientId={client.id}
-                  activeTab={internalTab}
-                  initialPeriodType={initialPeriodType}
-                  hideNav
-                />
-              );
-            })()}
+              {(() => {
+                const map: Record<
+                  string,
+                  | "synthese"
+                  | "chiffre-affaires"
+                  | "resultat"
+                  | "recouvrement"
+                  | undefined
+                > = {
+                  overview: "synthese",
+                  chiffres: "chiffre-affaires",
+                  resultats: "resultat",
+                  recouvrement: "recouvrement",
+                };
+                const internalTab = map[activeTab];
+                if (!internalTab) return null;
 
-            {/* Members */}
-            {activeTab === "members" && (
-              <Card className="p-6">
-                <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-lg font-semibold text-[#00122E]">
-                    Membres assignés
-                  </h2>
-                  {canAssignMembers && (
-                    <Link href={`/clients/${client.id}/assign`}>
-                      <Button size="sm" className="gap-2">
-                        <UserPlus className="w-4 h-4" />
-                        Gérer les membres
+                // Aucun reporting créé pour le client : on masque tous les
+                // onglets de reporting (Synthèse / Chiffres / Résultats /
+                // Recouvrement) au profit d'un empty state qui invite à
+                // créer un reporting. Les autres onglets sont par ailleurs
+                // grisés dans la nav.
+                if (!hasReporting) {
+                  return (
+                    <Card className="p-12 border-[#D0E3F5] text-center">
+                      <div className="mx-auto w-14 h-14 rounded-full bg-[#EBF5FF] flex items-center justify-center mb-4">
+                        <Plus className="w-6 h-6 text-[#0077C3]" />
+                      </div>
+                      <h3 className="text-lg font-semibold text-[#00122E] mb-1">
+                        Aucun reporting financier
+                      </h3>
+                      <p className="text-sm text-[#335890] mb-6">
+                        Créez un premier reporting pour visualiser la synthèse,
+                        le chiffre d&apos;affaires et les résultats de ce client.
+                      </p>
+                      <Button
+                        onClick={() => setShowUploadDialog(true)}
+                        className="gap-2 bg-gradient-to-r from-[#0077C3] to-[#0095F4] hover:from-[#005992] hover:to-[#0077C3] rounded-full"
+                      >
+                        <Plus className="w-4 h-4" />
+                        Créer un reporting
                       </Button>
-                    </Link>
-                  )}
-                </div>
+                    </Card>
+                  );
+                }
 
-                {client.assignedMembers && client.assignedMembers.length > 0 ? (
-                  <div className="border border-[#D0E3F5] rounded-xl overflow-hidden">
-                    <table className="w-full">
-                      <thead>
-                        <tr className="border-b border-[#D0E3F5] bg-[#F5F9FF]">
-                          <th className="text-left px-4 py-3 text-xs font-semibold text-[#335890] uppercase">
-                            Membre
-                          </th>
-                          <th className="text-left px-4 py-3 text-xs font-semibold text-[#335890] uppercase">
-                            Email
-                          </th>
-                          <th className="text-left px-4 py-3 text-xs font-semibold text-[#335890] uppercase">
-                            Rôle
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {client.assignedMembers.map((member: any, idx: number) => (
-                          <tr
-                            key={member.id}
-                            className={`border-b border-[#D0E3F5] last:border-b-0 ${
-                              idx % 2 === 0 ? "bg-white" : "bg-[#FAFCFF]"
-                            }`}
-                          >
-                            <td className="px-4 py-3">
-                              <div className="flex items-center gap-3">
-                                <div className="w-8 h-8 rounded-full bg-[#EBF5FF] flex items-center justify-center text-sm font-semibold text-[#0077C3]">
-                                  {member.firstName
-                                    ? member.firstName.charAt(0).toUpperCase()
-                                    : member.email.charAt(0).toUpperCase()}
-                                </div>
-                                <span className="text-sm font-medium text-[#00122E]">
-                                  {member.firstName && member.lastName
-                                    ? `${member.firstName} ${member.lastName}`
-                                    : member.email}
-                                </span>
-                              </div>
-                            </td>
-                            <td className="px-4 py-3 text-sm text-[#335890]">
-                              {member.email}
-                            </td>
-                            <td className="px-4 py-3">
-                              <Badge
-                                variant={getRoleBadgeVariant(member.role) as any}
-                                className="text-xs"
-                              >
-                                {getRoleLabel(member.role)}
-                              </Badge>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                ) : (
-                  <div className="text-center py-12">
-                    <Users className="w-12 h-12 text-[#D0E3F5] mx-auto mb-3" />
-                    <p className="text-[#335890]">Aucun membre assigné</p>
+                return (
+                  <ClientReportingChart
+                    clientId={client.id}
+                    activeTab={internalTab}
+                    initialPeriodType={initialPeriodType}
+                    hideNav
+                  />
+                );
+              })()}
+
+              {/* Members */}
+              {activeTab === "members" && (
+                <Card className="p-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <h2 className="text-lg font-semibold text-[#00122E]">
+                      Membres assignés
+                    </h2>
                     {canAssignMembers && (
                       <Link href={`/clients/${client.id}/assign`}>
-                        <Button variant="outline" className="mt-4 gap-2">
+                        <Button size="sm" className="gap-2">
                           <UserPlus className="w-4 h-4" />
-                          Assigner des membres
+                          Gérer les membres
                         </Button>
                       </Link>
                     )}
                   </div>
-                )}
-              </Card>
-            )}
 
-            {/* Reporting Financier */}
-            {activeTab === "declaration" && (
-              <Tabs value="declaration">
-                <DeclarationTabs clientId={client.id} />
-              </Tabs>
-            )}
+                  {client.assignedMembers &&
+                  client.assignedMembers.length > 0 ? (
+                    <div className="border border-[#D0E3F5] rounded-xl overflow-hidden">
+                      <table className="w-full">
+                        <thead>
+                          <tr className="border-b border-[#D0E3F5] bg-[#F5F9FF]">
+                            <th className="text-left px-4 py-3 text-xs font-semibold text-[#335890] uppercase">
+                              Membre
+                            </th>
+                            <th className="text-left px-4 py-3 text-xs font-semibold text-[#335890] uppercase">
+                              Email
+                            </th>
+                            <th className="text-left px-4 py-3 text-xs font-semibold text-[#335890] uppercase">
+                              Rôle
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {client.assignedMembers.map(
+                            (member: any, idx: number) => (
+                              <tr
+                                key={member.id}
+                                className={`border-b border-[#D0E3F5] last:border-b-0 ${
+                                  idx % 2 === 0 ? "bg-white" : "bg-[#FAFCFF]"
+                                }`}
+                              >
+                                <td className="px-4 py-3">
+                                  <div className="flex items-center gap-3">
+                                    <div className="w-8 h-8 rounded-full bg-[#EBF5FF] flex items-center justify-center text-sm font-semibold text-[#0077C3]">
+                                      {member.firstName
+                                        ? member.firstName
+                                            .charAt(0)
+                                            .toUpperCase()
+                                        : member.email.charAt(0).toUpperCase()}
+                                    </div>
+                                    <span className="text-sm font-medium text-[#00122E]">
+                                      {member.firstName && member.lastName
+                                        ? `${member.firstName} ${member.lastName}`
+                                        : member.email}
+                                    </span>
+                                  </div>
+                                </td>
+                                <td className="px-4 py-3 text-sm text-[#335890]">
+                                  {member.email}
+                                </td>
+                                <td className="px-4 py-3">
+                                  <Badge
+                                    variant={
+                                      getRoleBadgeVariant(member.role) as any
+                                    }
+                                    className="text-xs"
+                                  >
+                                    {getRoleLabel(member.role)}
+                                  </Badge>
+                                </td>
+                              </tr>
+                            ),
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  ) : (
+                    <div className="text-center py-12">
+                      <Users className="w-12 h-12 text-[#D0E3F5] mx-auto mb-3" />
+                      <p className="text-[#335890]">Aucun membre assigné</p>
+                      {canAssignMembers && (
+                        <Link href={`/clients/${client.id}/assign`}>
+                          <Button variant="outline" className="mt-4 gap-2">
+                            <UserPlus className="w-4 h-4" />
+                            Assigner des membres
+                          </Button>
+                        </Link>
+                      )}
+                    </div>
+                  )}
+                </Card>
+              )}
 
-            {/* Files */}
-            {activeTab === "files" && <FilesTabs clientId={client.id} />}
-          </div>
+              {/* Reporting Financier */}
+              {activeTab === "declaration" && (
+                <Tabs value="declaration">
+                  <DeclarationTabs clientId={client.id} />
+                </Tabs>
+              )}
+
+              {/* Files */}
+              {activeTab === "files" && <FilesTabs clientId={client.id} />}
+            </div>
           </div>
         </main>
       </div>
@@ -376,6 +483,21 @@ export default function ClientDetailsClient({
         client={showDeleteDialog ? client : null}
         open={showDeleteDialog}
         onClose={() => setShowDeleteDialog(false)}
+      />
+
+      {/* Demande de filtre au premier chargement quand un reporting existe et
+          qu'aucun filtre n'a encore été défini dans l'URL ni mémorisé. */}
+      <ReportingParamsDialog
+        open={showParamsDialog}
+        clientName={client.name}
+        onClose={() => setShowParamsDialog(false)}
+        onValidate={(params) => {
+          const qs = paramsToQuery(params);
+          // Mémoriser les paramètres : on ne redemandera plus pour ce client.
+          saveReportingParams(client.id, qs);
+          setShowParamsDialog(false);
+          router.replace(`/clients/${client.id}?${qs}`);
+        }}
       />
     </DashboardLayout>
   );

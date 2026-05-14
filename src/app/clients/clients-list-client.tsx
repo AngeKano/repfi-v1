@@ -27,6 +27,8 @@ import { ClientDetailsDialog } from "./client-details-dialog";
 import {
   ReportingParamsDialog,
   paramsToQuery,
+  getStoredReportingParams,
+  saveReportingParams,
 } from "./reporting-params-dialog";
 import { NewClientDialog } from "./new-client-dialog";
 import { DeleteClientDialog } from "./delete-client-dialog";
@@ -138,6 +140,17 @@ export default function ClientsListClient({
     setSelectedIds((prev) =>
       prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id],
     );
+  };
+
+  // Ouvrir le reporting d'un client : si les paramètres ont déjà été choisis
+  // pour ce client, on navigue directement sans redemander.
+  const openReporting = (client: any) => {
+    const stored = getStoredReportingParams(client.id);
+    if (stored) {
+      router.push(`/clients/${client.id}?${stored}`);
+      return;
+    }
+    setReportingClient(client);
   };
 
   // Generate page numbers for pagination
@@ -329,7 +342,7 @@ export default function ClientsListClient({
                 {initialClients.map((client, idx) => (
                   <tr
                     key={client.id}
-                    onClick={() => setReportingClient(client)}
+                    onClick={() => openReporting(client)}
                     className={`border-b border-[#D0E3F5] last:border-b-0 hover:bg-[#F5F9FF] transition-colors cursor-pointer ${
                       idx % 2 === 0 ? "bg-white" : "bg-[#FAFCFF]"
                     }`}
@@ -399,7 +412,7 @@ export default function ClientsListClient({
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => setReportingClient(client)}
+                          onClick={() => openReporting(client)}
                           className="text-[#0077C3] hover:text-[#005992] hover:bg-[#EBF5FF] h-8 w-8 p-0"
                           title="Reporting"
                         >
@@ -448,6 +461,8 @@ export default function ClientsListClient({
           onValidate={(params) => {
             if (!reportingClient) return;
             const qs = paramsToQuery(params);
+            // Mémoriser les paramètres pour ne plus redemander à l'avenir.
+            saveReportingParams(reportingClient.id, qs);
             router.push(`/clients/${reportingClient.id}?${qs}`);
           }}
         />
