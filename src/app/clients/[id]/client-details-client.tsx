@@ -71,6 +71,9 @@ const CLIENT_TABS = [
 // un reporting. Ils sont grisés tant qu'aucun reporting n'existe.
 const REPORTING_TAB_IDS = new Set(["chiffres", "resultats", "recouvrement"]);
 
+// Onglets désactivés de manière permanente (fonctionnalité à venir).
+const DISABLED_TAB_IDS = new Set(["files"]);
+
 export default function ClientDetailsClient({
   session,
   initialClient,
@@ -123,6 +126,10 @@ export default function ClientDetailsClient({
   // Si l'utilisateur tente d'accéder à un onglet grisé (par exemple via
   // l'URL), on le ramène automatiquement sur la Synthèse Financière.
   useEffect(() => {
+    if (DISABLED_TAB_IDS.has(activeTab)) {
+      setActiveTab("overview");
+      return;
+    }
     if (!hasReporting && REPORTING_TAB_IDS.has(activeTab)) {
       setActiveTab("overview");
     }
@@ -171,8 +178,10 @@ export default function ClientDetailsClient({
               const active = activeTab === tab.id;
               // Separator before "Membres" (index 4)
               const showSeparator = idx === 4;
+              const permanentlyDisabled = DISABLED_TAB_IDS.has(tab.id);
               const disabled =
-                REPORTING_TAB_IDS.has(tab.id) && !hasReporting;
+                permanentlyDisabled ||
+                (REPORTING_TAB_IDS.has(tab.id) && !hasReporting);
               return (
                 <div key={tab.id}>
                   {showSeparator && <div className="h-px bg-[#D0E3F5] my-2" />}
@@ -183,9 +192,11 @@ export default function ClientDetailsClient({
                     }}
                     disabled={disabled}
                     title={
-                      disabled
-                        ? "Créez d'abord un reporting financier pour activer cet onglet"
-                        : undefined
+                      permanentlyDisabled
+                        ? "Bientôt disponible"
+                        : disabled
+                          ? "Créez d'abord un reporting financier pour activer cet onglet"
+                          : undefined
                     }
                     aria-disabled={disabled}
                     className={`flex items-center gap-3 w-full px-4 py-3 rounded-lg text-sm font-medium transition-colors ${
