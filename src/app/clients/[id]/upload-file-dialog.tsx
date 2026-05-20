@@ -35,6 +35,13 @@ import {
   FileCheck,
 } from "lucide-react";
 import { toast } from "sonner";
+import { FileType } from "../../../../prisma/generated/prisma/enums";
+import {
+  acceptedExtensionsAttribute,
+  detectComptableFormat,
+  MAX_COMPTABLE_FILE_SIZE,
+  validateComptableFormat,
+} from "@/lib/comptable-formats";
 
 interface ClientOption {
   id: string;
@@ -51,53 +58,60 @@ interface UploadFileDialogProps {
 }
 
 const REQUIRED_FILE_TYPES = [
-  { type: "GRAND_LIVRE", label: "Grand Livre Comptable" },
-  { type: "PLAN_COMPTES", label: "Plan Comptable" },
-  { type: "PLAN_TIERS", label: "Plan des Tiers" },
-  { type: "CODE_JOURNAL", label: "Code Journal" },
+  { type: FileType.GRAND_LIVRE, label: "Grand Livre Comptable" },
+  { type: FileType.PLAN_COMPTES, label: "Plan Comptable" },
+  { type: FileType.PLAN_TIERS, label: "Plan des Tiers" },
+  { type: FileType.CODE_JOURNAL, label: "Code Journal" },
 ];
 
 const MAX_FILES = 4;
-const MAX_FILE_SIZE = 10 * 1024 * 1024;
 
 interface PickedFile {
   id: string;
   file: File;
-  fileType?: string;
+  fileType?: FileType;
   error?: string;
 }
 
-const isValidExcel = (file: File) => {
-  const validTypes = [
-    "application/vnd.ms-excel",
-    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-  ];
-  return (
-    validTypes.includes(file.type) ||
-    file.name.toLowerCase().endsWith(".xlsx") ||
-    file.name.toLowerCase().endsWith(".xls")
-  );
+/**
+ * Valide qu'un fichier est dans un format accepté pour AU MOINS un des types
+ * comptables requis. La validation finale par type (ex: plan_comptes refuse
+ * .pnm) est faite plus tard quand l'utilisateur a assigné un type.
+ */
+const isValidComptableFile = (file: File): boolean => {
+  return detectComptableFormat(file.name) !== "unknown";
 };
 
-const detectFileType = (fileName: string): string | undefined => {
+/**
+ * Auto-détection du fileType par extension d'abord (déterministe pour les
+ * fichiers Sage), puis fallback sur les keywords du nom de fichier pour
+ * les fichiers Excel (où l'extension ne renseigne pas sur le type métier).
+ */
+const detectFileType = (fileName: string): FileType | undefined => {
+  // 1. Extension Sage → type forcé
+  const fmt = detectComptableFormat(fileName);
+  if (fmt === "sage_pnm") return FileType.GRAND_LIVRE;
+  if (fmt === "sage_pnc") return FileType.PLAN_TIERS;
+
+  // 2. Fallback keywords pour Excel
   const normalized = fileName
     .toLowerCase()
     .replace(/[0-9_\-.]/g, " ")
     .trim();
   const keywords: Record<string, string[]> = {
-    GRAND_LIVRE: ["grand", "livre", "grandlivre", "gl"],
-    PLAN_COMPTES: [
+    [FileType.GRAND_LIVRE]: ["grand", "livre", "grandlivre", "gl"],
+    [FileType.PLAN_COMPTES]: [
       "plan",
       "compte",
       "plancompte",
       "plancomptable",
       "comptable",
     ],
-    PLAN_TIERS: ["plan", "tiers", "plantiers"],
-    CODE_JOURNAL: ["code", "journal", "codejournal", "journaux"],
+    [FileType.PLAN_TIERS]: ["plan", "tiers", "plantiers"],
+    [FileType.CODE_JOURNAL]: ["code", "journal", "codejournal", "journaux"],
   };
   const scores = Object.entries(keywords).map(([type, words]) => ({
-    type,
+    type: type as FileType,
     score: words.reduce(
       (acc, w) => (normalized.includes(w) ? acc + w.length : acc),
       0,
@@ -243,25 +257,40 @@ export function UploadFileDialog({
       toast.error(`Maximum ${MAX_FILES} fichiers.`);
       return;
     }
+    const limitMB = MAX_COMPTABLE_FILE_SIZE / (1024 * 1024);
     const next: PickedFile[] = [];
     for (let i = 0; i < arr.length && i < slots; i++) {
       const f = arr[i];
-      if (!isValidExcel(f)) {
-        toast.error(`${f.name} n'est pas un fichier Excel valide`);
+      if (!isValidComptableFile(f)) {
+        toast.error(
+          `${f.name} : format non supporté. Acceptés : Excel (.xlsx/.xls), Sage (.pnm/.pnc).`,
+        );
         continue;
       }
-      if (f.size > MAX_FILE_SIZE) {
+      if (f.size > MAX_COMPTABLE_FILE_SIZE) {
         next.push({
           id: Math.random().toString(36),
           file: f,
-          error: "Fichier trop volumineux (max 10MB)",
+          error: `Fichier trop volumineux (max ${limitMB} MB)`,
         });
         continue;
+      }
+      const detectedType = detectFileType(f.name);
+      // Si le type a été détecté par extension Sage, on vérifie que le format
+      // est bien autorisé pour ce type (cohérence avec ALLOWED_FORMATS).
+      let initialError: string | undefined;
+      if (detectedType) {
+        const formatError = validateComptableFormat(
+          detectedType,
+          detectComptableFormat(f.name),
+        );
+        if (formatError) initialError = formatError;
       }
       next.push({
         id: Math.random().toString(36),
         file: f,
-        fileType: detectFileType(f.name),
+        fileType: detectedType,
+        error: initialError,
       });
     }
     setFiles((prev) => [...prev, ...next].slice(0, MAX_FILES));
@@ -284,8 +313,19 @@ export function UploadFileDialog({
   const removeFile = (id: string) =>
     setFiles((prev) => prev.filter((f) => f.id !== id));
 
-  const updateFileType = (id: string, fileType: string) =>
-    setFiles((prev) => prev.map((f) => (f.id === id ? { ...f, fileType } : f)));
+  const updateFileType = (id: string, fileType: FileType) =>
+    setFiles((prev) =>
+      prev.map((f) => {
+        if (f.id !== id) return f;
+        // Re-vérifier que le format est autorisé pour le type choisi
+        // (ex: l'utilisateur ne peut pas assigner .pnm à plan_comptes).
+        const formatError = validateComptableFormat(
+          fileType,
+          detectComptableFormat(f.file.name),
+        );
+        return { ...f, fileType, error: formatError ?? undefined };
+      }),
+    );
 
   const formatSize = (size: number) => {
     if (size >= 1024 * 1024) return `${(size / (1024 * 1024)).toFixed(2)} MB`;
@@ -553,7 +593,9 @@ export function UploadFileDialog({
                                 </Badge>
                                 <Select
                                   value={f.fileType || ""}
-                                  onValueChange={(v) => updateFileType(f.id, v)}
+                                  onValueChange={(v) =>
+                                    updateFileType(f.id, v as FileType)
+                                  }
                                 >
                                   <SelectTrigger className="h-7 text-xs w-[170px]">
                                     <SelectValue placeholder="Choisir le type" />
@@ -613,14 +655,15 @@ export function UploadFileDialog({
                         Glissez-déposez vos fichiers ici
                       </p>
                       <p className="text-xs text-[#335890]">
-                        ou cliquez pour sélectionner (max {MAX_FILES} fichiers,
-                        10MB chacun)
+                        Excel (.xlsx/.xls) ou Sage (.pnm/.pnc) — max{" "}
+                        {MAX_FILES} fichiers,{" "}
+                        {MAX_COMPTABLE_FILE_SIZE / (1024 * 1024)} MB chacun
                       </p>
                     </div>
                     <Input
                       type="file"
                       multiple
-                      accept=".xlsx,.xls"
+                      accept={acceptedExtensionsAttribute()}
                       onChange={(e) => handleFiles(e.target.files)}
                       className="hidden"
                       id="upload-dialog-input"

@@ -48,6 +48,7 @@ export type ComptablePeriodMinAggregateOutputType = {
   createdAt: Date | null
   processedAt: Date | null
   excelFileUrl: string | null
+  planSource: string | null
 }
 
 export type ComptablePeriodMaxAggregateOutputType = {
@@ -62,6 +63,7 @@ export type ComptablePeriodMaxAggregateOutputType = {
   createdAt: Date | null
   processedAt: Date | null
   excelFileUrl: string | null
+  planSource: string | null
 }
 
 export type ComptablePeriodCountAggregateOutputType = {
@@ -76,6 +78,7 @@ export type ComptablePeriodCountAggregateOutputType = {
   createdAt: number
   processedAt: number
   excelFileUrl: number
+  planSource: number
   _all: number
 }
 
@@ -102,6 +105,7 @@ export type ComptablePeriodMinAggregateInputType = {
   createdAt?: true
   processedAt?: true
   excelFileUrl?: true
+  planSource?: true
 }
 
 export type ComptablePeriodMaxAggregateInputType = {
@@ -116,6 +120,7 @@ export type ComptablePeriodMaxAggregateInputType = {
   createdAt?: true
   processedAt?: true
   excelFileUrl?: true
+  planSource?: true
 }
 
 export type ComptablePeriodCountAggregateInputType = {
@@ -130,6 +135,7 @@ export type ComptablePeriodCountAggregateInputType = {
   createdAt?: true
   processedAt?: true
   excelFileUrl?: true
+  planSource?: true
   _all?: true
 }
 
@@ -231,6 +237,7 @@ export type ComptablePeriodGroupByOutputType = {
   createdAt: Date
   processedAt: Date | null
   excelFileUrl: string | null
+  planSource: string | null
   _count: ComptablePeriodCountAggregateOutputType | null
   _avg: ComptablePeriodAvgAggregateOutputType | null
   _sum: ComptablePeriodSumAggregateOutputType | null
@@ -268,6 +275,7 @@ export type ComptablePeriodWhereInput = {
   createdAt?: Prisma.DateTimeFilter<"ComptablePeriod"> | Date | string
   processedAt?: Prisma.DateTimeNullableFilter<"ComptablePeriod"> | Date | string | null
   excelFileUrl?: Prisma.StringNullableFilter<"ComptablePeriod"> | string | null
+  planSource?: Prisma.StringNullableFilter<"ComptablePeriod"> | string | null
   files?: Prisma.ComptableFileListRelationFilter
   client?: Prisma.XOR<Prisma.ClientScalarRelationFilter, Prisma.ClientWhereInput>
 }
@@ -284,6 +292,7 @@ export type ComptablePeriodOrderByWithRelationInput = {
   createdAt?: Prisma.SortOrder
   processedAt?: Prisma.SortOrderInput | Prisma.SortOrder
   excelFileUrl?: Prisma.SortOrderInput | Prisma.SortOrder
+  planSource?: Prisma.SortOrderInput | Prisma.SortOrder
   files?: Prisma.ComptableFileOrderByRelationAggregateInput
   client?: Prisma.ClientOrderByWithRelationInput
 }
@@ -304,6 +313,7 @@ export type ComptablePeriodWhereUniqueInput = Prisma.AtLeast<{
   createdAt?: Prisma.DateTimeFilter<"ComptablePeriod"> | Date | string
   processedAt?: Prisma.DateTimeNullableFilter<"ComptablePeriod"> | Date | string | null
   excelFileUrl?: Prisma.StringNullableFilter<"ComptablePeriod"> | string | null
+  planSource?: Prisma.StringNullableFilter<"ComptablePeriod"> | string | null
   files?: Prisma.ComptableFileListRelationFilter
   client?: Prisma.XOR<Prisma.ClientScalarRelationFilter, Prisma.ClientWhereInput>
 }, "id" | "batchId" | "clientId_periodStart_periodEnd">
@@ -320,6 +330,7 @@ export type ComptablePeriodOrderByWithAggregationInput = {
   createdAt?: Prisma.SortOrder
   processedAt?: Prisma.SortOrderInput | Prisma.SortOrder
   excelFileUrl?: Prisma.SortOrderInput | Prisma.SortOrder
+  planSource?: Prisma.SortOrderInput | Prisma.SortOrder
   _count?: Prisma.ComptablePeriodCountOrderByAggregateInput
   _avg?: Prisma.ComptablePeriodAvgOrderByAggregateInput
   _max?: Prisma.ComptablePeriodMaxOrderByAggregateInput
@@ -342,6 +353,7 @@ export type ComptablePeriodScalarWhereWithAggregatesInput = {
   createdAt?: Prisma.DateTimeWithAggregatesFilter<"ComptablePeriod"> | Date | string
   processedAt?: Prisma.DateTimeNullableWithAggregatesFilter<"ComptablePeriod"> | Date | string | null
   excelFileUrl?: Prisma.StringNullableWithAggregatesFilter<"ComptablePeriod"> | string | null
+  planSource?: Prisma.StringNullableWithAggregatesFilter<"ComptablePeriod"> | string | null
 }
 
 export type ComptablePeriodCreateInput = {
@@ -355,6 +367,7 @@ export type ComptablePeriodCreateInput = {
   createdAt?: Date | string
   processedAt?: Date | string | null
   excelFileUrl?: string | null
+  planSource?: string | null
   files?: Prisma.ComptableFileCreateNestedManyWithoutComptablePeriodInput
   client: Prisma.ClientCreateNestedOneWithoutComptablePeriodsInput
 }
@@ -371,6 +384,7 @@ export type ComptablePeriodUncheckedCreateInput = {
   createdAt?: Date | string
   processedAt?: Date | string | null
   excelFileUrl?: string | null
+  planSource?: string | null
   files?: Prisma.ComptableFileUncheckedCreateNestedManyWithoutComptablePeriodInput
 }
 
@@ -385,6 +399,7 @@ export type ComptablePeriodUpdateInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   processedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   excelFileUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  planSource?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   files?: Prisma.ComptableFileUpdateManyWithoutComptablePeriodNestedInput
   client?: Prisma.ClientUpdateOneRequiredWithoutComptablePeriodsNestedInput
 }
@@ -401,6 +416,7 @@ export type ComptablePeriodUncheckedUpdateInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   processedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   excelFileUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  planSource?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   files?: Prisma.ComptableFileUncheckedUpdateManyWithoutComptablePeriodNestedInput
 }
 
@@ -416,6 +432,7 @@ export type ComptablePeriodCreateManyInput = {
   createdAt?: Date | string
   processedAt?: Date | string | null
   excelFileUrl?: string | null
+  planSource?: string | null
 }
 
 export type ComptablePeriodUpdateManyMutationInput = {
@@ -429,6 +446,7 @@ export type ComptablePeriodUpdateManyMutationInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   processedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   excelFileUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  planSource?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
 }
 
 export type ComptablePeriodUncheckedUpdateManyInput = {
@@ -443,6 +461,7 @@ export type ComptablePeriodUncheckedUpdateManyInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   processedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   excelFileUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  planSource?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
 }
 
 export type ComptablePeriodListRelationFilter = {
@@ -478,6 +497,7 @@ export type ComptablePeriodCountOrderByAggregateInput = {
   createdAt?: Prisma.SortOrder
   processedAt?: Prisma.SortOrder
   excelFileUrl?: Prisma.SortOrder
+  planSource?: Prisma.SortOrder
 }
 
 export type ComptablePeriodAvgOrderByAggregateInput = {
@@ -497,6 +517,7 @@ export type ComptablePeriodMaxOrderByAggregateInput = {
   createdAt?: Prisma.SortOrder
   processedAt?: Prisma.SortOrder
   excelFileUrl?: Prisma.SortOrder
+  planSource?: Prisma.SortOrder
 }
 
 export type ComptablePeriodMinOrderByAggregateInput = {
@@ -511,6 +532,7 @@ export type ComptablePeriodMinOrderByAggregateInput = {
   createdAt?: Prisma.SortOrder
   processedAt?: Prisma.SortOrder
   excelFileUrl?: Prisma.SortOrder
+  planSource?: Prisma.SortOrder
 }
 
 export type ComptablePeriodSumOrderByAggregateInput = {
@@ -585,6 +607,7 @@ export type ComptablePeriodCreateWithoutClientInput = {
   createdAt?: Date | string
   processedAt?: Date | string | null
   excelFileUrl?: string | null
+  planSource?: string | null
   files?: Prisma.ComptableFileCreateNestedManyWithoutComptablePeriodInput
 }
 
@@ -599,6 +622,7 @@ export type ComptablePeriodUncheckedCreateWithoutClientInput = {
   createdAt?: Date | string
   processedAt?: Date | string | null
   excelFileUrl?: string | null
+  planSource?: string | null
   files?: Prisma.ComptableFileUncheckedCreateNestedManyWithoutComptablePeriodInput
 }
 
@@ -643,6 +667,7 @@ export type ComptablePeriodScalarWhereInput = {
   createdAt?: Prisma.DateTimeFilter<"ComptablePeriod"> | Date | string
   processedAt?: Prisma.DateTimeNullableFilter<"ComptablePeriod"> | Date | string | null
   excelFileUrl?: Prisma.StringNullableFilter<"ComptablePeriod"> | string | null
+  planSource?: Prisma.StringNullableFilter<"ComptablePeriod"> | string | null
 }
 
 export type ComptablePeriodCreateWithoutFilesInput = {
@@ -656,6 +681,7 @@ export type ComptablePeriodCreateWithoutFilesInput = {
   createdAt?: Date | string
   processedAt?: Date | string | null
   excelFileUrl?: string | null
+  planSource?: string | null
   client: Prisma.ClientCreateNestedOneWithoutComptablePeriodsInput
 }
 
@@ -671,6 +697,7 @@ export type ComptablePeriodUncheckedCreateWithoutFilesInput = {
   createdAt?: Date | string
   processedAt?: Date | string | null
   excelFileUrl?: string | null
+  planSource?: string | null
 }
 
 export type ComptablePeriodCreateOrConnectWithoutFilesInput = {
@@ -700,6 +727,7 @@ export type ComptablePeriodUpdateWithoutFilesInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   processedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   excelFileUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  planSource?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   client?: Prisma.ClientUpdateOneRequiredWithoutComptablePeriodsNestedInput
 }
 
@@ -715,6 +743,7 @@ export type ComptablePeriodUncheckedUpdateWithoutFilesInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   processedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   excelFileUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  planSource?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
 }
 
 export type ComptablePeriodCreateManyClientInput = {
@@ -728,6 +757,7 @@ export type ComptablePeriodCreateManyClientInput = {
   createdAt?: Date | string
   processedAt?: Date | string | null
   excelFileUrl?: string | null
+  planSource?: string | null
 }
 
 export type ComptablePeriodUpdateWithoutClientInput = {
@@ -741,6 +771,7 @@ export type ComptablePeriodUpdateWithoutClientInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   processedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   excelFileUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  planSource?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   files?: Prisma.ComptableFileUpdateManyWithoutComptablePeriodNestedInput
 }
 
@@ -755,6 +786,7 @@ export type ComptablePeriodUncheckedUpdateWithoutClientInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   processedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   excelFileUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  planSource?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   files?: Prisma.ComptableFileUncheckedUpdateManyWithoutComptablePeriodNestedInput
 }
 
@@ -769,6 +801,7 @@ export type ComptablePeriodUncheckedUpdateManyWithoutClientInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   processedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   excelFileUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  planSource?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
 }
 
 
@@ -814,6 +847,7 @@ export type ComptablePeriodSelect<ExtArgs extends runtime.Types.Extensions.Inter
   createdAt?: boolean
   processedAt?: boolean
   excelFileUrl?: boolean
+  planSource?: boolean
   files?: boolean | Prisma.ComptablePeriod$filesArgs<ExtArgs>
   client?: boolean | Prisma.ClientDefaultArgs<ExtArgs>
   _count?: boolean | Prisma.ComptablePeriodCountOutputTypeDefaultArgs<ExtArgs>
@@ -831,6 +865,7 @@ export type ComptablePeriodSelectCreateManyAndReturn<ExtArgs extends runtime.Typ
   createdAt?: boolean
   processedAt?: boolean
   excelFileUrl?: boolean
+  planSource?: boolean
   client?: boolean | Prisma.ClientDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["comptablePeriod"]>
 
@@ -846,6 +881,7 @@ export type ComptablePeriodSelectUpdateManyAndReturn<ExtArgs extends runtime.Typ
   createdAt?: boolean
   processedAt?: boolean
   excelFileUrl?: boolean
+  planSource?: boolean
   client?: boolean | Prisma.ClientDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["comptablePeriod"]>
 
@@ -861,9 +897,10 @@ export type ComptablePeriodSelectScalar = {
   createdAt?: boolean
   processedAt?: boolean
   excelFileUrl?: boolean
+  planSource?: boolean
 }
 
-export type ComptablePeriodOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "clientId" | "periodStart" | "periodEnd" | "year" | "batchId" | "status" | "progress" | "createdAt" | "processedAt" | "excelFileUrl", ExtArgs["result"]["comptablePeriod"]>
+export type ComptablePeriodOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "clientId" | "periodStart" | "periodEnd" | "year" | "batchId" | "status" | "progress" | "createdAt" | "processedAt" | "excelFileUrl" | "planSource", ExtArgs["result"]["comptablePeriod"]>
 export type ComptablePeriodInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   files?: boolean | Prisma.ComptablePeriod$filesArgs<ExtArgs>
   client?: boolean | Prisma.ClientDefaultArgs<ExtArgs>
@@ -894,6 +931,7 @@ export type $ComptablePeriodPayload<ExtArgs extends runtime.Types.Extensions.Int
     createdAt: Date
     processedAt: Date | null
     excelFileUrl: string | null
+    planSource: string | null
   }, ExtArgs["result"]["comptablePeriod"]>
   composites: {}
 }
@@ -1330,6 +1368,7 @@ export interface ComptablePeriodFieldRefs {
   readonly createdAt: Prisma.FieldRef<"ComptablePeriod", 'DateTime'>
   readonly processedAt: Prisma.FieldRef<"ComptablePeriod", 'DateTime'>
   readonly excelFileUrl: Prisma.FieldRef<"ComptablePeriod", 'String'>
+  readonly planSource: Prisma.FieldRef<"ComptablePeriod", 'String'>
 }
     
 

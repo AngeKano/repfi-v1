@@ -1525,7 +1525,8 @@ export const ComptablePeriodScalarFieldEnum = {
   progress: 'progress',
   createdAt: 'createdAt',
   processedAt: 'processedAt',
-  excelFileUrl: 'excelFileUrl'
+  excelFileUrl: 'excelFileUrl',
+  planSource: 'planSource'
 } as const
 
 export type ComptablePeriodScalarFieldEnum = (typeof ComptablePeriodScalarFieldEnum)[keyof typeof ComptablePeriodScalarFieldEnum]
