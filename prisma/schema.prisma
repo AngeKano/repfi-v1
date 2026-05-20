@@ -252,6 +252,10 @@ model ComptablePeriod {
   createdAt    DateTime         @default(now())
   processedAt  DateTime?
   excelFileUrl String?
+  // Plan comptable détecté à l'ingestion par le DAG : "PCG", "SYSCOHADA" ou "UNKNOWN".
+  // Si "PCG", le DAG a appliqué un mapping vers SYSCOHADA. Null tant que le batch
+  // n'a pas été traité (PENDING/VALIDATING).
+  planSource   String?
   files        ComptableFile[]
   client       Client           @relation(fields: [clientId], references: [id], onDelete: Cascade)
 
