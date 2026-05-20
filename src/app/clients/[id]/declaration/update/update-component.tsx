@@ -31,10 +31,17 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  acceptedExtensionsAttribute,
+  detectComptableFormat,
+  MAX_COMPTABLE_FILE_SIZE,
+  validateComptableFormat,
+} from "@/lib/comptable-formats";
+import { FileType } from "../../../../../../prisma/generated/prisma/enums";
 
+// Format v3.0 : 4 fichiers obligatoires (Grand Livre unifié)
 const REQUIRED_FILE_TYPES = [
-  { type: "GRAND_LIVRE_COMPTES", label: "Grand Livre des Comptes" },
-  { type: "GRAND_LIVRE_TIERS", label: "Grand Livre des Tiers" },
+  { type: "GRAND_LIVRE", label: "Grand Livre Comptable" },
   { type: "PLAN_COMPTES", label: "Plan Comptable" },
   { type: "PLAN_TIERS", label: "Plan des Tiers" },
   { type: "CODE_JOURNAL", label: "Code Journal" },
@@ -87,8 +94,7 @@ interface Period {
   status: string;
 }
 
-const MAX_FILE_SIZE = 10 * 1024 * 1024;
-const MAX_FILES = 5;
+const MAX_FILES = 4;
 
 export default function DeclarationComptable({
   session,
@@ -308,30 +314,40 @@ export default function DeclarationComptable({
     ? dateRange.to.toISOString().slice(0, 10)
     : "";
 
-  const isValidExcel = (file: File) => {
-    const validTypes = [
-      "application/vnd.ms-excel",
-      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-    ];
-    return (
-      validTypes.includes(file.type) ||
-      file.name.endsWith(".xlsx") ||
-      file.name.endsWith(".xls")
-    );
-  };
+  // Validation : Excel / .pnm / .pnc acceptés.
+  const isValidComptableFile = (file: File) =>
+    detectComptableFormat(file.name) !== "unknown";
 
+  // Détection du type : extension Sage d'abord (déterministe), puis keywords
+  // pour les fichiers Excel. Format v3.0 : 4 types (Grand Livre unifié).
   const detectFileType = (fileName: string): string | undefined => {
+    const fmt = detectComptableFormat(fileName);
+    if (fmt === "sage_pnm") return FileType.GRAND_LIVRE;
+    if (fmt === "sage_pnc") return FileType.PLAN_TIERS;
+
     const normalizedName = fileName
       .toLowerCase()
       .replace(/[0-9_\-\.]/g, " ")
       .trim();
 
-    const keywords = {
-      GRAND_LIVRE_COMPTES: ["grand", "livre", "compte", "glcompte"],
-      GRAND_LIVRE_TIERS: ["grand", "livre", "tiers", "gltiers"],
-      PLAN_COMPTES: ["plan", "compte", "plancompte"],
-      PLAN_TIERS: ["plan", "tiers", "plantiers"],
-      CODE_JOURNAL: ["code", "journal", "codejournal"],
+    const keywords: Record<string, string[]> = {
+      [FileType.GRAND_LIVRE]: [
+        "grand",
+        "livre",
+        "grandlivre",
+        "gl",
+        "glcompte",
+        "gltiers", // compat anciens noms
+      ],
+      [FileType.PLAN_COMPTES]: [
+        "plan",
+        "compte",
+        "plancompte",
+        "plancomptable",
+        "comptable",
+      ],
+      [FileType.PLAN_TIERS]: ["plan", "tiers", "plantiers"],
+      [FileType.CODE_JOURNAL]: ["code", "journal", "codejournal", "journaux"],
     };
 
     const matchesType = (words: string[]): number => {
@@ -342,19 +358,10 @@ export default function DeclarationComptable({
       return score;
     };
 
-    const scores = [
-      {
-        type: "GRAND_LIVRE_COMPTES",
-        score: matchesType(keywords.GRAND_LIVRE_COMPTES),
-      },
-      {
-        type: "GRAND_LIVRE_TIERS",
-        score: matchesType(keywords.GRAND_LIVRE_TIERS),
-      },
-      { type: "PLAN_COMPTES", score: matchesType(keywords.PLAN_COMPTES) },
-      { type: "PLAN_TIERS", score: matchesType(keywords.PLAN_TIERS) },
-      { type: "CODE_JOURNAL", score: matchesType(keywords.CODE_JOURNAL) },
-    ];
+    const scores = Object.entries(keywords).map(([type, words]) => ({
+      type,
+      score: matchesType(words),
+    }));
 
     const bestMatch = scores.reduce((prev, current) =>
       current.score > prev.score ? current : prev,
@@ -371,36 +378,51 @@ export default function DeclarationComptable({
     const availableSlots = MAX_FILES - currentCount;
 
     if (availableSlots <= 0) {
-      toast.error("Vous ne pouvez pas ajouter plus de 5 fichiers.");
+      toast.error(`Vous ne pouvez pas ajouter plus de ${MAX_FILES} fichiers.`);
       return;
     }
 
     const validFiles: UploadFile[] = [];
     let added = 0;
 
+    const limitMB = MAX_COMPTABLE_FILE_SIZE / (1024 * 1024);
+
     for (let i = 0; i < fileArray.length && added < availableSlots; i++) {
       const file = fileArray[i];
 
-      if (!isValidExcel(file)) {
-        toast.error(`${file.name} n'est pas un fichier Excel valide`);
+      if (!isValidComptableFile(file)) {
+        toast.error(
+          `${file.name} : format non supporté. Acceptés : Excel (.xlsx/.xls), Sage (.pnm/.pnc).`,
+        );
         continue;
       }
 
-      if (file.size > MAX_FILE_SIZE) {
+      if (file.size > MAX_COMPTABLE_FILE_SIZE) {
         validFiles.push({
           file,
           id: Math.random().toString(36),
-          error: "Fichier trop volumineux (max 10MB)",
+          error: `Fichier trop volumineux (max ${limitMB} MB)`,
         });
         added++;
         continue;
       }
 
       const detectedType = detectFileType(file.name);
+      // Si le type a été forcé par extension Sage, vérifier que le format
+      // est autorisé pour ce type (ALLOWED_FORMATS du module partagé).
+      let initialError: string | undefined;
+      if (detectedType) {
+        const formatError = validateComptableFormat(
+          detectedType as FileType,
+          detectComptableFormat(file.name),
+        );
+        if (formatError) initialError = formatError;
+      }
       validFiles.push({
         file,
         id: Math.random().toString(36),
         fileType: detectedType,
+        error: initialError,
       });
       added++;
     }
@@ -424,7 +446,7 @@ export default function DeclarationComptable({
     setDragActive(false);
 
     if (filesCount >= MAX_FILES) {
-      toast.error("Vous ne pouvez pas ajouter plus de 5 fichiers.");
+      toast.error(`Vous ne pouvez pas ajouter plus de ${MAX_FILES} fichiers.`);
       return;
     }
     handleFiles(e.dataTransfer.files);
@@ -435,11 +457,22 @@ export default function DeclarationComptable({
   };
 
   const updateFileType = (id: string, fileType: string) => {
-    setFiles((prev) => prev.map((f) => (f.id === id ? { ...f, fileType } : f)));
+    setFiles((prev) =>
+      prev.map((f) => {
+        if (f.id !== id) return f;
+        // Re-vérifier que le format du fichier est autorisé pour le type
+        // choisi (empêche d'assigner un .pnm à plan_comptes par exemple).
+        const formatError = validateComptableFormat(
+          fileType as FileType,
+          detectComptableFormat(f.file.name),
+        );
+        return { ...f, fileType, error: formatError ?? undefined };
+      }),
+    );
   };
 
   const allFilesValid = () => {
-    if (filesCount !== 5) return false;
+    if (filesCount !== MAX_FILES) return false;
 
     const types = files.map((f) => f.fileType);
     const requiredTypes = REQUIRED_FILE_TYPES.map((t) => t.type);
@@ -459,7 +492,7 @@ export default function DeclarationComptable({
 
     if (!allFilesValid()) {
       toast.error(
-        "Veuillez sélectionner les 5 fichiers obligatoires avec des types valides",
+        `Veuillez sélectionner les ${MAX_FILES} fichiers obligatoires avec des types valides`,
       );
       return;
     }
@@ -507,7 +540,7 @@ export default function DeclarationComptable({
 
     if (!allFilesValid()) {
       toast.error(
-        "Veuillez sélectionner les 5 fichiers obligatoires avec des types valides",
+        `Veuillez sélectionner les ${MAX_FILES} fichiers obligatoires avec des types valides`,
       );
       return;
     }
@@ -832,15 +865,16 @@ export default function DeclarationComptable({
           <p className="text-lg font-medium mb-2">
             {editMode
               ? "Glissez les nouveaux fichiers pour remplacer"
-              : "Glissez-déposez vos 5 fichiers Excel ici"}
+              : "Glissez-déposez vos fichiers comptables ici"}
           </p>
           <p className="text-sm text-gray-500 mb-4">
-            ou cliquez pour sélectionner (max 10MB chacun)
+            Excel (.xlsx/.xls) ou Sage (.pnm/.pnc) — max{" "}
+            {MAX_COMPTABLE_FILE_SIZE / (1024 * 1024)} MB chacun
           </p>
           <Input
             type="file"
             multiple
-            accept=".xlsx,.xls"
+            accept={acceptedExtensionsAttribute()}
             onChange={(e) => handleFiles(e.target.files)}
             className="hidden"
             id="file-input"
@@ -855,7 +889,7 @@ export default function DeclarationComptable({
             >
               <span>
                 {hasMaxFiles
-                  ? "Maximum 5 fichiers atteints"
+                  ? `Maximum ${MAX_FILES} fichiers atteints`
                   : editMode
                     ? "Sélectionner les nouveaux fichiers"
                     : "Sélectionner des fichiers"}
@@ -938,7 +972,9 @@ export default function DeclarationComptable({
         {/* Files List */}
         {filesCount > 0 && (
           <div className="space-y-3 mb-6">
-            <Label>Fichiers sélectionnés ({filesCount}/5 requis)</Label>
+            <Label>
+              Fichiers sélectionnés ({filesCount}/{MAX_FILES} requis)
+            </Label>
             {files.map((uploadFile) => (
               <div
                 key={uploadFile.id}

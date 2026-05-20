@@ -12,23 +12,25 @@ import {
   Loader2,
   Download,
   RotateCw,
+  AlertTriangle,
+  Languages,
 } from "lucide-react";
 import { toast } from "sonner";
 
-// Messages par étape
+// Messages par étape (format v3.0 : 4 fichiers, grand livre unifié).
 const STEP_MESSAGES = {
   PENDING: ["Début du traitement..."],
   VALIDATING: [
+    "Validation des formats de fichiers...",
     "Traitement du plan comptable...",
     "Traitement du code journal...",
     "Traitement du plan tiers...",
-    "Traitement du grand livre de compte...",
-    "Traitement du grand livre de tiers...",
   ],
   PROCESSING: [
-    "Traitement final...",
-    "Ajout des statistiques...",
-    "Génération des documents Excel...",
+    "Traitement du grand livre...",
+    "Détection du plan source et mapping...",
+    "Enrichissement et chargement ClickHouse...",
+    "Génération de l'export Excel...",
   ],
   COMPLETED: ["Traitement terminé !"],
   FAILED: ["Échec du traitement"],
@@ -310,18 +312,36 @@ export default function StatusComponents({
               </p>
             </div>
           </div>
-          <Badge
-            variant={
-              status.status === "COMPLETED"
-                ? "default"
-                : status.status === "FAILED"
-                  ? "destructive"
-                  : "secondary"
-            }
-            className="text-sm"
-          >
-            {Math.round(animatedProgress)}%
-          </Badge>
+          <div className="flex items-center gap-2">
+            {/* Badge plan comptable détecté (PCG / SYSCOHADA / UNKNOWN).
+                N'apparaît qu'une fois le DAG passé sur la détection. */}
+            {status.planSource && (
+              <Badge
+                variant="outline"
+                title="Plan comptable détecté par le pipeline ETL"
+                className="text-xs gap-1 border-[#D0E3F5] text-[#335890]"
+              >
+                <Languages className="w-3 h-3" />
+                {status.planSource === "PCG"
+                  ? "PCG → SYSCOHADA"
+                  : status.planSource === "SYSCOHADA"
+                    ? "Plan : SYSCOHADA"
+                    : "Plan : non détecté"}
+              </Badge>
+            )}
+            <Badge
+              variant={
+                status.status === "COMPLETED"
+                  ? "default"
+                  : status.status === "FAILED"
+                    ? "destructive"
+                    : "secondary"
+              }
+              className="text-sm"
+            >
+              {Math.round(animatedProgress)}%
+            </Badge>
+          </div>
         </div>
         <div className="flex flex-col gap-2 mb-6">
           {(isProcessing || currentMessage === "Traitement terminé !") && (
@@ -345,6 +365,24 @@ export default function StatusComponents({
               <Download className="w-4 h-4" />
               {downloading ? "Téléchargement..." : "Télécharger l'export Excel"}
             </Button>
+          </div>
+        )}
+
+        {/* Détails de l'erreur si Echec — le DAG écrit le message dans
+            ComptableFile.errorMessage, l'API status le remonte. */}
+        {status.status === "FAILED" && status.errorMessage && (
+          <div className="mb-4 p-4 rounded-lg bg-[#FEE2E2] border border-[#FCA5A5]">
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="w-5 h-5 text-[#DC2626] shrink-0 mt-0.5" />
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-[#991B1B] mb-1">
+                  Détails de l&apos;erreur
+                </p>
+                <p className="text-sm text-[#7F1D1D] whitespace-pre-wrap break-words">
+                  {status.errorMessage}
+                </p>
+              </div>
+            </div>
           </div>
         )}
 

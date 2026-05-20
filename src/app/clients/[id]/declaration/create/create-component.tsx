@@ -29,6 +29,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  acceptedExtensionsAttribute,
+  detectComptableFormat,
+  MAX_COMPTABLE_FILE_SIZE,
+  validateComptableFormat,
+} from "@/lib/comptable-formats";
+import { FileType } from "../../../../../../prisma/generated/prisma/enums";
 
 // ============================================================
 // FORMAT 4 FICHIERS (v3.0)
@@ -45,8 +52,7 @@ const REQUIRED_FILE_TYPES = [
   { type: "CODE_JOURNAL", label: "Code Journal" },
 ];
 
-const MAX_FILE_SIZE = 10 * 1024 * 1024;
-const MAX_FILES = 4; // Changé de 5 à 4
+const MAX_FILES = 4; // Format v3.0 : Grand Livre unifié
 
 function FileTypeSelect({
   value,
@@ -227,45 +233,41 @@ export default function DeclarationComptable({
     ? dateRange.to.toISOString().slice(0, 10)
     : "";
 
-  const isValidExcel = (file: File) => {
-    const validTypes = [
-      "application/vnd.ms-excel",
-      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-    ];
-    return (
-      validTypes.includes(file.type) ||
-      file.name.endsWith(".xlsx") ||
-      file.name.endsWith(".xls")
-    );
-  };
+  // Validation : Excel / .pnm / .pnc acceptés.
+  const isValidComptableFile = (file: File) =>
+    detectComptableFormat(file.name) !== "unknown";
 
-  // Détection du type de fichier basée sur le nom
+  // Détection du type de fichier : extension Sage d'abord (déterministe),
+  // puis fallback keywords pour les fichiers Excel.
   const detectFileType = (fileName: string): string | undefined => {
+    const fmt = detectComptableFormat(fileName);
+    if (fmt === "sage_pnm") return FileType.GRAND_LIVRE;
+    if (fmt === "sage_pnc") return FileType.PLAN_TIERS;
+
     const normalizedName = fileName
       .toLowerCase()
       .replace(/[0-9_\-\.]/g, " ")
       .trim();
 
-    // Mots-clés pour la détection (format v3.0)
     const keywords: Record<string, string[]> = {
-      GRAND_LIVRE: [
+      [FileType.GRAND_LIVRE]: [
         "grand",
         "livre",
         "compte",
         "grandlivre",
         "gl",
         "glcompte",
-        "gltiers", // Inclut les anciens noms pour compatibilité
+        "gltiers", // compat anciens noms
       ],
-      PLAN_COMPTES: [
+      [FileType.PLAN_COMPTES]: [
         "plan",
         "compte",
         "plancompte",
         "plancomptable",
         "comptable",
       ],
-      PLAN_TIERS: ["plan", "tiers", "plantiers"],
-      CODE_JOURNAL: ["code", "journal", "codejournal", "journaux"],
+      [FileType.PLAN_TIERS]: ["plan", "tiers", "plantiers"],
+      [FileType.CODE_JOURNAL]: ["code", "journal", "codejournal", "journaux"],
     };
 
     const matchesType = (words: string[]): number => {
@@ -303,29 +305,44 @@ export default function DeclarationComptable({
     const validFiles: UploadFile[] = [];
     let added = 0;
 
+    const limitMB = MAX_COMPTABLE_FILE_SIZE / (1024 * 1024);
+
     for (let i = 0; i < fileArray.length && added < availableSlots; i++) {
       const file = fileArray[i];
 
-      if (!isValidExcel(file)) {
-        toast.error(`${file.name} n'est pas un fichier Excel valide`);
+      if (!isValidComptableFile(file)) {
+        toast.error(
+          `${file.name} : format non supporté. Acceptés : Excel (.xlsx/.xls), Sage (.pnm/.pnc).`,
+        );
         continue;
       }
 
-      if (file.size > MAX_FILE_SIZE) {
+      if (file.size > MAX_COMPTABLE_FILE_SIZE) {
         validFiles.push({
           file,
           id: Math.random().toString(36),
-          error: "Fichier trop volumineux (max 10MB)",
+          error: `Fichier trop volumineux (max ${limitMB} MB)`,
         });
         added++;
         continue;
       }
 
       const detectedType = detectFileType(file.name);
+      // Si le type a été forcé par l'extension (Sage), on revérifie que le
+      // format est autorisé pour ce type (cohérence avec ALLOWED_FORMATS).
+      let initialError: string | undefined;
+      if (detectedType) {
+        const formatError = validateComptableFormat(
+          detectedType as FileType,
+          detectComptableFormat(file.name),
+        );
+        if (formatError) initialError = formatError;
+      }
       validFiles.push({
         file,
         id: Math.random().toString(36),
         fileType: detectedType,
+        error: initialError,
       });
       added++;
     }
@@ -360,7 +377,18 @@ export default function DeclarationComptable({
   };
 
   const updateFileType = (id: string, fileType: string) => {
-    setFiles((prev) => prev.map((f) => (f.id === id ? { ...f, fileType } : f)));
+    setFiles((prev) =>
+      prev.map((f) => {
+        if (f.id !== id) return f;
+        // Re-vérifier que le format du fichier est autorisé pour le nouveau
+        // type (empêche d'assigner un .pnm à plan_comptes par exemple).
+        const formatError = validateComptableFormat(
+          fileType as FileType,
+          detectComptableFormat(f.file.name),
+        );
+        return { ...f, fileType, error: formatError ?? undefined };
+      }),
+    );
   };
 
   const allFilesValid = () => {
@@ -598,15 +626,16 @@ export default function DeclarationComptable({
         >
           <Upload className="w-12 h-12 text-gray-400 mx-auto mb-4" />
           <p className="text-lg font-medium mb-2">
-            Glissez-déposez vos {MAX_FILES} fichiers Excel ici
+            Glissez-déposez vos {MAX_FILES} fichiers comptables ici
           </p>
           <p className="text-sm text-gray-500 mb-4">
-            ou cliquez pour sélectionner (max 10MB chacun)
+            Excel (.xlsx/.xls) ou Sage (.pnm/.pnc) — max{" "}
+            {MAX_COMPTABLE_FILE_SIZE / (1024 * 1024)} MB chacun
           </p>
           <Input
             type="file"
             multiple
-            accept=".xlsx,.xls"
+            accept={acceptedExtensionsAttribute()}
             onChange={(e) => handleFiles(e.target.files)}
             className="hidden"
             id="file-input"

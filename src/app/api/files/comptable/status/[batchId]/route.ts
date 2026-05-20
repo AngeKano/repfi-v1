@@ -34,6 +34,7 @@ export async function GET(
             fileType: true,
             status: true,
             processingStatus: true,
+            errorMessage: true,
           },
         },
       },
@@ -59,6 +60,12 @@ export async function GET(
     ).length;
     const progress = totalFiles > 0 ? (processedFiles / totalFiles) * 100 : 0;
 
+    // Message d'erreur consolidé : on prend le premier non-null parmi les
+    // ComptableFile du batch (le DAG les renseigne tous identiquement via
+    // update_files_error_message).
+    const errorMessage =
+      period.files.find((f) => f.errorMessage)?.errorMessage ?? null;
+
     return NextResponse.json({
       periodId: period.id,
       batchId: period.batchId,
@@ -67,6 +74,11 @@ export async function GET(
       periodStart: period.periodStart.toISOString(),
       periodEnd: period.periodEnd.toISOString(),
       processedAt: period.processedAt?.toISOString(),
+      // Plan comptable détecté par le DAG : 'PCG' | 'SYSCOHADA' | 'UNKNOWN'
+      // (null tant que le DAG n'a pas traité le batch)
+      planSource: period.planSource ?? null,
+      // Détails de l'erreur si le DAG a échoué
+      errorMessage,
       files: period.files,
     });
   } catch (error) {
