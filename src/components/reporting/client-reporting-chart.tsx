@@ -1114,73 +1114,84 @@ export default function ClientReportingChart({
   );
 
   // Composant Evolution CA
-  const EvolutionCA = () => (
-    <Card>
-      <CardHeader className="flex flex-row items-start justify-between gap-4">
-        <div>
-          <CardTitle>Évolution du Chiffre d&apos;Affaires</CardTitle>
-          <CardDescription>
-            Comparaison {yearN} vs {yearN1} - par{" "}
-            {getXAxisLabel().toLowerCase()}
-          </CardDescription>
-        </div>
-        <ChartLegend
-          labelN={yearN}
-          labelN1={yearN1}
-          colorN="#2463eb"
-          colorN1="#81a5f3"
-          solid
-        />
-      </CardHeader>
-      <CardContent>
-        <ChartContainer config={chartConfigCA} className="h-[400px] w-full">
-          <BarChart
-            data={visibleChartData}
-            margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
-            barCategoryGap="20%"
-          >
-            <CartesianGrid strokeDasharray="3 3" vertical={false} />
-            <XAxis
-              dataKey="label"
-              tickLine={false}
-              axisLine={false}
-              fontSize={12}
-            />
-            <YAxis
-              tickLine={false}
-              axisLine={false}
-              tickFormatter={(value) => `${(value / 1000000).toFixed(0)}M`}
-              fontSize={12}
-            />
-            <ChartTooltip
-              content={
-                <ChartTooltipContent
-                  formatter={(value, name) => [
-                    formatCompactOnly(value as number),
-                    name === `CA ${yearN}` ? `CA ${yearN}` : `CA ${yearN1}`,
-                  ]}
-                />
-              }
-            />
-            <Bar
-              dataKey="chiffreAffairesN1"
-              name={`CA ${yearN1}`}
-              fill="hsl(221, 83%, 73%)"
-              barSize={24}
-              radius={[4, 4, 0, 0]}
-            />
-            <Bar
-              dataKey="chiffreAffaires"
-              name={`CA ${yearN}`}
-              fill="hsl(221, 83%, 53%)"
-              barSize={24}
-              radius={[4, 4, 0, 0]}
-            />
-          </BarChart>
-        </ChartContainer>
-      </CardContent>
-    </Card>
-  );
+  // Mode "Cumulé" (periodType === "ytd")  → CA cumulé depuis janvier (YTD)
+  // Mode "Périodique" (periodType === "year") → CA mensuel seul, non cumulé
+  const EvolutionCA = () => {
+    const isCumule = periodType === "ytd";
+    const caKeyN = isCumule ? "chiffreAffaires" : "chiffreAffairesPeriodique";
+    const caKeyN1 = isCumule
+      ? "chiffreAffairesN1"
+      : "chiffreAffairesPeriodiqueN1";
+    const modeLabel = isCumule ? "cumulé" : "périodique";
+
+    return (
+      <Card>
+        <CardHeader className="flex flex-row items-start justify-between gap-4">
+          <div>
+            <CardTitle>Évolution du Chiffre d&apos;Affaires</CardTitle>
+            <CardDescription>
+              Comparaison {yearN} vs {yearN1} ({modeLabel}) — par{" "}
+              {getXAxisLabel().toLowerCase()}
+            </CardDescription>
+          </div>
+          <ChartLegend
+            labelN={yearN}
+            labelN1={yearN1}
+            colorN="#2463eb"
+            colorN1="#81a5f3"
+            solid
+          />
+        </CardHeader>
+        <CardContent>
+          <ChartContainer config={chartConfigCA} className="h-[400px] w-full">
+            <BarChart
+              data={visibleChartData}
+              margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
+              barCategoryGap="20%"
+            >
+              <CartesianGrid strokeDasharray="3 3" vertical={false} />
+              <XAxis
+                dataKey="label"
+                tickLine={false}
+                axisLine={false}
+                fontSize={12}
+              />
+              <YAxis
+                tickLine={false}
+                axisLine={false}
+                tickFormatter={(value) => `${(value / 1000000).toFixed(0)}M`}
+                fontSize={12}
+              />
+              <ChartTooltip
+                content={
+                  <ChartTooltipContent
+                    formatter={(value, name) => [
+                      formatCompactOnly(value as number),
+                      name === `CA ${yearN}` ? `CA ${yearN}` : `CA ${yearN1}`,
+                    ]}
+                  />
+                }
+              />
+              <Bar
+                dataKey={caKeyN1}
+                name={`CA ${yearN1}`}
+                fill="hsl(221, 83%, 73%)"
+                barSize={24}
+                radius={[4, 4, 0, 0]}
+              />
+              <Bar
+                dataKey={caKeyN}
+                name={`CA ${yearN}`}
+                fill="hsl(221, 83%, 53%)"
+                barSize={24}
+                radius={[4, 4, 0, 0]}
+              />
+            </BarChart>
+          </ChartContainer>
+        </CardContent>
+      </Card>
+    );
+  };
 
   // Composant CA par Nature — Détail des comptes TC avec comparaison N vs N-1
   const CAParNature = () => {

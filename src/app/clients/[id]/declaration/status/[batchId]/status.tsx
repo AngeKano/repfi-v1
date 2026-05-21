@@ -45,6 +45,26 @@ const PROGRESS_RANGES = {
   FAILED: { min: 0, max: 0 },
 };
 
+// ============================================================
+// POLLING ADAPTATIF DU STATUT
+// ============================================================
+// Stratégie en 3 phases pour équilibrer réactivité et charge serveur :
+//   - Phase 1 (0 → 45 s)   : rythme par défaut (3 s)
+//   - Phase 2 (45 → 180 s) : rythme rapide (1 s) — typiquement la fenêtre où
+//                            les DAGs courts approchent de leur complétion
+//   - Phase 3 (180 s +)    : retour au rythme par défaut pour éviter de
+//                            hammer l'API si le traitement est anormalement long
+const POLL_DEFAULT_INTERVAL_MS = 3000;
+const POLL_FAST_INTERVAL_MS = 1000;
+const POLL_FAST_THRESHOLD_MS = 45_000;
+const POLL_FAST_WINDOW_END_MS = 180_000; // 45 s + 135 s de fenêtre rapide
+
+function getPollingInterval(elapsedMs: number): number {
+  if (elapsedMs < POLL_FAST_THRESHOLD_MS) return POLL_DEFAULT_INTERVAL_MS;
+  if (elapsedMs < POLL_FAST_WINDOW_END_MS) return POLL_FAST_INTERVAL_MS;
+  return POLL_DEFAULT_INTERVAL_MS;
+}
+
 export default function StatusComponents({
   params: asyncParams,
 }: {
@@ -192,6 +212,7 @@ export default function StatusComponents({
   useEffect(() => {
     if (!params) return;
     let shouldPoll = true;
+    const pollingStartTime = Date.now();
 
     const fetchStatus = async () => {
       try {
@@ -206,7 +227,11 @@ export default function StatusComponents({
           data.status === "VALIDATING" ||
           data.status === "PENDING"
         ) {
-          if (shouldPoll) setTimeout(fetchStatus, 3000);
+          if (shouldPoll) {
+            const elapsed = Date.now() - pollingStartTime;
+            const nextDelay = getPollingInterval(elapsed);
+            setTimeout(fetchStatus, nextDelay);
+          }
         }
       } catch (error) {
         console.error("Erreur:", error);
