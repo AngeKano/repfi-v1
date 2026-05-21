@@ -97,8 +97,12 @@ interface DataPoint {
   resultat: number;
   cumulativeBalance: number;
   nbTransactions: number;
+  // CA cumulé (YTD) — somme depuis janvier jusqu'au mois courant
   chiffreAffaires: number;
   chiffreAffairesN1: number;
+  // CA périodique — valeur du mois seul (sans cumul)
+  chiffreAffairesPeriodique: number;
+  chiffreAffairesPeriodiqueN1: number;
   soldeTresorerie: number;
   soldeTresorerieN1: number;
   margeCommerciale: number;
@@ -1201,9 +1205,11 @@ export async function GET(
         cumulativeCaTTCN1 += recouvrementN1Jour.caTTCTotal;
         cumulativeCaEncaisseN1 += recouvrementN1Jour.caEncaisseTTC;
 
-        // CA comptes 70*
-        cumulativeCA70N += ca70ParJourN.get(dayStr) || 0;
-        cumulativeCA70N1 += ca70ParJourN1.get(dayStr) || 0;
+        // CA comptes 70* — valeurs journalières (périodique) et cumulées
+        const ca70JourN = ca70ParJourN.get(dayStr) || 0;
+        const ca70JourN1 = ca70ParJourN1.get(dayStr) || 0;
+        cumulativeCA70N += ca70JourN;
+        cumulativeCA70N1 += ca70JourN1;
 
         const tauxRecouvrementN =
           cumulativeCaTTCN !== 0
@@ -1225,6 +1231,8 @@ export async function GET(
           nbTransactions: fluxN.nbTransactions,
           chiffreAffaires: cumulativeCA70N,
           chiffreAffairesN1: cumulativeCA70N1,
+          chiffreAffairesPeriodique: ca70JourN,
+          chiffreAffairesPeriodiqueN1: ca70JourN1,
           soldeTresorerie: cumulativeTresoN,
           soldeTresorerieN1: cumulativeTresoN1,
           margeCommerciale: sigN.XA,
@@ -1422,9 +1430,11 @@ export async function GET(
       cumulativeCaTTCN1 += recouvrementN1Mois.caTTCTotal;
       cumulativeCaEncaisseN1 += recouvrementN1Mois.caEncaisseTTC;
 
-      // CA comptes 70*
-      cumulativeCA70N += ca70ParMoisN.get(monthStr) || 0;
-      cumulativeCA70N1 += ca70ParMoisN1.get(monthStr) || 0;
+      // CA comptes 70* — valeurs mensuelles (périodique) et cumulées (YTD)
+      const ca70MoisN = ca70ParMoisN.get(monthStr) || 0;
+      const ca70MoisN1 = ca70ParMoisN1.get(monthStr) || 0;
+      cumulativeCA70N += ca70MoisN;
+      cumulativeCA70N1 += ca70MoisN1;
 
       const tauxRecouvrementN =
         cumulativeCaTTCN !== 0
@@ -1444,8 +1454,12 @@ export async function GET(
         resultat,
         cumulativeBalance,
         nbTransactions: fluxN.nbTransactions,
+        // CA cumulé YTD (compat existante)
         chiffreAffaires: cumulativeCA70N,
         chiffreAffairesN1: cumulativeCA70N1,
+        // CA périodique (valeur du mois seul) — utilisé par le mode Périodique
+        chiffreAffairesPeriodique: ca70MoisN,
+        chiffreAffairesPeriodiqueN1: ca70MoisN1,
         soldeTresorerie: cumulativeTresorerieN,
         soldeTresorerieN1: cumulativeTresorerieN1,
         margeCommerciale: sigN.XA,
