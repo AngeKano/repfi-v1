@@ -422,10 +422,10 @@ async function recupererTresorerieParJour(
 }
 
 // ============================================================================
-// RECOUVREMENT - Comptes clients (41*)
-// CA TTC Total = Somme des montants au débit des comptes 41*
-// CA Encaissé TTC = Somme des montants au crédit des comptes 41*
-// Taux de recouvrement = (CA Encaissé TTC / CA TTC Total) * 100
+// RECOUVREMENT - Comptes clients (41*, hors 418 et 419)
+// Créances Clients TTC = Somme des montants au débit des comptes 41* (hors 418/419)
+// Encaissements Clients TTC = Somme des montants au crédit des comptes 41* (hors 418/419)
+// Taux de recouvrement = (Encaissements Clients TTC / Créances Clients TTC) * 100
 // ============================================================================
 
 async function recupererRecouvrementParMois(
@@ -442,8 +442,8 @@ async function recupererRecouvrementParMois(
     query: `
       SELECT
         substring(date_transaction, 4, 2) as period,
-        sum(CASE WHEN startsWith(compte, '41') THEN debit ELSE 0 END) as ca_ttc_total,
-        sum(CASE WHEN startsWith(compte, '41') THEN credit ELSE 0 END) as ca_encaisse_ttc
+        sum(CASE WHEN startsWith(compte, '41') AND NOT startsWith(compte, '418') AND NOT startsWith(compte, '419') THEN debit ELSE 0 END) as ca_ttc_total,
+        sum(CASE WHEN startsWith(compte, '41') AND NOT startsWith(compte, '418') AND NOT startsWith(compte, '419') THEN credit ELSE 0 END) as ca_encaisse_ttc
       FROM ${dbName}.grand_livre
       WHERE batch_id IN ({batchIds:Array(String)})
       GROUP BY period
@@ -484,8 +484,8 @@ async function recupererRecouvrementParJour(
     query: `
       SELECT
         substring(date_transaction, 1, 2) as period,
-        sum(CASE WHEN startsWith(compte, '41') THEN debit ELSE 0 END) as ca_ttc_total,
-        sum(CASE WHEN startsWith(compte, '41') THEN credit ELSE 0 END) as ca_encaisse_ttc
+        sum(CASE WHEN startsWith(compte, '41') AND NOT startsWith(compte, '418') AND NOT startsWith(compte, '419') THEN debit ELSE 0 END) as ca_ttc_total,
+        sum(CASE WHEN startsWith(compte, '41') AND NOT startsWith(compte, '418') AND NOT startsWith(compte, '419') THEN credit ELSE 0 END) as ca_encaisse_ttc
       FROM ${dbName}.grand_livre
       WHERE batch_id IN ({batchIds:Array(String)})
         AND substring(date_transaction, 4, 2) = {monthFilter:String}
@@ -728,6 +728,8 @@ async function recupererTop10Clients(
         FROM ${dbName}.grand_livre
         WHERE batch_id IN ({batchIds:Array(String)})
           AND startsWith(compte, '41')
+          AND NOT startsWith(compte, '418')
+          AND NOT startsWith(compte, '419')
           AND n_tiers != ''
           ${periodFilter}
         GROUP BY n_tiers, intitule_tiers
@@ -745,6 +747,8 @@ async function recupererTop10Clients(
         FROM ${dbName}.grand_livre
         WHERE batch_id IN ({batchIds:Array(String)})
           AND startsWith(compte, '41')
+          AND NOT startsWith(compte, '418')
+          AND NOT startsWith(compte, '419')
           ${periodFilter}
       `,
       query_params: queryParams,
