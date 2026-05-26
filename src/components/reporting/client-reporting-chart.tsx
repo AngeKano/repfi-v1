@@ -464,6 +464,11 @@ export default function ClientReportingChart({
     initialPeriodType || "year",
   );
   const [selectedMonth, setSelectedMonth] = useState<string>("12");
+  // Granularité applicable en mode cumulé : "mois" = cumul Jan → mois sélectionné,
+  // "annee" = cumul Jan → Décembre (selectedMonth forcé à 12, month picker masqué)
+  const [cumulGranularity, setCumulGranularity] = useState<"mois" | "annee">(
+    "mois",
+  );
   const [hiddenPeriods, setHiddenPeriods] = useState<Set<string>>(new Set());
   const [tunnelMetrics, setTunnelMetrics] = useState<TunnelMetric[]>(
     INITIAL_TUNNEL_METRICS,
@@ -588,6 +593,14 @@ export default function ClientReportingChart({
   const [recouvrementYear, setRecouvrementYear] = useState<string>(() => {
     return new Date().getFullYear().toString();
   });
+  // Mode + granularité du filtre période appliqué au Top 10 Créances.
+  // Le graphe Évolution du Taux de Recouvrement reste toujours cumulé.
+  const [recouvrementMode, setRecouvrementMode] = useState<
+    "periodique" | "cumule"
+  >("cumule");
+  const [recouvrementGranularity, setRecouvrementGranularity] = useState<
+    "mois" | "annee"
+  >("mois");
   const [recouvrementLoading, setRecouvrementLoading] = useState(false);
 
   // Générer la liste des années disponibles (5 ans en arrière, 2 ans en avant)
@@ -604,12 +617,20 @@ export default function ClientReportingChart({
     fetchData();
   }, [clientId, year, periodType, selectedMonth]);
 
-  // Charger les données de recouvrement quand l'onglet est actif ou quand le mois/année change
+  // Charger les données de recouvrement quand l'onglet est actif ou quand le mois/année/mode/granularité change
   useEffect(() => {
     if (activeTab === "recouvrement") {
       fetchRecouvrementData();
     }
-  }, [clientId, activeTab, recouvrementMonth, recouvrementYear]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    clientId,
+    activeTab,
+    recouvrementMonth,
+    recouvrementYear,
+    recouvrementMode,
+    recouvrementGranularity,
+  ]);
 
   const fetchData = async () => {
     setLoading(true);
@@ -646,8 +667,29 @@ export default function ClientReportingChart({
   const fetchRecouvrementData = async () => {
     setRecouvrementLoading(true);
     try {
-      const endPeriod = `${recouvrementYear}-${recouvrementMonth}`;
-      const url = `/api/clients/${clientId}/reporting/recouvrement?endPeriod=${endPeriod}`;
+      // Calcul de la fenêtre (startPeriod → endPeriod) appliquée au Top 10
+      // Créances selon le mode et la granularité choisis :
+      //   cumulé   + mois   → Jan → mois sélectionné
+      //   cumulé   + année  → Jan → Décembre
+      //   périodique + mois → mois sélectionné uniquement
+      //   périodique + année → Jan → Décembre (sur l'année entière)
+      let startMonth: string;
+      let endMonth: string;
+      if (recouvrementMode === "cumule") {
+        startMonth = "01";
+        endMonth = recouvrementGranularity === "annee" ? "12" : recouvrementMonth;
+      } else {
+        if (recouvrementGranularity === "annee") {
+          startMonth = "01";
+          endMonth = "12";
+        } else {
+          startMonth = recouvrementMonth;
+          endMonth = recouvrementMonth;
+        }
+      }
+      const startPeriod = `${recouvrementYear}-${startMonth}`;
+      const endPeriod = `${recouvrementYear}-${endMonth}`;
+      const url = `/api/clients/${clientId}/reporting/recouvrement?endPeriod=${endPeriod}&startPeriod=${startPeriod}`;
       const res = await fetch(url);
       if (!res.ok) throw new Error("Erreur API Recouvrement");
       const json = await res.json();
@@ -1354,14 +1396,16 @@ export default function ClientReportingChart({
     );
   };
 
-  // Composant Evolution Trésorerie
+  // Composant Evolution Trésorerie - toujours en cumulé, quel que soit le mode
+  // choisi par l'utilisateur (périodique ou cumulé). La granularité (mois/jour)
+  // est respectée via periodType.
   const EvolutionTresorerie = () => (
     <Card>
       <CardHeader className="flex flex-row items-start justify-between gap-4">
         <div>
           <CardTitle>Évolution de la Trésorerie</CardTitle>
           <CardDescription>
-            Solde cumulé {yearN} vs {yearN1} - par{" "}
+            Solde toujours cumulé — {yearN} vs {yearN1} - par{" "}
             {getXAxisLabel().toLowerCase()}
           </CardDescription>
         </div>
@@ -1921,7 +1965,7 @@ export default function ClientReportingChart({
               <Card>
                 <CardHeader className="pb-2">
                   <CardDescription className="text-sm font-medium">
-                    CA TTC Total (Débit 41*)
+                    Créances Clients TTC (Débit 41*)
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="pt-0">
@@ -1949,7 +1993,7 @@ export default function ClientReportingChart({
               <Card>
                 <CardHeader className="pb-2">
                   <CardDescription className="text-sm font-medium">
-                    CA Encaissé TTC (Crédit 41*)
+                    Encaissements Clients TTC (Crédit 41*)
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="pt-0">
@@ -1983,12 +2027,12 @@ export default function ClientReportingChart({
                 <div>
                   <CardTitle>Évolution du Taux de Recouvrement</CardTitle>
                   <CardDescription>
-                    Janvier → mois sélectionné — (CA Encaissé TTC / CA TTC Total) × 100
+                    Janvier → mois sélectionné — (Encaissements Clients TTC / Créances Clients TTC) × 100
                   </CardDescription>
                 </div>
                 <ChartLegend
-                  labelN="Taux périodique"
-                  labelN1="Taux mensuel"
+                  labelN="Taux cumulé"
+                  labelN1="Taux périodique"
                   colorN="hsl(262, 83%, 58%)"
                   colorN1="hsl(262, 83%, 78%)"
                 />
@@ -1997,11 +2041,11 @@ export default function ClientReportingChart({
                 <ChartContainer
                   config={{
                     tauxRecouvrementCumule: {
-                      label: "Taux périodique",
+                      label: "Taux cumulé",
                       color: "hsl(262, 83%, 58%)",
                     },
                     tauxRecouvrement: {
-                      label: "Taux mensuel",
+                      label: "Taux périodique",
                       color: "hsl(262, 83%, 78%)",
                     },
                   }}
@@ -2033,9 +2077,9 @@ export default function ClientReportingChart({
                         <ChartTooltipContent
                           formatter={(value, name) => [
                             `${(value as number).toFixed(1)}%`,
-                            name === "Taux périodique"
-                              ? "Taux périodique"
-                              : "Taux mensuel",
+                            name === "Taux cumulé"
+                              ? "Taux cumulé"
+                              : "Taux périodique",
                           ]}
                         />
                       }
@@ -2043,7 +2087,7 @@ export default function ClientReportingChart({
                     <Line
                       type="monotone"
                       dataKey="tauxRecouvrementCumule"
-                      name="Taux périodique"
+                      name="Taux cumulé"
                       stroke="hsl(262, 83%, 58%)"
                       strokeWidth={2}
                       dot={{ r: 4 }}
@@ -2051,7 +2095,7 @@ export default function ClientReportingChart({
                     <Line
                       type="monotone"
                       dataKey="tauxRecouvrement"
-                      name="Taux mensuel"
+                      name="Taux périodique"
                       stroke="hsl(262, 83%, 78%)"
                       strokeWidth={2}
                       dot={{ r: 3 }}
@@ -2062,18 +2106,18 @@ export default function ClientReportingChart({
               </CardContent>
             </Card>
 
-            {/* Graphique CA TTC vs CA Encaissé */}
+            {/* Graphique Créances Clients TTC vs Encaissements Clients TTC */}
             <Card>
               <CardHeader className="flex flex-row items-start justify-between gap-4">
                 <div>
-                  <CardTitle>CA TTC Total vs CA Encaissé TTC</CardTitle>
+                  <CardTitle>Créances Clients TTC vs Encaissements Clients TTC</CardTitle>
                   <CardDescription>
                     Comparaison mensuelle des montants
                   </CardDescription>
                 </div>
                 <ChartLegend
-                  labelN="CA TTC Total"
-                  labelN1="CA Encaissé"
+                  labelN="Créances Clients TTC"
+                  labelN1="Encaissements Clients TTC"
                   colorN="hsl(221, 83%, 53%)"
                   colorN1="hsl(142, 76%, 36%)"
                   solid
@@ -2083,11 +2127,11 @@ export default function ClientReportingChart({
                 <ChartContainer
                   config={{
                     caTTCTotal: {
-                      label: "CA TTC Total",
+                      label: "Créances Clients TTC",
                       color: "hsl(221, 83%, 53%)",
                     },
                     caEncaisseTTC: {
-                      label: "CA Encaissé",
+                      label: "Encaissements Clients TTC",
                       color: "hsl(142, 76%, 36%)",
                     },
                   }}
@@ -2120,23 +2164,23 @@ export default function ClientReportingChart({
                         <ChartTooltipContent
                           formatter={(value, name) => [
                             formatCompactOnly(value as number),
-                            name === "CA TTC Total"
-                              ? "CA TTC Total"
-                              : "CA Encaissé",
+                            name === "Créances Clients TTC"
+                              ? "Créances Clients TTC"
+                              : "Encaissements Clients TTC",
                           ]}
                         />
                       }
                     />
                     <Bar
                       dataKey="caTTCTotal"
-                      name="CA TTC Total"
+                      name="Créances Clients TTC"
                       fill="hsl(221, 83%, 53%)"
                       barSize={24}
                       radius={[4, 4, 0, 0]}
                     />
                     <Bar
                       dataKey="caEncaisseTTC"
-                      name="CA Encaissé"
+                      name="Encaissements Clients TTC"
                       fill="hsl(142, 76%, 36%)"
                       barSize={24}
                       radius={[4, 4, 0, 0]}
@@ -2154,8 +2198,8 @@ export default function ClientReportingChart({
                   <div>
                     <CardTitle>Analyse des Créances - Top 10</CardTitle>
                     <CardDescription>
-                      Clients avec les créances les plus élevées (Solde = CA TTC
-                      Total - CA Encaissé TTC)
+                      Clients avec les créances les plus élevées (Solde =
+                      Créances Clients TTC - Encaissements Clients TTC)
                     </CardDescription>
                   </div>
                 </div>
@@ -2219,11 +2263,11 @@ export default function ClientReportingChart({
                                 return [
                                   <div key="tooltip" className="space-y-1">
                                     <div className="grid grid-cols-2 gap-x-4 gap-y-1 mt-2 text-xs">
-                                      <span>CA TTC Total:</span>
+                                      <span>Créances Clients TTC:</span>
                                       <span className="font-medium">
                                         {formatCompactOnly(item.caTTCTotal)}
                                       </span>
-                                      <span>CA Encaissé:</span>
+                                      <span>Encaissements Clients TTC:</span>
                                       <span className="font-medium">
                                         {formatCompactOnly(item.caEncaisseTTC)}
                                       </span>
@@ -2261,9 +2305,9 @@ export default function ClientReportingChart({
                         <div className="col-span-1">#</div>
                         <div className="col-span-4">Entreprise</div>
                         <div className="col-span-2 text-right">
-                          CA TTC Total
+                          Créances Clients TTC
                         </div>
-                        <div className="col-span-2 text-right">CA Encaissé</div>
+                        <div className="col-span-2 text-right">Encaissements Clients TTC</div>
                         <div className="col-span-2 text-right">Solde</div>
                         <div className="col-span-1 text-right">%</div>
                       </div>
@@ -2458,7 +2502,7 @@ export default function ClientReportingChart({
                     </button>
                   </div>
                 </div>
-                {periodType !== "ytd" && (
+                {periodType !== "ytd" ? (
                   <div className="flex items-center gap-2 border border-[#D0E3F5] rounded-lg px-4 h-10">
                     <span className="text-xs text-[#335890]">
                       Granularité :
@@ -2478,8 +2522,31 @@ export default function ClientReportingChart({
                       </SelectContent>
                     </Select>
                   </div>
+                ) : (
+                  <div className="flex items-center gap-2 border border-[#D0E3F5] rounded-lg px-4 h-10">
+                    <span className="text-xs text-[#335890]">
+                      Granularité :
+                    </span>
+                    <Select
+                      value={cumulGranularity}
+                      onValueChange={(v: string) => {
+                        const g = v as "mois" | "annee";
+                        setCumulGranularity(g);
+                        if (g === "annee") setSelectedMonth("12");
+                      }}
+                    >
+                      <SelectTrigger className="border-0 p-0 h-auto shadow-none min-w-[80px] font-semibold text-[#00122E]">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="mois">Mois</SelectItem>
+                        <SelectItem value="annee">Année</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
                 )}
-                {(periodType === "ytd" || periodType === "month") && (
+                {((periodType === "ytd" && cumulGranularity === "mois") ||
+                  periodType === "month") && (
                   <div className="flex items-center gap-2 border border-[#D0E3F5] rounded-lg px-4 h-10">
                     <span className="text-xs text-[#335890]">Mois :</span>
                     <Select
@@ -2507,11 +2574,42 @@ export default function ClientReportingChart({
               </>
             ) : (
               <>
+                {/* Mode calcul (appliqué au Top 10 Créances uniquement ; le
+                    graphe Évolution du Taux de Recouvrement reste toujours
+                    en cumulé) */}
                 <div className="flex items-center gap-2 border border-[#D0E3F5] rounded-lg px-4 h-10">
                   <span className="text-xs text-[#335890]">Mode calcul :</span>
-                  <span className="font-semibold text-[#00122E]">
-                    Périodique
-                  </span>
+                  <Select
+                    value={recouvrementMode}
+                    onValueChange={(v: string) =>
+                      setRecouvrementMode(v as "periodique" | "cumule")
+                    }
+                  >
+                    <SelectTrigger className="border-0 p-0 h-auto shadow-none min-w-[90px] font-semibold text-[#00122E]">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="periodique">Périodique</SelectItem>
+                      <SelectItem value="cumule">Cumulé</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex items-center gap-2 border border-[#D0E3F5] rounded-lg px-4 h-10">
+                  <span className="text-xs text-[#335890]">Granularité :</span>
+                  <Select
+                    value={recouvrementGranularity}
+                    onValueChange={(v: string) =>
+                      setRecouvrementGranularity(v as "mois" | "annee")
+                    }
+                  >
+                    <SelectTrigger className="border-0 p-0 h-auto shadow-none min-w-[80px] font-semibold text-[#00122E]">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="mois">Mois</SelectItem>
+                      <SelectItem value="annee">Année</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div className="flex items-center gap-2 border border-[#D0E3F5] rounded-lg px-4 h-10">
                   <span className="text-xs text-[#335890]">Année :</span>
@@ -2531,31 +2629,42 @@ export default function ClientReportingChart({
                     </SelectContent>
                   </Select>
                 </div>
-                <div className="flex items-center gap-2 border border-[#D0E3F5] rounded-lg px-4 h-10">
-                  <span className="text-xs text-[#335890]">Mois :</span>
-                  <Select
-                    value={recouvrementMonth}
-                    onValueChange={setRecouvrementMonth}
-                  >
-                    <SelectTrigger className="border-0 p-0 h-auto shadow-none min-w-[80px] font-semibold text-[#00122E]">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {MONTHS.map((month) => (
-                        <SelectItem key={month.value} value={month.value}>
-                          {month.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+                {recouvrementGranularity === "mois" && (
+                  <div className="flex items-center gap-2 border border-[#D0E3F5] rounded-lg px-4 h-10">
+                    <span className="text-xs text-[#335890]">Mois :</span>
+                    <Select
+                      value={recouvrementMonth}
+                      onValueChange={setRecouvrementMonth}
+                    >
+                      <SelectTrigger className="border-0 p-0 h-auto shadow-none min-w-[80px] font-semibold text-[#00122E]">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {MONTHS.map((month) => (
+                          <SelectItem key={month.value} value={month.value}>
+                            {month.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
                 {/* Period indicator */}
                 <div className="flex items-center gap-2 bg-[#F5F9FF] rounded-lg px-4 h-10 text-xs text-[#335890]">
                   <CalendarRange className="w-3.5 h-3.5 text-[#0077C3]" />
                   <span>
-                    Janvier -{" "}
-                    {MONTHS.find((m) => m.value === recouvrementMonth)?.label}{" "}
-                    {recouvrementYear}
+                    {(() => {
+                      const monthLabel = MONTHS.find(
+                        (m) => m.value === recouvrementMonth,
+                      )?.label;
+                      if (recouvrementGranularity === "annee") {
+                        return `Janvier - Décembre ${recouvrementYear}`;
+                      }
+                      if (recouvrementMode === "cumule") {
+                        return `Janvier - ${monthLabel} ${recouvrementYear}`;
+                      }
+                      return `${monthLabel} ${recouvrementYear}`;
+                    })()}
                   </span>
                 </div>
               </>
