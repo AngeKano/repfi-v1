@@ -106,6 +106,20 @@ export default function ClientDetailsClient({
     return undefined;
   })();
 
+  // ===== Filtres reporting partagés entre Synthèse / Chiffres / Résultats /
+  // Dettes. Recouvrement conserve ses propres filtres en interne car son
+  // comportement diffère (toujours cumulé sur le graphe principal). =====
+  const [year, setYear] = useState<string>(
+    new Date().getFullYear().toString(),
+  );
+  const [periodType, setPeriodType] = useState<"year" | "month" | "ytd">(
+    initialPeriodType || "year",
+  );
+  const [selectedMonth, setSelectedMonth] = useState<string>("12");
+  const [cumulGranularity, setCumulGranularity] = useState<"mois" | "annee">(
+    "mois",
+  );
+
   // Les paramètres de reporting ne sont demandés qu'une seule fois par client.
   // Si l'URL contient déjà un filtre, ou si on a mémorisé un choix précédent,
   // on ne redemande pas. Sinon (et seulement si un reporting existe),
@@ -184,8 +198,10 @@ export default function ClientDetailsClient({
           <nav className="space-y-1">
             {CLIENT_TABS.map((tab, idx) => {
               const active = activeTab === tab.id;
-              // Separator before "Membres" (index 4)
-              const showSeparator = idx === 4;
+              // Separator before "Membres" (index 5) — Dettes (idx=4) reste
+              // groupé avec les onglets reporting (Synthèse, Chiffres,
+              // Résultats, Recouvrement).
+              const showSeparator = idx === 5;
               const permanentlyDisabled = DISABLED_TAB_IDS.has(tab.id);
               const disabled =
                 permanentlyDisabled ||
@@ -369,16 +385,34 @@ export default function ClientDetailsClient({
                   <ClientReportingChart
                     clientId={client.id}
                     activeTab={internalTab}
-                    initialPeriodType={initialPeriodType}
                     hideNav
+                    year={year}
+                    setYear={setYear}
+                    periodType={periodType}
+                    setPeriodType={setPeriodType}
+                    selectedMonth={selectedMonth}
+                    setSelectedMonth={setSelectedMonth}
+                    cumulGranularity={cumulGranularity}
+                    setCumulGranularity={setCumulGranularity}
                   />
                 );
               })()}
 
-              {/* Dettes — composant dédié */}
+              {/* Dettes — composant dédié, partage les mêmes filtres que les
+                  autres onglets reporting via les props ci-dessous. */}
               {activeTab === "dettes" &&
                 (hasReporting ? (
-                  <ClientDettesTab clientId={client.id} />
+                  <ClientDettesTab
+                    clientId={client.id}
+                    year={year}
+                    setYear={setYear}
+                    periodType={periodType}
+                    setPeriodType={setPeriodType}
+                    selectedMonth={selectedMonth}
+                    setSelectedMonth={setSelectedMonth}
+                    cumulGranularity={cumulGranularity}
+                    setCumulGranularity={setCumulGranularity}
+                  />
                 ) : (
                   <Card className="p-12 border-[#D0E3F5] text-center">
                     <div className="mx-auto w-14 h-14 rounded-full bg-[#EBF5FF] flex items-center justify-center mb-4">

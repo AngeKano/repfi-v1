@@ -442,8 +442,15 @@ export default function ClientReportingChart({
   clientId,
   initialTab,
   activeTab: activeTabProp,
-  initialPeriodType,
   hideNav = false,
+  year,
+  setYear,
+  periodType,
+  setPeriodType,
+  selectedMonth,
+  setSelectedMonth,
+  cumulGranularity,
+  setCumulGranularity,
 }: {
   clientId: string;
   initialTab?: TabId;
@@ -453,22 +460,21 @@ export default function ClientReportingChart({
    * rendu du contenu change. Si absent, l'onglet est géré localement.
    */
   activeTab?: TabId;
-  initialPeriodType?: PeriodType;
   hideNav?: boolean;
+  // Filtres reporting partagés (Synthèse / Chiffres / Résultats / Dettes).
+  // Recouvrement conserve ses propres états en interne.
+  year: string;
+  setYear: (y: string) => void;
+  periodType: PeriodType;
+  setPeriodType: (p: PeriodType) => void;
+  selectedMonth: string;
+  setSelectedMonth: (m: string) => void;
+  cumulGranularity: "mois" | "annee";
+  setCumulGranularity: (g: "mois" | "annee") => void;
 }) {
   const [data, setData] = useState<ReportingData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [year, setYear] = useState<string>(new Date().getFullYear().toString());
   const yearInitialized = useRef(false);
-  const [periodType, setPeriodType] = useState<PeriodType>(
-    initialPeriodType || "year",
-  );
-  const [selectedMonth, setSelectedMonth] = useState<string>("12");
-  // Granularité applicable en mode cumulé : "mois" = cumul Jan → mois sélectionné,
-  // "annee" = cumul Jan → Décembre (selectedMonth forcé à 12, month picker masqué)
-  const [cumulGranularity, setCumulGranularity] = useState<"mois" | "annee">(
-    "mois",
-  );
   const [hiddenPeriods, setHiddenPeriods] = useState<Set<string>>(new Set());
   const [tunnelMetrics, setTunnelMetrics] = useState<TunnelMetric[]>(
     INITIAL_TUNNEL_METRICS,
