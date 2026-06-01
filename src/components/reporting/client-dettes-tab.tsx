@@ -31,7 +31,15 @@ import {
   YAxis,
   CartesianGrid,
 } from "recharts";
-import { Loader2, Eye, EyeOffIcon, AlertTriangle } from "lucide-react";
+import {
+  Loader2,
+  Eye,
+  EyeOffIcon,
+  AlertTriangle,
+  ChevronLeft,
+  ChevronRight,
+  CalendarRange,
+} from "lucide-react";
 import {
   PiCoinsDuotone,
   PiMoneyWavyDuotone,
@@ -224,19 +232,48 @@ const MONTHS = [
   { value: "12", label: "Décembre" },
 ];
 
+type PeriodType = "year" | "month" | "ytd";
+
 interface ClientDettesTabProps {
   clientId: string;
+  // Filtres partagés avec les autres onglets reporting
+  // (Synthèse / Chiffres / Résultats). Le composant ne possède plus ses
+  // propres `year`/`month`/`mode`/`granularite` : ils sont fournis par le
+  // parent.
+  year: string;
+  setYear: (y: string) => void;
+  periodType: PeriodType;
+  setPeriodType: (p: PeriodType) => void;
+  selectedMonth: string;
+  setSelectedMonth: (m: string) => void;
+  cumulGranularity: "mois" | "annee";
+  setCumulGranularity: (g: "mois" | "annee") => void;
 }
 
-export default function ClientDettesTab({ clientId }: ClientDettesTabProps) {
+export default function ClientDettesTab({
+  clientId,
+  year,
+  setYear,
+  periodType,
+  setPeriodType,
+  selectedMonth,
+  setSelectedMonth,
+  cumulGranularity,
+  setCumulGranularity,
+}: ClientDettesTabProps) {
   const [data, setData] = useState<DetteData | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const [year, setYear] = useState<string>(new Date().getFullYear().toString());
-  const [month, setMonth] = useState<string>("12");
-  // Mode de calcul : cumulé / périodique + granularité mensuelle / journalière.
-  const [mode, setMode] = useState<"cumule" | "periodique">("cumule");
-  const [granularite, setGranularite] = useState<"mois" | "jour">("mois");
+  // Mode/granularité dérivés des filtres partagés :
+  //   mode = "cumule" quand periodType === "ytd", sinon "periodique"
+  //   API granularity :
+  //     - periodType === "month"            → "day"  (jour par jour intra-mois)
+  //     - periodType === "ytd"  + "mois"    → "month"
+  //     - periodType === "ytd"  + "annee"   → "month" sur Jan→Déc
+  //     - periodType === "year"             → "month"
+  const mode: "cumule" | "periodique" =
+    periodType === "ytd" ? "cumule" : "periodique";
+  const month = selectedMonth;
 
   // Config KPIs (séparée de la synthèse)
   const [kpiItems, setKpiItems] = useState<DetteKpiItem[]>(() =>
@@ -256,17 +293,32 @@ export default function ClientDettesTab({ clientId }: ClientDettesTabProps) {
     const fetchDettes = async () => {
       setLoading(true);
       try {
+        // Calcul de la fenêtre (startPeriod → endPeriod) + granularité API
+        // selon les filtres partagés (periodType + cumulGranularity + month) :
+        //
+        //   periodType = "month"             → un seul mois, granularité jour
+        //   periodType = "year" (périodique) → Jan → Déc, granularité mois
+        //   periodType = "ytd"  + "mois"     → Jan → mois sélectionné, mois
+        //   periodType = "ytd"  + "annee"    → Jan → Déc, granularité mois
         let startMonth: string;
         let endMonth: string;
         let granularity: "month" | "day";
-        if (granularite === "jour") {
-          // Cumul journalier intra-mois : un seul mois, abscisse = jours.
+        if (periodType === "month") {
           startMonth = month;
           endMonth = month;
           granularity = "day";
+        } else if (periodType === "year") {
+          startMonth = "01";
+          endMonth = "12";
+          granularity = "month";
+        } else if (cumulGranularity === "annee") {
+          startMonth = "01";
+          endMonth = "12";
+          granularity = "month";
         } else {
+          // periodType === "ytd" && cumulGranularity === "mois"
+          startMonth = "01";
           endMonth = month;
-          startMonth = mode === "cumule" ? "01" : month;
           granularity = "month";
         }
         const startPeriod = `${year}-${startMonth}`;
@@ -284,7 +336,7 @@ export default function ClientDettesTab({ clientId }: ClientDettesTabProps) {
       }
     };
     fetchDettes();
-  }, [clientId, year, month, mode, granularite]);
+  }, [clientId, year, month, mode, periodType, cumulGranularity]);
 
   // ----- KPI config handlers -----
   const updateKpi = (items: DetteKpiItem[]) => {
@@ -312,6 +364,28 @@ export default function ClientDettesTab({ clientId }: ClientDettesTabProps) {
   const formatKpiValue = (item: DetteKpiItem, value: number) =>
     item.percent ? `${value.toFixed(1)}%` : formatCompactOnly(value);
 
+  // Label "période" affiché à droite de la barre de filtres, identique au
+  // comportement de ClientReportingChart.
+  const getPeriodLabel = (): string => {
+    if (periodType === "year") return `Janvier - Décembre ${year}`;
+    if (periodType === "ytd") {
+      const m = MONTHS.find((x) => x.value === month);
+      return `Janvier - ${m?.label || ""} ${year}`;
+    }
+    // periodType === "month"
+    const m = MONTHS.find((x) => x.value === month);
+    return `${m?.label || ""} ${year}`;
+  };
+
+  const handleYearChange = (direction: "prev" | "next") => {
+    const idx = yearOptions.indexOf(year);
+    if (direction === "prev" && idx < yearOptions.length - 1) {
+      setYear(yearOptions[idx + 1]);
+    } else if (direction === "next" && idx > 0) {
+      setYear(yearOptions[idx - 1]);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -330,33 +404,92 @@ export default function ClientDettesTab({ clientId }: ClientDettesTabProps) {
 
   return (
     <div className="space-y-6">
-      {/* Barre de filtres — Mode de calcul */}
-      <Card>
-        <CardContent className="flex flex-wrap items-end gap-4 py-4">
-          <div className="flex flex-col gap-1">
-            <span className="text-xs font-medium text-muted-foreground">
-              Année
-            </span>
-            <Select value={year} onValueChange={setYear}>
-              <SelectTrigger className="w-[110px] h-9">
+      {/* Barre de filtres globaux — strictement identique à celle des onglets
+          Synthèse / Chiffres / Résultats (l'état est partagé via le parent). */}
+      <div className="flex flex-wrap items-center gap-3 mb-6">
+        <div className="flex items-center gap-2 border border-[#D0E3F5] rounded-lg px-4 h-10">
+          <span className="text-xs text-[#335890]">Mode calcul :</span>
+          <Select
+            value={periodType === "ytd" ? "cumule" : "periodique"}
+            onValueChange={(v: string) =>
+              setPeriodType(v === "cumule" ? "ytd" : "year")
+            }
+          >
+            <SelectTrigger className="border-0 p-0 h-auto shadow-none min-w-[90px] font-semibold text-[#00122E]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="periodique">Périodique</SelectItem>
+              <SelectItem value="cumule">Cumulé</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="flex items-center gap-2 border border-[#D0E3F5] rounded-lg px-4 h-10">
+          <span className="text-xs text-[#335890]">Année :</span>
+          <span className="font-semibold text-[#00122E]">{year}</span>
+          <div className="flex gap-1 ml-1">
+            <button
+              title="Année précédente"
+              onClick={() => handleYearChange("prev")}
+              disabled={yearOptions.indexOf(year) >= yearOptions.length - 1}
+              className="text-[#94A3B8] hover:text-[#0077C3] disabled:opacity-30"
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+            <button
+              title="Année suivante"
+              onClick={() => handleYearChange("next")}
+              disabled={yearOptions.indexOf(year) <= 0}
+              className="text-[#94A3B8] hover:text-[#0077C3] disabled:opacity-30"
+            >
+              <ChevronRight className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+        {periodType !== "ytd" ? (
+          <div className="flex items-center gap-2 border border-[#D0E3F5] rounded-lg px-4 h-10">
+            <span className="text-xs text-[#335890]">Granularité :</span>
+            <Select
+              value={periodType === "month" ? "month" : "year"}
+              onValueChange={(v: string) => setPeriodType(v as PeriodType)}
+            >
+              <SelectTrigger className="border-0 p-0 h-auto shadow-none min-w-[80px] font-semibold text-[#00122E]">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {yearOptions.map((y) => (
-                  <SelectItem key={y} value={y}>
-                    {y}
-                  </SelectItem>
-                ))}
+                <SelectItem value="year">Année</SelectItem>
+                <SelectItem value="month">Mois</SelectItem>
               </SelectContent>
             </Select>
           </div>
-          <div className="flex flex-col gap-1">
-            <span className="text-xs font-medium text-muted-foreground">
-              Mois
-            </span>
-            <Select value={month} onValueChange={setMonth}>
-              <SelectTrigger className="w-[150px] h-9">
+        ) : (
+          <div className="flex items-center gap-2 border border-[#D0E3F5] rounded-lg px-4 h-10">
+            <span className="text-xs text-[#335890]">Granularité :</span>
+            <Select
+              value={cumulGranularity}
+              onValueChange={(v: string) => {
+                const g = v as "mois" | "annee";
+                setCumulGranularity(g);
+                if (g === "annee") setSelectedMonth("12");
+              }}
+            >
+              <SelectTrigger className="border-0 p-0 h-auto shadow-none min-w-[80px] font-semibold text-[#00122E]">
                 <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="mois">Mois</SelectItem>
+                <SelectItem value="annee">Année</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        )}
+        {((periodType === "ytd" && cumulGranularity === "mois") ||
+          periodType === "month") && (
+          <div className="flex items-center gap-2 border border-[#D0E3F5] rounded-lg px-4 h-10">
+            <span className="text-xs text-[#335890]">Mois :</span>
+            <Select value={selectedMonth} onValueChange={setSelectedMonth}>
+              <SelectTrigger className="border-0 p-0 h-auto shadow-none min-w-[80px] font-semibold text-[#00122E]">
+                <SelectValue placeholder="Mois" />
               </SelectTrigger>
               <SelectContent>
                 {MONTHS.map((m) => (
@@ -367,42 +500,12 @@ export default function ClientDettesTab({ clientId }: ClientDettesTabProps) {
               </SelectContent>
             </Select>
           </div>
-          <div className="flex flex-col gap-1">
-            <span className="text-xs font-medium text-muted-foreground">
-              Mode de calcul
-            </span>
-            <Select
-              value={mode}
-              onValueChange={(v) => setMode(v as "cumule" | "periodique")}
-            >
-              <SelectTrigger className="w-[150px] h-9">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="cumule">Cumulé</SelectItem>
-                <SelectItem value="periodique">Périodique</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="flex flex-col gap-1">
-            <span className="text-xs font-medium text-muted-foreground">
-              Granularité
-            </span>
-            <Select
-              value={granularite}
-              onValueChange={(v) => setGranularite(v as "mois" | "jour")}
-            >
-              <SelectTrigger className="w-[170px] h-9">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="mois">Mensuelle</SelectItem>
-                <SelectItem value="jour">Journalière (cumul)</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </CardContent>
-      </Card>
+        )}
+        <div className="flex items-center gap-2 bg-[#F5F9FF] rounded-lg px-4 h-10 text-xs text-[#335890]">
+          <CalendarRange className="w-3.5 h-3.5 text-[#0077C3]" />
+          <span>{getPeriodLabel()}</span>
+        </div>
+      </div>
 
       {/* KPIs configurables */}
       <div>
