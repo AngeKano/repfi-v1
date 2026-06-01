@@ -27,6 +27,7 @@ import {
   PiCoinsDuotone,
   PiChartDonutDuotone,
   PiHandCoinsDuotone,
+  PiScalesDuotone,
   PiUsersThreeDuotone,
   PiChartBarHorizontalDuotone,
   PiFilesDuotone,
@@ -35,6 +36,7 @@ import Link from "next/link";
 import FilesTabs from "./files-tabs";
 import DeclarationTabs from "./declaration/declaration-tabs";
 import ClientReportingChart from "@/components/reporting/client-reporting-chart";
+import ClientDettesTab from "@/components/reporting/client-dettes-tab";
 import { UploadFileDialog } from "./upload-file-dialog";
 import { ClientDetailsDialog } from "@/app/clients/client-details-dialog";
 import { DeleteClientDialog } from "@/app/clients/delete-client-dialog";
@@ -58,6 +60,7 @@ const CLIENT_TABS = [
   { id: "chiffres", label: "Chiffres d'affaires", icon: PiCoinsDuotone },
   { id: "resultats", label: "Résultats", icon: PiChartDonutDuotone },
   { id: "recouvrement", label: "Recouvrement", icon: PiHandCoinsDuotone },
+  { id: "dettes", label: "Dettes", icon: PiScalesDuotone },
   { id: "members", label: "Membres", icon: PiUsersThreeDuotone },
   {
     id: "declaration",
@@ -69,7 +72,12 @@ const CLIENT_TABS = [
 
 // Onglets de reporting financier qui dépendent de la présence d'au moins
 // un reporting. Ils sont grisés tant qu'aucun reporting n'existe.
-const REPORTING_TAB_IDS = new Set(["chiffres", "resultats", "recouvrement"]);
+const REPORTING_TAB_IDS = new Set([
+  "chiffres",
+  "resultats",
+  "recouvrement",
+  "dettes",
+]);
 
 // Onglets désactivés de manière permanente (fonctionnalité à venir).
 const DISABLED_TAB_IDS = new Set(["files"]);
@@ -366,6 +374,32 @@ export default function ClientDetailsClient({
                   />
                 );
               })()}
+
+              {/* Dettes — composant dédié */}
+              {activeTab === "dettes" &&
+                (hasReporting ? (
+                  <ClientDettesTab clientId={client.id} />
+                ) : (
+                  <Card className="p-12 border-[#D0E3F5] text-center">
+                    <div className="mx-auto w-14 h-14 rounded-full bg-[#EBF5FF] flex items-center justify-center mb-4">
+                      <Plus className="w-6 h-6 text-[#0077C3]" />
+                    </div>
+                    <h3 className="text-lg font-semibold text-[#00122E] mb-1">
+                      Aucun reporting financier
+                    </h3>
+                    <p className="text-sm text-[#335890] mb-6">
+                      Créez un premier reporting pour visualiser les dettes de ce
+                      client.
+                    </p>
+                    <Button
+                      onClick={() => setShowUploadDialog(true)}
+                      className="gap-2 bg-gradient-to-r from-[#0077C3] to-[#0095F4] hover:from-[#005992] hover:to-[#0077C3] rounded-full"
+                    >
+                      <Plus className="w-4 h-4" />
+                      Créer un reporting
+                    </Button>
+                  </Card>
+                ))}
 
               {/* Members */}
               {activeTab === "members" && (
