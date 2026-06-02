@@ -187,7 +187,9 @@ interface ReportingData {
   caParNature: CAParNatureItem[];
 }
 
-type PeriodType = "year" | "month" | "ytd";
+// "ytd-day" : mode Cumulé + Granularité Mois — vue journalière intra-mois
+// avec valeur initiale = cumul des mois Jan → selectedMonth-1 (baseline).
+type PeriodType = "year" | "month" | "ytd" | "ytd-day";
 type TabId = "synthese" | "chiffre-affaires" | "resultat" | "recouvrement";
 
 interface TunnelMetric {
@@ -642,7 +644,12 @@ export default function ClientReportingChart({
     setLoading(true);
     try {
       let url = `/api/clients/${clientId}/reporting?year=${year}&periodType=${periodType}`;
-      if ((periodType === "month" || periodType === "ytd") && selectedMonth) {
+      if (
+        (periodType === "month" ||
+          periodType === "ytd" ||
+          periodType === "ytd-day") &&
+        selectedMonth
+      ) {
         url += `&month=${selectedMonth}`;
       }
       const res = await fetch(url);
@@ -871,11 +878,22 @@ export default function ClientReportingChart({
       const month = MONTHS.find((m) => m.value === selectedMonth);
       return `Janvier - ${month?.label || ""} ${year}`;
     }
+    if (periodType === "ytd-day") {
+      // Cumulé + jour : la baseline va de Jan au mois précédent, puis on
+      // détaille jour par jour sur le mois sélectionné.
+      const month = MONTHS.find((m) => m.value === selectedMonth);
+      return `Janvier - ${month?.label || ""} ${year} (jour par jour)`;
+    }
+    if (periodType === "month") {
+      const month = MONTHS.find((m) => m.value === selectedMonth);
+      return `${month?.label || ""} ${year}`;
+    }
     return `Janvier - Décembre ${year}`;
   };
 
   const getXAxisLabel = (): string => {
-    return periodType === "month" ? "Jour" : "Mois";
+    // "month" et "ytd-day" sont tous deux à granularité journalière.
+    return periodType === "month" || periodType === "ytd-day" ? "Jour" : "Mois";
   };
 
   const VariationBadge = ({ value }: { value: number }) => {
@@ -2469,10 +2487,26 @@ export default function ClientReportingChart({
                 <div className="flex items-center gap-2 border border-[#D0E3F5] rounded-lg px-4 h-10">
                   <span className="text-xs text-[#335890]">Mode calcul :</span>
                   <Select
-                    value={periodType === "ytd" ? "cumule" : "periodique"}
-                    onValueChange={(v: string) =>
-                      setPeriodType(v === "cumule" ? "ytd" : "year")
+                    value={
+                      periodType === "ytd" || periodType === "ytd-day"
+                        ? "cumule"
+                        : "periodique"
                     }
+                    onValueChange={(v: string) => {
+                      // En cumulé : "mois" → ytd-day (jour avec baseline),
+                      //             "annee" → ytd (mensuel Jan→Déc).
+                      // En périodique : on conserve la granularité courante.
+                      if (v === "cumule") {
+                        setPeriodType(
+                          cumulGranularity === "annee" ? "ytd" : "ytd-day",
+                        );
+                        if (cumulGranularity === "annee") setSelectedMonth("12");
+                      } else {
+                        setPeriodType(
+                          cumulGranularity === "annee" ? "year" : "month",
+                        );
+                      }
+                    }}
                   >
                     <SelectTrigger className="border-0 p-0 h-auto shadow-none min-w-[90px] font-semibold text-[#00122E]">
                       <SelectValue />
@@ -2508,7 +2542,7 @@ export default function ClientReportingChart({
                     </button>
                   </div>
                 </div>
-                {periodType !== "ytd" ? (
+                {periodType !== "ytd" && periodType !== "ytd-day" ? (
                   <div className="flex items-center gap-2 border border-[#D0E3F5] rounded-lg px-4 h-10">
                     <span className="text-xs text-[#335890]">
                       Granularité :
@@ -2538,7 +2572,14 @@ export default function ClientReportingChart({
                       onValueChange={(v: string) => {
                         const g = v as "mois" | "annee";
                         setCumulGranularity(g);
-                        if (g === "annee") setSelectedMonth("12");
+                        // En cumulé : mois → "ytd-day" (vue journalière avec
+                        // baseline), annee → "ytd" (mensuel Jan→Déc).
+                        if (g === "annee") {
+                          setPeriodType("ytd");
+                          setSelectedMonth("12");
+                        } else {
+                          setPeriodType("ytd-day");
+                        }
                       }}
                     >
                       <SelectTrigger className="border-0 p-0 h-auto shadow-none min-w-[80px] font-semibold text-[#00122E]">
@@ -2551,8 +2592,7 @@ export default function ClientReportingChart({
                     </Select>
                   </div>
                 )}
-                {((periodType === "ytd" && cumulGranularity === "mois") ||
-                  periodType === "month") && (
+                {(periodType === "ytd-day" || periodType === "month") && (
                   <div className="flex items-center gap-2 border border-[#D0E3F5] rounded-lg px-4 h-10">
                     <span className="text-xs text-[#335890]">Mois :</span>
                     <Select
@@ -2580,22 +2620,19 @@ export default function ClientReportingChart({
               </>
             ) : (
               <>
-                {/* Mode calcul (appliqué au Top 10 Créances uniquement ; le
-                    graphe Évolution du Taux de Recouvrement reste toujours
-                    en cumulé) */}
-                <div className="flex items-center gap-2 border border-[#D0E3F5] rounded-lg px-4 h-10">
+                {/* Mode calcul verrouillé sur Cumulé : l'onglet Recouvrement
+                    ne supporte pas le mode périodique. Le sélecteur reste
+                    visible mais désactivé. */}
+                <div
+                  className="flex items-center gap-2 border border-[#D0E3F5] rounded-lg px-4 h-10 opacity-70"
+                  title="Le mode de calcul est toujours Cumulé pour le Recouvrement"
+                >
                   <span className="text-xs text-[#335890]">Mode calcul :</span>
-                  <Select
-                    value={recouvrementMode}
-                    onValueChange={(v: string) =>
-                      setRecouvrementMode(v as "periodique" | "cumule")
-                    }
-                  >
-                    <SelectTrigger className="border-0 p-0 h-auto shadow-none min-w-[90px] font-semibold text-[#00122E]">
+                  <Select value="cumule" disabled>
+                    <SelectTrigger className="border-0 p-0 h-auto shadow-none min-w-[90px] font-semibold text-[#00122E] cursor-not-allowed">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="periodique">Périodique</SelectItem>
                       <SelectItem value="cumule">Cumulé</SelectItem>
                     </SelectContent>
                   </Select>

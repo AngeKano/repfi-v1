@@ -538,7 +538,13 @@ async function recupererCAParNature(
   if (periodType === "month" && selectedMonth) {
     periodFilter = `AND substring(date_transaction, 4, 2) = {monthFilter:String}`;
     baseParams.monthFilter = selectedMonth;
-  } else if (periodType === "ytd" && selectedMonth) {
+  } else if (
+    (periodType === "ytd" || periodType === "ytd-day") &&
+    selectedMonth
+  ) {
+    // "ytd" et "ytd-day" partagent le même filtre Jan → selectedMonth pour
+    // les agrégats totaux (Top 10, CA par nature). La différence porte sur
+    // la granularité de la chart principale.
     periodFilter = `AND substring(date_transaction, 4, 2) <= {monthFilter:String}`;
     baseParams.monthFilter = selectedMonth;
   }
@@ -648,7 +654,11 @@ async function recupererTop10Clients(
   if (periodType === "month" && selectedMonth) {
     periodFilter = `AND substring(date_transaction, 4, 2) = {monthFilter:String}`;
     queryParams.monthFilter = selectedMonth;
-  } else if (periodType === "ytd" && selectedMonth) {
+  } else if (
+    (periodType === "ytd" || periodType === "ytd-day") &&
+    selectedMonth
+  ) {
+    // "ytd-day" agrège comme "ytd" (Jan → mois sélectionné) pour le Top 10.
     periodFilter = `AND substring(date_transaction, 4, 2) <= {monthFilter:String}`;
     queryParams.monthFilter = selectedMonth;
   }
@@ -1105,8 +1115,14 @@ export async function GET(
 
     // ========================================================================
     // MODE MOIS : Données journalières
+    //   - periodType === "month"   → baseline = 0 (jour par jour intra-mois)
+    //   - periodType === "ytd-day" → baseline = cumul Jan → (selectedMonth-1)
+    //     pour chaque métrique cumulative (trésorerie, CA, recouvrement)
     // ========================================================================
-    if (periodType === "month" && selectedMonth) {
+    if (
+      (periodType === "month" || periodType === "ytd-day") &&
+      selectedMonth
+    ) {
       const monthNum = parseInt(selectedMonth);
       const daysInMonthN = getDaysInMonth(yearN, monthNum);
       const daysInMonthN1 = getDaysInMonth(yearN1, monthNum);
@@ -1167,6 +1183,50 @@ export async function GET(
       let cumulativeCA70N = 0;
       let cumulativeCA70N1 = 0;
       let cumulativeCaEncaisseN1 = 0;
+
+      // Baseline : en mode "ytd-day", on pré-charge le cumul des mois
+      // précédents (Jan → selectedMonth-1) dans les compteurs cumulatifs
+      // avant d'attaquer la boucle journalière. Ainsi, le premier jour du
+      // mois sélectionné démarre au cumul de fin de mois précédent.
+      if (periodType === "ytd-day" && monthNum > 1) {
+        const [
+          ca70ParMoisBaseN,
+          ca70ParMoisBaseN1,
+          recouvrementParMoisBaseN,
+          recouvrementParMoisBaseN1,
+          tresorerieParMoisBaseN,
+          tresorerieParMoisBaseN1,
+          fluxParMoisBaseN,
+        ] = await Promise.all([
+          recupererCA70ParMois(dbName, batchIds),
+          recupererCA70ParMois(dbName, batchIdsN1),
+          recupererRecouvrementParMois(dbName, batchIds),
+          recupererRecouvrementParMois(dbName, batchIdsN1),
+          recupererTresorerieParMois(dbName, batchIds),
+          recupererTresorerieParMois(dbName, batchIdsN1),
+          recupererFluxParMois(dbName, batchIds),
+        ]);
+
+        for (let m = 1; m < monthNum; m++) {
+          const mStr = m.toString().padStart(2, "0");
+          cumulativeCA70N += ca70ParMoisBaseN.get(mStr) || 0;
+          cumulativeCA70N1 += ca70ParMoisBaseN1.get(mStr) || 0;
+          const rN = recouvrementParMoisBaseN.get(mStr);
+          if (rN) {
+            cumulativeCaTTCN += rN.caTTCTotal;
+            cumulativeCaEncaisseN += rN.caEncaisseTTC;
+          }
+          const rN1 = recouvrementParMoisBaseN1.get(mStr);
+          if (rN1) {
+            cumulativeCaTTCN1 += rN1.caTTCTotal;
+            cumulativeCaEncaisseN1 += rN1.caEncaisseTTC;
+          }
+          cumulativeTresoN += tresorerieParMoisBaseN.get(mStr) || 0;
+          cumulativeTresoN1 += tresorerieParMoisBaseN1.get(mStr) || 0;
+          const fN = fluxParMoisBaseN.get(mStr);
+          if (fN) cumulativeBalanceN += fN.produits - fN.charges;
+        }
+      }
 
       for (let d = 1; d <= maxDays; d++) {
         const dayStr = d.toString().padStart(2, "0");

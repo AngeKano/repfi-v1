@@ -112,9 +112,11 @@ export default function ClientDetailsClient({
   const [year, setYear] = useState<string>(
     new Date().getFullYear().toString(),
   );
-  const [periodType, setPeriodType] = useState<"year" | "month" | "ytd">(
-    initialPeriodType || "year",
-  );
+  // "ytd-day" : Cumulé + Granularité Mois (vue journalière intra-mois,
+  // avec baseline = cumul Jan → selectedMonth-1).
+  const [periodType, setPeriodType] = useState<
+    "year" | "month" | "ytd" | "ytd-day"
+  >(initialPeriodType || "year");
   const [selectedMonth, setSelectedMonth] = useState<string>("12");
   const [cumulGranularity, setCumulGranularity] = useState<"mois" | "annee">(
     "mois",
@@ -144,6 +146,17 @@ export default function ClientDetailsClient({
 
   const roleLabel = getRoleLabel(session.user.role);
   const roleBadgeVariant = getRoleBadgeVariant(session.user.role);
+
+  // Onglets Dettes et Recouvrement : le mode de calcul est verrouillé sur
+  // "Cumulé". La granularité courante (mois/annee) détermine le periodType
+  // précis : "ytd-day" (vue jour avec baseline Jan→mois-1) ou "ytd" (mensuel
+  // Jan→Déc).
+  useEffect(() => {
+    if (activeTab === "dettes" || activeTab === "recouvrement") {
+      const target = cumulGranularity === "annee" ? "ytd" : "ytd-day";
+      if (periodType !== target) setPeriodType(target);
+    }
+  }, [activeTab, periodType, cumulGranularity]);
 
   // Si l'utilisateur tente d'accéder à un onglet grisé (par exemple via
   // l'URL), on le ramène automatiquement sur la Synthèse Financière.

@@ -232,7 +232,7 @@ const MONTHS = [
   { value: "12", label: "Décembre" },
 ];
 
-type PeriodType = "year" | "month" | "ytd";
+type PeriodType = "year" | "month" | "ytd" | "ytd-day";
 
 interface ClientDettesTabProps {
   clientId: string;
@@ -265,14 +265,16 @@ export default function ClientDettesTab({
   const [loading, setLoading] = useState(true);
 
   // Mode/granularité dérivés des filtres partagés :
-  //   mode = "cumule" quand periodType === "ytd", sinon "periodique"
+  //   mode = "cumule" quand periodType ∈ {"ytd", "ytd-day"}, sinon "periodique"
   //   API granularity :
-  //     - periodType === "month"            → "day"  (jour par jour intra-mois)
-  //     - periodType === "ytd"  + "mois"    → "month"
+  //     - periodType === "month"            → "day"  (jour par jour, baseline = 0)
+  //     - periodType === "ytd-day"          → "day"  (jour par jour, baseline = cumul Jan→M-1)
   //     - periodType === "ytd"  + "annee"   → "month" sur Jan→Déc
   //     - periodType === "year"             → "month"
   const mode: "cumule" | "periodique" =
-    periodType === "ytd" ? "cumule" : "periodique";
+    periodType === "ytd" || periodType === "ytd-day"
+      ? "cumule"
+      : "periodique";
   const month = selectedMonth;
 
   // Config KPIs (séparée de la synthèse)
@@ -303,27 +305,31 @@ export default function ClientDettesTab({
         let startMonth: string;
         let endMonth: string;
         let granularity: "month" | "day";
+        // dailyBaseline = true → la valeur initiale du cumul est Jan→M-1
+        // (au lieu de 0). Concerne uniquement periodType="ytd-day".
+        let dailyBaseline = false;
         if (periodType === "month") {
           startMonth = month;
           endMonth = month;
           granularity = "day";
+        } else if (periodType === "ytd-day") {
+          startMonth = month;
+          endMonth = month;
+          granularity = "day";
+          dailyBaseline = true;
         } else if (periodType === "year") {
           startMonth = "01";
           endMonth = "12";
           granularity = "month";
-        } else if (cumulGranularity === "annee") {
-          startMonth = "01";
-          endMonth = "12";
-          granularity = "month";
         } else {
-          // periodType === "ytd" && cumulGranularity === "mois"
+          // periodType === "ytd" : cumulé + granularité mois OU annee
           startMonth = "01";
-          endMonth = month;
+          endMonth = cumulGranularity === "annee" ? "12" : month;
           granularity = "month";
         }
         const startPeriod = `${year}-${startMonth}`;
         const endPeriod = `${year}-${endMonth}`;
-        const url = `/api/clients/${clientId}/reporting/dettes?endPeriod=${endPeriod}&startPeriod=${startPeriod}&mode=${mode}&granularity=${granularity}`;
+        const url = `/api/clients/${clientId}/reporting/dettes?endPeriod=${endPeriod}&startPeriod=${startPeriod}&mode=${mode}&granularity=${granularity}&dailyBaseline=${dailyBaseline}`;
         const res = await fetch(url);
         if (!res.ok) throw new Error("Erreur API Dettes");
         const json = (await res.json()) as DetteData;
@@ -372,6 +378,10 @@ export default function ClientDettesTab({
       const m = MONTHS.find((x) => x.value === month);
       return `Janvier - ${m?.label || ""} ${year}`;
     }
+    if (periodType === "ytd-day") {
+      const m = MONTHS.find((x) => x.value === month);
+      return `Janvier - ${m?.label || ""} ${year} (jour par jour)`;
+    }
     // periodType === "month"
     const m = MONTHS.find((x) => x.value === month);
     return `${m?.label || ""} ${year}`;
@@ -407,19 +417,19 @@ export default function ClientDettesTab({
       {/* Barre de filtres globaux — strictement identique à celle des onglets
           Synthèse / Chiffres / Résultats (l'état est partagé via le parent). */}
       <div className="flex flex-wrap items-center gap-3 mb-6">
-        <div className="flex items-center gap-2 border border-[#D0E3F5] rounded-lg px-4 h-10">
+        {/* Onglet Dettes : Mode calcul verrouillé sur Cumulé.
+            Le sélecteur reste visible mais désactivé pour signaler l'option
+            verrouillée à l'utilisateur. */}
+        <div
+          className="flex items-center gap-2 border border-[#D0E3F5] rounded-lg px-4 h-10 opacity-70"
+          title="Le mode de calcul est toujours Cumulé pour l'analyse des dettes"
+        >
           <span className="text-xs text-[#335890]">Mode calcul :</span>
-          <Select
-            value={periodType === "ytd" ? "cumule" : "periodique"}
-            onValueChange={(v: string) =>
-              setPeriodType(v === "cumule" ? "ytd" : "year")
-            }
-          >
-            <SelectTrigger className="border-0 p-0 h-auto shadow-none min-w-[90px] font-semibold text-[#00122E]">
+          <Select value="cumule" disabled>
+            <SelectTrigger className="border-0 p-0 h-auto shadow-none min-w-[90px] font-semibold text-[#00122E] cursor-not-allowed">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="periodique">Périodique</SelectItem>
               <SelectItem value="cumule">Cumulé</SelectItem>
             </SelectContent>
           </Select>
@@ -446,45 +456,33 @@ export default function ClientDettesTab({
             </button>
           </div>
         </div>
-        {periodType !== "ytd" ? (
-          <div className="flex items-center gap-2 border border-[#D0E3F5] rounded-lg px-4 h-10">
-            <span className="text-xs text-[#335890]">Granularité :</span>
-            <Select
-              value={periodType === "month" ? "month" : "year"}
-              onValueChange={(v: string) => setPeriodType(v as PeriodType)}
-            >
-              <SelectTrigger className="border-0 p-0 h-auto shadow-none min-w-[80px] font-semibold text-[#00122E]">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="year">Année</SelectItem>
-                <SelectItem value="month">Mois</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        ) : (
-          <div className="flex items-center gap-2 border border-[#D0E3F5] rounded-lg px-4 h-10">
-            <span className="text-xs text-[#335890]">Granularité :</span>
-            <Select
-              value={cumulGranularity}
-              onValueChange={(v: string) => {
-                const g = v as "mois" | "annee";
-                setCumulGranularity(g);
-                if (g === "annee") setSelectedMonth("12");
-              }}
-            >
-              <SelectTrigger className="border-0 p-0 h-auto shadow-none min-w-[80px] font-semibold text-[#00122E]">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="mois">Mois</SelectItem>
-                <SelectItem value="annee">Année</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        )}
-        {((periodType === "ytd" && cumulGranularity === "mois") ||
-          periodType === "month") && (
+        {/* Mode locked to cumulé → seul le sélecteur de granularité
+            "Mois / Année" (cumulé) est affiché. */}
+        <div className="flex items-center gap-2 border border-[#D0E3F5] rounded-lg px-4 h-10">
+          <span className="text-xs text-[#335890]">Granularité :</span>
+          <Select
+            value={cumulGranularity}
+            onValueChange={(v: string) => {
+              const g = v as "mois" | "annee";
+              setCumulGranularity(g);
+              if (g === "annee") {
+                setPeriodType("ytd");
+                setSelectedMonth("12");
+              } else {
+                setPeriodType("ytd-day");
+              }
+            }}
+          >
+            <SelectTrigger className="border-0 p-0 h-auto shadow-none min-w-[80px] font-semibold text-[#00122E]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="mois">Mois</SelectItem>
+              <SelectItem value="annee">Année</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        {(periodType === "ytd-day" || periodType === "month") && (
           <div className="flex items-center gap-2 border border-[#D0E3F5] rounded-lg px-4 h-10">
             <span className="text-xs text-[#335890]">Mois :</span>
             <Select value={selectedMonth} onValueChange={setSelectedMonth}>
