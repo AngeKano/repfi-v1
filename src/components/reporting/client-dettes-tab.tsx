@@ -684,7 +684,7 @@ export default function ClientDettesTab({
               },
               detteFournisseurRemboursee: {
                 label: "Dette remboursée",
-                color: "hsl(142, 76%, 36%)",
+                color: "hsl(221, 83%, 73%)",
               },
             }}
             className="h-[350px] w-full"
@@ -731,7 +731,7 @@ export default function ClientDettesTab({
               <Bar
                 dataKey="detteFournisseurRemboursee"
                 name="detteFournisseurRemboursee"
-                fill="hsl(142, 76%, 36%)"
+                fill="hsl(221, 83%, 73%)"
                 barSize={24}
                 radius={[4, 4, 0, 0]}
               />

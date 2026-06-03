@@ -2143,7 +2143,7 @@ export default function ClientReportingChart({
                   labelN="Créances Clients TTC"
                   labelN1="Encaissements Clients TTC"
                   colorN="hsl(221, 83%, 53%)"
-                  colorN1="hsl(142, 76%, 36%)"
+                  colorN1="hsl(221, 83%, 73%)"
                   solid
                 />
               </CardHeader>
@@ -2156,7 +2156,7 @@ export default function ClientReportingChart({
                     },
                     caEncaisseTTC: {
                       label: "Encaissements Clients TTC",
-                      color: "hsl(142, 76%, 36%)",
+                      color: "hsl(221, 83%, 73%)",
                     },
                   }}
                   className="h-[350px] w-full"
@@ -2205,7 +2205,7 @@ export default function ClientReportingChart({
                     <Bar
                       dataKey="caEncaisseTTC"
                       name="Encaissements Clients TTC"
-                      fill="hsl(142, 76%, 36%)"
+                      fill="hsl(221, 83%, 73%)"
                       barSize={24}
                       radius={[4, 4, 0, 0]}
                     />
