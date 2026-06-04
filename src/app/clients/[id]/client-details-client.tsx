@@ -28,6 +28,7 @@ import {
   PiChartDonutDuotone,
   PiHandCoinsDuotone,
   PiScalesDuotone,
+  PiBookOpenDuotone,
   PiUsersThreeDuotone,
   PiChartBarHorizontalDuotone,
   PiFilesDuotone,
@@ -37,6 +38,7 @@ import FilesTabs from "./files-tabs";
 import DeclarationTabs from "./declaration/declaration-tabs";
 import ClientReportingChart from "@/components/reporting/client-reporting-chart";
 import ClientDettesTab from "@/components/reporting/client-dettes-tab";
+import ClientBilanTab from "@/components/reporting/client-bilan-tab";
 import { UploadFileDialog } from "./upload-file-dialog";
 import { ClientDetailsDialog } from "@/app/clients/client-details-dialog";
 import { DeleteClientDialog } from "@/app/clients/delete-client-dialog";
@@ -61,6 +63,7 @@ const CLIENT_TABS = [
   { id: "resultats", label: "Résultats", icon: PiChartDonutDuotone },
   { id: "recouvrement", label: "Recouvrement", icon: PiHandCoinsDuotone },
   { id: "dettes", label: "Dettes", icon: PiScalesDuotone },
+  { id: "bilan", label: "Bilan", icon: PiBookOpenDuotone },
   { id: "members", label: "Membres", icon: PiUsersThreeDuotone },
   {
     id: "declaration",
@@ -77,6 +80,7 @@ const REPORTING_TAB_IDS = new Set([
   "resultats",
   "recouvrement",
   "dettes",
+  "bilan",
 ]);
 
 // Onglets désactivés de manière permanente (fonctionnalité à venir).
@@ -211,10 +215,10 @@ export default function ClientDetailsClient({
           <nav className="space-y-1">
             {CLIENT_TABS.map((tab, idx) => {
               const active = activeTab === tab.id;
-              // Separator before "Membres" (index 5) — Dettes (idx=4) reste
-              // groupé avec les onglets reporting (Synthèse, Chiffres,
-              // Résultats, Recouvrement).
-              const showSeparator = idx === 5;
+              // Separator before "Membres" (index 6) — Dettes (idx=4) et
+              // Bilan (idx=5) restent groupés avec les onglets reporting
+              // (Synthèse, Chiffres, Résultats, Recouvrement).
+              const showSeparator = idx === 6;
               const permanentlyDisabled = DISABLED_TAB_IDS.has(tab.id);
               const disabled =
                 permanentlyDisabled ||
@@ -436,6 +440,43 @@ export default function ClientDetailsClient({
                     </h3>
                     <p className="text-sm text-[#335890] mb-6">
                       Créez un premier reporting pour visualiser les dettes de ce
+                      client.
+                    </p>
+                    <Button
+                      onClick={() => setShowUploadDialog(true)}
+                      className="gap-2 bg-gradient-to-r from-[#0077C3] to-[#0095F4] hover:from-[#005992] hover:to-[#0077C3] rounded-full"
+                    >
+                      <Plus className="w-4 h-4" />
+                      Créer un reporting
+                    </Button>
+                  </Card>
+                ))}
+
+              {/* Bilan — composant dédié minimaliste, partage les mêmes
+                  filtres que les autres onglets reporting via les props
+                  ci-dessous. Contenu à enrichir ultérieurement. */}
+              {activeTab === "bilan" &&
+                (hasReporting ? (
+                  <ClientBilanTab
+                    year={year}
+                    setYear={setYear}
+                    periodType={periodType}
+                    setPeriodType={setPeriodType}
+                    selectedMonth={selectedMonth}
+                    setSelectedMonth={setSelectedMonth}
+                    cumulGranularity={cumulGranularity}
+                    setCumulGranularity={setCumulGranularity}
+                  />
+                ) : (
+                  <Card className="p-12 border-[#D0E3F5] text-center">
+                    <div className="mx-auto w-14 h-14 rounded-full bg-[#EBF5FF] flex items-center justify-center mb-4">
+                      <Plus className="w-6 h-6 text-[#0077C3]" />
+                    </div>
+                    <h3 className="text-lg font-semibold text-[#00122E] mb-1">
+                      Aucun reporting financier
+                    </h3>
+                    <p className="text-sm text-[#335890] mb-6">
+                      Créez un premier reporting pour visualiser le bilan de ce
                       client.
                     </p>
                     <Button
