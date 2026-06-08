@@ -577,7 +577,7 @@ export function ChartRemboursement() {
   return (
     <AppCard
       title="Évolution du Taux de Remboursement des Dettes"
-      subtitle="(Remboursements / Dettes nées) × 100 — cumulé et périodique"
+      subtitle="(Remboursements / Dettes) × 100 — cumulé et périodique"
       legend={
         <>
           <LegendItem color={APP.violet} label="Cumulé" />
@@ -632,10 +632,10 @@ export function ChartDettes() {
   return (
     <AppCard
       title="Dette Fournisseurs vs Dettes Remboursées"
-      subtitle="Dettes fournisseurs nées (crédit DJ) vs remboursées (débit DJ)"
+      subtitle="Dettes fournisseurs (crédit DJ) vs remboursées (débit DJ)"
       legend={
         <>
-          <LegendItem color={APP.blueN} label="Nées" />
+          <LegendItem color={APP.blueN} label="Dettes" />
           <LegendItem color={APP.blueN1} label="Remboursées" />
         </>
       }
@@ -645,7 +645,7 @@ export function ChartDettes() {
         max={1.8e6}
         fmtY={fmtM}
         series={[
-          { name: "Nées", color: APP.blueN, data: detteNee },
+          { name: "Dettes", color: APP.blueN, data: detteNee },
           { name: "Remboursées", color: APP.blueN1, data: detteRemb },
         ]}
       />

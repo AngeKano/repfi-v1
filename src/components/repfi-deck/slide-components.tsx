@@ -164,7 +164,7 @@ export function SlideCover() {
 
         <div className="max-w-[50%]">
           <Title theme="dark">
-            Le Reporting Comptable
+            Le Reporting Financier
             <br />
             <span style={hi}>au service de la performance</span>
           </Title>
