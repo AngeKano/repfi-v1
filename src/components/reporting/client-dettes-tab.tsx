@@ -595,7 +595,7 @@ export default function ClientDettesTab({
         <CardHeader>
           <CardTitle>Évolution du Taux de Remboursement des Dettes</CardTitle>
           <CardDescription>
-            (Remboursements / Dettes nées) × 100 — taux cumulé et périodique
+            (Remboursements / Dettes ) × 100 — taux cumulé et périodique
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -672,7 +672,7 @@ export default function ClientDettesTab({
             Dette Fournisseurs vs Dettes Fournisseurs Remboursées
           </CardTitle>
           <CardDescription>
-            Dettes fournisseurs nées (crédit DJ) vs remboursées (débit DJ)
+            Dettes fournisseurs (crédit DJ) vs remboursées (débit DJ)
           </CardDescription>
         </CardHeader>
         <CardContent>
