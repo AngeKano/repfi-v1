@@ -248,3 +248,68 @@
 .animation-delay-4000 {
   animation-delay: 4s;
 }
+
+/* ============================================================
+   Présentation REPFI (route /presentation) — styles du deck,
+   SCOPÉS à .repfi-deck pour ne pas affecter le reste de l'app.
+============================================================ */
+.repfi-deck {
+  font-family: var(--font-poppins), "Poppins", system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+@layer base {
+  .repfi-deck *,
+  .repfi-deck *::before,
+  .repfi-deck *::after {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+  }
+}
+
+.repfi-deck .gradient-text {
+  background: linear-gradient(135deg, #38bdf8 0%, #2f73d7 45%, #6366f1 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.repfi-deck .glass {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.repfi-deck .glass-light {
+  background: rgba(255, 255, 255, 0.85);
+  border: 1px solid rgba(20, 50, 110, 0.1);
+}
+
+.repfi-deck .glow-blue {
+  box-shadow: 0 0 60px rgba(79, 155, 255, 0.35);
+}
+
+.repfi-deck .dot-grid {
+  background-image: radial-gradient(circle at 1px 1px, #6366f1 1px, transparent 0);
+  background-size: 40px 40px;
+}
+
+.repfi-deck.navy-radial,
+.repfi-deck .navy-radial {
+  background: radial-gradient(
+    120% 130% at 72% 18%,
+    #11366f 0%,
+    #0a2150 34%,
+    #06142e 68%,
+    #040d20 100%
+  );
+}
+
+.repfi-deck .light-radial {
+  background: radial-gradient(
+    120% 120% at 82% 8%,
+    #ffffff 0%,
+    #eef4fc 58%,
+    #e4edf9 100%
+  );
+}

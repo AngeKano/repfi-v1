@@ -114,12 +114,14 @@ export default function Home() {
           >
             Créer un compte
           </a>
-          {/* Button: Dashboard */}
+          {/* Button: Présentation */}
           <a
-            href="/dashboard"
+            href="/presentation"
+            target="_blank"
+            rel="noopener noreferrer"
             className="group px-8 py-3 rounded-full border-2 border-[#33AAF6] bg-[#EBF5FF]/80 backdrop-blur-sm text-[#0077C3] font-semibold text-sm shadow-md hover:shadow-lg hover:bg-[#D0E3F5] transform hover:-translate-y-0.5 transition-all duration-200"
           >
-            Dashboard
+            Présentation
           </a>
         </div>
       </div>
