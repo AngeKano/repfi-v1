@@ -97,8 +97,12 @@ interface DataPoint {
   resultat: number;
   cumulativeBalance: number;
   nbTransactions: number;
+  // CA cumulé (YTD) — somme depuis janvier jusqu'au mois courant
   chiffreAffaires: number;
   chiffreAffairesN1: number;
+  // CA périodique — valeur du mois seul (sans cumul)
+  chiffreAffairesPeriodique: number;
+  chiffreAffairesPeriodiqueN1: number;
   soldeTresorerie: number;
   soldeTresorerieN1: number;
   margeCommerciale: number;
@@ -418,10 +422,10 @@ async function recupererTresorerieParJour(
 }
 
 // ============================================================================
-// RECOUVREMENT - Comptes clients (41*)
-// CA TTC Total = Somme des montants au débit des comptes 41*
-// CA Encaissé TTC = Somme des montants au crédit des comptes 41*
-// Taux de recouvrement = (CA Encaissé TTC / CA TTC Total) * 100
+// RECOUVREMENT - Comptes clients (41*, hors 418 et 419)
+// Créances Clients TTC = Somme des montants au débit des comptes 41* (hors 418/419)
+// Encaissements Clients TTC = Somme des montants au crédit des comptes 41* (hors 418/419)
+// Taux de recouvrement = (Encaissements Clients TTC / Créances Clients TTC) * 100
 // ============================================================================
 
 async function recupererRecouvrementParMois(
@@ -438,8 +442,8 @@ async function recupererRecouvrementParMois(
     query: `
       SELECT
         substring(date_transaction, 4, 2) as period,
-        sum(CASE WHEN startsWith(compte, '41') THEN debit ELSE 0 END) as ca_ttc_total,
-        sum(CASE WHEN startsWith(compte, '41') THEN credit ELSE 0 END) as ca_encaisse_ttc
+        sum(CASE WHEN startsWith(compte, '41') AND NOT startsWith(compte, '418') AND NOT startsWith(compte, '419') THEN debit ELSE 0 END) as ca_ttc_total,
+        sum(CASE WHEN startsWith(compte, '41') AND NOT startsWith(compte, '418') AND NOT startsWith(compte, '419') THEN credit ELSE 0 END) as ca_encaisse_ttc
       FROM ${dbName}.grand_livre
       WHERE batch_id IN ({batchIds:Array(String)})
       GROUP BY period
@@ -480,8 +484,8 @@ async function recupererRecouvrementParJour(
     query: `
       SELECT
         substring(date_transaction, 1, 2) as period,
-        sum(CASE WHEN startsWith(compte, '41') THEN debit ELSE 0 END) as ca_ttc_total,
-        sum(CASE WHEN startsWith(compte, '41') THEN credit ELSE 0 END) as ca_encaisse_ttc
+        sum(CASE WHEN startsWith(compte, '41') AND NOT startsWith(compte, '418') AND NOT startsWith(compte, '419') THEN debit ELSE 0 END) as ca_ttc_total,
+        sum(CASE WHEN startsWith(compte, '41') AND NOT startsWith(compte, '418') AND NOT startsWith(compte, '419') THEN credit ELSE 0 END) as ca_encaisse_ttc
       FROM ${dbName}.grand_livre
       WHERE batch_id IN ({batchIds:Array(String)})
         AND substring(date_transaction, 4, 2) = {monthFilter:String}
@@ -534,7 +538,13 @@ async function recupererCAParNature(
   if (periodType === "month" && selectedMonth) {
     periodFilter = `AND substring(date_transaction, 4, 2) = {monthFilter:String}`;
     baseParams.monthFilter = selectedMonth;
-  } else if (periodType === "ytd" && selectedMonth) {
+  } else if (
+    (periodType === "ytd" || periodType === "ytd-day") &&
+    selectedMonth
+  ) {
+    // "ytd" et "ytd-day" partagent le même filtre Jan → selectedMonth pour
+    // les agrégats totaux (Top 10, CA par nature). La différence porte sur
+    // la granularité de la chart principale.
     periodFilter = `AND substring(date_transaction, 4, 2) <= {monthFilter:String}`;
     baseParams.monthFilter = selectedMonth;
   }
@@ -644,7 +654,11 @@ async function recupererTop10Clients(
   if (periodType === "month" && selectedMonth) {
     periodFilter = `AND substring(date_transaction, 4, 2) = {monthFilter:String}`;
     queryParams.monthFilter = selectedMonth;
-  } else if (periodType === "ytd" && selectedMonth) {
+  } else if (
+    (periodType === "ytd" || periodType === "ytd-day") &&
+    selectedMonth
+  ) {
+    // "ytd-day" agrège comme "ytd" (Jan → mois sélectionné) pour le Top 10.
     periodFilter = `AND substring(date_transaction, 4, 2) <= {monthFilter:String}`;
     queryParams.monthFilter = selectedMonth;
   }
@@ -724,6 +738,8 @@ async function recupererTop10Clients(
         FROM ${dbName}.grand_livre
         WHERE batch_id IN ({batchIds:Array(String)})
           AND startsWith(compte, '41')
+          AND NOT startsWith(compte, '418')
+          AND NOT startsWith(compte, '419')
           AND n_tiers != ''
           ${periodFilter}
         GROUP BY n_tiers, intitule_tiers
@@ -741,6 +757,8 @@ async function recupererTop10Clients(
         FROM ${dbName}.grand_livre
         WHERE batch_id IN ({batchIds:Array(String)})
           AND startsWith(compte, '41')
+          AND NOT startsWith(compte, '418')
+          AND NOT startsWith(compte, '419')
           ${periodFilter}
       `,
       query_params: queryParams,
@@ -1097,8 +1115,14 @@ export async function GET(
 
     // ========================================================================
     // MODE MOIS : Données journalières
+    //   - periodType === "month"   → baseline = 0 (jour par jour intra-mois)
+    //   - periodType === "ytd-day" → baseline = cumul Jan → (selectedMonth-1)
+    //     pour chaque métrique cumulative (trésorerie, CA, recouvrement)
     // ========================================================================
-    if (periodType === "month" && selectedMonth) {
+    if (
+      (periodType === "month" || periodType === "ytd-day") &&
+      selectedMonth
+    ) {
       const monthNum = parseInt(selectedMonth);
       const daysInMonthN = getDaysInMonth(yearN, monthNum);
       const daysInMonthN1 = getDaysInMonth(yearN1, monthNum);
@@ -1160,6 +1184,50 @@ export async function GET(
       let cumulativeCA70N1 = 0;
       let cumulativeCaEncaisseN1 = 0;
 
+      // Baseline : en mode "ytd-day", on pré-charge le cumul des mois
+      // précédents (Jan → selectedMonth-1) dans les compteurs cumulatifs
+      // avant d'attaquer la boucle journalière. Ainsi, le premier jour du
+      // mois sélectionné démarre au cumul de fin de mois précédent.
+      if (periodType === "ytd-day" && monthNum > 1) {
+        const [
+          ca70ParMoisBaseN,
+          ca70ParMoisBaseN1,
+          recouvrementParMoisBaseN,
+          recouvrementParMoisBaseN1,
+          tresorerieParMoisBaseN,
+          tresorerieParMoisBaseN1,
+          fluxParMoisBaseN,
+        ] = await Promise.all([
+          recupererCA70ParMois(dbName, batchIds),
+          recupererCA70ParMois(dbName, batchIdsN1),
+          recupererRecouvrementParMois(dbName, batchIds),
+          recupererRecouvrementParMois(dbName, batchIdsN1),
+          recupererTresorerieParMois(dbName, batchIds),
+          recupererTresorerieParMois(dbName, batchIdsN1),
+          recupererFluxParMois(dbName, batchIds),
+        ]);
+
+        for (let m = 1; m < monthNum; m++) {
+          const mStr = m.toString().padStart(2, "0");
+          cumulativeCA70N += ca70ParMoisBaseN.get(mStr) || 0;
+          cumulativeCA70N1 += ca70ParMoisBaseN1.get(mStr) || 0;
+          const rN = recouvrementParMoisBaseN.get(mStr);
+          if (rN) {
+            cumulativeCaTTCN += rN.caTTCTotal;
+            cumulativeCaEncaisseN += rN.caEncaisseTTC;
+          }
+          const rN1 = recouvrementParMoisBaseN1.get(mStr);
+          if (rN1) {
+            cumulativeCaTTCN1 += rN1.caTTCTotal;
+            cumulativeCaEncaisseN1 += rN1.caEncaisseTTC;
+          }
+          cumulativeTresoN += tresorerieParMoisBaseN.get(mStr) || 0;
+          cumulativeTresoN1 += tresorerieParMoisBaseN1.get(mStr) || 0;
+          const fN = fluxParMoisBaseN.get(mStr);
+          if (fN) cumulativeBalanceN += fN.produits - fN.charges;
+        }
+      }
+
       for (let d = 1; d <= maxDays; d++) {
         const dayStr = d.toString().padStart(2, "0");
 
@@ -1201,9 +1269,11 @@ export async function GET(
         cumulativeCaTTCN1 += recouvrementN1Jour.caTTCTotal;
         cumulativeCaEncaisseN1 += recouvrementN1Jour.caEncaisseTTC;
 
-        // CA comptes 70*
-        cumulativeCA70N += ca70ParJourN.get(dayStr) || 0;
-        cumulativeCA70N1 += ca70ParJourN1.get(dayStr) || 0;
+        // CA comptes 70* — valeurs journalières (périodique) et cumulées
+        const ca70JourN = ca70ParJourN.get(dayStr) || 0;
+        const ca70JourN1 = ca70ParJourN1.get(dayStr) || 0;
+        cumulativeCA70N += ca70JourN;
+        cumulativeCA70N1 += ca70JourN1;
 
         const tauxRecouvrementN =
           cumulativeCaTTCN !== 0
@@ -1225,6 +1295,8 @@ export async function GET(
           nbTransactions: fluxN.nbTransactions,
           chiffreAffaires: cumulativeCA70N,
           chiffreAffairesN1: cumulativeCA70N1,
+          chiffreAffairesPeriodique: ca70JourN,
+          chiffreAffairesPeriodiqueN1: ca70JourN1,
           soldeTresorerie: cumulativeTresoN,
           soldeTresorerieN1: cumulativeTresoN1,
           margeCommerciale: sigN.XA,
@@ -1422,9 +1494,11 @@ export async function GET(
       cumulativeCaTTCN1 += recouvrementN1Mois.caTTCTotal;
       cumulativeCaEncaisseN1 += recouvrementN1Mois.caEncaisseTTC;
 
-      // CA comptes 70*
-      cumulativeCA70N += ca70ParMoisN.get(monthStr) || 0;
-      cumulativeCA70N1 += ca70ParMoisN1.get(monthStr) || 0;
+      // CA comptes 70* — valeurs mensuelles (périodique) et cumulées (YTD)
+      const ca70MoisN = ca70ParMoisN.get(monthStr) || 0;
+      const ca70MoisN1 = ca70ParMoisN1.get(monthStr) || 0;
+      cumulativeCA70N += ca70MoisN;
+      cumulativeCA70N1 += ca70MoisN1;
 
       const tauxRecouvrementN =
         cumulativeCaTTCN !== 0
@@ -1444,8 +1518,12 @@ export async function GET(
         resultat,
         cumulativeBalance,
         nbTransactions: fluxN.nbTransactions,
+        // CA cumulé YTD (compat existante)
         chiffreAffaires: cumulativeCA70N,
         chiffreAffairesN1: cumulativeCA70N1,
+        // CA périodique (valeur du mois seul) — utilisé par le mode Périodique
+        chiffreAffairesPeriodique: ca70MoisN,
+        chiffreAffairesPeriodiqueN1: ca70MoisN1,
         soldeTresorerie: cumulativeTresorerieN,
         soldeTresorerieN1: cumulativeTresorerieN1,
         margeCommerciale: sigN.XA,

@@ -14,6 +14,11 @@ import {
   ProcessingStatus,
 } from "../../../../../../prisma/generated/prisma/enums";
 import { requirePermission, FICHIERS_ACTIONS } from "@/lib/permissions";
+import {
+  detectComptableFormat,
+  validateComptableFormat,
+  MAX_COMPTABLE_FILE_SIZE,
+} from "@/lib/comptable-formats";
 
 const s3Client = new S3Client({
   region: process.env.AWS_REGION!,
@@ -186,19 +191,32 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Client non trouvé" }, { status: 404 });
     }
 
-    // Vérifier que tous les fichiers sont Excel
-    const validExcelTypes = [
-      "application/vnd.ms-excel",
-      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-    ];
-
+    // Vérifier que chaque fichier est dans un format autorisé pour son type.
+    // Les règles sont définies dans @/lib/comptable-formats et reflètent
+    // exactement la logique côté DAG Airflow (plugins/etl/format_detect.py) :
+    //   - plan_comptes / code_journal : Excel uniquement
+    //   - plan_tiers                  : Excel ou .pnc
+    //   - grand_livre                 : Excel ou .pnm
     for (const { file, fileType } of files) {
-      if (!validExcelTypes.includes(file.type)) {
+      const fmt = detectComptableFormat(file.name);
+      const formatError = validateComptableFormat(fileType, fmt);
+      if (formatError) {
+        return NextResponse.json(
+          { error: `${formatError} Fichier reçu : ${file.name}` },
+          { status: 400 },
+        );
+      }
+
+      if (file.size > MAX_COMPTABLE_FILE_SIZE) {
+        const sizeMB = (file.size / (1024 * 1024)).toFixed(2);
+        const limitMB = MAX_COMPTABLE_FILE_SIZE / (1024 * 1024);
         return NextResponse.json(
           {
-            error: `Le fichier "${FILE_TYPE_LABELS[fileType]}" (${file.name}) doit être un fichier Excel (.xls ou .xlsx)`,
+            error:
+              `Le fichier "${file.name}" (${sizeMB} Mo) dépasse la limite ` +
+              `autorisée (${limitMB} Mo).`,
           },
-          { status: 400 },
+          { status: 413 },
         );
       }
     }

@@ -27,6 +27,8 @@ import {
   PiCoinsDuotone,
   PiChartDonutDuotone,
   PiHandCoinsDuotone,
+  PiScalesDuotone,
+  PiBookOpenDuotone,
   PiUsersThreeDuotone,
   PiChartBarHorizontalDuotone,
   PiFilesDuotone,
@@ -35,6 +37,8 @@ import Link from "next/link";
 import FilesTabs from "./files-tabs";
 import DeclarationTabs from "./declaration/declaration-tabs";
 import ClientReportingChart from "@/components/reporting/client-reporting-chart";
+import ClientDettesTab from "@/components/reporting/client-dettes-tab";
+import ClientBilanTab from "@/components/reporting/client-bilan-tab";
 import { UploadFileDialog } from "./upload-file-dialog";
 import { ClientDetailsDialog } from "@/app/clients/client-details-dialog";
 import { DeleteClientDialog } from "@/app/clients/delete-client-dialog";
@@ -58,6 +62,8 @@ const CLIENT_TABS = [
   { id: "chiffres", label: "Chiffres d'affaires", icon: PiCoinsDuotone },
   { id: "resultats", label: "Résultats", icon: PiChartDonutDuotone },
   { id: "recouvrement", label: "Recouvrement", icon: PiHandCoinsDuotone },
+  { id: "dettes", label: "Dettes", icon: PiScalesDuotone },
+  { id: "bilan", label: "Bilan", icon: PiBookOpenDuotone },
   { id: "members", label: "Membres", icon: PiUsersThreeDuotone },
   {
     id: "declaration",
@@ -69,7 +75,16 @@ const CLIENT_TABS = [
 
 // Onglets de reporting financier qui dépendent de la présence d'au moins
 // un reporting. Ils sont grisés tant qu'aucun reporting n'existe.
-const REPORTING_TAB_IDS = new Set(["chiffres", "resultats", "recouvrement"]);
+const REPORTING_TAB_IDS = new Set([
+  "chiffres",
+  "resultats",
+  "recouvrement",
+  "dettes",
+  "bilan",
+]);
+
+// Onglets désactivés de manière permanente (fonctionnalité à venir).
+const DISABLED_TAB_IDS = new Set(["files"]);
 
 export default function ClientDetailsClient({
   session,
@@ -94,6 +109,22 @@ export default function ClientDetailsClient({
     if (qp === "year" || qp === "month" || qp === "ytd") return qp;
     return undefined;
   })();
+
+  // ===== Filtres reporting partagés entre Synthèse / Chiffres / Résultats /
+  // Dettes. Recouvrement conserve ses propres filtres en interne car son
+  // comportement diffère (toujours cumulé sur le graphe principal). =====
+  const [year, setYear] = useState<string>(
+    new Date().getFullYear().toString(),
+  );
+  // "ytd-day" : Cumulé + Granularité Mois (vue journalière intra-mois,
+  // avec baseline = cumul Jan → selectedMonth-1).
+  const [periodType, setPeriodType] = useState<
+    "year" | "month" | "ytd" | "ytd-day"
+  >(initialPeriodType || "year");
+  const [selectedMonth, setSelectedMonth] = useState<string>("12");
+  const [cumulGranularity, setCumulGranularity] = useState<"mois" | "annee">(
+    "mois",
+  );
 
   // Les paramètres de reporting ne sont demandés qu'une seule fois par client.
   // Si l'URL contient déjà un filtre, ou si on a mémorisé un choix précédent,
@@ -120,9 +151,24 @@ export default function ClientDetailsClient({
   const roleLabel = getRoleLabel(session.user.role);
   const roleBadgeVariant = getRoleBadgeVariant(session.user.role);
 
+  // Onglets Dettes et Recouvrement : le mode de calcul est verrouillé sur
+  // "Cumulé". La granularité courante (mois/annee) détermine le periodType
+  // précis : "ytd-day" (vue jour avec baseline Jan→mois-1) ou "ytd" (mensuel
+  // Jan→Déc).
+  useEffect(() => {
+    if (activeTab === "dettes" || activeTab === "recouvrement") {
+      const target = cumulGranularity === "annee" ? "ytd" : "ytd-day";
+      if (periodType !== target) setPeriodType(target);
+    }
+  }, [activeTab, periodType, cumulGranularity]);
+
   // Si l'utilisateur tente d'accéder à un onglet grisé (par exemple via
   // l'URL), on le ramène automatiquement sur la Synthèse Financière.
   useEffect(() => {
+    if (DISABLED_TAB_IDS.has(activeTab)) {
+      setActiveTab("overview");
+      return;
+    }
     if (!hasReporting && REPORTING_TAB_IDS.has(activeTab)) {
       setActiveTab("overview");
     }
@@ -169,10 +215,14 @@ export default function ClientDetailsClient({
           <nav className="space-y-1">
             {CLIENT_TABS.map((tab, idx) => {
               const active = activeTab === tab.id;
-              // Separator before "Membres" (index 4)
-              const showSeparator = idx === 4;
+              // Separator before "Membres" (index 6) — Dettes (idx=4) et
+              // Bilan (idx=5) restent groupés avec les onglets reporting
+              // (Synthèse, Chiffres, Résultats, Recouvrement).
+              const showSeparator = idx === 6;
+              const permanentlyDisabled = DISABLED_TAB_IDS.has(tab.id);
               const disabled =
-                REPORTING_TAB_IDS.has(tab.id) && !hasReporting;
+                permanentlyDisabled ||
+                (REPORTING_TAB_IDS.has(tab.id) && !hasReporting);
               return (
                 <div key={tab.id}>
                   {showSeparator && <div className="h-px bg-[#D0E3F5] my-2" />}
@@ -183,9 +233,11 @@ export default function ClientDetailsClient({
                     }}
                     disabled={disabled}
                     title={
-                      disabled
-                        ? "Créez d'abord un reporting financier pour activer cet onglet"
-                        : undefined
+                      permanentlyDisabled
+                        ? "Bientôt disponible"
+                        : disabled
+                          ? "Créez d'abord un reporting financier pour activer cet onglet"
+                          : undefined
                     }
                     aria-disabled={disabled}
                     className={`flex items-center gap-3 w-full px-4 py-3 rounded-lg text-sm font-medium transition-colors ${
@@ -350,11 +402,92 @@ export default function ClientDetailsClient({
                   <ClientReportingChart
                     clientId={client.id}
                     activeTab={internalTab}
-                    initialPeriodType={initialPeriodType}
                     hideNav
+                    year={year}
+                    setYear={setYear}
+                    periodType={periodType}
+                    setPeriodType={setPeriodType}
+                    selectedMonth={selectedMonth}
+                    setSelectedMonth={setSelectedMonth}
+                    cumulGranularity={cumulGranularity}
+                    setCumulGranularity={setCumulGranularity}
                   />
                 );
               })()}
+
+              {/* Dettes — composant dédié, partage les mêmes filtres que les
+                  autres onglets reporting via les props ci-dessous. */}
+              {activeTab === "dettes" &&
+                (hasReporting ? (
+                  <ClientDettesTab
+                    clientId={client.id}
+                    year={year}
+                    setYear={setYear}
+                    periodType={periodType}
+                    setPeriodType={setPeriodType}
+                    selectedMonth={selectedMonth}
+                    setSelectedMonth={setSelectedMonth}
+                    cumulGranularity={cumulGranularity}
+                    setCumulGranularity={setCumulGranularity}
+                  />
+                ) : (
+                  <Card className="p-12 border-[#D0E3F5] text-center">
+                    <div className="mx-auto w-14 h-14 rounded-full bg-[#EBF5FF] flex items-center justify-center mb-4">
+                      <Plus className="w-6 h-6 text-[#0077C3]" />
+                    </div>
+                    <h3 className="text-lg font-semibold text-[#00122E] mb-1">
+                      Aucun reporting financier
+                    </h3>
+                    <p className="text-sm text-[#335890] mb-6">
+                      Créez un premier reporting pour visualiser les dettes de ce
+                      client.
+                    </p>
+                    <Button
+                      onClick={() => setShowUploadDialog(true)}
+                      className="gap-2 bg-gradient-to-r from-[#0077C3] to-[#0095F4] hover:from-[#005992] hover:to-[#0077C3] rounded-full"
+                    >
+                      <Plus className="w-4 h-4" />
+                      Créer un reporting
+                    </Button>
+                  </Card>
+                ))}
+
+              {/* Bilan — composant dédié minimaliste, partage les mêmes
+                  filtres que les autres onglets reporting via les props
+                  ci-dessous. Contenu à enrichir ultérieurement. */}
+              {activeTab === "bilan" &&
+                (hasReporting ? (
+                  <ClientBilanTab
+                    year={year}
+                    setYear={setYear}
+                    periodType={periodType}
+                    setPeriodType={setPeriodType}
+                    selectedMonth={selectedMonth}
+                    setSelectedMonth={setSelectedMonth}
+                    cumulGranularity={cumulGranularity}
+                    setCumulGranularity={setCumulGranularity}
+                  />
+                ) : (
+                  <Card className="p-12 border-[#D0E3F5] text-center">
+                    <div className="mx-auto w-14 h-14 rounded-full bg-[#EBF5FF] flex items-center justify-center mb-4">
+                      <Plus className="w-6 h-6 text-[#0077C3]" />
+                    </div>
+                    <h3 className="text-lg font-semibold text-[#00122E] mb-1">
+                      Aucun reporting financier
+                    </h3>
+                    <p className="text-sm text-[#335890] mb-6">
+                      Créez un premier reporting pour visualiser le bilan de ce
+                      client.
+                    </p>
+                    <Button
+                      onClick={() => setShowUploadDialog(true)}
+                      className="gap-2 bg-gradient-to-r from-[#0077C3] to-[#0095F4] hover:from-[#005992] hover:to-[#0077C3] rounded-full"
+                    >
+                      <Plus className="w-4 h-4" />
+                      Créer un reporting
+                    </Button>
+                  </Card>
+                ))}
 
               {/* Members */}
               {activeTab === "members" && (

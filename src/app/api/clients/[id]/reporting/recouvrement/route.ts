@@ -78,8 +78,8 @@ async function recupererRecouvrementParYearMonth(
       SELECT
         substring(date_transaction, 7, 4) as year,
         substring(date_transaction, 4, 2) as month,
-        sum(CASE WHEN startsWith(compte, '41') THEN debit ELSE 0 END) as ca_ttc_total,
-        sum(CASE WHEN startsWith(compte, '41') THEN credit ELSE 0 END) as ca_encaisse_ttc
+        sum(CASE WHEN startsWith(compte, '41') AND NOT startsWith(compte, '418') AND NOT startsWith(compte, '419') THEN debit ELSE 0 END) as ca_ttc_total,
+        sum(CASE WHEN startsWith(compte, '41') AND NOT startsWith(compte, '418') AND NOT startsWith(compte, '419') THEN credit ELSE 0 END) as ca_encaisse_ttc
       FROM ${dbName}.grand_livre
       WHERE batch_id IN ({batchIds:Array(String)})
       GROUP BY year, month
@@ -109,7 +109,8 @@ async function recupererRecouvrementParYearMonth(
 
 // ============================================================================
 // TOP 10 CRÉANCES - Clients avec les créances les plus élevées
-// Créance = CA TTC Total (débit 41*) - CA Encaissé TTC (crédit 41*)
+// Créance = Créances Clients TTC (débit 41* hors 418/419) - Encaissements Clients TTC (crédit 41* hors 418/419)
+// Le filtre période est défini par (startYear, startMonth) → (endYear, endMonth).
 // ============================================================================
 
 interface TopCreance {
@@ -126,21 +127,26 @@ async function recupererTop10Creances(
   batchIds: string[],
   endYear?: number,
   endMonth?: number,
+  startYear?: number,
+  startMonth?: number,
 ): Promise<TopCreance[]> {
   if (batchIds.length === 0) return [];
 
-  // Filtre YTD borné à l'année sélectionnée : Janvier (01) → endMonth de endYear.
-  // Pas de débordement sur l'année précédente.
-  // date_transaction format: DD/MM/YYYY
+  // Filtre période borné par (startYear, startMonth) → (endYear, endMonth).
+  // Si startYear/startMonth absent, on prend Janvier de l'année de fin (YTD).
+  // date_transaction format: DD/MM/YYYY → year=substr(7,4), month=substr(4,2),
+  // donc on compare sur la concat YYYYMM (= substr(7,4) || substr(4,2)).
   let periodFilter = "";
   const queryParams: Record<string, unknown> = { batchIds };
 
   if (endYear && endMonth) {
-    queryParams.endYear = endYear.toString();
-    queryParams.endMonth = endMonth.toString().padStart(2, "0");
+    const effectiveStartYear = startYear ?? endYear;
+    const effectiveStartMonth = startMonth ?? 1;
+    queryParams.startYM = `${effectiveStartYear}${effectiveStartMonth.toString().padStart(2, "0")}`;
+    queryParams.endYM = `${endYear}${endMonth.toString().padStart(2, "0")}`;
     periodFilter = `
-      AND substring(date_transaction, 7, 4) = {endYear:String}
-      AND substring(date_transaction, 4, 2) <= {endMonth:String}
+      AND concat(substring(date_transaction, 7, 4), substring(date_transaction, 4, 2)) >= {startYM:String}
+      AND concat(substring(date_transaction, 7, 4), substring(date_transaction, 4, 2)) <= {endYM:String}
     `;
   }
 
@@ -157,6 +163,8 @@ async function recupererTop10Creances(
         FROM ${dbName}.grand_livre
         WHERE batch_id IN ({batchIds:Array(String)})
           AND startsWith(compte, '41')
+          AND NOT startsWith(compte, '418')
+          AND NOT startsWith(compte, '419')
           AND n_tiers != ''
           AND intitule_tiers != ''
           ${periodFilter}
@@ -220,6 +228,8 @@ export async function GET(
 
     // Mois de fin sélectionné (format: YYYY-MM)
     const endPeriod = searchParams.get("endPeriod");
+    // Mois de début optionnel (format: YYYY-MM). Si absent → Janvier de endYear (YTD)
+    const startPeriod = searchParams.get("startPeriod");
 
     let endYear: number;
     let endMonth: number;
@@ -233,6 +243,14 @@ export async function GET(
       const now = new Date();
       endYear = now.getFullYear();
       endMonth = now.getMonth() + 1;
+    }
+
+    let startYear: number | undefined;
+    let startMonth: number | undefined;
+    if (startPeriod) {
+      const [yearStr, monthStr] = startPeriod.split("-");
+      startYear = parseInt(yearStr);
+      startMonth = parseInt(monthStr);
     }
 
     const client = await prisma.client.findUnique({
@@ -322,7 +340,14 @@ export async function GET(
     };
 
     // Top 10 des créances clients (filtré par la période sélectionnée)
-    const topCreances = await recupererTop10Creances(dbName, allBatchIds, endYear, endMonth);
+    const topCreances = await recupererTop10Creances(
+      dbName,
+      allBatchIds,
+      endYear,
+      endMonth,
+      startYear,
+      startMonth,
+    );
 
     // Calculer le total des créances pour les stats
     const totalCreances = topCreances.reduce(
