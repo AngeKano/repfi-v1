@@ -458,6 +458,7 @@ export default function ClientDetailsClient({
               {activeTab === "bilan" &&
                 (hasReporting ? (
                   <ClientBilanTab
+                    clientId={client.id}
                     year={year}
                     setYear={setYear}
                     periodType={periodType}
