@@ -783,6 +783,291 @@ export function SlideCta() {
   );
 }
 
+/* ============================ SLIDE — Contact / Demande de démo ============================ */
+// Formulaire de demande de démo intégré dans le deck. Envoie un email via
+// /api/demo-request (Resend) à l'adresse interne. Pas de stockage en base.
+export function SlideContact() {
+  const [nom, setNom] = useState("");
+  const [prenom, setPrenom] = useState("");
+  const [entreprise, setEntreprise] = useState("");
+  const [email, setEmail] = useState("");
+  const [telephone, setTelephone] = useState("");
+  const [commentaire, setCommentaire] = useState("");
+  const [consent, setConsent] = useState(false);
+  // Honeypot : champ caché, doit rester vide. Si rempli, on simule un succès
+  // silencieux côté API.
+  const [website, setWebsite] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [success, setSuccess] = useState(false);
+
+  const canSubmit =
+    nom.trim() &&
+    prenom.trim() &&
+    entreprise.trim() &&
+    email.trim() &&
+    consent &&
+    !submitting;
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!canSubmit) return;
+    setSubmitting(true);
+    setErrorMsg(null);
+    try {
+      const res = await fetch("/api/demo-request", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          nom,
+          prenom,
+          entreprise,
+          email,
+          telephone: telephone || undefined,
+          commentaire: commentaire || undefined,
+          consent: true,
+          website,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setErrorMsg(data?.error || "Erreur lors de l'envoi. Réessayez.");
+        return;
+      }
+      setSuccess(true);
+    } catch {
+      setErrorMsg("Erreur réseau. Réessayez.");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  const inputStyle: React.CSSProperties = {
+    background: "rgba(255,255,255,0.06)",
+    border: `1px solid ${PALETTE.panelBorder}`,
+    color: "#fff",
+    borderRadius: 10,
+    padding: "0.7rem 0.9rem",
+    fontSize: "0.95rem",
+    width: "100%",
+    outline: "none",
+  };
+  const labelStyle: React.CSSProperties = {
+    color: PALETTE.ice,
+    fontSize: "0.78rem",
+    fontWeight: 600,
+    marginBottom: "0.35rem",
+    display: "block",
+  };
+
+  return (
+    <NavyFrame>
+      <motion.div
+        variants={stagger}
+        initial="hidden"
+        animate="show"
+        className="grid h-full grid-cols-1 gap-10 lg:grid-cols-2"
+        style={{ alignContent: "center" }}
+      >
+        {/* Colonne gauche : pitch */}
+        <div className="flex flex-col justify-center">
+          <Title theme="dark">
+            Parlons de votre <span style={hi}>reporting financier</span>.
+          </Title>
+          <Lead theme="dark">
+            Laissez-nous vos coordonnées : un membre de l&apos;équipe {BRAND}
+            vous recontacte sous 24 h ouvrées pour planifier une démo
+            personnalisée.
+          </Lead>
+          <motion.ul
+            variants={riseIn}
+            className="mt-6 space-y-2 text-sm"
+            style={{ color: PALETTE.ice }}
+          >
+            <li>✓ Démo adaptée à votre cabinet ou entreprise</li>
+            <li>✓ Réponse sous 24 h ouvrées</li>
+            <li>✓ Sans engagement</li>
+          </motion.ul>
+        </div>
+
+        {/* Colonne droite : formulaire ou message de succès */}
+        <motion.div variants={fromRight}>
+          {success ? (
+            <div
+              className="rounded-2xl p-8"
+              style={{
+                background: "rgba(255,255,255,0.06)",
+                border: `1px solid ${PALETTE.panelBorder}`,
+              }}
+            >
+              <div className="flex items-center gap-3">
+                <CircleIcon name="Check" size={48} />
+                <h3
+                  className="text-2xl font-bold"
+                  style={{ color: "#fff" }}
+                >
+                  Demande envoyée !
+                </h3>
+              </div>
+              <p
+                className="mt-4 text-base leading-relaxed"
+                style={{ color: PALETTE.ice }}
+              >
+                Merci {prenom}. Nous vous recontactons sous 24 h ouvrées à
+                l&apos;adresse <strong>{email}</strong> pour planifier votre
+                démo.
+              </p>
+            </div>
+          ) : (
+            <form
+              onSubmit={handleSubmit}
+              className="rounded-2xl p-6"
+              style={{
+                background: "rgba(255,255,255,0.06)",
+                border: `1px solid ${PALETTE.panelBorder}`,
+              }}
+            >
+              {/* Honeypot — invisible, accessible aux bots seulement. */}
+              <div
+                aria-hidden="true"
+                style={{
+                  position: "absolute",
+                  left: -10000,
+                  top: "auto",
+                  width: 1,
+                  height: 1,
+                  overflow: "hidden",
+                }}
+              >
+                <label>
+                  Ne pas remplir
+                  <input
+                    type="text"
+                    name="website"
+                    tabIndex={-1}
+                    autoComplete="off"
+                    value={website}
+                    onChange={(e) => setWebsite(e.target.value)}
+                  />
+                </label>
+              </div>
+
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div>
+                  <label style={labelStyle}>
+                    Nom <span style={{ color: PALETTE.blueBright }}>*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={nom}
+                    onChange={(e) => setNom(e.target.value)}
+                    style={inputStyle}
+                  />
+                </div>
+                <div>
+                  <label style={labelStyle}>
+                    Prénom <span style={{ color: PALETTE.blueBright }}>*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={prenom}
+                    onChange={(e) => setPrenom(e.target.value)}
+                    style={inputStyle}
+                  />
+                </div>
+                <div className="sm:col-span-2">
+                  <label style={labelStyle}>
+                    Entreprise{" "}
+                    <span style={{ color: PALETTE.blueBright }}>*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={entreprise}
+                    onChange={(e) => setEntreprise(e.target.value)}
+                    style={inputStyle}
+                  />
+                </div>
+                <div>
+                  <label style={labelStyle}>
+                    Email <span style={{ color: PALETTE.blueBright }}>*</span>
+                  </label>
+                  <input
+                    type="email"
+                    required
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    style={inputStyle}
+                  />
+                </div>
+                <div>
+                  <label style={labelStyle}>Téléphone</label>
+                  <input
+                    type="tel"
+                    value={telephone}
+                    onChange={(e) => setTelephone(e.target.value)}
+                    style={inputStyle}
+                  />
+                </div>
+                <div className="sm:col-span-2">
+                  <label style={labelStyle}>Commentaire</label>
+                  <textarea
+                    rows={3}
+                    value={commentaire}
+                    onChange={(e) => setCommentaire(e.target.value)}
+                    style={{ ...inputStyle, resize: "vertical" }}
+                  />
+                </div>
+              </div>
+
+              <label
+                className="mt-4 flex items-start gap-2 text-xs leading-snug"
+                style={{ color: PALETTE.ice }}
+              >
+                <input
+                  type="checkbox"
+                  required
+                  checked={consent}
+                  onChange={(e) => setConsent(e.target.checked)}
+                  className="mt-0.5"
+                />
+                <span>
+                  J&apos;accepte que mes données soient utilisées par {BRAND}{" "}
+                  pour me recontacter au sujet de cette demande de démo.
+                </span>
+              </label>
+
+              {errorMsg && (
+                <p
+                  className="mt-3 text-sm"
+                  style={{ color: "#ff8a8a" }}
+                  role="alert"
+                >
+                  {errorMsg}
+                </p>
+              )}
+
+              <button
+                type="submit"
+                disabled={!canSubmit}
+                className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-xl px-6 py-3 font-bold text-white shadow-lg transition-transform disabled:opacity-50"
+                style={{
+                  background: `linear-gradient(135deg, ${PALETTE.blue}, ${PALETTE.indigo})`,
+                }}
+              >
+                {submitting ? "Envoi en cours…" : "Envoyer ma demande"}
+                {!submitting && <ArrowRight size={18} />}
+              </button>
+            </form>
+          )}
+        </motion.div>
+      </motion.div>
+    </NavyFrame>
+  );
+}
+
 export const SLIDES = [
   SlideCover,
   SlideValue,
@@ -792,6 +1077,7 @@ export const SLIDES = [
   SlideBalance,
   SlideDecide,
   SlideSecurity,
+  SlideContact,
   SlideCta,
 ];
 
@@ -805,6 +1091,7 @@ export const SLIDE_TITLES = [
   "Décision",
   "Sécurité",
   "Contact",
+  "Démo",
 ];
 
 // Thème de fond par slide — utilisé pour adapter l'UI de navigation.
@@ -817,5 +1104,6 @@ export const SLIDE_THEMES: ("dark" | "light")[] = [
   "light",
   "dark",
   "light",
+  "dark",
   "dark",
 ];
