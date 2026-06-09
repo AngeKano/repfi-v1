@@ -86,6 +86,10 @@ interface IndicateursFinanciers {
   caTB: number; // Ventes de produits fabriqués
   caTC: number; // Travaux et services vendus
   caTD: number; // Production stockée
+  // Agrégats narratifs (onglet Bilan / tunnel de résultat)
+  produitsAdditionnels: number; // TE + TF + TG + TH + TI
+  totalAchats: number; // |RA + RB + RC + RD + RE + RF + RG + RH + RI + RJ|
+  impotResultat: number; // |RS| (impôts sur le résultat)
 }
 
 interface DataPoint {
@@ -695,6 +699,8 @@ async function recupererTop10Clients(
             AND c.batch_id IN ({batchIds:Array(String)})
             AND c.n_tiers != ''
             AND c.intitule_tiers != ''
+            AND NOT startsWith(c.compte, '418')
+            AND NOT startsWith(c.compte, '419')
         )
         SELECT
           n_tiers AS numero_client,
@@ -999,6 +1005,26 @@ function calculerIndicateursPeriode(
     caTB: rubriquesAgregees.TB,
     caTC: rubriquesAgregees.TC,
     caTD: rubriquesAgregees.TD,
+    // Agrégats narratifs (onglet Bilan / tunnel de résultat)
+    produitsAdditionnels:
+      rubriquesAgregees.TE +
+      rubriquesAgregees.TF +
+      rubriquesAgregees.TG +
+      rubriquesAgregees.TH +
+      rubriquesAgregees.TI,
+    totalAchats: Math.abs(
+      rubriquesAgregees.RA +
+        rubriquesAgregees.RB +
+        rubriquesAgregees.RC +
+        rubriquesAgregees.RD +
+        rubriquesAgregees.RE +
+        rubriquesAgregees.RF +
+        rubriquesAgregees.RG +
+        rubriquesAgregees.RH +
+        rubriquesAgregees.RI +
+        rubriquesAgregees.RJ,
+    ),
+    impotResultat: Math.abs(rubriquesAgregees.RS),
   };
 }
 
