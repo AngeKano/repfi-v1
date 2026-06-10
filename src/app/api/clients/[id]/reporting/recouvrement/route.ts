@@ -78,8 +78,8 @@ async function recupererRecouvrementParYearMonth(
       SELECT
         substring(date_transaction, 7, 4) as year,
         substring(date_transaction, 4, 2) as month,
-        sum(CASE WHEN startsWith(compte, '41') AND NOT startsWith(compte, '418') AND NOT startsWith(compte, '419') THEN debit ELSE 0 END) as ca_ttc_total,
-        sum(CASE WHEN startsWith(compte, '41') AND NOT startsWith(compte, '418') AND NOT startsWith(compte, '419') THEN credit ELSE 0 END) as ca_encaisse_ttc
+        sum(CASE WHEN startsWith(compte, '41') AND NOT startsWith(compte, '418') AND NOT startsWith(compte, '419') AND NOT startsWith(n_tiers, '418') AND NOT startsWith(n_tiers, '419') THEN debit ELSE 0 END) as ca_ttc_total,
+        sum(CASE WHEN startsWith(compte, '41') AND NOT startsWith(compte, '418') AND NOT startsWith(compte, '419') AND NOT startsWith(n_tiers, '418') AND NOT startsWith(n_tiers, '419') THEN credit ELSE 0 END) as ca_encaisse_ttc
       FROM ${dbName}.grand_livre
       WHERE batch_id IN ({batchIds:Array(String)})
       GROUP BY year, month
@@ -165,6 +165,8 @@ async function recupererTop10Creances(
           AND startsWith(compte, '41')
           AND NOT startsWith(compte, '418')
           AND NOT startsWith(compte, '419')
+          AND NOT startsWith(n_tiers, '418')
+          AND NOT startsWith(n_tiers, '419')
           AND n_tiers != ''
           AND intitule_tiers != ''
           ${periodFilter}

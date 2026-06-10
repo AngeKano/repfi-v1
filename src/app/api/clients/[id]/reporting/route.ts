@@ -446,8 +446,8 @@ async function recupererRecouvrementParMois(
     query: `
       SELECT
         substring(date_transaction, 4, 2) as period,
-        sum(CASE WHEN startsWith(compte, '41') AND NOT startsWith(compte, '418') AND NOT startsWith(compte, '419') THEN debit ELSE 0 END) as ca_ttc_total,
-        sum(CASE WHEN startsWith(compte, '41') AND NOT startsWith(compte, '418') AND NOT startsWith(compte, '419') THEN credit ELSE 0 END) as ca_encaisse_ttc
+        sum(CASE WHEN startsWith(compte, '41') AND NOT startsWith(compte, '418') AND NOT startsWith(compte, '419') AND NOT startsWith(n_tiers, '418') AND NOT startsWith(n_tiers, '419') THEN debit ELSE 0 END) as ca_ttc_total,
+        sum(CASE WHEN startsWith(compte, '41') AND NOT startsWith(compte, '418') AND NOT startsWith(compte, '419') AND NOT startsWith(n_tiers, '418') AND NOT startsWith(n_tiers, '419') THEN credit ELSE 0 END) as ca_encaisse_ttc
       FROM ${dbName}.grand_livre
       WHERE batch_id IN ({batchIds:Array(String)})
       GROUP BY period
@@ -488,8 +488,8 @@ async function recupererRecouvrementParJour(
     query: `
       SELECT
         substring(date_transaction, 1, 2) as period,
-        sum(CASE WHEN startsWith(compte, '41') AND NOT startsWith(compte, '418') AND NOT startsWith(compte, '419') THEN debit ELSE 0 END) as ca_ttc_total,
-        sum(CASE WHEN startsWith(compte, '41') AND NOT startsWith(compte, '418') AND NOT startsWith(compte, '419') THEN credit ELSE 0 END) as ca_encaisse_ttc
+        sum(CASE WHEN startsWith(compte, '41') AND NOT startsWith(compte, '418') AND NOT startsWith(compte, '419') AND NOT startsWith(n_tiers, '418') AND NOT startsWith(n_tiers, '419') THEN debit ELSE 0 END) as ca_ttc_total,
+        sum(CASE WHEN startsWith(compte, '41') AND NOT startsWith(compte, '418') AND NOT startsWith(compte, '419') AND NOT startsWith(n_tiers, '418') AND NOT startsWith(n_tiers, '419') THEN credit ELSE 0 END) as ca_encaisse_ttc
       FROM ${dbName}.grand_livre
       WHERE batch_id IN ({batchIds:Array(String)})
         AND substring(date_transaction, 4, 2) = {monthFilter:String}
@@ -701,6 +701,8 @@ async function recupererTop10Clients(
             AND c.intitule_tiers != ''
             AND NOT startsWith(c.compte, '418')
             AND NOT startsWith(c.compte, '419')
+            AND NOT startsWith(c.n_tiers, '418')
+            AND NOT startsWith(c.n_tiers, '419')
         )
         SELECT
           n_tiers AS numero_client,
@@ -746,6 +748,8 @@ async function recupererTop10Clients(
           AND startsWith(compte, '41')
           AND NOT startsWith(compte, '418')
           AND NOT startsWith(compte, '419')
+          AND NOT startsWith(n_tiers, '418')
+          AND NOT startsWith(n_tiers, '419')
           AND n_tiers != ''
           ${periodFilter}
         GROUP BY n_tiers, intitule_tiers
@@ -765,6 +769,8 @@ async function recupererTop10Clients(
           AND startsWith(compte, '41')
           AND NOT startsWith(compte, '418')
           AND NOT startsWith(compte, '419')
+          AND NOT startsWith(n_tiers, '418')
+          AND NOT startsWith(n_tiers, '419')
           ${periodFilter}
       `,
       query_params: queryParams,
