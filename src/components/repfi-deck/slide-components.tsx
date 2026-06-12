@@ -19,6 +19,7 @@ import {
   balanceItems,
   decisions,
   security,
+  contact,
 } from "./slides";
 import {
   Logo,
@@ -32,7 +33,7 @@ import {
   fromRight,
   scaleIn,
 } from "./primitives";
-import { DashboardMock } from "./charts";
+import { DashboardMock, LineSpark, BarsSpark } from "./charts";
 import {
   MacBook,
   SyntheseView,
@@ -459,6 +460,149 @@ export function SlideKpis() {
 }
 
 /* ===================== SLIDE 6 — Bilan complet ===================== */
+// Mock illustration mimant le rapport narratif réel produit par l'onglet
+// "Bilan d'activité" (src/components/reporting/client-bilan-tab.tsx) :
+// titre + sous-titre période + sections numérotées (h2 bleu souligné) +
+// paragraphes commentés + carte graphique par section. La 3ᵉ section est
+// volontairement coupée par un fade pour suggérer le scroll.
+function BilanActiviteReport() {
+  const sectionTitle: React.CSSProperties = {
+    color: "#0077C3",
+    fontWeight: 700,
+    fontSize: "0.95rem",
+    paddingBottom: "0.4rem",
+    borderBottom: "1px solid #D0E3F5",
+    marginBottom: "0.6rem",
+  };
+  const paraPrimary: React.CSSProperties = {
+    color: "#0B1F44",
+    fontSize: "0.7rem",
+    lineHeight: 1.55,
+  };
+  const paraSoft: React.CSSProperties = {
+    color: "#5B6B85",
+    fontSize: "0.65rem",
+    lineHeight: 1.5,
+    fontStyle: "italic",
+  };
+  const chartCard: React.CSSProperties = {
+    background: "#fff",
+    border: "1px solid rgba(20,50,110,0.10)",
+    borderRadius: 12,
+    padding: "10px 12px",
+  };
+  const bold = { color: "#00122E", fontWeight: 700 };
+
+  return (
+    <div
+      className="overflow-hidden rounded-2xl border shadow-2xl"
+      style={{
+        borderColor: "rgba(20,50,110,0.10)",
+        background: "#ffffff",
+        maxHeight: "75vh",
+      }}
+    >
+      {/* Barre de fenêtre */}
+      <div
+        className="flex items-center gap-2 border-b px-4 py-3"
+        style={{ borderColor: "rgba(20,50,110,0.10)", background: "#F7FAFE" }}
+      >
+        <span
+          className="h-3 w-3 rounded-full"
+          style={{ background: "#FF5F57" }}
+        />
+        <span
+          className="h-3 w-3 rounded-full"
+          style={{ background: "#FEBC2E" }}
+        />
+        <span
+          className="h-3 w-3 rounded-full"
+          style={{ background: "#28C840" }}
+        />
+        <span
+          className="ml-3 text-sm font-semibold"
+          style={{ color: PALETTE.ink }}
+        >
+          Bilan d&apos;activité
+        </span>
+      </div>
+
+      {/* Corps du rapport */}
+      <div className="relative">
+        <div className="space-y-4 px-6 py-5">
+          {/* En-tête narratif */}
+          <div>
+            <h3
+              className="font-extrabold leading-tight"
+              style={{ color: PALETTE.ink, fontSize: "1.05rem" }}
+            >
+              Bilan d&apos;activité périodique
+            </h3>
+            <p style={paraSoft}>
+              Période : Janvier – Décembre 2025 — comparaison avec 2024.
+            </p>
+          </div>
+
+          {/* Section 1 — Chiffre d'affaires */}
+          <section>
+            <div style={sectionTitle}>1. Chiffre d&apos;affaires</div>
+            <p style={paraPrimary}>
+              Sur la période, vous avez réalisé un chiffre d&apos;affaires de{" "}
+              <span style={bold}>2 450 K FCFA</span> qui traduit une évolution
+              de <span style={{ ...bold, color: PALETTE.up }}>+18,6 %</span> par
+              rapport à l&apos;année précédente.
+            </p>
+            <div style={chartCard} className="mt-2">
+              <div className="h-14">
+                <LineSpark
+                  data={[30, 38, 33, 47, 52, 61, 73]}
+                  color={PALETTE.blue}
+                  area
+                />
+              </div>
+            </div>
+          </section>
+
+          {/* Section 2 — Recouvrement */}
+          <section>
+            <div style={sectionTitle}>2. Recouvrement</div>
+            <p style={paraPrimary}>
+              Vous avez pu encaisser <span style={bold}>92,4 %</span> des
+              montants facturés à vos clients sur cette période.
+            </p>
+            <div style={chartCard} className="mt-2">
+              <div className="h-14">
+                <BarsSpark
+                  data={[40, 58, 48, 66, 72, 60]}
+                  color={PALETTE.blue}
+                />
+              </div>
+            </div>
+          </section>
+
+          {/* Section 3 — partiellement visible, coupée par le fade */}
+          <section>
+            <div style={sectionTitle}>3. Trésorerie</div>
+            <p style={paraPrimary}>
+              Au terme de cette période, vous disposez de{" "}
+              <span style={bold}>1 150 K FCFA</span> en banque et en caisse…
+            </p>
+          </section>
+        </div>
+
+        {/* Fade-out bas pour suggérer le scroll vers la section 4 (Résultat). */}
+        <div
+          className="pointer-events-none absolute inset-x-0 bottom-0 h-24"
+          style={{
+            background:
+              "linear-gradient(to bottom, rgba(255,255,255,0) 0%, #ffffff 90%)",
+          }}
+        />
+      </div>
+    </div>
+  );
+}
+
 export function SlideBalance() {
   return (
     <LightFrame>
@@ -488,17 +632,7 @@ export function SlideBalance() {
         </div>
 
         <motion.div variants={fromRight} className="col-span-7 min-w-0">
-          <DashboardMock
-            title="Bilan de l'activité"
-            cards={[
-              { title: "Rentabilité", kind: "line" },
-              { title: "Structure financière", kind: "donut" },
-              { title: "Liquidité", kind: "bars" },
-              { title: "Cycle d'exploitation", kind: "donut" },
-              { title: "Synthèse", kind: "synth" },
-              { title: "Comparatif N / N-1", kind: "bars" },
-            ]}
-          />
+          <BilanActiviteReport />
         </motion.div>
       </motion.div>
     </LightFrame>
@@ -754,7 +888,10 @@ export function SlideCta() {
               variants={riseIn}
               className="mt-8 flex flex-wrap items-center gap-3"
             >
-              <span className="text-sm font-medium" style={{ color: PALETTE.ice }}>
+              <span
+                className="text-sm font-medium"
+                style={{ color: PALETTE.ice }}
+              >
                 Télécharger la présentation :
               </span>
               <button
@@ -876,18 +1013,20 @@ export function SlideContact() {
           </Title>
           <Lead theme="dark">
             Laissez-nous vos coordonnées : un membre de l&apos;équipe {BRAND}
-            vous recontacte sous 24 h ouvrées pour planifier une démo
-            personnalisée.
+            vous recontacte pour planifier une démo personnalisée.
           </Lead>
-          <motion.ul
-            variants={riseIn}
-            className="mt-6 space-y-2 text-sm"
-            style={{ color: PALETTE.ice }}
+
+          <motion.div
+            variants={stagger}
+            className="flex flex-col gap-4"
+            style={blockGap}
           >
-            <li>✓ Démo adaptée à votre cabinet ou entreprise</li>
-            <li>✓ Réponse sous 24 h ouvrées</li>
-            <li>✓ Sans engagement</li>
-          </motion.ul>
+            {contact.map((s) => (
+              <CheckItem theme="onPhoto" key={s.text}>
+                {s.text}
+              </CheckItem>
+            ))}
+          </motion.div>
         </div>
 
         {/* Colonne droite : formulaire ou message de succès */}
@@ -902,10 +1041,7 @@ export function SlideContact() {
             >
               <div className="flex items-center gap-3">
                 <CircleIcon name="Check" size={48} />
-                <h3
-                  className="text-2xl font-bold"
-                  style={{ color: "#fff" }}
-                >
+                <h3 className="text-2xl font-bold" style={{ color: "#fff" }}>
                   Demande envoyée !
                 </h3>
               </div>
