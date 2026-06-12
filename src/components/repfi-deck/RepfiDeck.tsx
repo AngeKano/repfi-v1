@@ -40,6 +40,20 @@ function Deck() {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      // Quand l'utilisateur est en train de saisir dans un champ (formulaire
+      // de contact, etc.), on laisse le navigateur traiter Space, Enter,
+      // flèches, etc. — sinon Space changerait de slide au lieu d'insérer
+      // un espace, et les flèches déplaceraient le curseur de slide au lieu
+      // du curseur de texte.
+      const target = e.target as HTMLElement | null;
+      const isEditable =
+        !!target &&
+        (target.tagName === "INPUT" ||
+          target.tagName === "TEXTAREA" ||
+          target.tagName === "SELECT" ||
+          target.isContentEditable);
+      if (isEditable) return;
+
       if (["ArrowRight", "ArrowDown", " ", "Enter", "PageDown"].includes(e.key)) {
         e.preventDefault();
         paginate(1);

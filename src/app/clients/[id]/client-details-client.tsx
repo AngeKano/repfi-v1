@@ -63,7 +63,7 @@ const CLIENT_TABS = [
   { id: "resultats", label: "Résultats", icon: PiChartDonutDuotone },
   { id: "recouvrement", label: "Recouvrement", icon: PiHandCoinsDuotone },
   { id: "dettes", label: "Dettes", icon: PiScalesDuotone },
-  { id: "bilan", label: "Bilan", icon: PiBookOpenDuotone },
+  { id: "bilan", label: "Bilan d'activité", icon: PiBookOpenDuotone },
   { id: "members", label: "Membres", icon: PiUsersThreeDuotone },
   {
     id: "declaration",
