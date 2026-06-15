@@ -29,7 +29,6 @@ import {
   XAxis,
   YAxis,
   CartesianGrid,
-  Cell,
 } from "recharts";
 import {
   ChevronLeft,
@@ -49,7 +48,8 @@ import { cn } from "@/lib/utils";
 // Compose les endpoints existants :
 //   - /api/clients/[id]/reporting              (CA, trésorerie, VA, résultat…)
 //   - /api/clients/[id]/reporting/recouvrement (taux, créances, Top 10)
-// Les filtres (Périodique/Cumulé, Année, Mois) sont partagés via le parent.
+// IMPORTANT : ce rapport travaille TOUJOURS en cumulé (YTD Jan → mois
+// sélectionné), quel que soit le "Mode calcul" choisi dans la barre de filtres.
 // ============================================================================
 
 type PeriodType = "year" | "month" | "ytd" | "ytd-day";
@@ -69,8 +69,11 @@ interface ClientBilanTabProps {
 // ---- Types des réponses API (sous-ensemble utilisé ici) --------------------
 interface ReportingIndicateurs {
   chiffreAffaires: number;
+  margeCommerciale: number;
   masseSalariale: number;
   resultatExploitation: number;
+  resultatFinancier: number;
+  resultatHAO: number;
   resultatNet: number;
   soldeTresorerie: number;
   valeurAjoutee: number;
@@ -90,8 +93,6 @@ interface ReportingChartPoint {
   label: string;
   chiffreAffaires: number;
   chiffreAffairesN1: number;
-  chiffreAffairesPeriodique: number;
-  chiffreAffairesPeriodiqueN1: number;
   soldeTresorerie: number;
   soldeTresorerieN1: number;
 }
@@ -189,6 +190,60 @@ function Variation({ value }: { value: number }) {
   );
 }
 
+// ---- Légende N vs N-1 (réplique de client-reporting-chart.tsx) -------------
+function LegendLine({ color, dashed }: { color: string; dashed?: boolean }) {
+  return (
+    <svg
+      width="120"
+      height="4"
+      viewBox="0 0 199 3"
+      fill="none"
+      aria-hidden
+      preserveAspectRatio="none"
+    >
+      <path
+        d="M1.5 1.5H197.5"
+        stroke={color}
+        strokeWidth="3"
+        strokeLinecap="round"
+        strokeDasharray={dashed ? "6 6" : undefined}
+      />
+    </svg>
+  );
+}
+
+function ChartLegend({
+  labelN,
+  labelN1,
+  colorN = "#000000",
+  colorN1,
+  solid = false,
+}: {
+  labelN: string | number;
+  labelN1?: string | number;
+  colorN?: string;
+  colorN1?: string;
+  solid?: boolean;
+}) {
+  return (
+    <div className="flex flex-col gap-1 shrink-0">
+      <span className="text-base font-semibold text-[#335890]">Légende</span>
+      <div className="flex items-center gap-3">
+        <LegendLine color={colorN} />
+        <span className="text-base font-medium text-[#0077C3]">{labelN}</span>
+      </div>
+      {labelN1 !== undefined && (
+        <div className="flex items-center gap-3">
+          <LegendLine color={colorN1 ?? colorN} dashed={!solid} />
+          <span className="text-base font-medium text-[#0077C3]">
+            {labelN1}
+          </span>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function ClientBilanTab({
   clientId,
   year,
@@ -206,9 +261,6 @@ export default function ClientBilanTab({
   );
   const [loading, setLoading] = useState(true);
 
-  const mode: "cumule" | "periodique" =
-    periodType === "ytd" || periodType === "ytd-day" ? "cumule" : "periodique";
-
   const yearOptions = useMemo(() => {
     const current = new Date().getFullYear();
     const years: string[] = [];
@@ -216,29 +268,23 @@ export default function ClientBilanTab({
     return years;
   }, []);
 
+  // Mois de fin du cumul : année entière (mode Année / granularité Année) →
+  // Décembre ; sinon le mois sélectionné. Le rapport est TOUJOURS cumulé.
+  const endMonth =
+    periodType === "year" || cumulGranularity === "annee"
+      ? "12"
+      : selectedMonth;
+
   useEffect(() => {
     const fetchAll = async () => {
       setLoading(true);
       try {
-        // Fenêtre (startPeriod → endPeriod) pour le recouvrement, calquée sur
-        // client-dettes-tab.tsx.
-        let startMonth: string;
-        let endMonth: string;
-        if (periodType === "month" || periodType === "ytd-day") {
-          startMonth = "01";
-          endMonth = selectedMonth;
-        } else if (periodType === "year") {
-          startMonth = "01";
-          endMonth = "12";
-        } else {
-          // ytd
-          startMonth = "01";
-          endMonth = cumulGranularity === "annee" ? "12" : selectedMonth;
-        }
-        const startPeriod = `${year}-${startMonth}`;
+        const startPeriod = `${year}-01`;
         const endPeriod = `${year}-${endMonth}`;
 
-        const reportingUrl = `/api/clients/${clientId}/reporting?year=${year}&periodType=${periodType}&month=${selectedMonth}`;
+        // On force periodType=ytd (cumulé) pour obtenir des indicateurs et une
+        // courbe cumulés — indépendamment du mode de calcul de la barre.
+        const reportingUrl = `/api/clients/${clientId}/reporting?year=${year}&periodType=ytd&month=${endMonth}`;
         const recouvrementUrl = `/api/clients/${clientId}/reporting/recouvrement?endPeriod=${endPeriod}&startPeriod=${startPeriod}`;
 
         const [r1, r2] = await Promise.all([
@@ -258,7 +304,7 @@ export default function ClientBilanTab({
       }
     };
     fetchAll();
-  }, [clientId, year, selectedMonth, periodType, cumulGranularity]);
+  }, [clientId, year, endMonth]);
 
   const handleYearChange = (direction: "prev" | "next") => {
     const idx = yearOptions.indexOf(year);
@@ -271,31 +317,22 @@ export default function ClientBilanTab({
 
   const getPeriodLabel = (): string => {
     if (periodType === "year") return `Janvier - Décembre ${year}`;
-    if (periodType === "ytd") {
-      const m = MONTHS.find((x) => x.value === selectedMonth);
-      return `Janvier - ${m?.label || ""} ${year}`;
-    }
-    if (periodType === "ytd-day") {
-      const m = MONTHS.find((x) => x.value === selectedMonth);
-      return `Janvier - ${m?.label || ""} ${year} (jour par jour)`;
-    }
+    if (cumulGranularity === "annee") return `Janvier - Décembre ${year}`;
     const m = MONTHS.find((x) => x.value === selectedMonth);
-    return `${m?.label || ""} ${year}`;
+    return `Janvier - ${m?.label || ""} ${year}`;
   };
 
-  // Données dérivées pour les graphiques (sélection N / N-1 selon le mode).
+  const yearN1 = reporting?.yearN1 ?? (parseInt(year) - 1).toString();
+
+  // CA et trésorerie : séries toujours cumulées (N vs N-1).
   const caChart = useMemo(() => {
     if (!reporting) return [];
     return reporting.chartData.map((d) => ({
       label: d.label,
-      caN:
-        mode === "cumule" ? d.chiffreAffaires : d.chiffreAffairesPeriodique,
-      caN1:
-        mode === "cumule"
-          ? d.chiffreAffairesN1
-          : d.chiffreAffairesPeriodiqueN1,
+      caN: d.chiffreAffaires,
+      caN1: d.chiffreAffairesN1,
     }));
-  }, [reporting, mode]);
+  }, [reporting]);
 
   const tresoChart = useMemo(() => {
     if (!reporting) return [];
@@ -306,24 +343,31 @@ export default function ClientBilanTab({
     }));
   }, [reporting]);
 
-  // Tunnel de formation du résultat (niveaux SIG clés).
-  const tunnelChart = useMemo(() => {
+  // Tunnel de rentabilité (réplique de client-reporting-chart.tsx) :
+  // métriques SIG, % du CA, barres horizontales (négatif rouge / positif bleu).
+  const tunnelData = useMemo(() => {
     if (!reporting) return [];
     const ind = reporting.indicateurs.anneeN;
-    return [
-      { label: "Chiffre d'affaires", value: ind.chiffreAffaires, fill: "#0077C3" },
-      { label: "Valeur ajoutée", value: ind.valeurAjoutee, fill: "#0095F4" },
-      { label: "EBE", value: ind.ebe, fill: "#38BDF8" },
-      {
-        label: "Résultat d'exploitation",
-        value: ind.resultatExploitation,
-        fill: "#22C55E",
-      },
-      { label: "Résultat net", value: ind.resultatNet, fill: "#16A34A" },
+    const ca = ind.chiffreAffaires;
+    const metrics: { name: string; value: number }[] = [
+      { name: "Chiffre d'affaires", value: ind.chiffreAffaires },
+      { name: "Marge Commerciale", value: ind.margeCommerciale },
+      { name: "Valeur Ajoutée", value: ind.valeurAjoutee },
+      { name: "Rés. Exploitation", value: ind.resultatExploitation },
+      { name: "Résultat Financier", value: ind.resultatFinancier },
+      { name: "Résultat HAO", value: ind.resultatHAO },
+      { name: "Résultat Net", value: ind.resultatNet },
     ];
+    return metrics.map((m) => ({
+      ...m,
+      percentage: ca !== 0 ? (m.value / ca) * 100 : 0,
+    }));
   }, [reporting]);
 
-  const yearN1 = reporting?.yearN1 ?? (parseInt(year) - 1).toString();
+  const maxAbsValue = useMemo(() => {
+    if (tunnelData.length === 0) return 0;
+    return Math.max(...tunnelData.map((d) => Math.abs(d.value)));
+  }, [tunnelData]);
 
   return (
     <div className="space-y-6">
@@ -446,7 +490,8 @@ export default function ClientBilanTab({
         Bilan d&apos;activité périodique
       </h1>
       <p className="text-sm text-[#335890] italic -mt-3">
-        Période : {getPeriodLabel()} — comparaison avec {yearN1}.
+        Période : {getPeriodLabel()} — comparaison avec {yearN1} (valeurs
+        cumulées).
       </p>
 
       {loading ? (
@@ -475,16 +520,31 @@ export default function ClientBilanTab({
               par rapport à l&apos;année précédente.
             </p>
             <p className="text-[#335890]">
-              Voici la tendance d&apos;évolution de votre chiffre d&apos;affaires :
+              Voici la tendance d&apos;évolution de votre chiffre d&apos;affaires
+              (cumulé) :
             </p>
             <Card>
-              <CardContent className="pt-6">
+              <CardHeader className="flex flex-row items-start justify-between gap-4">
+                <div>
+                  <CardTitle>Évolution du Chiffre d&apos;Affaires</CardTitle>
+                  <CardDescription>
+                    Cumulé — {year} vs {yearN1}
+                  </CardDescription>
+                </div>
+                <ChartLegend
+                  labelN={`CA ${year}`}
+                  labelN1={`CA ${yearN1}`}
+                  colorN="hsl(221, 83%, 53%)"
+                  colorN1="hsl(221, 83%, 73%)"
+                />
+              </CardHeader>
+              <CardContent>
                 <ChartContainer
                   config={{
-                    caN: { label: `CA ${year}`, color: "#0077C3" },
-                    caN1: { label: `CA ${yearN1}`, color: "#94A3B8" },
+                    caN: { label: `CA ${year}`, color: "hsl(221, 83%, 53%)" },
+                    caN1: { label: `CA ${yearN1}`, color: "hsl(221, 83%, 73%)" },
                   }}
-                  className="h-[300px] w-full"
+                  className="h-[350px] w-full"
                 >
                   <LineChart
                     data={caChart}
@@ -518,20 +578,20 @@ export default function ClientBilanTab({
                     />
                     <Line
                       type="monotone"
-                      dataKey="caN"
-                      name="caN"
-                      stroke="#0077C3"
-                      strokeWidth={2}
-                      dot={{ r: 4 }}
-                    />
-                    <Line
-                      type="monotone"
                       dataKey="caN1"
                       name="caN1"
-                      stroke="#94A3B8"
+                      stroke="hsl(221, 83%, 73%)"
                       strokeWidth={2}
                       dot={{ r: 3 }}
                       strokeDasharray="5 5"
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey="caN"
+                      name="caN"
+                      stroke="hsl(221, 83%, 53%)"
+                      strokeWidth={2}
+                      dot={{ r: 4 }}
                     />
                   </LineChart>
                 </ChartContainer>
@@ -554,19 +614,33 @@ export default function ClientBilanTab({
               Voici la courbe d&apos;évolution de votre taux de recouvrement :
             </p>
             <Card>
-              <CardContent className="pt-6">
+              <CardHeader className="flex flex-row items-start justify-between gap-4">
+                <div>
+                  <CardTitle>Évolution du Taux de Recouvrement</CardTitle>
+                  <CardDescription>
+                    (Encaissements Clients TTC / Créances Clients TTC) × 100
+                  </CardDescription>
+                </div>
+                <ChartLegend
+                  labelN="Taux cumulé"
+                  labelN1="Taux périodique"
+                  colorN="hsl(262, 83%, 58%)"
+                  colorN1="hsl(262, 83%, 78%)"
+                />
+              </CardHeader>
+              <CardContent>
                 <ChartContainer
                   config={{
                     tauxRecouvrementCumule: {
                       label: "Taux cumulé",
-                      color: "#0077C3",
+                      color: "hsl(262, 83%, 58%)",
                     },
                     tauxRecouvrement: {
                       label: "Taux périodique",
-                      color: "#7DD3FC",
+                      color: "hsl(262, 83%, 78%)",
                     },
                   }}
-                  className="h-[300px] w-full"
+                  className="h-[350px] w-full"
                 >
                   <LineChart
                     data={recouvrement.chartData}
@@ -594,7 +668,7 @@ export default function ClientBilanTab({
                         <ChartTooltipContent
                           formatter={(value, name) => [
                             `${(value as number).toFixed(1)}%`,
-                            name === "tauxRecouvrementCumule"
+                            name === "Taux cumulé"
                               ? "Taux cumulé"
                               : "Taux périodique",
                           ]}
@@ -604,16 +678,16 @@ export default function ClientBilanTab({
                     <Line
                       type="monotone"
                       dataKey="tauxRecouvrementCumule"
-                      name="tauxRecouvrementCumule"
-                      stroke="#0077C3"
+                      name="Taux cumulé"
+                      stroke="hsl(262, 83%, 58%)"
                       strokeWidth={2}
                       dot={{ r: 4 }}
                     />
                     <Line
                       type="monotone"
                       dataKey="tauxRecouvrement"
-                      name="tauxRecouvrement"
-                      stroke="#7DD3FC"
+                      name="Taux périodique"
+                      stroke="hsl(262, 83%, 78%)"
                       strokeWidth={2}
                       dot={{ r: 3 }}
                       strokeDasharray="5 5"
@@ -633,13 +707,36 @@ export default function ClientBilanTab({
               de ce que vous avez encaissé mois par mois sur cette période :
             </p>
             <Card>
-              <CardContent className="pt-6">
+              <CardHeader className="flex flex-row items-start justify-between gap-4">
+                <div>
+                  <CardTitle>
+                    Créances Clients TTC vs Encaissements Clients TTC
+                  </CardTitle>
+                  <CardDescription>
+                    Comparaison mensuelle des montants
+                  </CardDescription>
+                </div>
+                <ChartLegend
+                  labelN="Créances Clients TTC"
+                  labelN1="Encaissements Clients TTC"
+                  colorN="hsl(221, 83%, 53%)"
+                  colorN1="hsl(221, 83%, 73%)"
+                  solid
+                />
+              </CardHeader>
+              <CardContent>
                 <ChartContainer
                   config={{
-                    caTTCTotal: { label: "Créances TTC", color: "#0077C3" },
-                    caEncaisseTTC: { label: "Encaissé TTC", color: "#22C55E" },
+                    caTTCTotal: {
+                      label: "Créances Clients TTC",
+                      color: "hsl(221, 83%, 53%)",
+                    },
+                    caEncaisseTTC: {
+                      label: "Encaissements Clients TTC",
+                      color: "hsl(221, 83%, 73%)",
+                    },
                   }}
-                  className="h-[300px] w-full"
+                  className="h-[350px] w-full"
                 >
                   <BarChart
                     data={recouvrement.chartData}
@@ -665,26 +762,26 @@ export default function ClientBilanTab({
                       content={
                         <ChartTooltipContent
                           formatter={(value, name) => [
-                            `${fmtK(value as number)} K`,
-                            name === "caTTCTotal"
-                              ? "Créances TTC"
-                              : "Encaissé TTC",
+                            formatCompactOnly(value as number),
+                            name === "Créances Clients TTC"
+                              ? "Créances Clients TTC"
+                              : "Encaissements Clients TTC",
                           ]}
                         />
                       }
                     />
                     <Bar
                       dataKey="caTTCTotal"
-                      name="caTTCTotal"
-                      fill="#0077C3"
-                      barSize={20}
+                      name="Créances Clients TTC"
+                      fill="hsl(221, 83%, 53%)"
+                      barSize={24}
                       radius={[4, 4, 0, 0]}
                     />
                     <Bar
                       dataKey="caEncaisseTTC"
-                      name="caEncaisseTTC"
-                      fill="#22C55E"
-                      barSize={20}
+                      name="Encaissements Clients TTC"
+                      fill="hsl(221, 83%, 73%)"
+                      barSize={24}
                       radius={[4, 4, 0, 0]}
                     />
                   </BarChart>
@@ -714,19 +811,35 @@ export default function ClientBilanTab({
             </p>
             <p className="text-[#335890]">
               Voici la courbe d&apos;évolution de vos avoirs en banque et en
-              caisse :
+              caisse (solde toujours cumulé) :
             </p>
             <Card>
-              <CardContent className="pt-6">
+              <CardHeader className="flex flex-row items-start justify-between gap-4">
+                <div>
+                  <CardTitle>Évolution de la Trésorerie</CardTitle>
+                  <CardDescription>
+                    Solde toujours cumulé — {year} vs {yearN1}
+                  </CardDescription>
+                </div>
+                <ChartLegend
+                  labelN={`Trésorerie ${year}`}
+                  labelN1={`Trésorerie ${yearN1}`}
+                  colorN="#5FC7B9"
+                />
+              </CardHeader>
+              <CardContent>
                 <ChartContainer
                   config={{
-                    tresoN: { label: `Trésorerie ${year}`, color: "#0077C3" },
+                    tresoN: {
+                      label: `Trésorerie ${year}`,
+                      color: "hsl(174, 72%, 46%)",
+                    },
                     tresoN1: {
                       label: `Trésorerie ${yearN1}`,
-                      color: "#94A3B8",
+                      color: "hsl(174, 72%, 66%)",
                     },
                   }}
-                  className="h-[300px] w-full"
+                  className="h-[350px] w-full"
                 >
                   <LineChart
                     data={tresoChart}
@@ -762,20 +875,20 @@ export default function ClientBilanTab({
                     />
                     <Line
                       type="monotone"
-                      dataKey="tresoN"
-                      name="tresoN"
-                      stroke="#0077C3"
-                      strokeWidth={2}
-                      dot={{ r: 4 }}
-                    />
-                    <Line
-                      type="monotone"
                       dataKey="tresoN1"
                       name="tresoN1"
-                      stroke="#94A3B8"
+                      stroke="hsl(174, 72%, 66%)"
                       strokeWidth={2}
                       dot={{ r: 3 }}
                       strokeDasharray="5 5"
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey="tresoN"
+                      name="tresoN"
+                      stroke="hsl(174, 72%, 46%)"
+                      strokeWidth={2}
+                      dot={{ r: 4 }}
                     />
                   </LineChart>
                 </ChartContainer>
@@ -802,48 +915,7 @@ export default function ClientBilanTab({
               Analysons ce tunnel pour comprendre comment s&apos;est formé votre
               résultat :
             </p>
-            <Card>
-              <CardContent className="pt-6">
-                <ChartContainer
-                  config={{ value: { label: "Montant", color: "#0077C3" } }}
-                  className="h-[320px] w-full"
-                >
-                  <BarChart
-                    data={tunnelChart}
-                    margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
-                  >
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                    <XAxis
-                      dataKey="label"
-                      tickLine={false}
-                      axisLine={false}
-                      fontSize={10}
-                      angle={-20}
-                      textAnchor="end"
-                      height={70}
-                    />
-                    <YAxis
-                      tickLine={false}
-                      axisLine={false}
-                      tickFormatter={(v) => fmtMillions(v as number)}
-                      fontSize={12}
-                    />
-                    <ChartTooltip
-                      content={
-                        <ChartTooltipContent
-                          formatter={(value) => [`${fmtK(value as number)} K`, ""]}
-                        />
-                      }
-                    />
-                    <Bar dataKey="value" name="value" radius={[4, 4, 0, 0]}>
-                      {tunnelChart.map((entry, i) => (
-                        <Cell key={i} fill={entry.fill} />
-                      ))}
-                    </Bar>
-                  </BarChart>
-                </ChartContainer>
-              </CardContent>
-            </Card>
+            <TunnelRentabilite data={tunnelData} maxAbsValue={maxAbsValue} />
             <p className="text-[#00122E] leading-relaxed">
               De votre chiffre d&apos;affaires de{" "}
               <B>{fmtK(reporting.indicateurs.anneeN.chiffreAffaires)} K FCFA</B>{" "}
@@ -899,6 +971,100 @@ export default function ClientBilanTab({
         </>
       )}
     </div>
+  );
+}
+
+// ==================== FORMAT COMPACT (réplique reporting-chart) ====================
+function formatCompactOnly(value: number): string {
+  const absValue = Math.abs(value);
+  if (absValue >= 1000) {
+    return `${Math.round(value / 1000).toLocaleString("fr-FR")}K`;
+  }
+  return value.toLocaleString("fr-FR");
+}
+
+// ==================== TUNNEL DE RENTABILITÉ (réplique) ====================
+function TunnelRentabilite({
+  data,
+  maxAbsValue,
+}: {
+  data: { name: string; value: number; percentage: number }[];
+  maxAbsValue: number;
+}) {
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Tunnel de rentabilité</CardTitle>
+        <CardDescription>
+          Décomposition du résultat - Base 100% = Chiffre d&apos;affaires
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-3">
+          {data.map((item) => {
+            const barWidth =
+              maxAbsValue !== 0 ? (Math.abs(item.value) / maxAbsValue) * 85 : 0;
+            const isPositive = item.value >= 0;
+            return (
+              <div key={item.name} className="flex items-center gap-4">
+                <div className="w-44 text-sm font-medium text-right shrink-0">
+                  {item.name}
+                </div>
+                <div className="flex-1 flex items-center h-11">
+                  <div className="w-1/2 flex justify-end pr-1">
+                    {!isPositive && (
+                      <div
+                        className="h-9 rounded-l-md transition-all duration-500 ease-out flex items-center justify-end pr-2"
+                        style={{
+                          width: `${barWidth}%`,
+                          backgroundColor: "hsl(0, 84%, 60%)",
+                          minWidth: item.value !== 0 ? "60px" : "0",
+                        }}
+                      >
+                        <span className="text-xs font-semibold text-white whitespace-nowrap">
+                          {formatCompactOnly(item.value)}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                  <div className="w-0.5 h-11 bg-gray-300 shrink-0" />
+                  <div className="w-1/2 flex justify-start pl-1">
+                    {isPositive && (
+                      <div
+                        className="h-9 rounded-r-md transition-all duration-500 ease-out flex items-center pl-2"
+                        style={{
+                          width: `${barWidth}%`,
+                          backgroundColor: "hsl(221, 83%, 53%)",
+                          minWidth: item.value !== 0 ? "60px" : "0",
+                        }}
+                      >
+                        <span className="text-xs font-semibold text-white whitespace-nowrap">
+                          {formatCompactOnly(item.value)}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+                <div className="w-20 text-sm font-medium text-right shrink-0">
+                  {item.percentage.toFixed(1)}%
+                </div>
+              </div>
+            );
+          })}
+          <div className="flex items-center gap-4 mt-6 pt-4 border-t">
+            <div className="w-44" />
+            <div className="flex-1 flex items-center text-xs text-muted-foreground">
+              <span className="w-1/2 text-right pr-4">← Négatif</span>
+              <div className="w-0.5 h-4 bg-gray-300" />
+              <span className="w-1/2 text-left pl-4">Positif →</span>
+            </div>
+            <div className="w-20 text-xs text-muted-foreground text-right">
+              % du CA
+            </div>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 
