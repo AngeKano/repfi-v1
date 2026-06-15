@@ -9,7 +9,7 @@ import { Resend } from "resend";
 //
 // Variables d'environnement requises :
 //   RESEND_API_KEY    Clé API Resend  (https://resend.com)
-//   DEMO_EMAIL_TO     Destinataire    (par défaut : grkla@envolperformances.onmicrosoft.com)
+//   DEMO_EMAIL_TO     Destinataire    (par défaut : contact@clickinsight.org)
 //   DEMO_EMAIL_FROM   Expéditeur      (par défaut : onboarding@resend.dev — sandbox Resend)
 // ============================================================================
 
@@ -115,7 +115,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const to = process.env.DEMO_EMAIL_TO || "grkla@envolperformances.onmicrosoft.com";
+  const to = process.env.DEMO_EMAIL_TO || "contact@clickinsight.org";
   const from = process.env.DEMO_EMAIL_FROM || "REPFI <onboarding@resend.dev>";
 
   const resend = new Resend(apiKey);
