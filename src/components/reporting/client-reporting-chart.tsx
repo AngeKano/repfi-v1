@@ -492,6 +492,105 @@ function saveRecouvrementKpiConfig(
   );
 }
 
+// ==================== KPI CONFIG — RÉSULTATS ====================
+const DEFAULT_RESULTAT_KPIS: KpiItem[] = [
+  {
+    id: "rex",
+    label: "Résultat Exploitation",
+    key: "resultatExploitation",
+    variationKey: "resultatExploitation",
+    color: "text-fuchsia-500",
+    colorNeg: "text-red-600",
+    icon: PiChartDonutDuotone,
+    visible: true,
+    order: 0,
+  },
+  {
+    id: "rf",
+    label: "Résultat Financier",
+    key: "resultatFinancier",
+    variationKey: "resultatFinancier",
+    color: "text-amber-600",
+    colorNeg: "text-red-600",
+    icon: PiReceiptDuotone,
+    visible: true,
+    order: 1,
+  },
+  {
+    id: "rhao",
+    label: "Résultat HAO",
+    key: "resultatHAO",
+    variationKey: "resultatHAO",
+    color: "text-yellow-500",
+    colorNeg: "text-red-600",
+    icon: PiCalculatorDuotone,
+    visible: true,
+    order: 2,
+  },
+  {
+    id: "rn",
+    label: "Résultat Net",
+    key: "resultatNet",
+    variationKey: "resultatNet",
+    color: "text-green-500",
+    colorNeg: "text-red-600",
+    icon: PiChartDonutDuotone,
+    visible: true,
+    order: 3,
+  },
+  {
+    id: "va",
+    label: "Valeur Ajoutée",
+    key: "valeurAjoutee",
+    variationKey: "valeurAjoutee",
+    color: "text-indigo-600",
+    colorNeg: "text-red-600",
+    icon: PiChartDonutDuotone,
+    visible: false,
+    order: 4,
+  },
+  {
+    id: "ebe",
+    label: "Excédent Brut d'Exploitation",
+    key: "ebe",
+    variationKey: "ebe",
+    color: "text-cyan-600",
+    colorNeg: "text-red-600",
+    icon: PiChartDonutDuotone,
+    visible: false,
+    order: 5,
+  },
+];
+
+function loadResultatKpiConfig(clientId: string): KpiItem[] {
+  if (typeof window === "undefined") return DEFAULT_RESULTAT_KPIS;
+  try {
+    const raw = localStorage.getItem(`kpi-config-resultat-${clientId}`);
+    if (!raw) return DEFAULT_RESULTAT_KPIS;
+    const saved = JSON.parse(raw) as Array<{
+      id: string;
+      visible: boolean;
+      order: number;
+    }>;
+    return DEFAULT_RESULTAT_KPIS.map((d) => {
+      const s = saved.find((x) => x.id === d.id);
+      return s ? { ...d, visible: s.visible, order: s.order } : d;
+    }).sort((a, b) => a.order - b.order);
+  } catch {
+    return DEFAULT_RESULTAT_KPIS;
+  }
+}
+
+function saveResultatKpiConfig(clientId: string, items: KpiItem[]) {
+  if (typeof window === "undefined") return;
+  const data = items.map((i) => ({
+    id: i.id,
+    visible: i.visible,
+    order: i.order,
+  }));
+  localStorage.setItem(`kpi-config-resultat-${clientId}`, JSON.stringify(data));
+}
+
 const chartConfigFlux: ChartConfig = {
   produits: { label: "Produits", color: "hsl(142, 76%, 36%)" },
   charges: { label: "Charges", color: "hsl(0, 84%, 60%)" },
@@ -675,6 +774,41 @@ export default function ClientReportingChart({
     const [moved] = items.splice(fromIdx, 1);
     items.splice(toIdx, 0, moved);
     updateRecouvrementKpi(items);
+  };
+
+  // KPI configuration state — onglet Résultats
+  const [resultatKpiItems, setResultatKpiItems] = useState<KpiItem[]>(() =>
+    loadResultatKpiConfig(clientId),
+  );
+  const [resultatKpiEditMode, setResultatKpiEditMode] = useState(false);
+  const [resultatKpiDragId, setResultatKpiDragId] = useState<string | null>(
+    null,
+  );
+
+  const updateResultatKpi = (newItems: KpiItem[]) => {
+    const reordered = newItems.map((item, idx) => ({ ...item, order: idx }));
+    setResultatKpiItems(reordered);
+    saveResultatKpiConfig(clientId, reordered);
+  };
+
+  const toggleResultatKpiVisible = (id: string) => {
+    updateResultatKpi(
+      resultatKpiItems.map((k) =>
+        k.id === id ? { ...k, visible: !k.visible } : k,
+      ),
+    );
+  };
+
+  const handleResultatKpiDragOver = (e: React.DragEvent, targetId: string) => {
+    e.preventDefault();
+    if (!resultatKpiDragId || resultatKpiDragId === targetId) return;
+    const items = [...resultatKpiItems];
+    const fromIdx = items.findIndex((k) => k.id === resultatKpiDragId);
+    const toIdx = items.findIndex((k) => k.id === targetId);
+    if (fromIdx === -1 || toIdx === -1) return;
+    const [moved] = items.splice(fromIdx, 1);
+    items.splice(toIdx, 0, moved);
+    updateResultatKpi(items);
   };
 
   // Sync activeTab with initialTab when parent changes it
@@ -1948,113 +2082,102 @@ export default function ClientReportingChart({
       case "resultat":
         return (
           <div className="space-y-6">
-            {/* KPIs Résultat */}
-            <div className="grid grid-cols-4 gap-4">
-              <Card>
-                <CardHeader className="pb-2">
-                  <div className="flex items-center justify-between">
-                    <CardDescription className="text-sm font-medium">
-                      Résultat Exploitation
-                    </CardDescription>
-                    <VariationBadge
-                      value={data.indicateurs.variations.resultatExploitation}
-                    />
-                  </div>
-                </CardHeader>
-                <CardContent className="pt-0">
-                  <div className="flex items-end justify-between gap-2">
-                    <div
-                      className={cn(
-                        "text-3xl font-bold truncate",
-                        data.indicateurs.anneeN.resultatExploitation < 0
-                          ? "text-red-600"
-                          : "text-[#00122E]",
-                      )}
-                    >
-                      {formatCompactOnly(
-                        data.indicateurs.anneeN.resultatExploitation,
-                      )}
-                    </div>
-                    <PiChartDonutDuotone className="w-8 h-8 shrink-0 text-fuchsia-500" />
-                  </div>
-                </CardContent>
-              </Card>
+            {/* KPIs Résultat — grille configurable */}
+            <div>
+              <div className="flex items-center justify-between mb-3">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setResultatKpiEditMode(!resultatKpiEditMode)}
+                  className={cn(
+                    "gap-2 h-9 rounded-lg transition-colors",
+                    resultatKpiEditMode
+                      ? "bg-[#0077C3] text-white border-[#0077C3] hover:bg-[#005992]"
+                      : "border-[#D0E3F5] text-[#335890] hover:bg-[#EBF5FF]",
+                  )}
+                >
+                  <PiGearDuotone className="w-4 h-4" />
+                  {resultatKpiEditMode ? "Terminer" : "Configurer les KPIs"}
+                </Button>
+              </div>
 
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardDescription className="text-sm font-medium">
-                    Résultat Financier
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="pt-0">
-                  <div className="flex items-end justify-between gap-2">
-                    <div
-                      className={cn(
-                        "text-3xl font-bold truncate",
-                        data.indicateurs.anneeN.resultatFinancier < 0
-                          ? "text-red-600"
-                          : "text-[#00122E]",
-                      )}
-                    >
-                      {formatCompactOnly(
-                        data.indicateurs.anneeN.resultatFinancier,
-                      )}
-                    </div>
-                    <PiReceiptDuotone className="w-8 h-8 shrink-0 text-amber-600" />
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardDescription className="text-sm font-medium">
-                    Résultat HAO
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="pt-0">
-                  <div className="flex items-end justify-between gap-2">
-                    <div
-                      className={cn(
-                        "text-3xl font-bold truncate",
-                        data.indicateurs.anneeN.resultatHAO < 0
-                          ? "text-red-600"
-                          : "text-[#00122E]",
-                      )}
-                    >
-                      {formatCompactOnly(data.indicateurs.anneeN.resultatHAO)}
-                    </div>
-                    <PiCalculatorDuotone className="w-8 h-8 shrink-0 text-yellow-500" />
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader className="pb-2">
-                  <div className="flex items-center justify-between">
-                    <CardDescription className="text-sm font-medium">
-                      Résultat Net
-                    </CardDescription>
-                    <VariationBadge
-                      value={data.indicateurs.variations.resultatNet}
-                    />
-                  </div>
-                </CardHeader>
-                <CardContent className="pt-0">
-                  <div className="flex items-end justify-between gap-2">
-                    <div
-                      className={cn(
-                        "text-3xl font-bold truncate",
-                        data.indicateurs.anneeN.resultatNet < 0
-                          ? "text-red-600"
-                          : "text-[#00122E]",
-                      )}
-                    >
-                      {formatCompactOnly(data.indicateurs.anneeN.resultatNet)}
-                    </div>
-                    <PiChartDonutDuotone className="w-8 h-8   shrink-0 text-green-500" />
-                  </div>
-                </CardContent>
-              </Card>
+              <div className="grid grid-cols-4 gap-4">
+                {resultatKpiItems
+                  .filter((k) => resultatKpiEditMode || k.visible)
+                  .map((kpi) => {
+                    const Icon = kpi.icon;
+                    const valueN = data.indicateurs.anneeN[kpi.key] as number;
+                    const variation = data.indicateurs.variations[
+                      kpi.variationKey
+                    ] as number;
+                    const isDragging = resultatKpiDragId === kpi.id;
+                    return (
+                      <div
+                        key={kpi.id}
+                        draggable={resultatKpiEditMode}
+                        onDragStart={() => setResultatKpiDragId(kpi.id)}
+                        onDragOver={(e) => handleResultatKpiDragOver(e, kpi.id)}
+                        onDragEnd={() => setResultatKpiDragId(null)}
+                        className={cn(
+                          "transition-all duration-200",
+                          resultatKpiEditMode &&
+                            "cursor-grab active:cursor-grabbing",
+                          isDragging && "opacity-50 rotate-2 scale-95",
+                          !kpi.visible && "opacity-40",
+                        )}
+                      >
+                        <Card
+                          className={cn(
+                            "relative overflow-hidden",
+                            resultatKpiEditMode &&
+                              "border-dashed border-[#0077C3] ring-1 ring-[#0077C3]/20",
+                          )}
+                        >
+                          {resultatKpiEditMode && (
+                            <button
+                              onClick={() => toggleResultatKpiVisible(kpi.id)}
+                              className="absolute top-2 right-2 z-10 w-6 h-6 rounded-full flex items-center justify-center bg-white border border-[#D0E3F5] text-[#94A3B8] hover:text-[#0077C3] transition-colors"
+                              title={kpi.visible ? "Masquer" : "Afficher"}
+                            >
+                              {kpi.visible ? (
+                                <Eye className="w-3.5 h-3.5" />
+                              ) : (
+                                <EyeOffIcon className="w-3.5 h-3.5" />
+                              )}
+                            </button>
+                          )}
+                          <CardHeader className="pb-2">
+                            <div className="flex items-center justify-between gap-2">
+                              <CardDescription className="text-sm font-medium">
+                                {kpi.label}
+                              </CardDescription>
+                              {!resultatKpiEditMode && (
+                                <VariationBadge value={variation} />
+                              )}
+                            </div>
+                          </CardHeader>
+                          <CardContent className="pt-0">
+                            <div className="flex items-end justify-between gap-2">
+                              <div
+                                className={cn(
+                                  "text-3xl font-bold truncate",
+                                  valueN < 0
+                                    ? "text-red-600"
+                                    : "text-[#00122E]",
+                                )}
+                              >
+                                {formatCompactOnly(valueN)}
+                              </div>
+                              <Icon
+                                className={`w-8 h-8 shrink-0 ${kpi.color}`}
+                              />
+                            </div>
+                          </CardContent>
+                        </Card>
+                      </div>
+                    );
+                  })}
+              </div>
             </div>
 
             {/* Tunnel de rentabilité */}
