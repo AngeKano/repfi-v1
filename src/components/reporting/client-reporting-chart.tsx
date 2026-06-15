@@ -405,6 +405,93 @@ function saveKpiConfig(clientId: string, items: KpiItem[]) {
   localStorage.setItem(`kpi-config-${clientId}`, JSON.stringify(data));
 }
 
+// ==================== KPI CONFIG — RECOUVREMENT ====================
+type RecouvrementTotalsKey =
+  | "tauxRecouvrement"
+  | "caTTCTotal"
+  | "caEncaisseTTC";
+
+interface RecouvrementKpiItem {
+  id: string;
+  label: string;
+  key: RecouvrementTotalsKey;
+  sub: string;
+  color: string;
+  icon: React.ElementType;
+  percent?: boolean;
+  visible: boolean;
+  order: number;
+}
+
+const DEFAULT_RECOUVREMENT_KPIS: RecouvrementKpiItem[] = [
+  {
+    id: "taux",
+    label: "Taux de Recouvrement",
+    key: "tauxRecouvrement",
+    sub: "Sur la période sélectionnée",
+    color: "text-violet-600",
+    icon: PiPercentDuotone,
+    percent: true,
+    visible: true,
+    order: 0,
+  },
+  {
+    id: "creances",
+    label: "Créances Clients TTC (Débit 41*)",
+    key: "caTTCTotal",
+    sub: "Somme des débits comptes clients",
+    color: "text-blue-600",
+    icon: PiCoinsDuotone,
+    visible: true,
+    order: 1,
+  },
+  {
+    id: "encaisse",
+    label: "Encaissements Clients TTC (Crédit 41*)",
+    key: "caEncaisseTTC",
+    sub: "Somme des crédits comptes clients",
+    color: "text-green-600",
+    icon: PiWalletDuotone,
+    visible: true,
+    order: 2,
+  },
+];
+
+function loadRecouvrementKpiConfig(clientId: string): RecouvrementKpiItem[] {
+  if (typeof window === "undefined") return DEFAULT_RECOUVREMENT_KPIS;
+  try {
+    const raw = localStorage.getItem(`kpi-config-recouvrement-${clientId}`);
+    if (!raw) return DEFAULT_RECOUVREMENT_KPIS;
+    const saved = JSON.parse(raw) as Array<{
+      id: string;
+      visible: boolean;
+      order: number;
+    }>;
+    return DEFAULT_RECOUVREMENT_KPIS.map((d) => {
+      const s = saved.find((x) => x.id === d.id);
+      return s ? { ...d, visible: s.visible, order: s.order } : d;
+    }).sort((a, b) => a.order - b.order);
+  } catch {
+    return DEFAULT_RECOUVREMENT_KPIS;
+  }
+}
+
+function saveRecouvrementKpiConfig(
+  clientId: string,
+  items: RecouvrementKpiItem[],
+) {
+  if (typeof window === "undefined") return;
+  const data = items.map((i) => ({
+    id: i.id,
+    visible: i.visible,
+    order: i.order,
+  }));
+  localStorage.setItem(
+    `kpi-config-recouvrement-${clientId}`,
+    JSON.stringify(data),
+  );
+}
+
 const chartConfigFlux: ChartConfig = {
   produits: { label: "Produits", color: "hsl(142, 76%, 36%)" },
   charges: { label: "Charges", color: "hsl(0, 84%, 60%)" },
@@ -551,6 +638,44 @@ export default function ClientReportingChart({
     window.addEventListener("click", handler);
     return () => window.removeEventListener("click", handler);
   }, [kpiContextMenu]);
+
+  // KPI configuration state — onglet Recouvrement (métriques propres)
+  const [recouvrementKpiItems, setRecouvrementKpiItems] = useState<
+    RecouvrementKpiItem[]
+  >(() => loadRecouvrementKpiConfig(clientId));
+  const [recouvrementKpiEditMode, setRecouvrementKpiEditMode] = useState(false);
+  const [recouvrementKpiDragId, setRecouvrementKpiDragId] = useState<
+    string | null
+  >(null);
+
+  const updateRecouvrementKpi = (newItems: RecouvrementKpiItem[]) => {
+    const reordered = newItems.map((item, idx) => ({ ...item, order: idx }));
+    setRecouvrementKpiItems(reordered);
+    saveRecouvrementKpiConfig(clientId, reordered);
+  };
+
+  const toggleRecouvrementKpiVisible = (id: string) => {
+    updateRecouvrementKpi(
+      recouvrementKpiItems.map((k) =>
+        k.id === id ? { ...k, visible: !k.visible } : k,
+      ),
+    );
+  };
+
+  const handleRecouvrementKpiDragOver = (
+    e: React.DragEvent,
+    targetId: string,
+  ) => {
+    e.preventDefault();
+    if (!recouvrementKpiDragId || recouvrementKpiDragId === targetId) return;
+    const items = [...recouvrementKpiItems];
+    const fromIdx = items.findIndex((k) => k.id === recouvrementKpiDragId);
+    const toIdx = items.findIndex((k) => k.id === targetId);
+    if (fromIdx === -1 || toIdx === -1) return;
+    const [moved] = items.splice(fromIdx, 1);
+    items.splice(toIdx, 0, moved);
+    updateRecouvrementKpi(items);
+  };
 
   // Sync activeTab with initialTab when parent changes it
   useEffect(() => {
@@ -1956,93 +2081,109 @@ export default function ClientReportingChart({
 
         return (
           <div className="space-y-6">
-            {/* KPIs Recouvrement */}
-            <div className="grid grid-cols-3 gap-4">
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardDescription className="text-sm font-medium">
-                    Taux de Recouvrement
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="pt-0">
-                  <div className="flex items-end justify-between gap-2">
-                    <div className="min-w-0">
-                      <div
-                        className={cn(
-                          "text-3xl font-bold truncate",
-                          recouvrementData.totals.tauxRecouvrement < 0
-                            ? "text-red-600"
-                            : "text-[#00122E]",
-                        )}
-                      >
-                        {recouvrementData.totals.tauxRecouvrement.toFixed(1)}%
-                      </div>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        Sur la période sélectionnée
-                      </p>
-                    </div>
-                    <PiPercentDuotone className="w-8 h-8 shrink-0 text-violet-600" />
-                  </div>
-                </CardContent>
-              </Card>
+            {/* KPIs Recouvrement — grille configurable */}
+            <div>
+              <div className="flex items-center justify-between mb-3">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() =>
+                    setRecouvrementKpiEditMode(!recouvrementKpiEditMode)
+                  }
+                  className={cn(
+                    "gap-2 h-9 rounded-lg transition-colors",
+                    recouvrementKpiEditMode
+                      ? "bg-[#0077C3] text-white border-[#0077C3] hover:bg-[#005992]"
+                      : "border-[#D0E3F5] text-[#335890] hover:bg-[#EBF5FF]",
+                  )}
+                >
+                  <PiGearDuotone className="w-4 h-4" />
+                  {recouvrementKpiEditMode
+                    ? "Terminer"
+                    : "Configurer les KPIs"}
+                </Button>
+              </div>
 
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardDescription className="text-sm font-medium">
-                    Créances Clients TTC (Débit 41*)
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="pt-0">
-                  <div className="flex items-end justify-between gap-2">
-                    <div className="min-w-0">
+              <div className="grid grid-cols-3 gap-4">
+                {recouvrementKpiItems
+                  .filter((k) => recouvrementKpiEditMode || k.visible)
+                  .map((kpi) => {
+                    const Icon = kpi.icon;
+                    const value = recouvrementData.totals[kpi.key];
+                    const isDragging = recouvrementKpiDragId === kpi.id;
+                    return (
                       <div
+                        key={kpi.id}
+                        draggable={recouvrementKpiEditMode}
+                        onDragStart={() => setRecouvrementKpiDragId(kpi.id)}
+                        onDragOver={(e) =>
+                          handleRecouvrementKpiDragOver(e, kpi.id)
+                        }
+                        onDragEnd={() => setRecouvrementKpiDragId(null)}
                         className={cn(
-                          "text-3xl font-bold truncate",
-                          recouvrementData.totals.caTTCTotal < 0
-                            ? "text-red-600"
-                            : "text-[#00122E]",
+                          "transition-all duration-200",
+                          recouvrementKpiEditMode &&
+                            "cursor-grab active:cursor-grabbing",
+                          isDragging && "opacity-50 rotate-2 scale-95",
+                          !kpi.visible && "opacity-40",
                         )}
                       >
-                        {formatCompactOnly(recouvrementData.totals.caTTCTotal)}
+                        <Card
+                          className={cn(
+                            "relative overflow-hidden",
+                            recouvrementKpiEditMode &&
+                              "border-dashed border-[#0077C3] ring-1 ring-[#0077C3]/20",
+                          )}
+                        >
+                          {recouvrementKpiEditMode && (
+                            <button
+                              onClick={() =>
+                                toggleRecouvrementKpiVisible(kpi.id)
+                              }
+                              className="absolute top-2 right-2 z-10 w-6 h-6 rounded-full flex items-center justify-center bg-white border border-[#D0E3F5] text-[#94A3B8] hover:text-[#0077C3] transition-colors"
+                              title={kpi.visible ? "Masquer" : "Afficher"}
+                            >
+                              {kpi.visible ? (
+                                <Eye className="w-3.5 h-3.5" />
+                              ) : (
+                                <EyeOffIcon className="w-3.5 h-3.5" />
+                              )}
+                            </button>
+                          )}
+                          <CardHeader className="pb-2">
+                            <CardDescription className="text-sm font-medium">
+                              {kpi.label}
+                            </CardDescription>
+                          </CardHeader>
+                          <CardContent className="pt-0">
+                            <div className="flex items-end justify-between gap-2">
+                              <div className="min-w-0">
+                                <div
+                                  className={cn(
+                                    "text-3xl font-bold truncate",
+                                    value < 0
+                                      ? "text-red-600"
+                                      : "text-[#00122E]",
+                                  )}
+                                >
+                                  {kpi.percent
+                                    ? `${value.toFixed(1)}%`
+                                    : formatCompactOnly(value)}
+                                </div>
+                                <p className="text-xs text-muted-foreground mt-1">
+                                  {kpi.sub}
+                                </p>
+                              </div>
+                              <Icon
+                                className={`w-8 h-8 shrink-0 ${kpi.color}`}
+                              />
+                            </div>
+                          </CardContent>
+                        </Card>
                       </div>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        Somme des débits comptes clients
-                      </p>
-                    </div>
-                    <PiCoinsDuotone className="w-8 h-8 shrink-0 text-blue-600" />
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardDescription className="text-sm font-medium">
-                    Encaissements Clients TTC (Crédit 41*)
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="pt-0">
-                  <div className="flex items-end justify-between gap-2">
-                    <div className="min-w-0">
-                      <div
-                        className={cn(
-                          "text-3xl font-bold truncate",
-                          recouvrementData.totals.caEncaisseTTC < 0
-                            ? "text-red-600"
-                            : "text-[#00122E]",
-                        )}
-                      >
-                        {formatCompactOnly(
-                          recouvrementData.totals.caEncaisseTTC,
-                        )}
-                      </div>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        Somme des crédits comptes clients
-                      </p>
-                    </div>
-                    <PiWalletDuotone className="w-8 h-8 shrink-0 text-green-600" />
-                  </div>
-                </CardContent>
-              </Card>
+                    );
+                  })}
+              </div>
             </div>
 
             {/* Graphique Evolution Taux de Recouvrement - YTD année courante */}
