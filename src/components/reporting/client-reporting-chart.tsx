@@ -546,7 +546,7 @@ const DEFAULT_RESULTAT_KPIS: KpiItem[] = [
     color: "text-indigo-600",
     colorNeg: "text-red-600",
     icon: PiChartDonutDuotone,
-    visible: false,
+    visible: true,
     order: 4,
   },
   {
@@ -557,7 +557,7 @@ const DEFAULT_RESULTAT_KPIS: KpiItem[] = [
     color: "text-cyan-600",
     colorNeg: "text-red-600",
     icon: PiChartDonutDuotone,
-    visible: false,
+    visible: true,
     order: 5,
   },
 ];
@@ -2101,7 +2101,7 @@ export default function ClientReportingChart({
                 </Button>
               </div>
 
-              <div className="grid grid-cols-4 gap-4">
+              <div className="grid grid-cols-3 gap-4">
                 {resultatKpiItems
                   .filter((k) => resultatKpiEditMode || k.visible)
                   .map((kpi) => {
