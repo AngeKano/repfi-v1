@@ -10,7 +10,7 @@ import { Resend } from "resend";
 // Variables d'environnement requises :
 //   RESEND_API_KEY    Clé API Resend  (https://resend.com)
 //   DEMO_EMAIL_TO     Destinataire    (par défaut : contact@clickinsight.org)
-//   DEMO_EMAIL_FROM   Expéditeur      (par défaut : onboarding@resend.dev — sandbox Resend)
+//   DEMO_EMAIL_FROM   Expéditeur      (par défaut : noreply@clickinsight.org — domaine à vérifier dans Resend)
 // ============================================================================
 
 const demoRequestSchema = z.object({
@@ -116,7 +116,7 @@ export async function POST(request: NextRequest) {
   }
 
   const to = process.env.DEMO_EMAIL_TO || "contact@clickinsight.org";
-  const from = process.env.DEMO_EMAIL_FROM || "REPFI <onboarding@resend.dev>";
+  const from = process.env.DEMO_EMAIL_FROM || "ClickInsight <noreply@clickinsight.org>";
 
   const resend = new Resend(apiKey);
 
