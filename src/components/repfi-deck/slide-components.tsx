@@ -33,7 +33,7 @@ import {
   fromRight,
   scaleIn,
 } from "./primitives";
-import { DashboardMock, LineSpark, BarsSpark } from "./charts";
+import { LineSpark, BarsSpark } from "./charts";
 import {
   MacBook,
   SyntheseView,

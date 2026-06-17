@@ -113,9 +113,7 @@ export default function ClientDetailsClient({
   // ===== Filtres reporting partagés entre Synthèse / Chiffres / Résultats /
   // Dettes. Recouvrement conserve ses propres filtres en interne car son
   // comportement diffère (toujours cumulé sur le graphe principal). =====
-  const [year, setYear] = useState<string>(
-    new Date().getFullYear().toString(),
-  );
+  const [year, setYear] = useState<string>(new Date().getFullYear().toString());
   // "ytd-day" : Cumulé + Granularité Mois (vue journalière intra-mois,
   // avec baseline = cumul Jan → selectedMonth-1).
   const [periodType, setPeriodType] = useState<
@@ -385,7 +383,8 @@ export default function ClientDetailsClient({
                       </h3>
                       <p className="text-sm text-[#335890] mb-6">
                         Créez un premier reporting pour visualiser la synthèse,
-                        le chiffre d&apos;affaires et les résultats de ce client.
+                        le chiffre d&apos;affaires et les résultats de ce
+                        client.
                       </p>
                       <Button
                         onClick={() => setShowUploadDialog(true)}
@@ -439,8 +438,8 @@ export default function ClientDetailsClient({
                       Aucun reporting financier
                     </h3>
                     <p className="text-sm text-[#335890] mb-6">
-                      Créez un premier reporting pour visualiser les dettes de ce
-                      client.
+                      Créez un premier reporting pour visualiser les dettes de
+                      ce client.
                     </p>
                     <Button
                       onClick={() => setShowUploadDialog(true)}
