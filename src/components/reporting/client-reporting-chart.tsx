@@ -978,6 +978,110 @@ export default function ClientReportingChart({
   const yearN = parseInt(year);
   const yearN1 = yearN - 1;
 
+  // Composant Charges vs Produits — LineChart 2 séries.
+  //   Mode "périodique" (periodType=year/month) → valeur de la période
+  //   Mode "cumulé"     (periodType=ytd/ytd-day) → running sum frontend
+  // Couleurs : palette REPFI duotone (bleu foncé / bleu clair), comme
+  // CA par Nature et Créances vs Encaissements.
+  const ChargesVsProduits = () => {
+    const isCumule = periodType === "ytd" || periodType === "ytd-day";
+    const modeLabel = isCumule ? "cumulé" : "périodique";
+
+    // Données : valeur par période en mode périodique, cumul running sum en
+    // mode cumulé.
+    const series = (() => {
+      if (!isCumule) {
+        return visibleChartData.map((d) => ({
+          label: d.label,
+          charges: d.charges,
+          produits: d.produits,
+        }));
+      }
+      let sumC = 0;
+      let sumP = 0;
+      return visibleChartData.map((d) => {
+        sumC += d.charges;
+        sumP += d.produits;
+        return { label: d.label, charges: sumC, produits: sumP };
+      });
+    })();
+
+    return (
+      <Card>
+        <CardHeader className="flex flex-row items-start justify-between gap-4">
+          <div>
+            <CardTitle>Charges vs Produits</CardTitle>
+            <CardDescription>
+              Comparaison {yearN} ({modeLabel}) — par{" "}
+              {getXAxisLabel().toLowerCase()}
+            </CardDescription>
+          </div>
+          <ChartLegend
+            labelN="Charges"
+            labelN1="Produits"
+            colorN="hsl(221, 83%, 53%)"
+            colorN1="hsl(221, 83%, 73%)"
+            solid
+          />
+        </CardHeader>
+        <CardContent>
+          <ChartContainer
+            config={{
+              charges: { label: "Charges", color: "hsl(221, 83%, 53%)" },
+              produits: { label: "Produits", color: "hsl(221, 83%, 73%)" },
+            }}
+            className="h-[400px] w-full"
+          >
+            <LineChart
+              data={series}
+              margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
+            >
+              <CartesianGrid strokeDasharray="3 3" vertical={false} />
+              <XAxis
+                dataKey="label"
+                tickLine={false}
+                axisLine={false}
+                fontSize={12}
+              />
+              <YAxis
+                tickLine={false}
+                axisLine={false}
+                tickFormatter={(value) => `${(value / 1000000).toFixed(0)}M`}
+                fontSize={12}
+              />
+              <ChartTooltip
+                content={
+                  <ChartTooltipContent
+                    formatter={(value, name) => [
+                      formatCompactOnly(value as number),
+                      name === "charges" ? "Charges" : "Produits",
+                    ]}
+                  />
+                }
+              />
+              <Line
+                type="monotone"
+                dataKey="charges"
+                name="charges"
+                stroke="hsl(221, 83%, 53%)"
+                strokeWidth={2}
+                dot={{ r: 4 }}
+              />
+              <Line
+                type="monotone"
+                dataKey="produits"
+                name="produits"
+                stroke="hsl(221, 83%, 73%)"
+                strokeWidth={2}
+                dot={{ r: 4 }}
+              />
+            </LineChart>
+          </ChartContainer>
+        </CardContent>
+      </Card>
+    );
+  };
+
   // Composant Tunnel de rentabilité
   const TunnelRentabilite = () => (
     <Card>
@@ -1649,8 +1753,9 @@ export default function ClientReportingChart({
             {/* Evolution Trésorerie */}
             <EvolutionTresorerie />
 
-            {/* Tunnel de rentabilité */}
-            <TunnelRentabilite />
+            {/* Charges vs Produits — remplace le Tunnel de rentabilité dans
+                l'onglet Synthèse. Sensible au mode (périodique / cumulé). */}
+            <ChargesVsProduits />
           </div>
         );
 
