@@ -230,12 +230,20 @@ function ChartLegend({
       <span className="text-base font-semibold text-[#335890]">Légende</span>
       <div className="flex items-center gap-3">
         <LegendLine color={colorN} />
-        <span className="text-base font-medium text-[#0077C3]">{labelN}</span>
+        <span
+          className="text-base font-medium"
+          style={{ color: colorN }}
+        >
+          {labelN}
+        </span>
       </div>
       {labelN1 !== undefined && (
         <div className="flex items-center gap-3">
           <LegendLine color={colorN1 ?? colorN} dashed={!solid} />
-          <span className="text-base font-medium text-[#0077C3]">
+          <span
+            className="text-base font-medium"
+            style={{ color: colorN1 ?? colorN }}
+          >
             {labelN1}
           </span>
         </div>
