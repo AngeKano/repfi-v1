@@ -807,8 +807,8 @@ async function recupererFluxParMois(
     query: `
       SELECT
         substring(date_transaction, 4, 2) as period,
-        sum(CASE WHEN startsWith(compte, '6') THEN debit - credit ELSE 0 END) as charges,
-        sum(CASE WHEN startsWith(compte, '7') THEN credit - debit ELSE 0 END) as produits,
+        sum(CASE WHEN startsWith(compte, '6') OR startsWith(compte, '81') OR startsWith(compte, '83') OR startsWith(compte, '85') OR startsWith(compte, '87') OR startsWith(compte, '89') THEN debit - credit ELSE 0 END) as charges,
+        sum(CASE WHEN startsWith(compte, '7') OR startsWith(compte, '82') OR startsWith(compte, '84') OR startsWith(compte, '86') OR startsWith(compte, '88') THEN credit - debit ELSE 0 END) as produits,
         count(*) as nb_transactions
       FROM ${dbName}.grand_livre
       WHERE batch_id IN ({batchIds:Array(String)})
@@ -854,8 +854,8 @@ async function recupererFluxParJour(
     query: `
       SELECT 
         substring(date_transaction, 1, 2) as period,
-        sum(CASE WHEN startsWith(compte, '6') THEN debit - credit ELSE 0 END) as charges,
-        sum(CASE WHEN startsWith(compte, '7') THEN credit - debit ELSE 0 END) as produits,
+        sum(CASE WHEN startsWith(compte, '6') OR startsWith(compte, '81') OR startsWith(compte, '83') OR startsWith(compte, '85') OR startsWith(compte, '87') OR startsWith(compte, '89') THEN debit - credit ELSE 0 END) as charges,
+        sum(CASE WHEN startsWith(compte, '7') OR startsWith(compte, '82') OR startsWith(compte, '84') OR startsWith(compte, '86') OR startsWith(compte, '88') THEN credit - debit ELSE 0 END) as produits,
         count(*) as nb_transactions
       FROM ${dbName}.grand_livre
       WHERE batch_id IN ({batchIds:Array(String)})
@@ -1688,8 +1688,8 @@ async function enrichirPeriodes(postgresPeriodsData: any[], dbName: string) {
           const statsData = await clickhouseClient.query({
             query: `
               SELECT 
-                sum(CASE WHEN startsWith(compte, '6') THEN debit - credit ELSE 0 END) as charges,
-                sum(CASE WHEN startsWith(compte, '7') THEN credit - debit ELSE 0 END) as produits,
+                sum(CASE WHEN startsWith(compte, '6') OR startsWith(compte, '81') OR startsWith(compte, '83') OR startsWith(compte, '85') OR startsWith(compte, '87') OR startsWith(compte, '89') THEN debit - credit ELSE 0 END) as charges,
+                sum(CASE WHEN startsWith(compte, '7') OR startsWith(compte, '82') OR startsWith(compte, '84') OR startsWith(compte, '86') OR startsWith(compte, '88') THEN credit - debit ELSE 0 END) as produits,
                 count(*) as nb_transactions
               FROM ${dbName}.grand_livre
               WHERE batch_id = {batchId:String}
