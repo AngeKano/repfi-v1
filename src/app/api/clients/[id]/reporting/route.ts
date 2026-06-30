@@ -785,6 +785,7 @@ async function recupererTop10Clients(
           AND NOT startsWith(compte, '419')
           AND NOT startsWith(n_tiers, '418')
           AND NOT startsWith(n_tiers, '419')
+          AND n_tiers != ''
           ${periodFilter}
       `,
       query_params: queryParams,

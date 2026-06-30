@@ -178,7 +178,11 @@ async function recupererTop10Creances(
         nom_client,
         ca_ttc_total,
         ca_encaisse_ttc,
-        solde_creance
+        solde_creance,
+        -- A6 : total des créances de TOUS les clients (même périmètre/période),
+        -- pour que pourcentageTotal soit la vraie part du total (et non la part
+        -- au sein du seul Top 10). La fenêtre OVER () agrège avant le LIMIT.
+        sum(solde_creance) OVER () AS total_global
       FROM creances_clients
       ORDER BY solde_creance DESC
       LIMIT 10
@@ -193,13 +197,11 @@ async function recupererTop10Creances(
     ca_ttc_total: string;
     ca_encaisse_ttc: string;
     solde_creance: string;
+    total_global: string;
   }>;
 
-  // Calculer le total des créances pour les pourcentages
-  const totalCreances = rows.reduce(
-    (sum, row) => sum + (parseFloat(row.solde_creance) || 0),
-    0,
-  );
+  // Total global des créances positives (dénominateur des pourcentages).
+  const totalGlobal = parseFloat(rows[0]?.total_global) || 0;
 
   return rows.map((row) => {
     const soldeCreance = parseFloat(row.solde_creance) || 0;
@@ -210,7 +212,7 @@ async function recupererTop10Creances(
       caEncaisseTTC: parseFloat(row.ca_encaisse_ttc) || 0,
       soldeCreance,
       pourcentageTotal:
-        totalCreances > 0 ? (soldeCreance / totalCreances) * 100 : 0,
+        totalGlobal > 0 ? (soldeCreance / totalGlobal) * 100 : 0,
     };
   });
 }

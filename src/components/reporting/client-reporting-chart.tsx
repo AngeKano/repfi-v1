@@ -1572,7 +1572,9 @@ export default function ClientReportingChart({
   // Mode "Cumulé" (periodType === "ytd")  → CA cumulé depuis janvier (YTD)
   // Mode "Périodique" (periodType === "year") → CA mensuel seul, non cumulé
   const EvolutionCA = () => {
-    const isCumule = periodType === "ytd";
+    // A5 — "ytd-day" (Cumulé + granularité Mois) doit être traité comme cumulé,
+    // au même titre que "ytd" (cohérent avec ChargesVsProduits).
+    const isCumule = periodType === "ytd" || periodType === "ytd-day";
     const caKeyN = isCumule ? "chiffreAffaires" : "chiffreAffairesPeriodique";
     const caKeyN1 = isCumule
       ? "chiffreAffairesN1"
