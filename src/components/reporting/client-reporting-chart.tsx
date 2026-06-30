@@ -493,7 +493,42 @@ function saveRecouvrementKpiConfig(
 }
 
 // ==================== KPI CONFIG — RÉSULTATS ====================
+// Grille par défaut 3×2 : 6 KPI visibles (cascade SIG). Résultat HAO est
+// masqué par défaut (disponible via "Configurer les KPIs").
 const DEFAULT_RESULTAT_KPIS: KpiItem[] = [
+  {
+    id: "marge",
+    label: "Marge Commerciale",
+    key: "margeCommerciale",
+    variationKey: "margeCommerciale",
+    color: "text-indigo-600",
+    colorNeg: "text-red-600",
+    icon: PiShoppingCartSimpleDuotone,
+    visible: true,
+    order: 0,
+  },
+  {
+    id: "va",
+    label: "Valeur Ajoutée",
+    key: "valeurAjoutee",
+    variationKey: "valeurAjoutee",
+    color: "text-sky-600",
+    colorNeg: "text-red-600",
+    icon: PiChartDonutDuotone,
+    visible: true,
+    order: 1,
+  },
+  {
+    id: "ebe",
+    label: "Excédent Brut d'Exploitation",
+    key: "ebe",
+    variationKey: "ebe",
+    color: "text-cyan-600",
+    colorNeg: "text-red-600",
+    icon: PiChartDonutDuotone,
+    visible: true,
+    order: 2,
+  },
   {
     id: "rex",
     label: "Résultat Exploitation",
@@ -503,7 +538,7 @@ const DEFAULT_RESULTAT_KPIS: KpiItem[] = [
     colorNeg: "text-red-600",
     icon: PiChartDonutDuotone,
     visible: true,
-    order: 0,
+    order: 3,
   },
   {
     id: "rf",
@@ -514,18 +549,7 @@ const DEFAULT_RESULTAT_KPIS: KpiItem[] = [
     colorNeg: "text-red-600",
     icon: PiReceiptDuotone,
     visible: true,
-    order: 1,
-  },
-  {
-    id: "rhao",
-    label: "Résultat HAO",
-    key: "resultatHAO",
-    variationKey: "resultatHAO",
-    color: "text-yellow-500",
-    colorNeg: "text-red-600",
-    icon: PiCalculatorDuotone,
-    visible: true,
-    order: 2,
+    order: 4,
   },
   {
     id: "rn",
@@ -536,36 +560,27 @@ const DEFAULT_RESULTAT_KPIS: KpiItem[] = [
     colorNeg: "text-red-600",
     icon: PiChartDonutDuotone,
     visible: true,
-    order: 3,
-  },
-  {
-    id: "va",
-    label: "Valeur Ajoutée",
-    key: "valeurAjoutee",
-    variationKey: "valeurAjoutee",
-    color: "text-indigo-600",
-    colorNeg: "text-red-600",
-    icon: PiChartDonutDuotone,
-    visible: false,
-    order: 4,
-  },
-  {
-    id: "ebe",
-    label: "Excédent Brut d'Exploitation",
-    key: "ebe",
-    variationKey: "ebe",
-    color: "text-cyan-600",
-    colorNeg: "text-red-600",
-    icon: PiChartDonutDuotone,
-    visible: false,
     order: 5,
+  },
+  {
+    id: "rhao",
+    label: "Résultat HAO",
+    key: "resultatHAO",
+    variationKey: "resultatHAO",
+    color: "text-yellow-500",
+    colorNeg: "text-red-600",
+    icon: PiCalculatorDuotone,
+    visible: false,
+    order: 6,
   },
 ];
 
 function loadResultatKpiConfig(clientId: string): KpiItem[] {
   if (typeof window === "undefined") return DEFAULT_RESULTAT_KPIS;
   try {
-    const raw = localStorage.getItem(`kpi-config-resultat-${clientId}`);
+    // Clé v2 : réinitialise la config pour appliquer la nouvelle grille 3×2
+    // (HAO masqué) même chez les utilisateurs ayant une ancienne config.
+    const raw = localStorage.getItem(`kpi-config-resultat-v2-${clientId}`);
     if (!raw) return DEFAULT_RESULTAT_KPIS;
     const saved = JSON.parse(raw) as Array<{
       id: string;
@@ -588,7 +603,10 @@ function saveResultatKpiConfig(clientId: string, items: KpiItem[]) {
     visible: i.visible,
     order: i.order,
   }));
-  localStorage.setItem(`kpi-config-resultat-${clientId}`, JSON.stringify(data));
+  localStorage.setItem(
+    `kpi-config-resultat-v2-${clientId}`,
+    JSON.stringify(data),
+  );
 }
 
 const chartConfigFlux: ChartConfig = {
@@ -2214,7 +2232,7 @@ export default function ClientReportingChart({
                 </Button>
               </div>
 
-              <div className="grid grid-cols-4 gap-4">
+              <div className="grid grid-cols-3 gap-4">
                 {resultatKpiItems
                   .filter((k) => resultatKpiEditMode || k.visible)
                   .map((kpi) => {

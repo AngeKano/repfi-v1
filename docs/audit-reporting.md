@@ -52,8 +52,8 @@ Sévérité : 🔴 Critique · 🟠 Moyen · 🟡 Mineur. Statut : ✅ corrigé 
 |---|---|---|---|---|
 | **A1** | 🔴 | ✅ | **Top 10 clients « assujetti TVA »** — la jointure `numero_piece+date_transaction` dupliquait `montant_ht` (fan-out : lignes 411 multiples / TVA / produits), faussant CA et %. **Corrigé** par une CTE `tiers_piece` (`DISTINCT`, comptes 41* uniquement). | `R:690-733` |
 | **A2** | 🔴 | ✅ | **Dettes `dailyBaseline` ignoré par l'API** — la baseline cumulée Jan→M-1 était toujours appliquée en granularité jour, y compris en *Périodique + Mois* (baseline devait être 0). **Corrigé** : param lu et baseline conditionnée. | `dettes/route.ts:431-449` |
-| **A3** | 🟠 | ⬜ | **« Chiffre d'affaires » a 2 définitions** : KPI assujetti = `XB` (rubriques TA-TD) ≠ courbe/séries = comptes **70** (`recupererCA70*`). | `R:993` vs `R:1472,1557` |
-| **A4** | 🟠 | ⬜ | **« Taux de recouvrement » : 3 calculs/fenêtres** (KPI agrégé, courbe cumulée, REC) ; sa **variation N-1 est en points de %** alors que toutes les autres variations sont en %. | `R:989,1310,1399` / `REC:310-340` |
+| **A3** | 🟠 | ✅ | **« Chiffre d'affaires » avait 2 définitions** : KPI assujetti = `XB` (rubriques TA-TD) ≠ courbe = comptes **70**. **Corrigé** : le KPI CA (assujetti) reprend le CA70 cumulé (dernier point de la courbe) → KPI = Bilan = tendance. `XB` reste interne au SIG. | `R:1373,1605` |
+| **A4** | 🟠 | ✅ | **« Taux de recouvrement »** : formule **identique partout** (`encaissements / créances`) — vérifié ; les 3 emplacements donnent la même valeur à fenêtre égale (les écarts de fenêtre relèvent de A7/A8). Sa variation N-1 est un **delta en points**, **non affichée** côté UI → clarifiée par commentaire. | `R:989,1310` / `REC:310-340` |
 | **A5** | 🟠 | ⬜ | **Évolution CA** : `isCumule = periodType === "ytd"` **exclut `ytd-day`** → libellé « (périodique) » + clés périodiques alors que l'utilisateur est en Cumulé (le chart Charges/Produits voisin gère correctement `ytd` ET `ytd-day`). | `client-reporting-chart.tsx:1557` |
 | **A6** | 🟠 | ⬜ | **Non-réconciliation Top10 ↔ totaux** : les Top10 imposent `n_tiers!=''` / `intitule_tiers!=''`, pas les totaux/dénominateurs → Σ(lignes) ≠ total, % ne somment pas à 100. | `R:748-780`, `REC:165-171` |
 | **A7** | 🟠 | ⬜ | **Recouvrement « périodique » inaccessible** : `recouvrementMode` figé sur `cumule`, sélecteur `disabled` → bloc périodique = code mort ; KPI « Sur la période sélectionnée » trompeur (en réalité Jan→mois). | `client-reporting-chart.tsx:865,954,3014` |
@@ -145,3 +145,6 @@ Réponse : `{ client, period, checks: QcCheck[], summary: { total, pass, warn, f
 | Audit initial | A1 | Fan-out de jointure Top 10 clients assujetti corrigé (CTE `tiers_piece` DISTINCT, comptes 41*). |
 | Audit initial | A2 | `dailyBaseline` lu par l'API dettes ; baseline conditionnée (0 en périodique-mois). |
 | Système QC | §5 | Module d'invariants purs + endpoint `/reporting/qc` déployés (valide A1, A4, A6, 418/419, A10 sur données réelles). |
+| Harmonisation | A3 | KPI CA (assujetti) aligné sur le CA70 cumulé de la courbe (les deux branches du GET). |
+| Harmonisation | A4 | Taux de recouvrement : formule unique confirmée ; variation en points documentée (non affichée). |
+| UI | Résultats | KPI Résultat HAO masqué par défaut ; grille passée en 3×2 (`grid-cols-3`, 6 KPI cascade SIG) ; clé localStorage `v2`. |

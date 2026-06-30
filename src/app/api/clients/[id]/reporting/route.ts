@@ -1372,6 +1372,19 @@ export async function GET(
         client.assujettiTVA,
       );
 
+      // A3 — Harmonisation CA : pour un assujetti TVA, le KPI "Chiffre
+      // d'affaires" reprend le CA comptes 70* (dernier point cumulé de la
+      // courbe) au lieu de XB, afin que KPI / narration Bilan / tendance
+      // affichent strictement la même valeur.
+      if (client.assujettiTVA && chartData.length > 0) {
+        const lastCA = chartData[chartData.length - 1];
+        indicateursN.chiffreAffaires = lastCA.chiffreAffaires;
+        indicateursN1.chiffreAffaires = lastCA.chiffreAffairesN1;
+      }
+
+      // A4 — Le taux de recouvrement utilise partout la même formule
+      // (encaissements / créances). NB : sa variation ci-dessous est un delta
+      // en POINTS (pas en %), et n'est pas affichée côté UI.
       const variations = {
         chiffreAffaires: calculerVariation(
           indicateursN.chiffreAffaires,
@@ -1604,6 +1617,15 @@ export async function GET(
       client.assujettiTVA,
     );
 
+    // A3 — Harmonisation CA (cf. branche journalière) : KPI CA = CA70 cumulé.
+    if (client.assujettiTVA && chartData.length > 0) {
+      const lastCA = chartData[chartData.length - 1];
+      indicateursN.chiffreAffaires = lastCA.chiffreAffaires;
+      indicateursN1.chiffreAffaires = lastCA.chiffreAffairesN1;
+    }
+
+    // A4 — Taux de recouvrement : formule unique (encaissements / créances).
+    // Sa variation est un delta en POINTS (non affichée côté UI).
     const variations = {
       chiffreAffaires: calculerVariation(
         indicateursN.chiffreAffaires,
