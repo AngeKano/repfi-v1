@@ -381,31 +381,14 @@ export default function ClientBilanTab({
     <div className="space-y-6">
       {/* Barre de filtres globaux — identique aux autres onglets reporting. */}
       <div className="flex flex-wrap items-center gap-3 mb-6">
-        <div className="flex items-center gap-2 border border-[#D0E3F5] rounded-lg px-4 h-10">
+        {/* A8 — Le bilan d'activité est TOUJOURS cumulé : mode verrouillé
+            (pas d'option Périodique trompeuse). */}
+        <div
+          className="flex items-center gap-2 border border-[#D0E3F5] rounded-lg px-4 h-10 opacity-70"
+          title="Le bilan d'activité est toujours calculé en cumulé"
+        >
           <span className="text-xs text-[#335890]">Mode calcul :</span>
-          <Select
-            value={
-              periodType === "ytd" || periodType === "ytd-day"
-                ? "cumule"
-                : "periodique"
-            }
-            onValueChange={(v: string) => {
-              if (v === "cumule") {
-                setPeriodType(cumulGranularity === "annee" ? "ytd" : "ytd-day");
-                if (cumulGranularity === "annee") setSelectedMonth("12");
-              } else {
-                setPeriodType(cumulGranularity === "annee" ? "year" : "month");
-              }
-            }}
-          >
-            <SelectTrigger className="border-0 p-0 h-auto shadow-none min-w-[90px] font-semibold text-[#00122E]">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="periodique">Périodique</SelectItem>
-              <SelectItem value="cumule">Cumulé</SelectItem>
-            </SelectContent>
-          </Select>
+          <span className="font-semibold text-[#00122E]">Cumulé</span>
         </div>
         <div className="flex items-center gap-2 border border-[#D0E3F5] rounded-lg px-4 h-10">
           <span className="text-xs text-[#335890]">Année :</span>
@@ -429,49 +412,32 @@ export default function ClientBilanTab({
             </button>
           </div>
         </div>
-        {periodType !== "ytd" && periodType !== "ytd-day" ? (
-          <div className="flex items-center gap-2 border border-[#D0E3F5] rounded-lg px-4 h-10">
-            <span className="text-xs text-[#335890]">Granularité :</span>
-            <Select
-              value={periodType === "month" ? "month" : "year"}
-              onValueChange={(v: string) => setPeriodType(v as PeriodType)}
-            >
-              <SelectTrigger className="border-0 p-0 h-auto shadow-none min-w-[80px] font-semibold text-[#00122E]">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="year">Année</SelectItem>
-                <SelectItem value="month">Mois</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        ) : (
-          <div className="flex items-center gap-2 border border-[#D0E3F5] rounded-lg px-4 h-10">
-            <span className="text-xs text-[#335890]">Granularité :</span>
-            <Select
-              value={cumulGranularity}
-              onValueChange={(v: string) => {
-                const g = v as "mois" | "annee";
-                setCumulGranularity(g);
-                if (g === "annee") {
-                  setPeriodType("ytd");
-                  setSelectedMonth("12");
-                } else {
-                  setPeriodType("ytd-day");
-                }
-              }}
-            >
-              <SelectTrigger className="border-0 p-0 h-auto shadow-none min-w-[80px] font-semibold text-[#00122E]">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="mois">Mois</SelectItem>
-                <SelectItem value="annee">Année</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        )}
-        {(periodType === "ytd-day" || periodType === "month") && (
+        {/* Granularité du cumul (le Bilan est toujours en mode cumulé). */}
+        <div className="flex items-center gap-2 border border-[#D0E3F5] rounded-lg px-4 h-10">
+          <span className="text-xs text-[#335890]">Granularité :</span>
+          <Select
+            value={cumulGranularity}
+            onValueChange={(v: string) => {
+              const g = v as "mois" | "annee";
+              setCumulGranularity(g);
+              if (g === "annee") {
+                setPeriodType("ytd");
+                setSelectedMonth("12");
+              } else {
+                setPeriodType("ytd-day");
+              }
+            }}
+          >
+            <SelectTrigger className="border-0 p-0 h-auto shadow-none min-w-[80px] font-semibold text-[#00122E]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="mois">Mois</SelectItem>
+              <SelectItem value="annee">Année</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        {cumulGranularity === "mois" && (
           <div className="flex items-center gap-2 border border-[#D0E3F5] rounded-lg px-4 h-10">
             <span className="text-xs text-[#335890]">Mois :</span>
             <Select value={selectedMonth} onValueChange={setSelectedMonth}>
@@ -615,8 +581,9 @@ export default function ClientBilanTab({
             <p className="text-[#00122E] leading-relaxed">
               Vous avez pu encaisser{" "}
               <B>{fmtPct(recouvrement.totals.tauxRecouvrement)}</B> des montants
-              facturés à vos clients sur cette période. Ce taux inclut les
-              factures clients non soldées des années précédentes.
+              facturés à vos clients sur cette période. Ce taux cumulé porte sur
+              l&apos;ensemble des factures et encaissements de l&apos;exercice (du
+              1er janvier au mois sélectionné).
             </p>
             <p className="text-[#335890]">
               Voici la courbe d&apos;évolution de votre taux de recouvrement :
@@ -707,8 +674,8 @@ export default function ClientBilanTab({
             <p className="text-sm text-[#335890]">
               Le taux périodique prend en compte uniquement les factures et les
               encaissements du mois. Le taux cumulé prend en compte toutes les
-              factures non soldées (y compris celles des années précédentes) et
-              tous les encaissements depuis le début de l&apos;année.
+              factures et tous les encaissements de l&apos;exercice, depuis le
+              1er janvier jusqu&apos;au mois sélectionné.
             </p>
             <p className="text-[#335890]">
               Ci-dessous, une comparaison de ce que vos clients vous doivent et
@@ -1084,7 +1051,7 @@ function TopCreancesTable({ rows }: { rows: TopCreance[] }) {
       <CardHeader>
         <CardTitle>Top 10 des créances clients</CardTitle>
         <CardDescription>
-          Solde = Créances TTC − Encaissé TTC (hors comptes 418 et 419)
+          Solde de l&apos;exercice = Créances TTC − Encaissé TTC (hors 418/419)
         </CardDescription>
       </CardHeader>
       <CardContent>

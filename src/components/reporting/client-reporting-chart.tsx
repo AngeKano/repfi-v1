@@ -428,7 +428,7 @@ const DEFAULT_RECOUVREMENT_KPIS: RecouvrementKpiItem[] = [
     id: "taux",
     label: "Taux de Recouvrement",
     key: "tauxRecouvrement",
-    sub: "Sur la période sélectionnée",
+    sub: "Cumulé : Janvier → mois sélectionné",
     color: "text-violet-600",
     icon: PiPercentDuotone,
     percent: true,
@@ -880,9 +880,7 @@ export default function ClientReportingChart({
   });
   // Mode + granularité du filtre période appliqué au Top 10 Créances.
   // Le graphe Évolution du Taux de Recouvrement reste toujours cumulé.
-  const [recouvrementMode, setRecouvrementMode] = useState<
-    "periodique" | "cumule"
-  >("cumule");
+  // Recouvrement : toujours cumulé (pas de mode périodique).
   const [recouvrementGranularity, setRecouvrementGranularity] = useState<
     "mois" | "annee"
   >("mois");
@@ -913,7 +911,6 @@ export default function ClientReportingChart({
     activeTab,
     recouvrementMonth,
     recouvrementYear,
-    recouvrementMode,
     recouvrementGranularity,
   ]);
 
@@ -957,27 +954,12 @@ export default function ClientReportingChart({
   const fetchRecouvrementData = async () => {
     setRecouvrementLoading(true);
     try {
-      // Calcul de la fenêtre (startPeriod → endPeriod) appliquée au Top 10
-      // Créances selon le mode et la granularité choisis :
-      //   cumulé   + mois   → Jan → mois sélectionné
-      //   cumulé   + année  → Jan → Décembre
-      //   périodique + mois → mois sélectionné uniquement
-      //   périodique + année → Jan → Décembre (sur l'année entière)
-      let startMonth: string;
-      let endMonth: string;
-      if (recouvrementMode === "cumule") {
-        startMonth = "01";
-        endMonth =
-          recouvrementGranularity === "annee" ? "12" : recouvrementMonth;
-      } else {
-        if (recouvrementGranularity === "annee") {
-          startMonth = "01";
-          endMonth = "12";
-        } else {
-          startMonth = recouvrementMonth;
-          endMonth = recouvrementMonth;
-        }
-      }
+      // Fenêtre (startPeriod → endPeriod) du Top 10 Créances — toujours cumulé :
+      //   granularité Mois  → Janvier → mois sélectionné
+      //   granularité Année → Janvier → Décembre
+      const startMonth = "01";
+      const endMonth =
+        recouvrementGranularity === "annee" ? "12" : recouvrementMonth;
       const startPeriod = `${recouvrementYear}-${startMonth}`;
       const endPeriod = `${recouvrementYear}-${endMonth}`;
       const url = `/api/clients/${clientId}/reporting/recouvrement?endPeriod=${endPeriod}&startPeriod=${startPeriod}`;
@@ -2622,8 +2604,9 @@ export default function ClientReportingChart({
                   <div>
                     <CardTitle>Analyse des Créances - Top 10</CardTitle>
                     <CardDescription>
-                      Clients avec les créances les plus élevées (Solde =
-                      Créances Clients TTC - Encaissements Clients TTC)
+                      Clients avec les créances les plus élevées — solde de
+                      l&apos;exercice (Créances Clients TTC − Encaissements
+                      Clients TTC)
                     </CardDescription>
                   </div>
                 </div>
@@ -3106,10 +3089,7 @@ export default function ClientReportingChart({
                       if (recouvrementGranularity === "annee") {
                         return `Janvier - Décembre ${recouvrementYear}`;
                       }
-                      if (recouvrementMode === "cumule") {
-                        return `Janvier - ${monthLabel} ${recouvrementYear}`;
-                      }
-                      return `${monthLabel} ${recouvrementYear}`;
+                      return `Janvier - ${monthLabel} ${recouvrementYear}`;
                     })()}
                   </span>
                 </div>
