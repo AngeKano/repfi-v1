@@ -687,22 +687,36 @@ async function recupererTop10Clients(
             AND rubrique = 'TC'
             ${periodFilter}
         ),
+        -- Un seul tiers client par (pièce, date) pour éviter le fan-out de
+        -- jointure : sans le DISTINCT, une pièce portant plusieurs lignes avec
+        -- tiers (lignes 411 multiples, TVA, produits…) dupliquait montant_ht.
+        -- On ne retient que les comptes clients 41* (hors 418/419), seuls
+        -- porteurs légitimes du tiers d'une vente.
+        tiers_piece AS (
+          SELECT DISTINCT
+            numero_piece,
+            date_transaction,
+            n_tiers,
+            intitule_tiers
+          FROM ${dbName}.grand_livre
+          WHERE batch_id IN ({batchIds:Array(String)})
+            AND startsWith(compte, '41')
+            AND NOT startsWith(compte, '418')
+            AND NOT startsWith(compte, '419')
+            AND NOT startsWith(n_tiers, '418')
+            AND NOT startsWith(n_tiers, '419')
+            AND n_tiers != ''
+            AND intitule_tiers != ''
+        ),
         correspondances AS (
           SELECT
-            c.n_tiers,
-            c.intitule_tiers,
+            t.n_tiers,
+            t.intitule_tiers,
             v.montant_ht
           FROM ventes_ht v
-          INNER JOIN ${dbName}.grand_livre c
-            ON c.numero_piece = v.numero_piece
-            AND c.date_transaction = v.date_transaction
-            AND c.batch_id IN ({batchIds:Array(String)})
-            AND c.n_tiers != ''
-            AND c.intitule_tiers != ''
-            AND NOT startsWith(c.compte, '418')
-            AND NOT startsWith(c.compte, '419')
-            AND NOT startsWith(c.n_tiers, '418')
-            AND NOT startsWith(c.n_tiers, '419')
+          INNER JOIN tiers_piece t
+            ON t.numero_piece = v.numero_piece
+            AND t.date_transaction = v.date_transaction
         )
         SELECT
           n_tiers AS numero_client,
