@@ -109,11 +109,32 @@ Quatre familles de contrôles, par ordre de rentabilité :
 
 ---
 
-## 5. Système de contrôle qualité (proposition de déploiement)
+## 5. Système de contrôle qualité — DÉPLOYÉ ✅
 
-Module QC à 2 niveaux :
-- **(a) Tests automatisés** (`vitest`) : invariants §3 + fonctions pures + fixtures golden → CI, bloque les régressions.
-- **(b) Endpoint self-check** `GET /api/clients/[id]/reporting/qc?period=…` : exécute les invariants de réconciliation **sur données réelles** et renvoie `[{ check, statut, écart }]` → panneau admin de supervision continue.
+Deux composants livrés (sans dépendance externe) :
+
+### 5.1 Invariants purs — `src/lib/reporting/qc-invariants.ts`
+Fonctions pures (testables) encodant les règles §3 : `checkAttributedNotExceedTotal` (A1), `checkSharesBounded`, `checkRateBounded`, `checkIdentity`, `checkNoForbiddenPrefix` (418/419), `checkSingleExercise`, `summarize`. Chaque check renvoie `{ id, label, severity, status: pass|warn|fail, expected, actual, ecart?, detail? }`.
+
+### 5.2 Endpoint self-check — `GET /api/clients/[id]/reporting/qc?year=YYYY&endMonth=MM`
+Exécute des requêtes ClickHouse **indépendantes** (vérification croisée, pas une copie du code audité) sur Janvier→endMonth, puis applique les invariants. Contrôles actifs :
+
+| ID | Contrôle | Détecte |
+|---|---|---|
+| C2 | Taux de recouvrement ∈ [0 ; 100] | A4 / saisies anormales |
+| C3 | Σ parts Top 10 créances ≤ 100% | A6 |
+| C4 | Aucun tiers 418/419 dans les créances | exclusion 418/419 |
+| A1 | CA attribué ≤ CA total HT (assujetti) **ou** Σ parts Top clients ≤ 100% (non-assujetti) | **A1 (fan-out)** |
+| A10 | Aucun batch ne mélange plusieurs exercices | A10 |
+
+Réponse : `{ client, period, checks: QcCheck[], summary: { total, pass, warn, fail, ok } }`.
+
+**Exemple** : `GET /api/clients/<id>/reporting/qc?year=2024&endMonth=12`
+→ `summary.fail === 0` ⇒ reporting réconcilié pour la période.
+
+### 5.3 Reste à faire (optionnel)
+- Suite `vitest` sur les fonctions pures (`qc-invariants.ts`) — non configurée dans le repo (`npm i -D vitest` requis).
+- Panneau admin appelant l'endpoint pour une supervision visuelle.
 
 ---
 
@@ -123,3 +144,4 @@ Module QC à 2 niveaux :
 |---|---|---|
 | Audit initial | A1 | Fan-out de jointure Top 10 clients assujetti corrigé (CTE `tiers_piece` DISTINCT, comptes 41*). |
 | Audit initial | A2 | `dailyBaseline` lu par l'API dettes ; baseline conditionnée (0 en périodique-mois). |
+| Système QC | §5 | Module d'invariants purs + endpoint `/reporting/qc` déployés (valide A1, A4, A6, 418/419, A10 sur données réelles). |
