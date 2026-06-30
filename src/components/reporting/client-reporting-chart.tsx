@@ -428,7 +428,7 @@ const DEFAULT_RECOUVREMENT_KPIS: RecouvrementKpiItem[] = [
     id: "taux",
     label: "Taux de Recouvrement",
     key: "tauxRecouvrement",
-    sub: "Sur la période sélectionnée",
+    sub: "Cumulé : Janvier → mois sélectionné",
     color: "text-violet-600",
     icon: PiPercentDuotone,
     percent: true,
@@ -493,7 +493,42 @@ function saveRecouvrementKpiConfig(
 }
 
 // ==================== KPI CONFIG — RÉSULTATS ====================
+// Grille par défaut 3×2 : 6 KPI visibles (cascade SIG). Résultat HAO est
+// masqué par défaut (disponible via "Configurer les KPIs").
 const DEFAULT_RESULTAT_KPIS: KpiItem[] = [
+  {
+    id: "marge",
+    label: "Marge Commerciale",
+    key: "margeCommerciale",
+    variationKey: "margeCommerciale",
+    color: "text-indigo-600",
+    colorNeg: "text-red-600",
+    icon: PiShoppingCartSimpleDuotone,
+    visible: true,
+    order: 0,
+  },
+  {
+    id: "va",
+    label: "Valeur Ajoutée",
+    key: "valeurAjoutee",
+    variationKey: "valeurAjoutee",
+    color: "text-sky-600",
+    colorNeg: "text-red-600",
+    icon: PiChartDonutDuotone,
+    visible: true,
+    order: 1,
+  },
+  {
+    id: "ebe",
+    label: "Excédent Brut d'Exploitation",
+    key: "ebe",
+    variationKey: "ebe",
+    color: "text-cyan-600",
+    colorNeg: "text-red-600",
+    icon: PiChartDonutDuotone,
+    visible: true,
+    order: 2,
+  },
   {
     id: "rex",
     label: "Résultat Exploitation",
@@ -503,7 +538,7 @@ const DEFAULT_RESULTAT_KPIS: KpiItem[] = [
     colorNeg: "text-red-600",
     icon: PiChartDonutDuotone,
     visible: true,
-    order: 0,
+    order: 3,
   },
   {
     id: "rf",
@@ -514,18 +549,7 @@ const DEFAULT_RESULTAT_KPIS: KpiItem[] = [
     colorNeg: "text-red-600",
     icon: PiReceiptDuotone,
     visible: true,
-    order: 1,
-  },
-  {
-    id: "rhao",
-    label: "Résultat HAO",
-    key: "resultatHAO",
-    variationKey: "resultatHAO",
-    color: "text-yellow-500",
-    colorNeg: "text-red-600",
-    icon: PiCalculatorDuotone,
-    visible: true,
-    order: 2,
+    order: 4,
   },
   {
     id: "rn",
@@ -536,36 +560,27 @@ const DEFAULT_RESULTAT_KPIS: KpiItem[] = [
     colorNeg: "text-red-600",
     icon: PiChartDonutDuotone,
     visible: true,
-    order: 3,
-  },
-  {
-    id: "va",
-    label: "Valeur Ajoutée",
-    key: "valeurAjoutee",
-    variationKey: "valeurAjoutee",
-    color: "text-indigo-600",
-    colorNeg: "text-red-600",
-    icon: PiChartDonutDuotone,
-    visible: false,
-    order: 4,
-  },
-  {
-    id: "ebe",
-    label: "Excédent Brut d'Exploitation",
-    key: "ebe",
-    variationKey: "ebe",
-    color: "text-cyan-600",
-    colorNeg: "text-red-600",
-    icon: PiChartDonutDuotone,
-    visible: false,
     order: 5,
+  },
+  {
+    id: "rhao",
+    label: "Résultat HAO",
+    key: "resultatHAO",
+    variationKey: "resultatHAO",
+    color: "text-yellow-500",
+    colorNeg: "text-red-600",
+    icon: PiCalculatorDuotone,
+    visible: false,
+    order: 6,
   },
 ];
 
 function loadResultatKpiConfig(clientId: string): KpiItem[] {
   if (typeof window === "undefined") return DEFAULT_RESULTAT_KPIS;
   try {
-    const raw = localStorage.getItem(`kpi-config-resultat-${clientId}`);
+    // Clé v2 : réinitialise la config pour appliquer la nouvelle grille 3×2
+    // (HAO masqué) même chez les utilisateurs ayant une ancienne config.
+    const raw = localStorage.getItem(`kpi-config-resultat-v2-${clientId}`);
     if (!raw) return DEFAULT_RESULTAT_KPIS;
     const saved = JSON.parse(raw) as Array<{
       id: string;
@@ -588,7 +603,10 @@ function saveResultatKpiConfig(clientId: string, items: KpiItem[]) {
     visible: i.visible,
     order: i.order,
   }));
-  localStorage.setItem(`kpi-config-resultat-${clientId}`, JSON.stringify(data));
+  localStorage.setItem(
+    `kpi-config-resultat-v2-${clientId}`,
+    JSON.stringify(data),
+  );
 }
 
 const chartConfigFlux: ChartConfig = {
@@ -862,9 +880,7 @@ export default function ClientReportingChart({
   });
   // Mode + granularité du filtre période appliqué au Top 10 Créances.
   // Le graphe Évolution du Taux de Recouvrement reste toujours cumulé.
-  const [recouvrementMode, setRecouvrementMode] = useState<
-    "periodique" | "cumule"
-  >("cumule");
+  // Recouvrement : toujours cumulé (pas de mode périodique).
   const [recouvrementGranularity, setRecouvrementGranularity] = useState<
     "mois" | "annee"
   >("mois");
@@ -895,7 +911,6 @@ export default function ClientReportingChart({
     activeTab,
     recouvrementMonth,
     recouvrementYear,
-    recouvrementMode,
     recouvrementGranularity,
   ]);
 
@@ -939,27 +954,12 @@ export default function ClientReportingChart({
   const fetchRecouvrementData = async () => {
     setRecouvrementLoading(true);
     try {
-      // Calcul de la fenêtre (startPeriod → endPeriod) appliquée au Top 10
-      // Créances selon le mode et la granularité choisis :
-      //   cumulé   + mois   → Jan → mois sélectionné
-      //   cumulé   + année  → Jan → Décembre
-      //   périodique + mois → mois sélectionné uniquement
-      //   périodique + année → Jan → Décembre (sur l'année entière)
-      let startMonth: string;
-      let endMonth: string;
-      if (recouvrementMode === "cumule") {
-        startMonth = "01";
-        endMonth =
-          recouvrementGranularity === "annee" ? "12" : recouvrementMonth;
-      } else {
-        if (recouvrementGranularity === "annee") {
-          startMonth = "01";
-          endMonth = "12";
-        } else {
-          startMonth = recouvrementMonth;
-          endMonth = recouvrementMonth;
-        }
-      }
+      // Fenêtre (startPeriod → endPeriod) du Top 10 Créances — toujours cumulé :
+      //   granularité Mois  → Janvier → mois sélectionné
+      //   granularité Année → Janvier → Décembre
+      const startMonth = "01";
+      const endMonth =
+        recouvrementGranularity === "annee" ? "12" : recouvrementMonth;
       const startPeriod = `${recouvrementYear}-${startMonth}`;
       const endPeriod = `${recouvrementYear}-${endMonth}`;
       const url = `/api/clients/${clientId}/reporting/recouvrement?endPeriod=${endPeriod}&startPeriod=${startPeriod}`;
@@ -1554,7 +1554,9 @@ export default function ClientReportingChart({
   // Mode "Cumulé" (periodType === "ytd")  → CA cumulé depuis janvier (YTD)
   // Mode "Périodique" (periodType === "year") → CA mensuel seul, non cumulé
   const EvolutionCA = () => {
-    const isCumule = periodType === "ytd";
+    // A5 — "ytd-day" (Cumulé + granularité Mois) doit être traité comme cumulé,
+    // au même titre que "ytd" (cohérent avec ChargesVsProduits).
+    const isCumule = periodType === "ytd" || periodType === "ytd-day";
     const caKeyN = isCumule ? "chiffreAffaires" : "chiffreAffairesPeriodique";
     const caKeyN1 = isCumule
       ? "chiffreAffairesN1"
@@ -2214,7 +2216,7 @@ export default function ClientReportingChart({
                 </Button>
               </div>
 
-              <div className="grid grid-cols-4 gap-4">
+              <div className="grid grid-cols-3 gap-4">
                 {resultatKpiItems
                   .filter((k) => resultatKpiEditMode || k.visible)
                   .map((kpi) => {
@@ -2602,8 +2604,9 @@ export default function ClientReportingChart({
                   <div>
                     <CardTitle>Analyse des Créances - Top 10</CardTitle>
                     <CardDescription>
-                      Clients avec les créances les plus élevées (Solde =
-                      Créances Clients TTC - Encaissements Clients TTC)
+                      Clients avec les créances les plus élevées — solde de
+                      l&apos;exercice (Créances Clients TTC − Encaissements
+                      Clients TTC)
                     </CardDescription>
                   </div>
                 </div>
@@ -3086,10 +3089,7 @@ export default function ClientReportingChart({
                       if (recouvrementGranularity === "annee") {
                         return `Janvier - Décembre ${recouvrementYear}`;
                       }
-                      if (recouvrementMode === "cumule") {
-                        return `Janvier - ${monthLabel} ${recouvrementYear}`;
-                      }
-                      return `${monthLabel} ${recouvrementYear}`;
+                      return `Janvier - ${monthLabel} ${recouvrementYear}`;
                     })()}
                   </span>
                 </div>

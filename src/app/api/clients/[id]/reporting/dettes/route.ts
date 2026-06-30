@@ -382,6 +382,9 @@ export async function GET(
     const mode = searchParams.get("mode") === "periodique" ? "periodique" : "cumule";
     // Granularité : 'day' force le découpage journalier (valable si un seul mois).
     const granularityParam = searchParams.get("granularity");
+    // dailyBaseline : en granularité jour, démarre le cumul au cumul Jan→M-1
+    // (mode cumulé/ytd-day) au lieu de 0 (mode périodique sur un seul mois).
+    const dailyBaseline = searchParams.get("dailyBaseline") === "true";
 
     let endYear: number;
     let endMonth: number;
@@ -441,11 +444,15 @@ export async function GET(
 
     if (useDaily) {
       // Baseline cumulée = janvier → mois précédent (inclus dans le cumul).
-      for (let m = 1; m < endMonth; m++) {
-        const key = `${endYear}-${m.toString().padStart(2, "0")}`;
-        const { detteNee, rembourse } = flowsForAllDebts(monthlyData.get(key));
-        cumulDetteNee += detteNee;
-        cumulRembourse += rembourse;
+      // Appliquée uniquement en mode cumulé (dailyBaseline=true). En mode
+      // périodique sur un seul mois, la baseline reste 0.
+      if (dailyBaseline) {
+        for (let m = 1; m < endMonth; m++) {
+          const key = `${endYear}-${m.toString().padStart(2, "0")}`;
+          const { detteNee, rembourse } = flowsForAllDebts(monthlyData.get(key));
+          cumulDetteNee += detteNee;
+          cumulRembourse += rembourse;
+        }
       }
 
       const dailyData = await recupererDettesParJour(
