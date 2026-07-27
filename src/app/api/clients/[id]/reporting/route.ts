@@ -70,6 +70,7 @@ interface SoldesIntermediairesGestion {
 interface IndicateursFinanciers {
   chiffreAffaires: number;
   masseSalariale: number;
+  ratioMasseSalarialeCA: number; // (masse salariale / chiffre d'affaires) × 100
   resultatExploitation: number;
   resultatNet: number;
   soldeTresorerie: number;
@@ -1010,6 +1011,10 @@ function calculerIndicateursPeriode(
   return {
     chiffreAffaires,
     masseSalariale: Math.abs(rubriquesAgregees.RK),
+    ratioMasseSalarialeCA:
+      chiffreAffaires !== 0
+        ? (Math.abs(rubriquesAgregees.RK) / chiffreAffaires) * 100
+        : 0,
     resultatExploitation: sig.XE,
     resultatNet: sig.XI,
     soldeTresorerie: tresorerieTotal,
@@ -1381,6 +1386,16 @@ export async function GET(
         const lastCA = chartData[chartData.length - 1];
         indicateursN.chiffreAffaires = lastCA.chiffreAffaires;
         indicateursN1.chiffreAffaires = lastCA.chiffreAffairesN1;
+        // Ratio masse salariale / CA recalculé sur le CA harmonisé.
+        indicateursN.ratioMasseSalarialeCA =
+          indicateursN.chiffreAffaires !== 0
+            ? (indicateursN.masseSalariale / indicateursN.chiffreAffaires) * 100
+            : 0;
+        indicateursN1.ratioMasseSalarialeCA =
+          indicateursN1.chiffreAffaires !== 0
+            ? (indicateursN1.masseSalariale / indicateursN1.chiffreAffaires) *
+              100
+            : 0;
       }
 
       // A4 — Le taux de recouvrement utilise partout la même formule
@@ -1394,6 +1409,10 @@ export async function GET(
         masseSalariale: calculerVariation(
           indicateursN.masseSalariale,
           indicateursN1.masseSalariale,
+        ),
+        ratioMasseSalarialeCA: calculerVariation(
+          indicateursN.ratioMasseSalarialeCA,
+          indicateursN1.ratioMasseSalarialeCA,
         ),
         resultatExploitation: calculerVariation(
           indicateursN.resultatExploitation,
@@ -1623,6 +1642,15 @@ export async function GET(
       const lastCA = chartData[chartData.length - 1];
       indicateursN.chiffreAffaires = lastCA.chiffreAffaires;
       indicateursN1.chiffreAffaires = lastCA.chiffreAffairesN1;
+      // Ratio masse salariale / CA recalculé sur le CA harmonisé.
+      indicateursN.ratioMasseSalarialeCA =
+        indicateursN.chiffreAffaires !== 0
+          ? (indicateursN.masseSalariale / indicateursN.chiffreAffaires) * 100
+          : 0;
+      indicateursN1.ratioMasseSalarialeCA =
+        indicateursN1.chiffreAffaires !== 0
+          ? (indicateursN1.masseSalariale / indicateursN1.chiffreAffaires) * 100
+          : 0;
     }
 
     // A4 — Taux de recouvrement : formule unique (encaissements / créances).
@@ -1635,6 +1663,10 @@ export async function GET(
       masseSalariale: calculerVariation(
         indicateursN.masseSalariale,
         indicateursN1.masseSalariale,
+      ),
+      ratioMasseSalarialeCA: calculerVariation(
+        indicateursN.ratioMasseSalarialeCA,
+        indicateursN1.ratioMasseSalarialeCA,
       ),
       resultatExploitation: calculerVariation(
         indicateursN.resultatExploitation,
