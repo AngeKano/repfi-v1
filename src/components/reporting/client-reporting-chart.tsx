@@ -112,6 +112,7 @@ interface Period {
 interface IndicateursFinanciers {
   chiffreAffaires: number;
   masseSalariale: number;
+  ratioMasseSalarialeCA: number;
   resultatExploitation: number;
   resultatNet: number;
   soldeTresorerie: number;
@@ -133,6 +134,7 @@ interface IndicateursFinanciers {
 interface Variations {
   chiffreAffaires: number;
   masseSalariale: number;
+  ratioMasseSalarialeCA: number;
   resultatExploitation: number;
   resultatNet: number;
   soldeTresorerie: number;
@@ -305,6 +307,7 @@ interface KpiItem {
   color: string;
   colorNeg?: string;
   icon: React.ElementType;
+  percent?: boolean; // affiche la valeur en % (ratio) au lieu de K
   visible: boolean;
   order: number;
 }
@@ -373,6 +376,17 @@ const DEFAULT_KPI_ITEMS: KpiItem[] = [
     icon: PiShoppingCartSimpleDuotone,
     visible: true,
     order: 5,
+  },
+  {
+    id: "ratiomsca",
+    label: "Masse salariale / CA",
+    key: "ratioMasseSalarialeCA",
+    variationKey: "ratioMasseSalarialeCA",
+    color: "text-rose-600",
+    icon: PiPercentDuotone,
+    percent: true,
+    visible: true,
+    order: 6,
   },
 ];
 
@@ -1958,10 +1972,15 @@ export default function ClientReportingChart({
                                       : "text-[#00122E]",
                                   )}
                                 >
-                                  {formatCompactOnly(valueN)}
+                                  {kpi.percent
+                                    ? `${valueN.toFixed(1)}%`
+                                    : formatCompactOnly(valueN)}
                                 </div>
                                 <p className="text-xs text-muted-foreground mt-1">
-                                  {yearN1}: {formatCompactOnly(valueN1)}
+                                  {yearN1}:{" "}
+                                  {kpi.percent
+                                    ? `${valueN1.toFixed(1)}%`
+                                    : formatCompactOnly(valueN1)}
                                 </p>
                               </div>
                               <Icon
