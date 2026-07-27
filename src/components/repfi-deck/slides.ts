@@ -6,7 +6,7 @@ export const valueProps = [
   { icon: "Cloud", label: "100 % SaaS" },
   { icon: "ShieldCheck", label: "Sécurisé" },
   { icon: "BadgeCheck", label: "Fiable" },
-  { icon: "Clock", label: "Gain de temps" },
+  { icon: "Clock", label: "Temps" },
 ] as const;
 
 /* Slide 3 — processus en 4 étapes */
