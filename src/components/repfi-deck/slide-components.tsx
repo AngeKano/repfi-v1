@@ -10,6 +10,13 @@ import {
   TrendingUp,
   FileText,
   Presentation,
+  Building2,
+  Users,
+  Eye,
+  UploadCloud,
+  Plus,
+  Star,
+  Folder,
 } from "lucide-react";
 import { useDeckExport, useIsExportClone } from "./deck-export";
 import { BRAND, DOMAIN, DEMO_URL, SITE_URL, PALETTE } from "./brand";
@@ -1204,6 +1211,330 @@ export function SlideContact() {
   );
 }
 
+/* ===================== SLIDE — Offre Client final ===================== */
+const ADDONS = [
+  { icon: Folder, k: "Dossier supplémentaire", v: "+35 000" },
+  { icon: UploadCloud, k: "Utilisateur Loader Plus", v: "+10 000" },
+  { icon: Eye, k: "Utilisateur Viewer", v: "+5 000" },
+] as const;
+
+function PriceAmount({
+  value,
+  onDark,
+}: {
+  value: string;
+  onDark: boolean;
+}) {
+  return (
+    <div className="flex items-baseline gap-2">
+      <span
+        className="font-extrabold tabular-nums tracking-tight"
+        style={{
+          color: onDark ? "#fff" : PALETTE.ink,
+          fontSize: "clamp(2.4rem, 4.6vw, 3.4rem)",
+          lineHeight: 1,
+        }}
+      >
+        {value}
+      </span>
+      <span
+        className="font-bold"
+        style={{ color: onDark ? PALETTE.ice : PALETTE.inkSoft }}
+      >
+        F CFA
+      </span>
+      <span
+        className="text-sm"
+        style={{ color: onDark ? PALETTE.muted : PALETTE.inkSoft }}
+      >
+        / mois
+      </span>
+    </div>
+  );
+}
+
+export function SlidePricingClient() {
+  const feats = [
+    { icon: ShieldCheck, t: "1 compte Admin", d: "gère le dossier, les comptes et les accès." },
+    { icon: UploadCloud, t: "1 compte Loader Plus", d: "importe les données et exploite tous les reportings." },
+    { icon: Eye, t: "1 compte Viewer", d: "consulte les tableaux de bord en lecture seule." },
+  ];
+  return (
+    <NavyFrame>
+      <motion.div
+        variants={stagger}
+        initial="hidden"
+        animate="show"
+        className="grid h-full grid-cols-12 items-center gap-12"
+      >
+        <div className="col-span-5 flex min-w-0 flex-col">
+          <Title theme="dark">
+            Une offre simple pour <span style={hi}>l&apos;entreprise</span>
+          </Title>
+          <Lead theme="dark">
+            Suivez votre activité — chiffre d&apos;affaires, recouvrement,
+            trésorerie, résultat — sans complexité.
+          </Lead>
+          <motion.div
+            variants={stagger}
+            className="flex flex-col gap-3"
+            style={blockGap}
+          >
+            {ADDONS.map((a) => (
+              <motion.div
+                key={a.k}
+                variants={riseIn}
+                className="flex items-center gap-3 rounded-xl px-4 py-2.5"
+                style={{ background: "rgba(255,255,255,0.06)" }}
+              >
+                <a.icon size={18} color={PALETTE.blueBright} />
+                <span className="flex-1 text-sm" style={{ color: PALETTE.ice }}>
+                  {a.k}
+                </span>
+                <span
+                  className="text-sm font-extrabold tabular-nums"
+                  style={{ color: "#fff" }}
+                >
+                  {a.v}
+                  <span
+                    className="ml-1 text-xs font-semibold"
+                    style={{ color: PALETTE.muted }}
+                  >
+                    F CFA/mois
+                  </span>
+                </span>
+              </motion.div>
+            ))}
+          </motion.div>
+        </div>
+
+        <motion.div
+          variants={fromRight}
+          className="col-span-7 flex min-w-0 items-center justify-center"
+        >
+          <div className="glass glow-blue w-full max-w-md rounded-3xl p-8">
+            <div
+              className="text-xs font-bold uppercase tracking-widest"
+              style={{ color: PALETTE.blueBright }}
+            >
+              Offre standard
+            </div>
+            <div className="mt-1 text-2xl font-extrabold text-white">
+              Client final
+            </div>
+            <div className="mt-4">
+              <PriceAmount value="60 000" onDark />
+            </div>
+            <div className="mt-5 grid grid-cols-2 gap-3">
+              <div
+                className="flex items-center gap-2 rounded-xl px-3 py-2.5"
+                style={{ background: "rgba(255,255,255,0.06)" }}
+              >
+                <Folder size={18} color={PALETTE.blueBright} />
+                <span className="text-sm text-white">
+                  <b>1</b> dossier
+                </span>
+              </div>
+              <div
+                className="flex items-center gap-2 rounded-xl px-3 py-2.5"
+                style={{ background: "rgba(255,255,255,0.06)" }}
+              >
+                <Users size={18} color={PALETTE.blueBright} />
+                <span className="text-sm text-white">
+                  <b>3</b> comptes
+                </span>
+              </div>
+            </div>
+            <div className="mt-5 flex flex-col gap-3">
+              {feats.map((f) => (
+                <div key={f.t} className="flex items-start gap-3">
+                  <span
+                    className="mt-0.5 flex h-6 w-6 flex-none items-center justify-center rounded-full"
+                    style={{ background: "rgba(79,155,255,0.18)" }}
+                  >
+                    <f.icon size={14} color={PALETTE.blueBright} />
+                  </span>
+                  <span className="text-sm leading-snug" style={{ color: PALETTE.ice }}>
+                    <b className="text-white">{f.t}</b> — {f.d}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </motion.div>
+      </motion.div>
+    </NavyFrame>
+  );
+}
+
+/* ===================== SLIDE — Offres Cabinet ===================== */
+export function SlidePricingCabinet() {
+  const tiers = [
+    {
+      name: "Standard Cabinet",
+      price: "150 000",
+      dossiers: "6 dossiers max",
+      detail: "1 cabinet (offert) + 5 clients",
+      reco: false,
+    },
+    {
+      name: "Business Cabinet",
+      price: "250 000",
+      dossiers: "11 dossiers max",
+      detail: "1 cabinet (offert) + 10 clients",
+      reco: true,
+    },
+  ];
+  const perDossier = [
+    "2 comptes / dossier : 1 Loader Plus + 1 Viewer",
+    "Administration centralisée chez le cabinet",
+    "Tous les reportings : CA, recouvrement, trésorerie, résultat",
+  ];
+  return (
+    <LightFrame>
+      <motion.div
+        variants={stagger}
+        initial="hidden"
+        animate="show"
+        className="flex h-full flex-col justify-center"
+      >
+        <div className="max-w-[62%]">
+          <Title theme="light">
+            Deux offres pour les <span style={hi}>cabinets</span>
+          </Title>
+          <Lead theme="light">
+            Centralisez le pilotage de vos dossiers clients.{" "}
+            <span className="font-semibold" style={{ color: PALETTE.ink }}>
+              Le dossier du cabinet est offert.
+            </span>
+          </Lead>
+        </div>
+
+        <motion.div
+          variants={stagger}
+          className="grid grid-cols-2 gap-6"
+          style={{ marginTop: "clamp(1.4rem, 3vh, 2.2rem)" }}
+        >
+          {tiers.map((t) => (
+            <motion.div
+              key={t.name}
+              variants={scaleIn}
+              className="relative rounded-3xl p-7"
+              style={
+                t.reco
+                  ? {
+                      background: `linear-gradient(160deg, ${PALETTE.blue}, ${PALETTE.indigo})`,
+                      color: "#fff",
+                      boxShadow: "0 20px 50px -18px rgba(47,115,215,0.55)",
+                    }
+                  : {
+                      background: PALETTE.lightCard,
+                      border: `1px solid ${PALETTE.lightBorder}`,
+                      boxShadow: "0 12px 32px -16px rgba(11,31,68,0.22)",
+                    }
+              }
+            >
+              {t.reco && (
+                <span
+                  className="absolute right-5 top-5 flex items-center gap-1 rounded-full px-3 py-1 text-xs font-bold uppercase tracking-wide"
+                  style={{ background: "rgba(255,255,255,0.22)", color: "#fff" }}
+                >
+                  <Star size={13} /> Recommandé
+                </span>
+              )}
+              <div className="flex items-center gap-2">
+                <Building2
+                  size={20}
+                  color={t.reco ? "#fff" : PALETTE.blue}
+                />
+                <span
+                  className="text-lg font-extrabold"
+                  style={{ color: t.reco ? "#fff" : PALETTE.ink }}
+                >
+                  {t.name}
+                </span>
+              </div>
+              <div className="mt-4">
+                <PriceAmount value={t.price} onDark={t.reco} />
+              </div>
+              <div
+                className="mt-4 flex items-center gap-2 rounded-xl px-3 py-2.5 text-sm font-bold"
+                style={{
+                  background: t.reco
+                    ? "rgba(255,255,255,0.16)"
+                    : "rgba(47,115,215,0.10)",
+                  color: t.reco ? "#fff" : PALETTE.ink,
+                }}
+              >
+                <Folder size={16} color={t.reco ? "#fff" : PALETTE.blue} />
+                {t.dossiers}
+                <span
+                  className="font-medium"
+                  style={{ color: t.reco ? "rgba(255,255,255,0.85)" : PALETTE.inkSoft }}
+                >
+                  — {t.detail}
+                </span>
+              </div>
+              <div className="mt-4 flex flex-col gap-2.5">
+                {perDossier.map((p) => (
+                  <div key={p} className="flex items-start gap-2.5">
+                    <Check
+                      size={16}
+                      className="mt-0.5 flex-none"
+                      color={t.reco ? "#fff" : PALETTE.blue}
+                    />
+                    <span
+                      className="text-sm leading-snug"
+                      style={{
+                        color: t.reco ? "rgba(255,255,255,0.92)" : PALETTE.inkSoft,
+                      }}
+                    >
+                      {p}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </motion.div>
+          ))}
+        </motion.div>
+
+        <motion.div
+          variants={riseIn}
+          className="flex flex-wrap items-center gap-3"
+          style={{ marginTop: "clamp(1.2rem, 2.6vh, 1.8rem)" }}
+        >
+          <span
+            className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide"
+            style={{ color: PALETTE.inkSoft }}
+          >
+            <Plus size={14} color={PALETTE.blue} /> À la carte
+          </span>
+          {ADDONS.map((a) => (
+            <span
+              key={a.k}
+              className="flex items-center gap-2 rounded-full px-3 py-1.5 text-sm"
+              style={{
+                background: PALETTE.lightCard,
+                border: `1px solid ${PALETTE.lightBorder}`,
+                color: PALETTE.ink,
+              }}
+            >
+              <a.icon size={15} color={PALETTE.blue} />
+              {a.k}
+              <b className="tabular-nums" style={{ color: PALETTE.blue }}>
+                {a.v}
+              </b>
+              <span className="text-xs" style={{ color: PALETTE.inkSoft }}>
+                F CFA/mois
+              </span>
+            </span>
+          ))}
+        </motion.div>
+      </motion.div>
+    </LightFrame>
+  );
+}
+
 export const SLIDES = [
   SlideCover,
   SlideValue,
@@ -1213,6 +1544,8 @@ export const SLIDES = [
   SlideBalance,
   SlideDecide,
   SlideSecurity,
+  SlidePricingClient,
+  SlidePricingCabinet,
   SlideContact,
   SlideCta,
 ];
@@ -1226,12 +1559,16 @@ export const SLIDE_TITLES = [
   "Bilan",
   "Décision",
   "Sécurité",
+  "Offre client",
+  "Offre cabinet",
   "Contact",
   "Démo",
 ];
 
 // Thème de fond par slide — utilisé pour adapter l'UI de navigation.
 export const SLIDE_THEMES: ("dark" | "light")[] = [
+  "dark",
+  "light",
   "dark",
   "light",
   "dark",
