@@ -2,7 +2,7 @@
 
 /* ============================================================
    Export du deck en PDF / PowerPoint (captures image fidèles).
-   - rend les 9 slides hors-écran en 1280×720
+   - rend toutes les slides hors-écran en 1280×720
    - capture chacune avec html-to-image
    - assemble un PDF (jsPDF) ou un PPTX (pptxgenjs)
    Les boutons de téléchargement sont masqués dans les copies

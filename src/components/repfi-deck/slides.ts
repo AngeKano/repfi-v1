@@ -1,4 +1,4 @@
-// Données des 9 slides Click Insight, alignées sur le PPTX de référence.
+// Données des slides Click Insight, alignées sur le PPTX de référence.
 
 /* Slide 2 — proposition de valeur */
 export const valueProps = [
