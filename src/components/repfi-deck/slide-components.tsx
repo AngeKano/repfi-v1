@@ -48,7 +48,7 @@ import {
   KPI_CARDS,
   METRICS,
 } from "./app-charts";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 /* ============================================================
    Cadres
@@ -340,19 +340,9 @@ export function SlideProcess() {
 
 /* ===================== SLIDE 4 — Indicateurs clés ===================== */
 export function SlideIndicators() {
+  // Slide 4 : reste sur le point 1 par défaut (pas d'auto-défilement).
+  // L'utilisateur peut cliquer un indicateur pour changer la vue.
   const [active, setActive] = useState(0);
-  const [paused, setPaused] = useState(false);
-
-  // Card switch automatique (délai court), suspendu au survol.
-  // Dépend de `active` : chaque sélection manuelle relance le minuteur,
-  // pour que le clic « tienne » avant de reprendre le défilement.
-  useEffect(() => {
-    if (paused) return;
-    const t = setTimeout(() => {
-      setActive((i) => (i + 1) % METRICS.length);
-    }, 3200);
-    return () => clearTimeout(t);
-  }, [paused, active]);
 
   const Chart = METRICS[active].Chart;
 
@@ -373,8 +363,6 @@ export function SlideIndicators() {
             variants={stagger}
             className="flex flex-col gap-2"
             style={blockGap}
-            onMouseEnter={() => setPaused(true)}
-            onMouseLeave={() => setPaused(false)}
           >
             {METRICS.map((m, i) => {
               const on = i === active;
@@ -415,8 +403,6 @@ export function SlideIndicators() {
         <motion.div
           variants={fromRight}
           className="col-span-7 min-w-0"
-          onMouseEnter={() => setPaused(true)}
-          onMouseLeave={() => setPaused(false)}
         >
           <div className="relative h-[58vh] max-h-[460px] w-full">
             <motion.div
@@ -1259,6 +1245,10 @@ export function SlidePricingClient() {
     { icon: UploadCloud, t: "1 compte Loader Plus", d: "importe les données et exploite tous les reportings." },
     { icon: Eye, t: "1 compte Viewer", d: "consulte les tableaux de bord en lecture seule." },
   ];
+  // Offre client final : pas de "dossier supplémentaire" (une seule entité).
+  const clientAddons = ADDONS.filter(
+    (a) => a.k !== "Dossier supplémentaire",
+  );
   return (
     <NavyFrame>
       <motion.div
@@ -1280,7 +1270,7 @@ export function SlidePricingClient() {
             className="flex flex-col gap-3"
             style={blockGap}
           >
-            {ADDONS.map((a) => (
+            {clientAddons.map((a) => (
               <motion.div
                 key={a.k}
                 variants={riseIn}
@@ -1535,7 +1525,23 @@ export function SlidePricingCabinet() {
   );
 }
 
-export const SLIDES = [
+// ============================================================
+//  Deux présentations distinctes qui partagent le même tronc :
+//  seule la slide "tarif" change (Client final vs Cabinet), et
+//  jamais les deux à la fois. Sélection depuis l'accueil.
+// ============================================================
+export type DeckMode = "client" | "cabinet";
+type Theme = "dark" | "light";
+
+export interface DeckDef {
+  label: string;
+  slides: React.ComponentType[];
+  titles: string[];
+  themes: Theme[];
+}
+
+// Tronc commun avant la slide tarif.
+const COMMON_SLIDES = [
   SlideCover,
   SlideValue,
   SlideProcess,
@@ -1544,13 +1550,8 @@ export const SLIDES = [
   SlideBalance,
   SlideDecide,
   SlideSecurity,
-  SlidePricingClient,
-  SlidePricingCabinet,
-  SlideContact,
-  SlideCta,
 ];
-
-export const SLIDE_TITLES = [
+const COMMON_TITLES = [
   "Couverture",
   "Valeur",
   "Processus",
@@ -1559,24 +1560,34 @@ export const SLIDE_TITLES = [
   "Bilan",
   "Décision",
   "Sécurité",
-  "Offre client",
-  "Offre cabinet",
-  "Contact",
-  "Démo",
+];
+const COMMON_THEMES: Theme[] = [
+  "dark",
+  "light",
+  "dark",
+  "light",
+  "dark",
+  "light",
+  "dark",
+  "light",
 ];
 
-// Thème de fond par slide — utilisé pour adapter l'UI de navigation.
-export const SLIDE_THEMES: ("dark" | "light")[] = [
-  "dark",
-  "light",
-  "dark",
-  "light",
-  "dark",
-  "light",
-  "dark",
-  "light",
-  "dark",
-  "light",
-  "dark",
-  "dark",
-];
+// Tronc commun après la slide tarif.
+const AFTER_SLIDES = [SlideContact, SlideCta];
+const AFTER_TITLES = ["Contact", "Démo"];
+const AFTER_THEMES: Theme[] = ["dark", "dark"];
+
+export const DECKS: Record<DeckMode, DeckDef> = {
+  client: {
+    label: "Client final",
+    slides: [...COMMON_SLIDES, SlidePricingClient, ...AFTER_SLIDES],
+    titles: [...COMMON_TITLES, "Offre client", ...AFTER_TITLES],
+    themes: [...COMMON_THEMES, "dark", ...AFTER_THEMES],
+  },
+  cabinet: {
+    label: "Cabinet",
+    slides: [...COMMON_SLIDES, SlidePricingCabinet, ...AFTER_SLIDES],
+    titles: [...COMMON_TITLES, "Offre cabinet", ...AFTER_TITLES],
+    themes: [...COMMON_THEMES, "light", ...AFTER_THEMES],
+  },
+};
