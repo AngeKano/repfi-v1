@@ -1550,7 +1550,6 @@ export function SlideContactCard() {
 
   return (
     <NavyFrame>
-      <HeroChart className="pointer-events-none absolute right-8 top-1/2 h-[46%] w-[36%] -translate-y-1/2 opacity-60" />
       <motion.div
         variants={stagger}
         initial="hidden"
@@ -1671,9 +1670,13 @@ type Theme = "dark" | "light";
 
 export interface DeckDef {
   label: string;
-  slides: React.ComponentType[];
+  slides: React.ComponentType[]; // présentation en ligne (interactive)
   titles: string[];
   themes: Theme[];
+  // Slides utilisées UNIQUEMENT pour l'export PDF/PowerPoint : les slides
+  // "Contact" (formulaire) + "Démo/CTA" y sont remplacées par une seule slide
+  // contact fusionnée. La présentation en ligne, elle, garde les deux.
+  exportSlides: React.ComponentType[];
 }
 
 // Tronc commun avant la slide tarif.
@@ -1708,11 +1711,13 @@ const COMMON_THEMES: Theme[] = [
   "light",
 ];
 
-// Tronc commun après la slide tarif : une seule slide "Contact" (fusion des
-// anciennes slides Contact + Démo/CTA).
-const AFTER_SLIDES = [SlideContactCard];
-const AFTER_TITLES = ["Contact"];
-const AFTER_THEMES: Theme[] = ["dark"];
+// En ligne : Contact (formulaire de démo) + Démo/CTA.
+const AFTER_SLIDES = [SlideContact, SlideCta];
+const AFTER_TITLES = ["Contact", "Démo"];
+const AFTER_THEMES: Theme[] = ["dark", "dark"];
+// Export PPTX/PDF : les deux slides ci-dessus sont remplacées par la slide
+// contact fusionnée (site, email, réseaux, engagements).
+const EXPORT_AFTER_SLIDES = [SlideContactCard];
 
 export const DECKS: Record<DeckMode, DeckDef> = {
   client: {
@@ -1720,11 +1725,21 @@ export const DECKS: Record<DeckMode, DeckDef> = {
     slides: [...COMMON_SLIDES, SlidePricingClient, ...AFTER_SLIDES],
     titles: [...COMMON_TITLES, "Offre client", ...AFTER_TITLES],
     themes: [...COMMON_THEMES, "dark", ...AFTER_THEMES],
+    exportSlides: [
+      ...COMMON_SLIDES,
+      SlidePricingClient,
+      ...EXPORT_AFTER_SLIDES,
+    ],
   },
   cabinet: {
     label: "Cabinet",
     slides: [...COMMON_SLIDES, SlidePricingCabinet, ...AFTER_SLIDES],
     titles: [...COMMON_TITLES, "Offre cabinet", ...AFTER_TITLES],
     themes: [...COMMON_THEMES, "light", ...AFTER_THEMES],
+    exportSlides: [
+      ...COMMON_SLIDES,
+      SlidePricingCabinet,
+      ...EXPORT_AFTER_SLIDES,
+    ],
   },
 };
