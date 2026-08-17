@@ -14,8 +14,8 @@ import {
   useCallback,
   useContext,
   useState,
+  type ComponentType,
 } from "react";
-import { SLIDES } from "./slide-components";
 
 const W = 1280;
 const H = 720;
@@ -42,7 +42,39 @@ export const useIsExportClone = () => useContext(CloneCtx);
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-export function DeckExportProvider({ children }: { children: React.ReactNode }) {
+// Attend que toutes les images fournies soient chargées et décodées.
+// Évite de capturer une slide dont un logo / une capture n'est pas encore
+// rendu (glitchs de design incohérent dans le PPTX/PDF).
+async function waitForImages(imgs: ArrayLike<Element>) {
+  const list = Array.from(imgs).filter(
+    (el): el is HTMLImageElement => el instanceof HTMLImageElement,
+  );
+  await Promise.all(
+    list.map(async (img) => {
+      try {
+        if (!img.complete || img.naturalWidth === 0) {
+          await new Promise<void>((res) => {
+            img.addEventListener("load", () => res(), { once: true });
+            img.addEventListener("error", () => res(), { once: true });
+          });
+        }
+        if (img.decode) await img.decode().catch(() => {});
+      } catch {
+        /* ignore */
+      }
+    }),
+  );
+}
+
+export function DeckExportProvider({
+  children,
+  slides,
+  fileBase = "REPFI-presentation",
+}: {
+  children: React.ReactNode;
+  slides: ComponentType[];
+  fileBase?: string;
+}) {
   const [exporting, setExporting] = useState(false);
   const [progress, setProgress] = useState("");
 
@@ -61,15 +93,29 @@ export function DeckExportProvider({ children }: { children: React.ReactNode }) 
         } catch {
           /* ignore */
         }
-        await sleep(2200);
+        await sleep(1400);
 
         const { toPng } = await import("html-to-image");
         const boxes = Array.from(
           document.querySelectorAll<HTMLElement>("[data-export-slide]"),
         );
+
+        // Attend le décodage de TOUTES les images de TOUTES les slides avant
+        // de démarrer la capture.
+        await waitForImages(
+          document.querySelectorAll("[data-export-slide] img"),
+        );
+        await sleep(500);
+
         const images: string[] = [];
         for (let i = 0; i < boxes.length; i++) {
           setProgress(`Capture ${i + 1}/${boxes.length}…`);
+          // Rendu complet de CETTE slide (images décodées + 2 frames) avant
+          // capture — garantit une slide entièrement chargée.
+          await waitForImages(boxes[i].querySelectorAll("img"));
+          await new Promise((r) =>
+            requestAnimationFrame(() => requestAnimationFrame(() => r(null))),
+          );
           // double capture : la 1re « réchauffe » l'embed des polices/images
           await toPng(boxes[i], { width: W, height: H, pixelRatio: 1, cacheBust: true });
           const url = await toPng(boxes[i], {
@@ -83,10 +129,10 @@ export function DeckExportProvider({ children }: { children: React.ReactNode }) 
 
         if (fmt === "pdf") {
           setProgress("Assemblage du PDF…");
-          await buildPdf(images);
+          await buildPdf(images, fileBase);
         } else {
           setProgress("Assemblage du PowerPoint…");
-          await buildPptx(images);
+          await buildPptx(images, fileBase);
         }
       } catch (err) {
         console.error("Export deck échoué", err);
@@ -98,24 +144,25 @@ export function DeckExportProvider({ children }: { children: React.ReactNode }) 
         setProgress("");
       }
     },
-    [],
+    [fileBase],
   );
 
   return (
     <ExportCtx.Provider value={{ exportDeck, exporting, progress }}>
       {children}
-      {exporting && <HiddenSlides />}
+      {exporting && <HiddenSlides slides={slides} />}
       {exporting && <Overlay progress={progress} />}
     </ExportCtx.Provider>
   );
 }
 
-/* Pile des 9 slides rendues hors-écran à taille fixe pour la capture. */
-function HiddenSlides() {
+/* Pile des slides du deck courant, rendues hors-écran à taille fixe. */
+function HiddenSlides({ slides }: { slides: ComponentType[] }) {
   return (
     <CloneCtx.Provider value={true}>
       <div
         aria-hidden
+        className="repfi-deck"
         style={{
           position: "fixed",
           left: -100000,
@@ -125,7 +172,7 @@ function HiddenSlides() {
           zIndex: -1,
         }}
       >
-        {SLIDES.map((Slide, i) => (
+        {slides.map((Slide, i) => (
           <div
             key={i}
             data-export-slide
@@ -175,14 +222,14 @@ function Overlay({ progress }: { progress: string }) {
 }
 
 /* ---------- assemblage des fichiers ---------- */
-async function buildPdf(images: string[]) {
+async function buildPdf(images: string[], fileBase: string) {
   const { jsPDF } = await import("jspdf");
   const pdf = new jsPDF({ orientation: "landscape", unit: "px", format: [W, H] });
   images.forEach((img, i) => {
     if (i) pdf.addPage([W, H], "landscape");
     pdf.addImage(img, "PNG", 0, 0, W, H);
   });
-  pdf.save("REPFI-presentation.pdf");
+  pdf.save(`${fileBase}.pdf`);
 }
 
 // pptxgenjs importe `node:fs` et ne peut pas être bundlé pour le navigateur
@@ -201,7 +248,7 @@ function loadScript(src: string): Promise<void> {
   });
 }
 
-async function buildPptx(images: string[]) {
+async function buildPptx(images: string[], fileBase: string) {
   await loadScript("/vendor/pptxgen.bundle.js");
   const PptxGenJS = (window as unknown as { PptxGenJS?: new () => PptxInstance })
     .PptxGenJS;
@@ -213,7 +260,7 @@ async function buildPptx(images: string[]) {
     const slide = pptx.addSlide();
     slide.addImage({ data: img, x: 0, y: 0, w: 13.333, h: 7.5 });
   });
-  await pptx.writeFile({ fileName: "REPFI-presentation.pptx" });
+  await pptx.writeFile({ fileName: `${fileBase}.pptx` });
 }
 
 type PptxInstance = {
