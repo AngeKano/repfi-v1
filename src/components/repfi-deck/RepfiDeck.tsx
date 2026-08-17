@@ -221,9 +221,9 @@ function Deck({ deck, onHome }: { deck: DeckDef; onHome: () => void }) {
         />
       </div>
 
-      {/* Indicateur de page */}
+      {/* Indicateur de page (à gauche — le logo est en haut à droite) */}
       <div
-        className="fixed right-6 top-5 z-50 text-base font-bold tabular-nums"
+        className="fixed left-6 top-5 z-50 text-base font-bold tabular-nums"
         style={{ color: fgSoft }}
       >
         <span style={{ color: PALETTE.blueBright }}>

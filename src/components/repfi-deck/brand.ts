@@ -4,7 +4,9 @@
 export const BRAND = "Click Insight";
 export const DOMAIN = "repfi.envolperformance.com";
 export const DEMO_URL = "https://repfi.envolperformance.com";
-export const SITE_URL = "click-insight.com";
+export const SITE_URL = "clickinsight.org";
+export const EMAIL = "contact@clickinsight.org";
+export const SOCIAL = "@ClickInsight";
 
 export const PALETTE = {
   /* ---- Accents partagés ---- */
