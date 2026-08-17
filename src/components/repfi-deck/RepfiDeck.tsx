@@ -32,7 +32,9 @@ export default function RepfiDeck() {
     mode === "client" ? "REPFI-client-final" : "REPFI-cabinet";
 
   return (
-    <DeckExportProvider slides={deck.slides} fileBase={fileBase}>
+    // L'export PPTX/PDF utilise `exportSlides` (Contact + Démo fusionnées) ;
+    // la présentation en ligne (Deck) garde `deck.slides` (les deux slides).
+    <DeckExportProvider slides={deck.exportSlides} fileBase={fileBase}>
       <Deck deck={deck} onHome={() => setMode(null)} />
     </DeckExportProvider>
   );
