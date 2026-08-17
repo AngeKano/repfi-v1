@@ -17,9 +17,12 @@ import {
   Plus,
   Star,
   Folder,
+  Globe,
+  Mail,
+  Share2,
 } from "lucide-react";
 import { useDeckExport, useIsExportClone } from "./deck-export";
-import { BRAND, DOMAIN, DEMO_URL, SITE_URL, PALETTE } from "./brand";
+import { BRAND, DOMAIN, DEMO_URL, SITE_URL, EMAIL, SOCIAL, PALETTE } from "./brand";
 import {
   valueProps,
   processSteps,
@@ -58,7 +61,8 @@ const PAD_H = "clamp(2.5rem, 5.5vw, 6rem)";
 const FRAME_PAD = {
   padding: `${PAD_V} ${PAD_H} clamp(5rem, 9vh, 7rem)`,
 } as const;
-const LOGO_POS = { top: PAD_V, left: PAD_H } as const;
+// Logo positionné en haut à DROITE sur toutes les slides.
+const LOGO_POS = { top: PAD_V, right: PAD_H } as const;
 
 function NavyFrame({ children }: { children: React.ReactNode }) {
   return (
@@ -226,18 +230,18 @@ export function SlideValue() {
 
           <motion.div
             variants={stagger}
-            className="flex flex-wrap gap-x-8 gap-y-6"
+            className="grid grid-cols-5 gap-x-3 gap-y-2"
             style={blockGap}
           >
             {valueProps.map((vp) => (
               <motion.div
                 key={vp.label}
                 variants={riseIn}
-                className="flex w-24 flex-col items-center gap-y-6 text-center"
+                className="flex flex-col items-center gap-1.5 text-center"
               >
-                <CircleIcon name={vp.icon} size={58} variant="softLight" />
+                <CircleIcon name={vp.icon} size={50} variant="softLight" />
                 <span
-                  className="mt-2.5 text-sm font-semibold"
+                  className="text-[13px] font-semibold leading-tight"
                   style={{ color: PALETTE.ink }}
                 >
                   {vp.label}
@@ -1525,6 +1529,138 @@ export function SlidePricingCabinet() {
   );
 }
 
+/* ===================== SLIDE — Contact (récap final) ===================== */
+// Fusionne les anciennes slides "Contact" + "Démo/CTA" : coordonnées
+// (site, email, réseaux) + engagements + téléchargement de la présentation.
+export function SlideContactCard() {
+  const { exportDeck, exporting } = useDeckExport();
+  const isClone = useIsExportClone();
+
+  const points = [
+    "Démo adaptée à votre cabinet ou entreprise",
+    "Réponse sous 24 h ouvrées",
+    "Sans engagement",
+    "Disponible 24/7, partout dans le monde",
+  ];
+  const channels = [
+    { icon: Globe, label: "Site web", value: SITE_URL },
+    { icon: Mail, label: "Email", value: EMAIL },
+    { icon: Share2, label: "Réseaux", value: SOCIAL },
+  ];
+
+  return (
+    <NavyFrame>
+      <HeroChart className="pointer-events-none absolute right-8 top-1/2 h-[46%] w-[36%] -translate-y-1/2 opacity-60" />
+      <motion.div
+        variants={stagger}
+        initial="hidden"
+        animate="show"
+        className="grid h-full grid-cols-1 items-center gap-10 lg:grid-cols-2"
+        style={{ alignContent: "center" }}
+      >
+        {/* Gauche : pitch + engagements */}
+        <div className="flex flex-col justify-center">
+          <Title theme="dark">
+            Parlons de votre <span style={hi}>reporting financier</span>.
+          </Title>
+          <Lead theme="dark">
+            {BRAND}, votre copilote pour piloter votre activité. Contactez-nous
+            pour une démo personnalisée.
+          </Lead>
+          <motion.div
+            variants={stagger}
+            className="flex flex-col gap-3.5"
+            style={blockGap}
+          >
+            {points.map((p) => (
+              <CheckItem theme="onPhoto" key={p}>
+                {p}
+              </CheckItem>
+            ))}
+          </motion.div>
+        </div>
+
+        {/* Droite : carte coordonnées */}
+        <motion.div variants={fromRight}>
+          <div className="glass glow-blue rounded-3xl p-8">
+            <div
+              className="text-xs font-bold uppercase tracking-widest"
+              style={{ color: PALETTE.blueBright }}
+            >
+              Contactez-nous
+            </div>
+            <div className="mt-5 flex flex-col gap-4">
+              {channels.map((c) => (
+                <div key={c.label} className="flex items-center gap-4">
+                  <span
+                    className="flex h-12 w-12 flex-none items-center justify-center rounded-2xl"
+                    style={{
+                      background: `linear-gradient(135deg, ${PALETTE.blue}, ${PALETTE.indigo})`,
+                    }}
+                  >
+                    <c.icon size={22} color="#fff" />
+                  </span>
+                  <div className="min-w-0">
+                    <div
+                      className="text-xs font-semibold uppercase tracking-wide"
+                      style={{ color: PALETTE.muted }}
+                    >
+                      {c.label}
+                    </div>
+                    <div className="truncate text-lg font-bold text-white">
+                      {c.value}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <motion.a
+              href={`mailto:${EMAIL}?subject=Demande%20de%20d%C3%A9mo%20${BRAND}`}
+              whileHover={{ scale: 1.03 }}
+              whileTap={{ scale: 0.97 }}
+              className="mt-7 inline-flex w-full items-center justify-center gap-2 rounded-2xl px-6 py-4 font-bold text-white shadow-xl"
+              style={{
+                background: `linear-gradient(135deg, ${PALETTE.blue}, ${PALETTE.indigo})`,
+                fontSize: "1.05rem",
+              }}
+            >
+              Demandez une démo <ArrowRight size={20} />
+            </motion.a>
+
+            {!isClone && (
+              <div className="mt-5 flex flex-wrap items-center gap-3">
+                <span
+                  className="text-sm font-medium"
+                  style={{ color: PALETTE.ice }}
+                >
+                  Télécharger :
+                </span>
+                <button
+                  onClick={() => exportDeck("pdf")}
+                  disabled={exporting}
+                  className="inline-flex items-center gap-2 rounded-xl border px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-white/10 disabled:opacity-50"
+                  style={{ borderColor: PALETTE.panelBorder }}
+                >
+                  <FileText size={18} color={PALETTE.blueBright} /> PDF
+                </button>
+                <button
+                  onClick={() => exportDeck("pptx")}
+                  disabled={exporting}
+                  className="inline-flex items-center gap-2 rounded-xl border px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-white/10 disabled:opacity-50"
+                  style={{ borderColor: PALETTE.panelBorder }}
+                >
+                  <Presentation size={18} color={PALETTE.blueBright} /> PowerPoint
+                </button>
+              </div>
+            )}
+          </div>
+        </motion.div>
+      </motion.div>
+    </NavyFrame>
+  );
+}
+
 // ============================================================
 //  Deux présentations distinctes qui partagent le même tronc :
 //  seule la slide "tarif" change (Client final vs Cabinet), et
@@ -1572,10 +1708,11 @@ const COMMON_THEMES: Theme[] = [
   "light",
 ];
 
-// Tronc commun après la slide tarif.
-const AFTER_SLIDES = [SlideContact, SlideCta];
-const AFTER_TITLES = ["Contact", "Démo"];
-const AFTER_THEMES: Theme[] = ["dark", "dark"];
+// Tronc commun après la slide tarif : une seule slide "Contact" (fusion des
+// anciennes slides Contact + Démo/CTA).
+const AFTER_SLIDES = [SlideContactCard];
+const AFTER_TITLES = ["Contact"];
+const AFTER_THEMES: Theme[] = ["dark"];
 
 export const DECKS: Record<DeckMode, DeckDef> = {
   client: {
