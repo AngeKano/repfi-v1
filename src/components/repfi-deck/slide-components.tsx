@@ -58,11 +58,14 @@ import { useState } from "react";
 ============================================================ */
 const PAD_V = "clamp(2.75rem, 5.5vh, 5rem)";
 const PAD_H = "clamp(2.5rem, 5.5vw, 6rem)";
+// Padding haut agrandi : réserve une bande supérieure pour le logo (haut à
+// droite) afin qu'il ne chevauche jamais le contenu, même en 1280×720 (export).
+const CONTENT_TOP = "clamp(4.25rem, 8vh, 5.5rem)";
 const FRAME_PAD = {
-  padding: `${PAD_V} ${PAD_H} clamp(5rem, 9vh, 7rem)`,
+  padding: `${CONTENT_TOP} ${PAD_H} clamp(5rem, 9vh, 7rem)`,
 } as const;
-// Logo positionné en haut à DROITE sur toutes les slides.
-const LOGO_POS = { top: PAD_V, right: PAD_H } as const;
+// Logo en haut à DROITE, dans la bande supérieure (au-dessus du contenu).
+const LOGO_POS = { top: "1.05rem", right: PAD_H } as const;
 
 function NavyFrame({ children }: { children: React.ReactNode }) {
   return (
@@ -75,7 +78,7 @@ function NavyFrame({ children }: { children: React.ReactNode }) {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
       >
-        <Logo theme="dark" size={56} />
+        <Logo theme="dark" size={42} />
       </motion.div>
       <div
         className="relative z-10 flex h-full w-full flex-col"
@@ -98,7 +101,7 @@ function LightFrame({ children }: { children: React.ReactNode }) {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
       >
-        <Logo theme="light" size={52} />
+        <Logo theme="light" size={42} />
       </motion.div>
       <div
         className="relative z-10 flex h-full w-full flex-col"
