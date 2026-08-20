@@ -22,7 +22,7 @@ import {
   Share2,
 } from "lucide-react";
 import { useDeckExport, useIsExportClone } from "./deck-export";
-import { BRAND, DOMAIN, DEMO_URL, SITE_URL, EMAIL, SOCIAL, PALETTE } from "./brand";
+import { BRAND, SITE_URL, EMAIL, SOCIAL, PALETTE } from "./brand";
 import {
   valueProps,
   processSteps,
@@ -857,7 +857,7 @@ export function SlideCta() {
           </Lead>
 
           <motion.a
-            href={DEMO_URL}
+            href={`https://${SITE_URL}`}
             target="_blank"
             rel="noopener noreferrer"
             variants={riseIn}
@@ -879,7 +879,7 @@ export function SlideCta() {
             style={{ color: PALETTE.muted }}
           >
             et découvrez tout le potentiel de vos données. &nbsp;•&nbsp;{" "}
-            {DOMAIN}
+            {SITE_URL}
           </motion.p>
 
           {/* Téléchargement de la présentation (masqué dans les captures) */}
