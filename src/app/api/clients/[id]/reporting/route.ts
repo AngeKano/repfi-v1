@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import { createClient as createClickhouseClient } from "@clickhouse/client";
 import { prisma } from "@/lib/prisma";
+import { manualBatchId } from "@/lib/clickhouse/manual-sync";
 
 const clickhouseClient = createClickhouseClient({
   url: process.env.CLICKHOUSE_HOST || "http://localhost:8123",
@@ -1139,12 +1140,16 @@ export async function GET(
       ),
     ].sort((a, b) => parseInt(b) - parseInt(a));
 
-    const batchIds = postgresPeriodsData
-      .map((p) => p.batchId)
-      .filter((b): b is string => !!b);
-    const batchIdsN1 = postgresPeriodsN1
-      .map((p) => p.batchId)
-      .filter((b): b is string => !!b);
+    // Inclut le batch des lignes saisies manuellement (année N / N-1) pour que
+    // le reporting les agrège comme les lignes uploadées.
+    const batchIds = [
+      ...postgresPeriodsData.map((p) => p.batchId).filter((b): b is string => !!b),
+      manualBatchId(id, yearN),
+    ];
+    const batchIdsN1 = [
+      ...postgresPeriodsN1.map((p) => p.batchId).filter((b): b is string => !!b),
+      manualBatchId(id, yearN1),
+    ];
 
     const monthNames = [
       "Jan",

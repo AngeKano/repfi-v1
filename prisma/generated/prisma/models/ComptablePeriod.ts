@@ -278,6 +278,7 @@ export type ComptablePeriodWhereInput = {
   planSource?: Prisma.StringNullableFilter<"ComptablePeriod"> | string | null
   files?: Prisma.ComptableFileListRelationFilter
   client?: Prisma.XOR<Prisma.ClientScalarRelationFilter, Prisma.ClientWhereInput>
+  manualEntries?: Prisma.ManualLedgerEntryListRelationFilter
 }
 
 export type ComptablePeriodOrderByWithRelationInput = {
@@ -295,6 +296,7 @@ export type ComptablePeriodOrderByWithRelationInput = {
   planSource?: Prisma.SortOrderInput | Prisma.SortOrder
   files?: Prisma.ComptableFileOrderByRelationAggregateInput
   client?: Prisma.ClientOrderByWithRelationInput
+  manualEntries?: Prisma.ManualLedgerEntryOrderByRelationAggregateInput
 }
 
 export type ComptablePeriodWhereUniqueInput = Prisma.AtLeast<{
@@ -316,6 +318,7 @@ export type ComptablePeriodWhereUniqueInput = Prisma.AtLeast<{
   planSource?: Prisma.StringNullableFilter<"ComptablePeriod"> | string | null
   files?: Prisma.ComptableFileListRelationFilter
   client?: Prisma.XOR<Prisma.ClientScalarRelationFilter, Prisma.ClientWhereInput>
+  manualEntries?: Prisma.ManualLedgerEntryListRelationFilter
 }, "id" | "batchId" | "clientId_periodStart_periodEnd">
 
 export type ComptablePeriodOrderByWithAggregationInput = {
@@ -370,6 +373,7 @@ export type ComptablePeriodCreateInput = {
   planSource?: string | null
   files?: Prisma.ComptableFileCreateNestedManyWithoutComptablePeriodInput
   client: Prisma.ClientCreateNestedOneWithoutComptablePeriodsInput
+  manualEntries?: Prisma.ManualLedgerEntryCreateNestedManyWithoutComptablePeriodInput
 }
 
 export type ComptablePeriodUncheckedCreateInput = {
@@ -386,6 +390,7 @@ export type ComptablePeriodUncheckedCreateInput = {
   excelFileUrl?: string | null
   planSource?: string | null
   files?: Prisma.ComptableFileUncheckedCreateNestedManyWithoutComptablePeriodInput
+  manualEntries?: Prisma.ManualLedgerEntryUncheckedCreateNestedManyWithoutComptablePeriodInput
 }
 
 export type ComptablePeriodUpdateInput = {
@@ -402,6 +407,7 @@ export type ComptablePeriodUpdateInput = {
   planSource?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   files?: Prisma.ComptableFileUpdateManyWithoutComptablePeriodNestedInput
   client?: Prisma.ClientUpdateOneRequiredWithoutComptablePeriodsNestedInput
+  manualEntries?: Prisma.ManualLedgerEntryUpdateManyWithoutComptablePeriodNestedInput
 }
 
 export type ComptablePeriodUncheckedUpdateInput = {
@@ -418,6 +424,7 @@ export type ComptablePeriodUncheckedUpdateInput = {
   excelFileUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   planSource?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   files?: Prisma.ComptableFileUncheckedUpdateManyWithoutComptablePeriodNestedInput
+  manualEntries?: Prisma.ManualLedgerEntryUncheckedUpdateManyWithoutComptablePeriodNestedInput
 }
 
 export type ComptablePeriodCreateManyInput = {
@@ -596,6 +603,20 @@ export type ComptablePeriodUpdateOneRequiredWithoutFilesNestedInput = {
   update?: Prisma.XOR<Prisma.XOR<Prisma.ComptablePeriodUpdateToOneWithWhereWithoutFilesInput, Prisma.ComptablePeriodUpdateWithoutFilesInput>, Prisma.ComptablePeriodUncheckedUpdateWithoutFilesInput>
 }
 
+export type ComptablePeriodCreateNestedOneWithoutManualEntriesInput = {
+  create?: Prisma.XOR<Prisma.ComptablePeriodCreateWithoutManualEntriesInput, Prisma.ComptablePeriodUncheckedCreateWithoutManualEntriesInput>
+  connectOrCreate?: Prisma.ComptablePeriodCreateOrConnectWithoutManualEntriesInput
+  connect?: Prisma.ComptablePeriodWhereUniqueInput
+}
+
+export type ComptablePeriodUpdateOneRequiredWithoutManualEntriesNestedInput = {
+  create?: Prisma.XOR<Prisma.ComptablePeriodCreateWithoutManualEntriesInput, Prisma.ComptablePeriodUncheckedCreateWithoutManualEntriesInput>
+  connectOrCreate?: Prisma.ComptablePeriodCreateOrConnectWithoutManualEntriesInput
+  upsert?: Prisma.ComptablePeriodUpsertWithoutManualEntriesInput
+  connect?: Prisma.ComptablePeriodWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.ComptablePeriodUpdateToOneWithWhereWithoutManualEntriesInput, Prisma.ComptablePeriodUpdateWithoutManualEntriesInput>, Prisma.ComptablePeriodUncheckedUpdateWithoutManualEntriesInput>
+}
+
 export type ComptablePeriodCreateWithoutClientInput = {
   id?: string
   periodStart: Date | string
@@ -609,6 +630,7 @@ export type ComptablePeriodCreateWithoutClientInput = {
   excelFileUrl?: string | null
   planSource?: string | null
   files?: Prisma.ComptableFileCreateNestedManyWithoutComptablePeriodInput
+  manualEntries?: Prisma.ManualLedgerEntryCreateNestedManyWithoutComptablePeriodInput
 }
 
 export type ComptablePeriodUncheckedCreateWithoutClientInput = {
@@ -624,6 +646,7 @@ export type ComptablePeriodUncheckedCreateWithoutClientInput = {
   excelFileUrl?: string | null
   planSource?: string | null
   files?: Prisma.ComptableFileUncheckedCreateNestedManyWithoutComptablePeriodInput
+  manualEntries?: Prisma.ManualLedgerEntryUncheckedCreateNestedManyWithoutComptablePeriodInput
 }
 
 export type ComptablePeriodCreateOrConnectWithoutClientInput = {
@@ -683,6 +706,7 @@ export type ComptablePeriodCreateWithoutFilesInput = {
   excelFileUrl?: string | null
   planSource?: string | null
   client: Prisma.ClientCreateNestedOneWithoutComptablePeriodsInput
+  manualEntries?: Prisma.ManualLedgerEntryCreateNestedManyWithoutComptablePeriodInput
 }
 
 export type ComptablePeriodUncheckedCreateWithoutFilesInput = {
@@ -698,6 +722,7 @@ export type ComptablePeriodUncheckedCreateWithoutFilesInput = {
   processedAt?: Date | string | null
   excelFileUrl?: string | null
   planSource?: string | null
+  manualEntries?: Prisma.ManualLedgerEntryUncheckedCreateNestedManyWithoutComptablePeriodInput
 }
 
 export type ComptablePeriodCreateOrConnectWithoutFilesInput = {
@@ -729,6 +754,7 @@ export type ComptablePeriodUpdateWithoutFilesInput = {
   excelFileUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   planSource?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   client?: Prisma.ClientUpdateOneRequiredWithoutComptablePeriodsNestedInput
+  manualEntries?: Prisma.ManualLedgerEntryUpdateManyWithoutComptablePeriodNestedInput
 }
 
 export type ComptablePeriodUncheckedUpdateWithoutFilesInput = {
@@ -744,6 +770,87 @@ export type ComptablePeriodUncheckedUpdateWithoutFilesInput = {
   processedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   excelFileUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   planSource?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  manualEntries?: Prisma.ManualLedgerEntryUncheckedUpdateManyWithoutComptablePeriodNestedInput
+}
+
+export type ComptablePeriodCreateWithoutManualEntriesInput = {
+  id?: string
+  periodStart: Date | string
+  periodEnd: Date | string
+  year: number
+  batchId: string
+  status?: $Enums.ProcessingStatus
+  progress?: number
+  createdAt?: Date | string
+  processedAt?: Date | string | null
+  excelFileUrl?: string | null
+  planSource?: string | null
+  files?: Prisma.ComptableFileCreateNestedManyWithoutComptablePeriodInput
+  client: Prisma.ClientCreateNestedOneWithoutComptablePeriodsInput
+}
+
+export type ComptablePeriodUncheckedCreateWithoutManualEntriesInput = {
+  id?: string
+  clientId: string
+  periodStart: Date | string
+  periodEnd: Date | string
+  year: number
+  batchId: string
+  status?: $Enums.ProcessingStatus
+  progress?: number
+  createdAt?: Date | string
+  processedAt?: Date | string | null
+  excelFileUrl?: string | null
+  planSource?: string | null
+  files?: Prisma.ComptableFileUncheckedCreateNestedManyWithoutComptablePeriodInput
+}
+
+export type ComptablePeriodCreateOrConnectWithoutManualEntriesInput = {
+  where: Prisma.ComptablePeriodWhereUniqueInput
+  create: Prisma.XOR<Prisma.ComptablePeriodCreateWithoutManualEntriesInput, Prisma.ComptablePeriodUncheckedCreateWithoutManualEntriesInput>
+}
+
+export type ComptablePeriodUpsertWithoutManualEntriesInput = {
+  update: Prisma.XOR<Prisma.ComptablePeriodUpdateWithoutManualEntriesInput, Prisma.ComptablePeriodUncheckedUpdateWithoutManualEntriesInput>
+  create: Prisma.XOR<Prisma.ComptablePeriodCreateWithoutManualEntriesInput, Prisma.ComptablePeriodUncheckedCreateWithoutManualEntriesInput>
+  where?: Prisma.ComptablePeriodWhereInput
+}
+
+export type ComptablePeriodUpdateToOneWithWhereWithoutManualEntriesInput = {
+  where?: Prisma.ComptablePeriodWhereInput
+  data: Prisma.XOR<Prisma.ComptablePeriodUpdateWithoutManualEntriesInput, Prisma.ComptablePeriodUncheckedUpdateWithoutManualEntriesInput>
+}
+
+export type ComptablePeriodUpdateWithoutManualEntriesInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  periodStart?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  periodEnd?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  year?: Prisma.IntFieldUpdateOperationsInput | number
+  batchId?: Prisma.StringFieldUpdateOperationsInput | string
+  status?: Prisma.EnumProcessingStatusFieldUpdateOperationsInput | $Enums.ProcessingStatus
+  progress?: Prisma.IntFieldUpdateOperationsInput | number
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  processedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  excelFileUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  planSource?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  files?: Prisma.ComptableFileUpdateManyWithoutComptablePeriodNestedInput
+  client?: Prisma.ClientUpdateOneRequiredWithoutComptablePeriodsNestedInput
+}
+
+export type ComptablePeriodUncheckedUpdateWithoutManualEntriesInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  clientId?: Prisma.StringFieldUpdateOperationsInput | string
+  periodStart?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  periodEnd?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  year?: Prisma.IntFieldUpdateOperationsInput | number
+  batchId?: Prisma.StringFieldUpdateOperationsInput | string
+  status?: Prisma.EnumProcessingStatusFieldUpdateOperationsInput | $Enums.ProcessingStatus
+  progress?: Prisma.IntFieldUpdateOperationsInput | number
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  processedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  excelFileUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  planSource?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  files?: Prisma.ComptableFileUncheckedUpdateManyWithoutComptablePeriodNestedInput
 }
 
 export type ComptablePeriodCreateManyClientInput = {
@@ -773,6 +880,7 @@ export type ComptablePeriodUpdateWithoutClientInput = {
   excelFileUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   planSource?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   files?: Prisma.ComptableFileUpdateManyWithoutComptablePeriodNestedInput
+  manualEntries?: Prisma.ManualLedgerEntryUpdateManyWithoutComptablePeriodNestedInput
 }
 
 export type ComptablePeriodUncheckedUpdateWithoutClientInput = {
@@ -788,6 +896,7 @@ export type ComptablePeriodUncheckedUpdateWithoutClientInput = {
   excelFileUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   planSource?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   files?: Prisma.ComptableFileUncheckedUpdateManyWithoutComptablePeriodNestedInput
+  manualEntries?: Prisma.ManualLedgerEntryUncheckedUpdateManyWithoutComptablePeriodNestedInput
 }
 
 export type ComptablePeriodUncheckedUpdateManyWithoutClientInput = {
@@ -811,10 +920,12 @@ export type ComptablePeriodUncheckedUpdateManyWithoutClientInput = {
 
 export type ComptablePeriodCountOutputType = {
   files: number
+  manualEntries: number
 }
 
 export type ComptablePeriodCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   files?: boolean | ComptablePeriodCountOutputTypeCountFilesArgs
+  manualEntries?: boolean | ComptablePeriodCountOutputTypeCountManualEntriesArgs
 }
 
 /**
@@ -834,6 +945,13 @@ export type ComptablePeriodCountOutputTypeCountFilesArgs<ExtArgs extends runtime
   where?: Prisma.ComptableFileWhereInput
 }
 
+/**
+ * ComptablePeriodCountOutputType without action
+ */
+export type ComptablePeriodCountOutputTypeCountManualEntriesArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.ManualLedgerEntryWhereInput
+}
+
 
 export type ComptablePeriodSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
@@ -850,6 +968,7 @@ export type ComptablePeriodSelect<ExtArgs extends runtime.Types.Extensions.Inter
   planSource?: boolean
   files?: boolean | Prisma.ComptablePeriod$filesArgs<ExtArgs>
   client?: boolean | Prisma.ClientDefaultArgs<ExtArgs>
+  manualEntries?: boolean | Prisma.ComptablePeriod$manualEntriesArgs<ExtArgs>
   _count?: boolean | Prisma.ComptablePeriodCountOutputTypeDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["comptablePeriod"]>
 
@@ -904,6 +1023,7 @@ export type ComptablePeriodOmit<ExtArgs extends runtime.Types.Extensions.Interna
 export type ComptablePeriodInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   files?: boolean | Prisma.ComptablePeriod$filesArgs<ExtArgs>
   client?: boolean | Prisma.ClientDefaultArgs<ExtArgs>
+  manualEntries?: boolean | Prisma.ComptablePeriod$manualEntriesArgs<ExtArgs>
   _count?: boolean | Prisma.ComptablePeriodCountOutputTypeDefaultArgs<ExtArgs>
 }
 export type ComptablePeriodIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
@@ -918,6 +1038,7 @@ export type $ComptablePeriodPayload<ExtArgs extends runtime.Types.Extensions.Int
   objects: {
     files: Prisma.$ComptableFilePayload<ExtArgs>[]
     client: Prisma.$ClientPayload<ExtArgs>
+    manualEntries: Prisma.$ManualLedgerEntryPayload<ExtArgs>[]
   }
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     id: string
@@ -1328,6 +1449,7 @@ export interface Prisma__ComptablePeriodClient<T, Null = never, ExtArgs extends 
   readonly [Symbol.toStringTag]: "PrismaPromise"
   files<T extends Prisma.ComptablePeriod$filesArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.ComptablePeriod$filesArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$ComptableFilePayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   client<T extends Prisma.ClientDefaultArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.ClientDefaultArgs<ExtArgs>>): Prisma.Prisma__ClientClient<runtime.Types.Result.GetResult<Prisma.$ClientPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
+  manualEntries<T extends Prisma.ComptablePeriod$manualEntriesArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.ComptablePeriod$manualEntriesArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$ManualLedgerEntryPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   /**
    * Attaches callbacks for the resolution and/or rejection of the Promise.
    * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -1786,6 +1908,30 @@ export type ComptablePeriod$filesArgs<ExtArgs extends runtime.Types.Extensions.I
   take?: number
   skip?: number
   distinct?: Prisma.ComptableFileScalarFieldEnum | Prisma.ComptableFileScalarFieldEnum[]
+}
+
+/**
+ * ComptablePeriod.manualEntries
+ */
+export type ComptablePeriod$manualEntriesArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the ManualLedgerEntry
+   */
+  select?: Prisma.ManualLedgerEntrySelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the ManualLedgerEntry
+   */
+  omit?: Prisma.ManualLedgerEntryOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.ManualLedgerEntryInclude<ExtArgs> | null
+  where?: Prisma.ManualLedgerEntryWhereInput
+  orderBy?: Prisma.ManualLedgerEntryOrderByWithRelationInput | Prisma.ManualLedgerEntryOrderByWithRelationInput[]
+  cursor?: Prisma.ManualLedgerEntryWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.ManualLedgerEntryScalarFieldEnum | Prisma.ManualLedgerEntryScalarFieldEnum[]
 }
 
 /**

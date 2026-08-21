@@ -80,6 +80,7 @@ model Client {
   folders          Folder[]
   normalFiles      NormalFile[]
   socialNetworks   SocialNetwork[]
+  manualEntries    ManualLedgerEntry[]
 
   @@index([companyId])
   @@index([isSelfEntity])
@@ -256,13 +257,46 @@ model ComptablePeriod {
   // Si "PCG", le DAG a appliqué un mapping vers SYSCOHADA. Null tant que le batch
   // n'a pas été traité (PENDING/VALIDATING).
   planSource   String?
-  files        ComptableFile[]
-  client       Client           @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  files         ComptableFile[]
+  client        Client              @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  manualEntries ManualLedgerEntry[]
 
   @@unique([clientId, periodStart, periodEnd])
   @@index([clientId])
   @@index([status])
   @@map("comptable_periods")
+}
+
+// Lignes comptables saisies manuellement par l'utilisateur (éditables /
+// supprimables), distinctes des lignes uploadées (immuables, dans ClickHouse).
+// Source de vérité en Postgres ; synchronisées dans ClickHouse `grand_livre`
+// sous le batch `manual_{clientId}_{year}` pour alimenter le reporting.
+model ManualLedgerEntry {
+  id                String   @id @default(cuid())
+  clientId          String
+  comptablePeriodId String
+  year              Int
+  dateTransaction   DateTime
+  compte            String
+  intituleCompte    String   @default("")
+  nTiers            String   @default("")
+  intituleTiers     String   @default("")
+  rubrique          String   @default("")
+  bilanRubrique     String   @default("")
+  numeroPiece       String   @default("")
+  libelle           String   @default("")
+  debit             Float    @default(0)
+  credit            Float    @default(0)
+  createdById       String
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  client          Client          @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  comptablePeriod ComptablePeriod @relation(fields: [comptablePeriodId], references: [id], onDelete: Cascade)
+
+  @@index([clientId, year])
+  @@index([comptablePeriodId])
+  @@map("manual_ledger_entries")
 }
 
 enum PackType {

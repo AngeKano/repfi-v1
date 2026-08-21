@@ -395,7 +395,8 @@ export const ModelName = {
   NormalFileHistory: 'NormalFileHistory',
   ComptableFileHistory: 'ComptableFileHistory',
   FileTypePattern: 'FileTypePattern',
-  ComptablePeriod: 'ComptablePeriod'
+  ComptablePeriod: 'ComptablePeriod',
+  ManualLedgerEntry: 'ManualLedgerEntry'
 } as const
 
 export type ModelName = (typeof ModelName)[keyof typeof ModelName]
@@ -411,7 +412,7 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
     omit: GlobalOmitOptions
   }
   meta: {
-    modelProps: "company" | "user" | "client" | "clientAssignment" | "folder" | "socialNetwork" | "normalFile" | "comptableFile" | "normalFileHistory" | "comptableFileHistory" | "fileTypePattern" | "comptablePeriod"
+    modelProps: "company" | "user" | "client" | "clientAssignment" | "folder" | "socialNetwork" | "normalFile" | "comptableFile" | "normalFileHistory" | "comptableFileHistory" | "fileTypePattern" | "comptablePeriod" | "manualLedgerEntry"
     txIsolationLevel: TransactionIsolationLevel
   }
   model: {
@@ -1303,6 +1304,80 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
         }
       }
     }
+    ManualLedgerEntry: {
+      payload: Prisma.$ManualLedgerEntryPayload<ExtArgs>
+      fields: Prisma.ManualLedgerEntryFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.ManualLedgerEntryFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ManualLedgerEntryPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.ManualLedgerEntryFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ManualLedgerEntryPayload>
+        }
+        findFirst: {
+          args: Prisma.ManualLedgerEntryFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ManualLedgerEntryPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.ManualLedgerEntryFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ManualLedgerEntryPayload>
+        }
+        findMany: {
+          args: Prisma.ManualLedgerEntryFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ManualLedgerEntryPayload>[]
+        }
+        create: {
+          args: Prisma.ManualLedgerEntryCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ManualLedgerEntryPayload>
+        }
+        createMany: {
+          args: Prisma.ManualLedgerEntryCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.ManualLedgerEntryCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ManualLedgerEntryPayload>[]
+        }
+        delete: {
+          args: Prisma.ManualLedgerEntryDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ManualLedgerEntryPayload>
+        }
+        update: {
+          args: Prisma.ManualLedgerEntryUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ManualLedgerEntryPayload>
+        }
+        deleteMany: {
+          args: Prisma.ManualLedgerEntryDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.ManualLedgerEntryUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.ManualLedgerEntryUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ManualLedgerEntryPayload>[]
+        }
+        upsert: {
+          args: Prisma.ManualLedgerEntryUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ManualLedgerEntryPayload>
+        }
+        aggregate: {
+          args: Prisma.ManualLedgerEntryAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateManualLedgerEntry>
+        }
+        groupBy: {
+          args: Prisma.ManualLedgerEntryGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.ManualLedgerEntryGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.ManualLedgerEntryCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.ManualLedgerEntryCountAggregateOutputType> | number
+        }
+      }
+    }
   }
 } & {
   other: {
@@ -1530,6 +1605,30 @@ export const ComptablePeriodScalarFieldEnum = {
 } as const
 
 export type ComptablePeriodScalarFieldEnum = (typeof ComptablePeriodScalarFieldEnum)[keyof typeof ComptablePeriodScalarFieldEnum]
+
+
+export const ManualLedgerEntryScalarFieldEnum = {
+  id: 'id',
+  clientId: 'clientId',
+  comptablePeriodId: 'comptablePeriodId',
+  year: 'year',
+  dateTransaction: 'dateTransaction',
+  compte: 'compte',
+  intituleCompte: 'intituleCompte',
+  nTiers: 'nTiers',
+  intituleTiers: 'intituleTiers',
+  rubrique: 'rubrique',
+  bilanRubrique: 'bilanRubrique',
+  numeroPiece: 'numeroPiece',
+  libelle: 'libelle',
+  debit: 'debit',
+  credit: 'credit',
+  createdById: 'createdById',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type ManualLedgerEntryScalarFieldEnum = (typeof ManualLedgerEntryScalarFieldEnum)[keyof typeof ManualLedgerEntryScalarFieldEnum]
 
 
 export const SortOrder = {
@@ -1829,6 +1928,7 @@ export type GlobalOmitConfig = {
   comptableFileHistory?: Prisma.ComptableFileHistoryOmit
   fileTypePattern?: Prisma.FileTypePatternOmit
   comptablePeriod?: Prisma.ComptablePeriodOmit
+  manualLedgerEntry?: Prisma.ManualLedgerEntryOmit
 }
 
 /* Types for Logging */

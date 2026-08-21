@@ -62,7 +62,8 @@ export const ModelName = {
   NormalFileHistory: 'NormalFileHistory',
   ComptableFileHistory: 'ComptableFileHistory',
   FileTypePattern: 'FileTypePattern',
-  ComptablePeriod: 'ComptablePeriod'
+  ComptablePeriod: 'ComptablePeriod',
+  ManualLedgerEntry: 'ManualLedgerEntry'
 } as const
 
 export type ModelName = (typeof ModelName)[keyof typeof ModelName]
@@ -269,6 +270,30 @@ export const ComptablePeriodScalarFieldEnum = {
 } as const
 
 export type ComptablePeriodScalarFieldEnum = (typeof ComptablePeriodScalarFieldEnum)[keyof typeof ComptablePeriodScalarFieldEnum]
+
+
+export const ManualLedgerEntryScalarFieldEnum = {
+  id: 'id',
+  clientId: 'clientId',
+  comptablePeriodId: 'comptablePeriodId',
+  year: 'year',
+  dateTransaction: 'dateTransaction',
+  compte: 'compte',
+  intituleCompte: 'intituleCompte',
+  nTiers: 'nTiers',
+  intituleTiers: 'intituleTiers',
+  rubrique: 'rubrique',
+  bilanRubrique: 'bilanRubrique',
+  numeroPiece: 'numeroPiece',
+  libelle: 'libelle',
+  debit: 'debit',
+  credit: 'credit',
+  createdById: 'createdById',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type ManualLedgerEntryScalarFieldEnum = (typeof ManualLedgerEntryScalarFieldEnum)[keyof typeof ManualLedgerEntryScalarFieldEnum]
 
 
 export const SortOrder = {

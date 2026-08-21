@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import { createClient as createClickhouseClient } from "@clickhouse/client";
 import { prisma } from "@/lib/prisma";
+import { manualBatchIdsForYears } from "@/lib/clickhouse/manual-sync";
 
 const clickhouseClient = createClickhouseClient({
   url: process.env.CLICKHOUSE_HOST || "http://localhost:8123",
@@ -281,12 +282,15 @@ export async function GET(
     // Récupérer toutes les périodes disponibles pour ce client
     const allPeriods = await prisma.comptablePeriod.findMany({
       where: { clientId: id },
-      select: { batchId: true, periodStart: true },
+      select: { batchId: true, periodStart: true, year: true },
     });
 
-    const allBatchIds = allPeriods
-      .map((p) => p.batchId)
-      .filter((b): b is string => !!b);
+    // + batchs des lignes saisies manuellement (intégrées au reporting).
+    const manualYears = [...new Set([...allPeriods.map((p) => p.year), endYear])];
+    const allBatchIds = [
+      ...allPeriods.map((p) => p.batchId).filter((b): b is string => !!b),
+      ...manualBatchIdsForYears(id, manualYears),
+    ];
 
     // Récupérer les données de recouvrement
     const recouvrementData = await recupererRecouvrementParYearMonth(
