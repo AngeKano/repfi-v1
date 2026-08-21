@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { requirePermission } from "@/lib/permissions";
 import { SAISIE_ACTIONS } from "@/lib/permissions/actions";
 import { getClickhouseDbName, syncManualBatch } from "@/lib/clickhouse/manual-sync";
+import { isCentralizingAccount } from "@/lib/comptable/saisie-refs";
 
 const clickhouse = createClickhouseClient({
   url: process.env.CLICKHOUSE_HOST || "http://localhost:8123",
@@ -34,6 +35,8 @@ const patchSchema = z.object({
   dateTransaction: z.string().min(1).optional(),
   compte: z.string().trim().min(1).optional(),
   nTiers: z.string().trim().optional(),
+  typeTiers: z.string().trim().max(40).optional(),
+  numeroFacture: z.string().trim().max(60).optional(),
   libelle: z.string().trim().max(300).optional(),
   debit: z.number().nonnegative().optional(),
   credit: z.number().nonnegative().optional(),
@@ -79,11 +82,14 @@ export async function PATCH(
       return NextResponse.json({ error: "La date doit être dans la période." }, { status: 400 });
 
     const compte = p.compte ?? entry.compte;
-    const nTiers = p.nTiers ?? entry.nTiers;
+    // Tiers uniquement pour comptes centralisateurs (401/411) — sinon vidés.
+    const central = isCentralizingAccount(compte);
+    const nTiers = central ? p.nTiers ?? entry.nTiers : "";
+    const typeTiers = central ? p.typeTiers ?? entry.typeTiers : "";
     let intituleCompte = entry.intituleCompte;
     let rubrique = entry.rubrique;
     let bilanRubrique = entry.bilanRubrique;
-    let intituleTiers = entry.intituleTiers;
+    let intituleTiers = central ? entry.intituleTiers : "";
 
     // Si compte/tiers changent, revérifier l'existence + réhériter les rubriques.
     const dbName = getClickhouseDbName(id);
@@ -131,10 +137,12 @@ export async function PATCH(
         dateTransaction,
         compte,
         intituleCompte,
-        nTiers: nTiers || "",
+        nTiers,
         intituleTiers,
+        typeTiers,
         rubrique,
         bilanRubrique,
+        numeroFacture: p.numeroFacture ?? entry.numeroFacture,
         libelle: p.libelle ?? entry.libelle,
         debit,
         credit,

@@ -7,6 +7,10 @@ import { prisma } from "@/lib/prisma";
 import { requirePermission } from "@/lib/permissions";
 import { SAISIE_ACTIONS } from "@/lib/permissions/actions";
 import { getClickhouseDbName, syncManualBatch } from "@/lib/clickhouse/manual-sync";
+import {
+  CODE_JOURNAUX_SET,
+  isCentralizingAccount,
+} from "@/lib/comptable/saisie-refs";
 
 const clickhouse = createClickhouseClient({
   url: process.env.CLICKHOUSE_HOST || "http://localhost:8123",
@@ -125,6 +129,30 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     const period = periods.find((p) => p.id === periodId) || periods[0];
     const realBatchIds = periods.map((p) => p.batchId).filter(Boolean);
 
+    // Recherche + tri (colonnes whitelistées → pas d'injection ; la valeur de
+    // recherche passe par query_params).
+    const search = (searchParams.get("search") || "").trim();
+    const sortDir = searchParams.get("sortDir") === "desc" ? "DESC" : "ASC";
+    const ORDER: Record<string, string> = {
+      date: `substring(date_transaction,7,4) ${sortDir}, substring(date_transaction,4,2) ${sortDir}, substring(date_transaction,1,2) ${sortDir}, numero_piece ${sortDir}`,
+      compte: `compte ${sortDir}`,
+      tiers: `n_tiers ${sortDir}`,
+      piece: `numero_piece ${sortDir}`,
+      debit: `debit ${sortDir}`,
+      credit: `credit ${sortDir}`,
+    };
+    const orderBy = ORDER[searchParams.get("sortBy") || "date"] || ORDER.date;
+    const searchFilter = search
+      ? `AND (positionCaseInsensitive(compte, {s:String}) > 0
+             OR positionCaseInsensitive(intitule_compte, {s:String}) > 0
+             OR positionCaseInsensitive(n_tiers, {s:String}) > 0
+             OR positionCaseInsensitive(intitule_tiers, {s:String}) > 0
+             OR positionCaseInsensitive(numero_piece, {s:String}) > 0
+             OR positionCaseInsensitive(date_transaction, {s:String}) > 0)`
+      : "";
+    const qParams: Record<string, unknown> = { batchId: period.batchId };
+    if (search) qParams.s = search;
+
     // Lignes uploadées de la période sélectionnée (lecture seule), paginées.
     const offset = (page - 1) * PAGE_SIZE;
     let uploadedRows: unknown[] = [];
@@ -136,17 +164,16 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
             SELECT date_transaction, compte, intitule_compte, n_tiers, intitule_tiers,
                    numero_piece, rubrique, bilan_rubrique, debit, credit
             FROM ${dbName}.grand_livre
-            WHERE batch_id = {batchId:String}
-            ORDER BY substring(date_transaction,7,4), substring(date_transaction,4,2),
-                     substring(date_transaction,1,2), numero_piece
+            WHERE batch_id = {batchId:String} ${searchFilter}
+            ORDER BY ${orderBy}
             LIMIT ${PAGE_SIZE} OFFSET ${offset}
           `,
-          query_params: { batchId: period.batchId },
+          query_params: qParams,
           format: "JSONEachRow",
         }),
         clickhouse.query({
-          query: `SELECT count() AS c FROM ${dbName}.grand_livre WHERE batch_id = {batchId:String}`,
-          query_params: { batchId: period.batchId },
+          query: `SELECT count() AS c FROM ${dbName}.grand_livre WHERE batch_id = {batchId:String} ${searchFilter}`,
+          query_params: qParams,
           format: "JSONEachRow",
         }),
       ]);
@@ -229,16 +256,20 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 // ============================================================================
 // POST — crée une écriture (ensemble de lignes) équilibrée.
 // ============================================================================
+// Une écriture : en-tête partagé (date, code journal, libellé, n° pièce) + lignes.
 const ligneSchema = z.object({
-  dateTransaction: z.string().min(1),
   compte: z.string().trim().min(1),
   nTiers: z.string().trim().optional().default(""),
-  libelle: z.string().trim().max(300).optional().default(""),
+  typeTiers: z.string().trim().max(40).optional().default(""),
+  numeroFacture: z.string().trim().max(60).optional().default(""),
   debit: z.number().nonnegative().default(0),
   credit: z.number().nonnegative().default(0),
 });
 const ecritureSchema = z.object({
   periodId: z.string().min(1),
+  dateTransaction: z.string().min(1),
+  codeJournal: z.string().trim().min(1),
+  libelle: z.string().trim().max(300).optional().default(""),
   numeroPiece: z.string().trim().max(60).optional().default(""),
   lignes: z.array(ligneSchema).min(1),
 });
@@ -256,8 +287,11 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     const parsed = ecritureSchema.safeParse(body);
     if (!parsed.success)
       return NextResponse.json({ error: parsed.error.issues[0]?.message || "Données invalides" }, { status: 400 });
-    const { periodId, lignes } = parsed.data;
+    const { periodId, codeJournal, libelle, lignes } = parsed.data;
     let numeroPiece = parsed.data.numeroPiece;
+
+    if (!CODE_JOURNAUX_SET.has(codeJournal))
+      return NextResponse.json({ error: `Code journal inconnu : ${codeJournal}.` }, { status: 400 });
 
     const period = await prisma.comptablePeriod.findFirst({
       where: { id: periodId, clientId: id },
@@ -265,7 +299,14 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     });
     if (!period) return NextResponse.json({ error: "Période introuvable" }, { status: 404 });
 
-    // Équilibre de l'écriture.
+    // Date de l'écriture (au niveau écriture) dans la période.
+    const dateEcriture = new Date(parsed.data.dateTransaction);
+    if (isNaN(dateEcriture.getTime()))
+      return NextResponse.json({ error: "Date invalide." }, { status: 400 });
+    if (dateEcriture < new Date(period.periodStart) || dateEcriture > new Date(period.periodEnd))
+      return NextResponse.json({ error: "La date doit être dans la période sélectionnée." }, { status: 400 });
+
+    // Équilibre.
     const sumD = lignes.reduce((s, l) => s + l.debit, 0);
     const sumC = lignes.reduce((s, l) => s + l.credit, 0);
     if (Math.abs(sumD - sumC) > BALANCE_TOLERANCE)
@@ -282,27 +323,21 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         return NextResponse.json({ error: "Une ligne ne peut avoir à la fois un débit et un crédit." }, { status: 400 });
     }
 
-    // Dates dans la période.
-    const start = new Date(period.periodStart);
-    const end = new Date(period.periodEnd);
-    const dates = lignes.map((l) => new Date(l.dateTransaction));
-    if (dates.some((d) => isNaN(d.getTime())))
-      return NextResponse.json({ error: "Date invalide." }, { status: 400 });
-    if (dates.some((d) => d < start || d > end))
-      return NextResponse.json({ error: "Chaque date doit être dans la période sélectionnée." }, { status: 400 });
-
-    // Comptes & tiers doivent exister dans le grand livre (pas de création).
+    // Comptes existants ; tiers uniquement pour comptes centralisateurs (401/411).
     const dbName = getClickhouseDbName(id);
     const allPeriods = await prisma.comptablePeriod.findMany({ where: { clientId: id }, select: { batchId: true } });
     const realBatchIds = allPeriods.map((p) => p.batchId).filter(Boolean);
     const compteMap = await lookupComptes(dbName, realBatchIds, [...new Set(lignes.map((l) => l.compte))]);
-    const tiersMap = await lookupTiers(dbName, realBatchIds, [...new Set(lignes.map((l) => l.nTiers).filter(Boolean))]);
+    const wantedTiers = [
+      ...new Set(lignes.filter((l) => isCentralizingAccount(l.compte) && l.nTiers).map((l) => l.nTiers)),
+    ];
+    const tiersMap = await lookupTiers(dbName, realBatchIds, wantedTiers);
 
     for (const l of lignes) {
       if (!compteMap.has(l.compte))
         return NextResponse.json({ error: `Compte inexistant : ${l.compte}. Utilisez un compte du plan existant.` }, { status: 400 });
-      if (l.nTiers && !tiersMap.has(l.nTiers))
-        return NextResponse.json({ error: `Tiers inexistant : ${l.nTiers}. Utilisez un tiers existant.` }, { status: 400 });
+      if (isCentralizingAccount(l.compte) && l.nTiers && !tiersMap.has(l.nTiers))
+        return NextResponse.json({ error: `Tiers inexistant : ${l.nTiers}.` }, { status: 400 });
     }
 
     if (!numeroPiece) numeroPiece = `SAI-${period.year}-${Date.now().toString().slice(-6)}`;
@@ -310,19 +345,24 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     await prisma.manualLedgerEntry.createMany({
       data: lignes.map((l) => {
         const c = compteMap.get(l.compte)!;
+        const central = isCentralizingAccount(l.compte);
         return {
           clientId: id,
           comptablePeriodId: period.id,
           year: period.year,
-          dateTransaction: new Date(l.dateTransaction),
+          dateTransaction: dateEcriture,
+          codeJournal,
           compte: l.compte,
           intituleCompte: c.intitule,
-          nTiers: l.nTiers || "",
-          intituleTiers: l.nTiers ? tiersMap.get(l.nTiers) || "" : "",
+          // Champs tiers vidés si le compte n'est pas centralisateur (spec).
+          nTiers: central ? l.nTiers || "" : "",
+          intituleTiers: central && l.nTiers ? tiersMap.get(l.nTiers) || "" : "",
+          typeTiers: central ? l.typeTiers || "" : "",
           rubrique: c.rubrique,
           bilanRubrique: c.bilan,
           numeroPiece,
-          libelle: l.libelle || "",
+          numeroFacture: l.numeroFacture || "",
+          libelle: libelle || "",
           debit: l.debit,
           credit: l.credit,
           createdById: perm.user.id,

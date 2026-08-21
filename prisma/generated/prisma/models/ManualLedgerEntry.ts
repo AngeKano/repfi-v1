@@ -44,13 +44,16 @@ export type ManualLedgerEntryMinAggregateOutputType = {
   comptablePeriodId: string | null
   year: number | null
   dateTransaction: Date | null
+  codeJournal: string | null
   compte: string | null
   intituleCompte: string | null
   nTiers: string | null
   intituleTiers: string | null
+  typeTiers: string | null
   rubrique: string | null
   bilanRubrique: string | null
   numeroPiece: string | null
+  numeroFacture: string | null
   libelle: string | null
   debit: number | null
   credit: number | null
@@ -65,13 +68,16 @@ export type ManualLedgerEntryMaxAggregateOutputType = {
   comptablePeriodId: string | null
   year: number | null
   dateTransaction: Date | null
+  codeJournal: string | null
   compte: string | null
   intituleCompte: string | null
   nTiers: string | null
   intituleTiers: string | null
+  typeTiers: string | null
   rubrique: string | null
   bilanRubrique: string | null
   numeroPiece: string | null
+  numeroFacture: string | null
   libelle: string | null
   debit: number | null
   credit: number | null
@@ -86,13 +92,16 @@ export type ManualLedgerEntryCountAggregateOutputType = {
   comptablePeriodId: number
   year: number
   dateTransaction: number
+  codeJournal: number
   compte: number
   intituleCompte: number
   nTiers: number
   intituleTiers: number
+  typeTiers: number
   rubrique: number
   bilanRubrique: number
   numeroPiece: number
+  numeroFacture: number
   libelle: number
   debit: number
   credit: number
@@ -121,13 +130,16 @@ export type ManualLedgerEntryMinAggregateInputType = {
   comptablePeriodId?: true
   year?: true
   dateTransaction?: true
+  codeJournal?: true
   compte?: true
   intituleCompte?: true
   nTiers?: true
   intituleTiers?: true
+  typeTiers?: true
   rubrique?: true
   bilanRubrique?: true
   numeroPiece?: true
+  numeroFacture?: true
   libelle?: true
   debit?: true
   credit?: true
@@ -142,13 +154,16 @@ export type ManualLedgerEntryMaxAggregateInputType = {
   comptablePeriodId?: true
   year?: true
   dateTransaction?: true
+  codeJournal?: true
   compte?: true
   intituleCompte?: true
   nTiers?: true
   intituleTiers?: true
+  typeTiers?: true
   rubrique?: true
   bilanRubrique?: true
   numeroPiece?: true
+  numeroFacture?: true
   libelle?: true
   debit?: true
   credit?: true
@@ -163,13 +178,16 @@ export type ManualLedgerEntryCountAggregateInputType = {
   comptablePeriodId?: true
   year?: true
   dateTransaction?: true
+  codeJournal?: true
   compte?: true
   intituleCompte?: true
   nTiers?: true
   intituleTiers?: true
+  typeTiers?: true
   rubrique?: true
   bilanRubrique?: true
   numeroPiece?: true
+  numeroFacture?: true
   libelle?: true
   debit?: true
   credit?: true
@@ -271,13 +289,16 @@ export type ManualLedgerEntryGroupByOutputType = {
   comptablePeriodId: string
   year: number
   dateTransaction: Date
+  codeJournal: string
   compte: string
   intituleCompte: string
   nTiers: string
   intituleTiers: string
+  typeTiers: string
   rubrique: string
   bilanRubrique: string
   numeroPiece: string
+  numeroFacture: string
   libelle: string
   debit: number
   credit: number
@@ -315,13 +336,16 @@ export type ManualLedgerEntryWhereInput = {
   comptablePeriodId?: Prisma.StringFilter<"ManualLedgerEntry"> | string
   year?: Prisma.IntFilter<"ManualLedgerEntry"> | number
   dateTransaction?: Prisma.DateTimeFilter<"ManualLedgerEntry"> | Date | string
+  codeJournal?: Prisma.StringFilter<"ManualLedgerEntry"> | string
   compte?: Prisma.StringFilter<"ManualLedgerEntry"> | string
   intituleCompte?: Prisma.StringFilter<"ManualLedgerEntry"> | string
   nTiers?: Prisma.StringFilter<"ManualLedgerEntry"> | string
   intituleTiers?: Prisma.StringFilter<"ManualLedgerEntry"> | string
+  typeTiers?: Prisma.StringFilter<"ManualLedgerEntry"> | string
   rubrique?: Prisma.StringFilter<"ManualLedgerEntry"> | string
   bilanRubrique?: Prisma.StringFilter<"ManualLedgerEntry"> | string
   numeroPiece?: Prisma.StringFilter<"ManualLedgerEntry"> | string
+  numeroFacture?: Prisma.StringFilter<"ManualLedgerEntry"> | string
   libelle?: Prisma.StringFilter<"ManualLedgerEntry"> | string
   debit?: Prisma.FloatFilter<"ManualLedgerEntry"> | number
   credit?: Prisma.FloatFilter<"ManualLedgerEntry"> | number
@@ -338,13 +362,16 @@ export type ManualLedgerEntryOrderByWithRelationInput = {
   comptablePeriodId?: Prisma.SortOrder
   year?: Prisma.SortOrder
   dateTransaction?: Prisma.SortOrder
+  codeJournal?: Prisma.SortOrder
   compte?: Prisma.SortOrder
   intituleCompte?: Prisma.SortOrder
   nTiers?: Prisma.SortOrder
   intituleTiers?: Prisma.SortOrder
+  typeTiers?: Prisma.SortOrder
   rubrique?: Prisma.SortOrder
   bilanRubrique?: Prisma.SortOrder
   numeroPiece?: Prisma.SortOrder
+  numeroFacture?: Prisma.SortOrder
   libelle?: Prisma.SortOrder
   debit?: Prisma.SortOrder
   credit?: Prisma.SortOrder
@@ -364,13 +391,16 @@ export type ManualLedgerEntryWhereUniqueInput = Prisma.AtLeast<{
   comptablePeriodId?: Prisma.StringFilter<"ManualLedgerEntry"> | string
   year?: Prisma.IntFilter<"ManualLedgerEntry"> | number
   dateTransaction?: Prisma.DateTimeFilter<"ManualLedgerEntry"> | Date | string
+  codeJournal?: Prisma.StringFilter<"ManualLedgerEntry"> | string
   compte?: Prisma.StringFilter<"ManualLedgerEntry"> | string
   intituleCompte?: Prisma.StringFilter<"ManualLedgerEntry"> | string
   nTiers?: Prisma.StringFilter<"ManualLedgerEntry"> | string
   intituleTiers?: Prisma.StringFilter<"ManualLedgerEntry"> | string
+  typeTiers?: Prisma.StringFilter<"ManualLedgerEntry"> | string
   rubrique?: Prisma.StringFilter<"ManualLedgerEntry"> | string
   bilanRubrique?: Prisma.StringFilter<"ManualLedgerEntry"> | string
   numeroPiece?: Prisma.StringFilter<"ManualLedgerEntry"> | string
+  numeroFacture?: Prisma.StringFilter<"ManualLedgerEntry"> | string
   libelle?: Prisma.StringFilter<"ManualLedgerEntry"> | string
   debit?: Prisma.FloatFilter<"ManualLedgerEntry"> | number
   credit?: Prisma.FloatFilter<"ManualLedgerEntry"> | number
@@ -387,13 +417,16 @@ export type ManualLedgerEntryOrderByWithAggregationInput = {
   comptablePeriodId?: Prisma.SortOrder
   year?: Prisma.SortOrder
   dateTransaction?: Prisma.SortOrder
+  codeJournal?: Prisma.SortOrder
   compte?: Prisma.SortOrder
   intituleCompte?: Prisma.SortOrder
   nTiers?: Prisma.SortOrder
   intituleTiers?: Prisma.SortOrder
+  typeTiers?: Prisma.SortOrder
   rubrique?: Prisma.SortOrder
   bilanRubrique?: Prisma.SortOrder
   numeroPiece?: Prisma.SortOrder
+  numeroFacture?: Prisma.SortOrder
   libelle?: Prisma.SortOrder
   debit?: Prisma.SortOrder
   credit?: Prisma.SortOrder
@@ -416,13 +449,16 @@ export type ManualLedgerEntryScalarWhereWithAggregatesInput = {
   comptablePeriodId?: Prisma.StringWithAggregatesFilter<"ManualLedgerEntry"> | string
   year?: Prisma.IntWithAggregatesFilter<"ManualLedgerEntry"> | number
   dateTransaction?: Prisma.DateTimeWithAggregatesFilter<"ManualLedgerEntry"> | Date | string
+  codeJournal?: Prisma.StringWithAggregatesFilter<"ManualLedgerEntry"> | string
   compte?: Prisma.StringWithAggregatesFilter<"ManualLedgerEntry"> | string
   intituleCompte?: Prisma.StringWithAggregatesFilter<"ManualLedgerEntry"> | string
   nTiers?: Prisma.StringWithAggregatesFilter<"ManualLedgerEntry"> | string
   intituleTiers?: Prisma.StringWithAggregatesFilter<"ManualLedgerEntry"> | string
+  typeTiers?: Prisma.StringWithAggregatesFilter<"ManualLedgerEntry"> | string
   rubrique?: Prisma.StringWithAggregatesFilter<"ManualLedgerEntry"> | string
   bilanRubrique?: Prisma.StringWithAggregatesFilter<"ManualLedgerEntry"> | string
   numeroPiece?: Prisma.StringWithAggregatesFilter<"ManualLedgerEntry"> | string
+  numeroFacture?: Prisma.StringWithAggregatesFilter<"ManualLedgerEntry"> | string
   libelle?: Prisma.StringWithAggregatesFilter<"ManualLedgerEntry"> | string
   debit?: Prisma.FloatWithAggregatesFilter<"ManualLedgerEntry"> | number
   credit?: Prisma.FloatWithAggregatesFilter<"ManualLedgerEntry"> | number
@@ -435,13 +471,16 @@ export type ManualLedgerEntryCreateInput = {
   id?: string
   year: number
   dateTransaction: Date | string
+  codeJournal?: string
   compte: string
   intituleCompte?: string
   nTiers?: string
   intituleTiers?: string
+  typeTiers?: string
   rubrique?: string
   bilanRubrique?: string
   numeroPiece?: string
+  numeroFacture?: string
   libelle?: string
   debit?: number
   credit?: number
@@ -458,13 +497,16 @@ export type ManualLedgerEntryUncheckedCreateInput = {
   comptablePeriodId: string
   year: number
   dateTransaction: Date | string
+  codeJournal?: string
   compte: string
   intituleCompte?: string
   nTiers?: string
   intituleTiers?: string
+  typeTiers?: string
   rubrique?: string
   bilanRubrique?: string
   numeroPiece?: string
+  numeroFacture?: string
   libelle?: string
   debit?: number
   credit?: number
@@ -477,13 +519,16 @@ export type ManualLedgerEntryUpdateInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   year?: Prisma.IntFieldUpdateOperationsInput | number
   dateTransaction?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  codeJournal?: Prisma.StringFieldUpdateOperationsInput | string
   compte?: Prisma.StringFieldUpdateOperationsInput | string
   intituleCompte?: Prisma.StringFieldUpdateOperationsInput | string
   nTiers?: Prisma.StringFieldUpdateOperationsInput | string
   intituleTiers?: Prisma.StringFieldUpdateOperationsInput | string
+  typeTiers?: Prisma.StringFieldUpdateOperationsInput | string
   rubrique?: Prisma.StringFieldUpdateOperationsInput | string
   bilanRubrique?: Prisma.StringFieldUpdateOperationsInput | string
   numeroPiece?: Prisma.StringFieldUpdateOperationsInput | string
+  numeroFacture?: Prisma.StringFieldUpdateOperationsInput | string
   libelle?: Prisma.StringFieldUpdateOperationsInput | string
   debit?: Prisma.FloatFieldUpdateOperationsInput | number
   credit?: Prisma.FloatFieldUpdateOperationsInput | number
@@ -500,13 +545,16 @@ export type ManualLedgerEntryUncheckedUpdateInput = {
   comptablePeriodId?: Prisma.StringFieldUpdateOperationsInput | string
   year?: Prisma.IntFieldUpdateOperationsInput | number
   dateTransaction?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  codeJournal?: Prisma.StringFieldUpdateOperationsInput | string
   compte?: Prisma.StringFieldUpdateOperationsInput | string
   intituleCompte?: Prisma.StringFieldUpdateOperationsInput | string
   nTiers?: Prisma.StringFieldUpdateOperationsInput | string
   intituleTiers?: Prisma.StringFieldUpdateOperationsInput | string
+  typeTiers?: Prisma.StringFieldUpdateOperationsInput | string
   rubrique?: Prisma.StringFieldUpdateOperationsInput | string
   bilanRubrique?: Prisma.StringFieldUpdateOperationsInput | string
   numeroPiece?: Prisma.StringFieldUpdateOperationsInput | string
+  numeroFacture?: Prisma.StringFieldUpdateOperationsInput | string
   libelle?: Prisma.StringFieldUpdateOperationsInput | string
   debit?: Prisma.FloatFieldUpdateOperationsInput | number
   credit?: Prisma.FloatFieldUpdateOperationsInput | number
@@ -521,13 +569,16 @@ export type ManualLedgerEntryCreateManyInput = {
   comptablePeriodId: string
   year: number
   dateTransaction: Date | string
+  codeJournal?: string
   compte: string
   intituleCompte?: string
   nTiers?: string
   intituleTiers?: string
+  typeTiers?: string
   rubrique?: string
   bilanRubrique?: string
   numeroPiece?: string
+  numeroFacture?: string
   libelle?: string
   debit?: number
   credit?: number
@@ -540,13 +591,16 @@ export type ManualLedgerEntryUpdateManyMutationInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   year?: Prisma.IntFieldUpdateOperationsInput | number
   dateTransaction?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  codeJournal?: Prisma.StringFieldUpdateOperationsInput | string
   compte?: Prisma.StringFieldUpdateOperationsInput | string
   intituleCompte?: Prisma.StringFieldUpdateOperationsInput | string
   nTiers?: Prisma.StringFieldUpdateOperationsInput | string
   intituleTiers?: Prisma.StringFieldUpdateOperationsInput | string
+  typeTiers?: Prisma.StringFieldUpdateOperationsInput | string
   rubrique?: Prisma.StringFieldUpdateOperationsInput | string
   bilanRubrique?: Prisma.StringFieldUpdateOperationsInput | string
   numeroPiece?: Prisma.StringFieldUpdateOperationsInput | string
+  numeroFacture?: Prisma.StringFieldUpdateOperationsInput | string
   libelle?: Prisma.StringFieldUpdateOperationsInput | string
   debit?: Prisma.FloatFieldUpdateOperationsInput | number
   credit?: Prisma.FloatFieldUpdateOperationsInput | number
@@ -561,13 +615,16 @@ export type ManualLedgerEntryUncheckedUpdateManyInput = {
   comptablePeriodId?: Prisma.StringFieldUpdateOperationsInput | string
   year?: Prisma.IntFieldUpdateOperationsInput | number
   dateTransaction?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  codeJournal?: Prisma.StringFieldUpdateOperationsInput | string
   compte?: Prisma.StringFieldUpdateOperationsInput | string
   intituleCompte?: Prisma.StringFieldUpdateOperationsInput | string
   nTiers?: Prisma.StringFieldUpdateOperationsInput | string
   intituleTiers?: Prisma.StringFieldUpdateOperationsInput | string
+  typeTiers?: Prisma.StringFieldUpdateOperationsInput | string
   rubrique?: Prisma.StringFieldUpdateOperationsInput | string
   bilanRubrique?: Prisma.StringFieldUpdateOperationsInput | string
   numeroPiece?: Prisma.StringFieldUpdateOperationsInput | string
+  numeroFacture?: Prisma.StringFieldUpdateOperationsInput | string
   libelle?: Prisma.StringFieldUpdateOperationsInput | string
   debit?: Prisma.FloatFieldUpdateOperationsInput | number
   credit?: Prisma.FloatFieldUpdateOperationsInput | number
@@ -592,13 +649,16 @@ export type ManualLedgerEntryCountOrderByAggregateInput = {
   comptablePeriodId?: Prisma.SortOrder
   year?: Prisma.SortOrder
   dateTransaction?: Prisma.SortOrder
+  codeJournal?: Prisma.SortOrder
   compte?: Prisma.SortOrder
   intituleCompte?: Prisma.SortOrder
   nTiers?: Prisma.SortOrder
   intituleTiers?: Prisma.SortOrder
+  typeTiers?: Prisma.SortOrder
   rubrique?: Prisma.SortOrder
   bilanRubrique?: Prisma.SortOrder
   numeroPiece?: Prisma.SortOrder
+  numeroFacture?: Prisma.SortOrder
   libelle?: Prisma.SortOrder
   debit?: Prisma.SortOrder
   credit?: Prisma.SortOrder
@@ -619,13 +679,16 @@ export type ManualLedgerEntryMaxOrderByAggregateInput = {
   comptablePeriodId?: Prisma.SortOrder
   year?: Prisma.SortOrder
   dateTransaction?: Prisma.SortOrder
+  codeJournal?: Prisma.SortOrder
   compte?: Prisma.SortOrder
   intituleCompte?: Prisma.SortOrder
   nTiers?: Prisma.SortOrder
   intituleTiers?: Prisma.SortOrder
+  typeTiers?: Prisma.SortOrder
   rubrique?: Prisma.SortOrder
   bilanRubrique?: Prisma.SortOrder
   numeroPiece?: Prisma.SortOrder
+  numeroFacture?: Prisma.SortOrder
   libelle?: Prisma.SortOrder
   debit?: Prisma.SortOrder
   credit?: Prisma.SortOrder
@@ -640,13 +703,16 @@ export type ManualLedgerEntryMinOrderByAggregateInput = {
   comptablePeriodId?: Prisma.SortOrder
   year?: Prisma.SortOrder
   dateTransaction?: Prisma.SortOrder
+  codeJournal?: Prisma.SortOrder
   compte?: Prisma.SortOrder
   intituleCompte?: Prisma.SortOrder
   nTiers?: Prisma.SortOrder
   intituleTiers?: Prisma.SortOrder
+  typeTiers?: Prisma.SortOrder
   rubrique?: Prisma.SortOrder
   bilanRubrique?: Prisma.SortOrder
   numeroPiece?: Prisma.SortOrder
+  numeroFacture?: Prisma.SortOrder
   libelle?: Prisma.SortOrder
   debit?: Prisma.SortOrder
   credit?: Prisma.SortOrder
@@ -757,13 +823,16 @@ export type ManualLedgerEntryCreateWithoutClientInput = {
   id?: string
   year: number
   dateTransaction: Date | string
+  codeJournal?: string
   compte: string
   intituleCompte?: string
   nTiers?: string
   intituleTiers?: string
+  typeTiers?: string
   rubrique?: string
   bilanRubrique?: string
   numeroPiece?: string
+  numeroFacture?: string
   libelle?: string
   debit?: number
   credit?: number
@@ -778,13 +847,16 @@ export type ManualLedgerEntryUncheckedCreateWithoutClientInput = {
   comptablePeriodId: string
   year: number
   dateTransaction: Date | string
+  codeJournal?: string
   compte: string
   intituleCompte?: string
   nTiers?: string
   intituleTiers?: string
+  typeTiers?: string
   rubrique?: string
   bilanRubrique?: string
   numeroPiece?: string
+  numeroFacture?: string
   libelle?: string
   debit?: number
   credit?: number
@@ -828,13 +900,16 @@ export type ManualLedgerEntryScalarWhereInput = {
   comptablePeriodId?: Prisma.StringFilter<"ManualLedgerEntry"> | string
   year?: Prisma.IntFilter<"ManualLedgerEntry"> | number
   dateTransaction?: Prisma.DateTimeFilter<"ManualLedgerEntry"> | Date | string
+  codeJournal?: Prisma.StringFilter<"ManualLedgerEntry"> | string
   compte?: Prisma.StringFilter<"ManualLedgerEntry"> | string
   intituleCompte?: Prisma.StringFilter<"ManualLedgerEntry"> | string
   nTiers?: Prisma.StringFilter<"ManualLedgerEntry"> | string
   intituleTiers?: Prisma.StringFilter<"ManualLedgerEntry"> | string
+  typeTiers?: Prisma.StringFilter<"ManualLedgerEntry"> | string
   rubrique?: Prisma.StringFilter<"ManualLedgerEntry"> | string
   bilanRubrique?: Prisma.StringFilter<"ManualLedgerEntry"> | string
   numeroPiece?: Prisma.StringFilter<"ManualLedgerEntry"> | string
+  numeroFacture?: Prisma.StringFilter<"ManualLedgerEntry"> | string
   libelle?: Prisma.StringFilter<"ManualLedgerEntry"> | string
   debit?: Prisma.FloatFilter<"ManualLedgerEntry"> | number
   credit?: Prisma.FloatFilter<"ManualLedgerEntry"> | number
@@ -847,13 +922,16 @@ export type ManualLedgerEntryCreateWithoutComptablePeriodInput = {
   id?: string
   year: number
   dateTransaction: Date | string
+  codeJournal?: string
   compte: string
   intituleCompte?: string
   nTiers?: string
   intituleTiers?: string
+  typeTiers?: string
   rubrique?: string
   bilanRubrique?: string
   numeroPiece?: string
+  numeroFacture?: string
   libelle?: string
   debit?: number
   credit?: number
@@ -868,13 +946,16 @@ export type ManualLedgerEntryUncheckedCreateWithoutComptablePeriodInput = {
   clientId: string
   year: number
   dateTransaction: Date | string
+  codeJournal?: string
   compte: string
   intituleCompte?: string
   nTiers?: string
   intituleTiers?: string
+  typeTiers?: string
   rubrique?: string
   bilanRubrique?: string
   numeroPiece?: string
+  numeroFacture?: string
   libelle?: string
   debit?: number
   credit?: number
@@ -914,13 +995,16 @@ export type ManualLedgerEntryCreateManyClientInput = {
   comptablePeriodId: string
   year: number
   dateTransaction: Date | string
+  codeJournal?: string
   compte: string
   intituleCompte?: string
   nTiers?: string
   intituleTiers?: string
+  typeTiers?: string
   rubrique?: string
   bilanRubrique?: string
   numeroPiece?: string
+  numeroFacture?: string
   libelle?: string
   debit?: number
   credit?: number
@@ -933,13 +1017,16 @@ export type ManualLedgerEntryUpdateWithoutClientInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   year?: Prisma.IntFieldUpdateOperationsInput | number
   dateTransaction?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  codeJournal?: Prisma.StringFieldUpdateOperationsInput | string
   compte?: Prisma.StringFieldUpdateOperationsInput | string
   intituleCompte?: Prisma.StringFieldUpdateOperationsInput | string
   nTiers?: Prisma.StringFieldUpdateOperationsInput | string
   intituleTiers?: Prisma.StringFieldUpdateOperationsInput | string
+  typeTiers?: Prisma.StringFieldUpdateOperationsInput | string
   rubrique?: Prisma.StringFieldUpdateOperationsInput | string
   bilanRubrique?: Prisma.StringFieldUpdateOperationsInput | string
   numeroPiece?: Prisma.StringFieldUpdateOperationsInput | string
+  numeroFacture?: Prisma.StringFieldUpdateOperationsInput | string
   libelle?: Prisma.StringFieldUpdateOperationsInput | string
   debit?: Prisma.FloatFieldUpdateOperationsInput | number
   credit?: Prisma.FloatFieldUpdateOperationsInput | number
@@ -954,13 +1041,16 @@ export type ManualLedgerEntryUncheckedUpdateWithoutClientInput = {
   comptablePeriodId?: Prisma.StringFieldUpdateOperationsInput | string
   year?: Prisma.IntFieldUpdateOperationsInput | number
   dateTransaction?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  codeJournal?: Prisma.StringFieldUpdateOperationsInput | string
   compte?: Prisma.StringFieldUpdateOperationsInput | string
   intituleCompte?: Prisma.StringFieldUpdateOperationsInput | string
   nTiers?: Prisma.StringFieldUpdateOperationsInput | string
   intituleTiers?: Prisma.StringFieldUpdateOperationsInput | string
+  typeTiers?: Prisma.StringFieldUpdateOperationsInput | string
   rubrique?: Prisma.StringFieldUpdateOperationsInput | string
   bilanRubrique?: Prisma.StringFieldUpdateOperationsInput | string
   numeroPiece?: Prisma.StringFieldUpdateOperationsInput | string
+  numeroFacture?: Prisma.StringFieldUpdateOperationsInput | string
   libelle?: Prisma.StringFieldUpdateOperationsInput | string
   debit?: Prisma.FloatFieldUpdateOperationsInput | number
   credit?: Prisma.FloatFieldUpdateOperationsInput | number
@@ -974,13 +1064,16 @@ export type ManualLedgerEntryUncheckedUpdateManyWithoutClientInput = {
   comptablePeriodId?: Prisma.StringFieldUpdateOperationsInput | string
   year?: Prisma.IntFieldUpdateOperationsInput | number
   dateTransaction?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  codeJournal?: Prisma.StringFieldUpdateOperationsInput | string
   compte?: Prisma.StringFieldUpdateOperationsInput | string
   intituleCompte?: Prisma.StringFieldUpdateOperationsInput | string
   nTiers?: Prisma.StringFieldUpdateOperationsInput | string
   intituleTiers?: Prisma.StringFieldUpdateOperationsInput | string
+  typeTiers?: Prisma.StringFieldUpdateOperationsInput | string
   rubrique?: Prisma.StringFieldUpdateOperationsInput | string
   bilanRubrique?: Prisma.StringFieldUpdateOperationsInput | string
   numeroPiece?: Prisma.StringFieldUpdateOperationsInput | string
+  numeroFacture?: Prisma.StringFieldUpdateOperationsInput | string
   libelle?: Prisma.StringFieldUpdateOperationsInput | string
   debit?: Prisma.FloatFieldUpdateOperationsInput | number
   credit?: Prisma.FloatFieldUpdateOperationsInput | number
@@ -994,13 +1087,16 @@ export type ManualLedgerEntryCreateManyComptablePeriodInput = {
   clientId: string
   year: number
   dateTransaction: Date | string
+  codeJournal?: string
   compte: string
   intituleCompte?: string
   nTiers?: string
   intituleTiers?: string
+  typeTiers?: string
   rubrique?: string
   bilanRubrique?: string
   numeroPiece?: string
+  numeroFacture?: string
   libelle?: string
   debit?: number
   credit?: number
@@ -1013,13 +1109,16 @@ export type ManualLedgerEntryUpdateWithoutComptablePeriodInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   year?: Prisma.IntFieldUpdateOperationsInput | number
   dateTransaction?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  codeJournal?: Prisma.StringFieldUpdateOperationsInput | string
   compte?: Prisma.StringFieldUpdateOperationsInput | string
   intituleCompte?: Prisma.StringFieldUpdateOperationsInput | string
   nTiers?: Prisma.StringFieldUpdateOperationsInput | string
   intituleTiers?: Prisma.StringFieldUpdateOperationsInput | string
+  typeTiers?: Prisma.StringFieldUpdateOperationsInput | string
   rubrique?: Prisma.StringFieldUpdateOperationsInput | string
   bilanRubrique?: Prisma.StringFieldUpdateOperationsInput | string
   numeroPiece?: Prisma.StringFieldUpdateOperationsInput | string
+  numeroFacture?: Prisma.StringFieldUpdateOperationsInput | string
   libelle?: Prisma.StringFieldUpdateOperationsInput | string
   debit?: Prisma.FloatFieldUpdateOperationsInput | number
   credit?: Prisma.FloatFieldUpdateOperationsInput | number
@@ -1034,13 +1133,16 @@ export type ManualLedgerEntryUncheckedUpdateWithoutComptablePeriodInput = {
   clientId?: Prisma.StringFieldUpdateOperationsInput | string
   year?: Prisma.IntFieldUpdateOperationsInput | number
   dateTransaction?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  codeJournal?: Prisma.StringFieldUpdateOperationsInput | string
   compte?: Prisma.StringFieldUpdateOperationsInput | string
   intituleCompte?: Prisma.StringFieldUpdateOperationsInput | string
   nTiers?: Prisma.StringFieldUpdateOperationsInput | string
   intituleTiers?: Prisma.StringFieldUpdateOperationsInput | string
+  typeTiers?: Prisma.StringFieldUpdateOperationsInput | string
   rubrique?: Prisma.StringFieldUpdateOperationsInput | string
   bilanRubrique?: Prisma.StringFieldUpdateOperationsInput | string
   numeroPiece?: Prisma.StringFieldUpdateOperationsInput | string
+  numeroFacture?: Prisma.StringFieldUpdateOperationsInput | string
   libelle?: Prisma.StringFieldUpdateOperationsInput | string
   debit?: Prisma.FloatFieldUpdateOperationsInput | number
   credit?: Prisma.FloatFieldUpdateOperationsInput | number
@@ -1054,13 +1156,16 @@ export type ManualLedgerEntryUncheckedUpdateManyWithoutComptablePeriodInput = {
   clientId?: Prisma.StringFieldUpdateOperationsInput | string
   year?: Prisma.IntFieldUpdateOperationsInput | number
   dateTransaction?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  codeJournal?: Prisma.StringFieldUpdateOperationsInput | string
   compte?: Prisma.StringFieldUpdateOperationsInput | string
   intituleCompte?: Prisma.StringFieldUpdateOperationsInput | string
   nTiers?: Prisma.StringFieldUpdateOperationsInput | string
   intituleTiers?: Prisma.StringFieldUpdateOperationsInput | string
+  typeTiers?: Prisma.StringFieldUpdateOperationsInput | string
   rubrique?: Prisma.StringFieldUpdateOperationsInput | string
   bilanRubrique?: Prisma.StringFieldUpdateOperationsInput | string
   numeroPiece?: Prisma.StringFieldUpdateOperationsInput | string
+  numeroFacture?: Prisma.StringFieldUpdateOperationsInput | string
   libelle?: Prisma.StringFieldUpdateOperationsInput | string
   debit?: Prisma.FloatFieldUpdateOperationsInput | number
   credit?: Prisma.FloatFieldUpdateOperationsInput | number
@@ -1077,13 +1182,16 @@ export type ManualLedgerEntrySelect<ExtArgs extends runtime.Types.Extensions.Int
   comptablePeriodId?: boolean
   year?: boolean
   dateTransaction?: boolean
+  codeJournal?: boolean
   compte?: boolean
   intituleCompte?: boolean
   nTiers?: boolean
   intituleTiers?: boolean
+  typeTiers?: boolean
   rubrique?: boolean
   bilanRubrique?: boolean
   numeroPiece?: boolean
+  numeroFacture?: boolean
   libelle?: boolean
   debit?: boolean
   credit?: boolean
@@ -1100,13 +1208,16 @@ export type ManualLedgerEntrySelectCreateManyAndReturn<ExtArgs extends runtime.T
   comptablePeriodId?: boolean
   year?: boolean
   dateTransaction?: boolean
+  codeJournal?: boolean
   compte?: boolean
   intituleCompte?: boolean
   nTiers?: boolean
   intituleTiers?: boolean
+  typeTiers?: boolean
   rubrique?: boolean
   bilanRubrique?: boolean
   numeroPiece?: boolean
+  numeroFacture?: boolean
   libelle?: boolean
   debit?: boolean
   credit?: boolean
@@ -1123,13 +1234,16 @@ export type ManualLedgerEntrySelectUpdateManyAndReturn<ExtArgs extends runtime.T
   comptablePeriodId?: boolean
   year?: boolean
   dateTransaction?: boolean
+  codeJournal?: boolean
   compte?: boolean
   intituleCompte?: boolean
   nTiers?: boolean
   intituleTiers?: boolean
+  typeTiers?: boolean
   rubrique?: boolean
   bilanRubrique?: boolean
   numeroPiece?: boolean
+  numeroFacture?: boolean
   libelle?: boolean
   debit?: boolean
   credit?: boolean
@@ -1146,13 +1260,16 @@ export type ManualLedgerEntrySelectScalar = {
   comptablePeriodId?: boolean
   year?: boolean
   dateTransaction?: boolean
+  codeJournal?: boolean
   compte?: boolean
   intituleCompte?: boolean
   nTiers?: boolean
   intituleTiers?: boolean
+  typeTiers?: boolean
   rubrique?: boolean
   bilanRubrique?: boolean
   numeroPiece?: boolean
+  numeroFacture?: boolean
   libelle?: boolean
   debit?: boolean
   credit?: boolean
@@ -1161,7 +1278,7 @@ export type ManualLedgerEntrySelectScalar = {
   updatedAt?: boolean
 }
 
-export type ManualLedgerEntryOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "clientId" | "comptablePeriodId" | "year" | "dateTransaction" | "compte" | "intituleCompte" | "nTiers" | "intituleTiers" | "rubrique" | "bilanRubrique" | "numeroPiece" | "libelle" | "debit" | "credit" | "createdById" | "createdAt" | "updatedAt", ExtArgs["result"]["manualLedgerEntry"]>
+export type ManualLedgerEntryOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "clientId" | "comptablePeriodId" | "year" | "dateTransaction" | "codeJournal" | "compte" | "intituleCompte" | "nTiers" | "intituleTiers" | "typeTiers" | "rubrique" | "bilanRubrique" | "numeroPiece" | "numeroFacture" | "libelle" | "debit" | "credit" | "createdById" | "createdAt" | "updatedAt", ExtArgs["result"]["manualLedgerEntry"]>
 export type ManualLedgerEntryInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   client?: boolean | Prisma.ClientDefaultArgs<ExtArgs>
   comptablePeriod?: boolean | Prisma.ComptablePeriodDefaultArgs<ExtArgs>
@@ -1187,13 +1304,16 @@ export type $ManualLedgerEntryPayload<ExtArgs extends runtime.Types.Extensions.I
     comptablePeriodId: string
     year: number
     dateTransaction: Date
+    codeJournal: string
     compte: string
     intituleCompte: string
     nTiers: string
     intituleTiers: string
+    typeTiers: string
     rubrique: string
     bilanRubrique: string
     numeroPiece: string
+    numeroFacture: string
     libelle: string
     debit: number
     credit: number
@@ -1630,13 +1750,16 @@ export interface ManualLedgerEntryFieldRefs {
   readonly comptablePeriodId: Prisma.FieldRef<"ManualLedgerEntry", 'String'>
   readonly year: Prisma.FieldRef<"ManualLedgerEntry", 'Int'>
   readonly dateTransaction: Prisma.FieldRef<"ManualLedgerEntry", 'DateTime'>
+  readonly codeJournal: Prisma.FieldRef<"ManualLedgerEntry", 'String'>
   readonly compte: Prisma.FieldRef<"ManualLedgerEntry", 'String'>
   readonly intituleCompte: Prisma.FieldRef<"ManualLedgerEntry", 'String'>
   readonly nTiers: Prisma.FieldRef<"ManualLedgerEntry", 'String'>
   readonly intituleTiers: Prisma.FieldRef<"ManualLedgerEntry", 'String'>
+  readonly typeTiers: Prisma.FieldRef<"ManualLedgerEntry", 'String'>
   readonly rubrique: Prisma.FieldRef<"ManualLedgerEntry", 'String'>
   readonly bilanRubrique: Prisma.FieldRef<"ManualLedgerEntry", 'String'>
   readonly numeroPiece: Prisma.FieldRef<"ManualLedgerEntry", 'String'>
+  readonly numeroFacture: Prisma.FieldRef<"ManualLedgerEntry", 'String'>
   readonly libelle: Prisma.FieldRef<"ManualLedgerEntry", 'String'>
   readonly debit: Prisma.FieldRef<"ManualLedgerEntry", 'Float'>
   readonly credit: Prisma.FieldRef<"ManualLedgerEntry", 'Float'>

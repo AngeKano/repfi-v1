@@ -204,7 +204,8 @@ export const PERMISSION_MATRIX: Record<
 
     // Fichiers
     [FICHIERS_ACTIONS.CHARGER]: true,
-    [SAISIE_ACTIONS.GERER]: true,
+    // Saisie manuelle réservée au Loader Plus (spec).
+    [SAISIE_ACTIONS.GERER]: false,
     [FICHIERS_ACTIONS.VOIR]: true,
     [FICHIERS_ACTIONS.EXPORTER_FINAUX]: true,
     [FICHIERS_ACTIONS.SUPPRIMER]: true,
