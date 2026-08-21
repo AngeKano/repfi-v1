@@ -70,6 +70,13 @@ export const REPORTING_ACTIONS = {
   EXPORTER: "reporting:exporter",
 } as const;
 
+// ============================================
+// SAISIE (lignes comptables manuelles)
+// ============================================
+export const SAISIE_ACTIONS = {
+  GERER: "saisie:gerer",
+} as const;
+
 // Type union de toutes les actions
 export type EntrepriseAction =
   (typeof ENTREPRISE_ACTIONS)[keyof typeof ENTREPRISE_ACTIONS];
@@ -83,6 +90,8 @@ export type FichiersAction =
   (typeof FICHIERS_ACTIONS)[keyof typeof FICHIERS_ACTIONS];
 export type ReportingAction =
   (typeof REPORTING_ACTIONS)[keyof typeof REPORTING_ACTIONS];
+export type SaisieAction =
+  (typeof SAISIE_ACTIONS)[keyof typeof SAISIE_ACTIONS];
 
 export type PermissionAction =
   | EntrepriseAction
@@ -90,7 +99,8 @@ export type PermissionAction =
   | MembresAction
   | ClientsAction
   | FichiersAction
-  | ReportingAction;
+  | ReportingAction
+  | SaisieAction;
 
 // Export groupé de toutes les actions
 export const ACTIONS = {
@@ -100,6 +110,7 @@ export const ACTIONS = {
   ...CLIENTS_ACTIONS,
   ...FICHIERS_ACTIONS,
   ...REPORTING_ACTIONS,
+  ...SAISIE_ACTIONS,
 } as const;
 
 // Liste de toutes les actions pour validation
@@ -110,6 +121,7 @@ export const ALL_ACTIONS: PermissionAction[] = [
   ...Object.values(CLIENTS_ACTIONS),
   ...Object.values(FICHIERS_ACTIONS),
   ...Object.values(REPORTING_ACTIONS),
+  ...Object.values(SAISIE_ACTIONS),
 ];
 
 /**
@@ -139,6 +151,10 @@ export const ACTION_CATEGORIES = {
   REPORTING: {
     label: "Reporting",
     actions: Object.values(REPORTING_ACTIONS),
+  },
+  SAISIE: {
+    label: "Saisie",
+    actions: Object.values(SAISIE_ACTIONS),
   },
 } as const;
 
@@ -188,4 +204,7 @@ export const ACTION_LABELS: Record<PermissionAction, string> = {
   [REPORTING_ACTIONS.MODIFIER]: "Modifier un rapport/dashboard",
   [REPORTING_ACTIONS.SUPPRIMER]: "Supprimer un rapport/dashboard",
   [REPORTING_ACTIONS.EXPORTER]: "Exporter un rapport/dashboard",
+
+  // Saisie
+  [SAISIE_ACTIONS.GERER]: "Saisir/éditer des lignes comptables",
 };

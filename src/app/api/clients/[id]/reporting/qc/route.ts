@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import { createClient as createClickhouseClient } from "@clickhouse/client";
 import { prisma } from "@/lib/prisma";
+import { manualBatchId } from "@/lib/clickhouse/manual-sync";
 import {
   checkAttributedNotExceedTotal,
   checkNoForbiddenPrefix,
@@ -70,9 +71,10 @@ export async function GET(
       where: { clientId: id },
       select: { batchId: true },
     });
-    const batchIds = periods
-      .map((p) => p.batchId)
-      .filter((b): b is string => !!b);
+    const batchIds = [
+      ...periods.map((p) => p.batchId).filter((b): b is string => !!b),
+      manualBatchId(id, parseInt(year, 10)),
+    ];
 
     const startYM = `${year}01`;
     const endYM = `${year}${endMonth}`;

@@ -77,3 +77,8 @@ export type FileTypePattern = Prisma.FileTypePatternModel
  * 
  */
 export type ComptablePeriod = Prisma.ComptablePeriodModel
+/**
+ * Model ManualLedgerEntry
+ * 
+ */
+export type ManualLedgerEntry = Prisma.ManualLedgerEntryModel

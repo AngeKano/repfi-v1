@@ -12,6 +12,7 @@ import {
   CLIENTS_ACTIONS,
   FICHIERS_ACTIONS,
   REPORTING_ACTIONS,
+  SAISIE_ACTIONS,
 } from "./actions";
 
 /**
@@ -56,6 +57,7 @@ export const PERMISSION_MATRIX: Record<
 
     // Fichiers
     [FICHIERS_ACTIONS.CHARGER]: true,
+    [SAISIE_ACTIONS.GERER]: true,
     [FICHIERS_ACTIONS.VOIR]: true,
     [FICHIERS_ACTIONS.EXPORTER_FINAUX]: true,
     [FICHIERS_ACTIONS.SUPPRIMER]: true,
@@ -104,6 +106,7 @@ export const PERMISSION_MATRIX: Record<
 
     // Fichiers
     [FICHIERS_ACTIONS.CHARGER]: false,
+    [SAISIE_ACTIONS.GERER]: false,
     [FICHIERS_ACTIONS.VOIR]: true,
     [FICHIERS_ACTIONS.EXPORTER_FINAUX]: true,
     [FICHIERS_ACTIONS.SUPPRIMER]: true,
@@ -152,6 +155,7 @@ export const PERMISSION_MATRIX: Record<
 
     // Fichiers
     [FICHIERS_ACTIONS.CHARGER]: false,
+    [SAISIE_ACTIONS.GERER]: false,
     [FICHIERS_ACTIONS.VOIR]: true,
     [FICHIERS_ACTIONS.EXPORTER_FINAUX]: true,
     [FICHIERS_ACTIONS.SUPPRIMER]: true,
@@ -200,6 +204,7 @@ export const PERMISSION_MATRIX: Record<
 
     // Fichiers
     [FICHIERS_ACTIONS.CHARGER]: true,
+    [SAISIE_ACTIONS.GERER]: true,
     [FICHIERS_ACTIONS.VOIR]: true,
     [FICHIERS_ACTIONS.EXPORTER_FINAUX]: true,
     [FICHIERS_ACTIONS.SUPPRIMER]: true,
@@ -248,6 +253,7 @@ export const PERMISSION_MATRIX: Record<
 
     // Fichiers
     [FICHIERS_ACTIONS.CHARGER]: true,
+    [SAISIE_ACTIONS.GERER]: true,
     [FICHIERS_ACTIONS.VOIR]: true,
     [FICHIERS_ACTIONS.EXPORTER_FINAUX]: true,
     [FICHIERS_ACTIONS.SUPPRIMER]: true,
@@ -296,6 +302,7 @@ export const PERMISSION_MATRIX: Record<
 
     // Fichiers
     [FICHIERS_ACTIONS.CHARGER]: false,
+    [SAISIE_ACTIONS.GERER]: false,
     [FICHIERS_ACTIONS.VOIR]: false,
     [FICHIERS_ACTIONS.EXPORTER_FINAUX]: false,
     [FICHIERS_ACTIONS.SUPPRIMER]: false,

@@ -32,9 +32,11 @@ import {
   PiUsersThreeDuotone,
   PiChartBarHorizontalDuotone,
   PiFilesDuotone,
+  PiNotePencilDuotone,
 } from "react-icons/pi";
 import Link from "next/link";
 import FilesTabs from "./files-tabs";
+import SaisieTab from "./saisie";
 import DeclarationTabs from "./declaration/declaration-tabs";
 import ClientReportingChart from "@/components/reporting/client-reporting-chart";
 import ClientDettesTab from "@/components/reporting/client-dettes-tab";
@@ -70,6 +72,7 @@ const CLIENT_TABS = [
     label: "Reporting Financier",
     icon: PiChartBarHorizontalDuotone,
   },
+  { id: "saisie", label: "Saisie", icon: PiNotePencilDuotone },
   { id: "files", label: "Autres Fichiers", icon: PiFilesDuotone },
 ];
 
@@ -81,6 +84,7 @@ const REPORTING_TAB_IDS = new Set([
   "recouvrement",
   "dettes",
   "bilan",
+  "saisie",
 ]);
 
 // Onglets désactivés de manière permanente (fonctionnalité à venir).
@@ -590,6 +594,32 @@ export default function ClientDetailsClient({
                   <DeclarationTabs clientId={client.id} />
                 </Tabs>
               )}
+
+              {/* Saisie — lignes comptables manuelles */}
+              {activeTab === "saisie" &&
+                (hasReporting ? (
+                  <SaisieTab clientId={client.id} />
+                ) : (
+                  <Card className="p-12 border-[#D0E3F5] text-center">
+                    <div className="mx-auto w-14 h-14 rounded-full bg-[#EBF5FF] flex items-center justify-center mb-4">
+                      <Plus className="w-6 h-6 text-[#0077C3]" />
+                    </div>
+                    <h3 className="text-lg font-semibold text-[#00122E] mb-1">
+                      Aucun grand livre importé
+                    </h3>
+                    <p className="text-sm text-[#335890] mb-6">
+                      Importez d&apos;abord un reporting pour saisir des lignes
+                      comptables.
+                    </p>
+                    <Button
+                      onClick={() => setShowUploadDialog(true)}
+                      className="gap-2 bg-gradient-to-r from-[#0077C3] to-[#0095F4] hover:from-[#005992] hover:to-[#0077C3] rounded-full"
+                    >
+                      <Plus className="w-4 h-4" />
+                      Créer un reporting
+                    </Button>
+                  </Card>
+                ))}
 
               {/* Files */}
               {activeTab === "files" && <FilesTabs clientId={client.id} />}
