@@ -277,13 +277,16 @@ model ManualLedgerEntry {
   comptablePeriodId String
   year              Int
   dateTransaction   DateTime
+  codeJournal       String   @default("")
   compte            String
   intituleCompte    String   @default("")
   nTiers            String   @default("")
   intituleTiers     String   @default("")
+  typeTiers         String   @default("")
   rubrique          String   @default("")
   bilanRubrique     String   @default("")
   numeroPiece       String   @default("")
+  numeroFacture     String   @default("")
   libelle           String   @default("")
   debit             Float    @default(0)
   credit            Float    @default(0)
