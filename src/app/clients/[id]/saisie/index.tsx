@@ -123,6 +123,22 @@ const num = (s: string) => {
   return isNaN(v) ? 0 : v;
 };
 
+// Cellule "auto" : valeur dérivée du numéro de compte / tiers (référentiel
+// existant, même logique qu'Airflow). Grisée, verrouillée, non modifiable.
+function AutoCell({ value, className }: { value?: string; className?: string }) {
+  return (
+    <div
+      title={value || ""}
+      className={cn(
+        "h-8 flex items-center px-2 rounded-md bg-muted/60 text-muted-foreground text-xs truncate cursor-not-allowed border border-transparent",
+        className,
+      )}
+    >
+      {value || "—"}
+    </div>
+  );
+}
+
 function pageWindow(current: number, total: number, size = 5): (number | "…")[] {
   if (total <= size) return Array.from({ length: total }, (_, i) => i + 1);
   let start = Math.max(1, current - Math.floor(size / 2));
@@ -238,6 +254,10 @@ export default function SaisieTab({ clientId }: { clientId: string }) {
 
   const compteInfo = useCallback(
     (c: string) => data?.refs.comptes.find((x) => x.compte === c),
+    [data],
+  );
+  const tiersInfo = useCallback(
+    (t: string) => data?.refs.tiers.find((x) => x.nTiers === t),
     [data],
   );
 
@@ -515,8 +535,9 @@ export default function SaisieTab({ clientId }: { clientId: string }) {
                     <tr className="text-[11px] text-muted-foreground text-left">
                       <th className="p-1 w-8">#</th>
                       <th className="p-1">Compte</th>
-                      <th className="p-1">Intitulé</th>
+                      <th className="p-1">Intitulé compte</th>
                       <th className="p-1">N° Tiers</th>
+                      <th className="p-1">Intitulé tiers</th>
                       <th className="p-1">Type Tiers</th>
                       <th className="p-1">Rubrique</th>
                       <th className="p-1">N° Facture</th>
@@ -549,8 +570,8 @@ export default function SaisieTab({ clientId }: { clientId: string }) {
                               className={cn(cellInput, "w-28")}
                             />
                           </td>
-                          <td className="p-1 text-muted-foreground max-w-[140px] truncate">
-                            {info?.intitule || ""}
+                          <td className="p-1">
+                            <AutoCell value={info?.intitule} className="w-40 max-w-[170px]" />
                           </td>
                           <td className="p-1">
                             <Input
@@ -563,6 +584,12 @@ export default function SaisieTab({ clientId }: { clientId: string }) {
                             />
                           </td>
                           <td className="p-1">
+                            <AutoCell
+                              value={central ? tiersInfo(l.nTiers)?.intitule : ""}
+                              className="w-36 max-w-[150px]"
+                            />
+                          </td>
+                          <td className="p-1">
                             <Input
                               list="saisie-types-tiers"
                               value={l.typeTiers}
@@ -572,7 +599,9 @@ export default function SaisieTab({ clientId }: { clientId: string }) {
                               placeholder={central ? "" : "—"}
                             />
                           </td>
-                          <td className="p-1 text-muted-foreground">{info?.rubrique || ""}</td>
+                          <td className="p-1">
+                            <AutoCell value={info?.rubrique} className="w-20" />
+                          </td>
                           <td className="p-1">
                             <Input value={l.numeroFacture} onChange={(e) => setLine(i, { numeroFacture: e.target.value })} className={cn(cellInput, "w-24")} />
                           </td>
@@ -591,7 +620,7 @@ export default function SaisieTab({ clientId }: { clientId: string }) {
                       );
                     })}
                     <tr className="border-t font-semibold">
-                      <td className="p-1" colSpan={7}>
+                      <td className="p-1" colSpan={8}>
                         Total
                       </td>
                       <td className="p-1 text-right tabular-nums">{fmt(formDelta.d)}</td>
@@ -667,7 +696,9 @@ export default function SaisieTab({ clientId }: { clientId: string }) {
                         <td className="p-1">
                           <Input list="saisie-types-tiers" value={editRow.typeTiers} disabled={!central} onChange={(e) => setEditRow({ ...editRow, typeTiers: e.target.value })} className={cn(cellInput, "w-24", !central && "opacity-40")} />
                         </td>
-                        <td className="p-2 text-muted-foreground">{compteInfo(editRow.compte)?.rubrique || m.rubrique}</td>
+                        <td className="p-1">
+                          <AutoCell value={compteInfo(editRow.compte)?.rubrique || m.rubrique} className="w-20" />
+                        </td>
                         <td className="p-2 text-muted-foreground">{m.numeroPiece}</td>
                         <td className="p-1">
                           <Input value={editRow.numeroFacture} onChange={(e) => setEditRow({ ...editRow, numeroFacture: e.target.value })} className={cn(cellInput, "w-24")} />
