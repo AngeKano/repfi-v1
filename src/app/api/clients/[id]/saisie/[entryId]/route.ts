@@ -103,7 +103,10 @@ export async function PATCH(
     if (p.compte && p.compte !== entry.compte) {
       const rows = (await (
         await clickhouse.query({
-          query: `SELECT any(intitule_compte) i, any(rubrique) r, any(bilan_rubrique) b, count() c
+          query: `SELECT anyIf(intitule_compte, intitule_compte != '') i,
+                         anyIf(rubrique, rubrique != '') r,
+                         anyIf(bilan_rubrique, bilan_rubrique != '') b,
+                         count() c
                   FROM ${dbName}.grand_livre
                   WHERE batch_id IN ({batchIds:Array(String)}) AND compte = {compte:String}`,
           query_params: { batchIds: realBatchIds, compte },
@@ -119,7 +122,7 @@ export async function PATCH(
     if (p.nTiers !== undefined && nTiers && nTiers !== entry.nTiers) {
       const rows = (await (
         await clickhouse.query({
-          query: `SELECT any(intitule_tiers) i, count() c FROM ${dbName}.grand_livre
+          query: `SELECT anyIf(intitule_tiers, intitule_tiers != '') i, count() c FROM ${dbName}.grand_livre
                   WHERE batch_id IN ({batchIds:Array(String)}) AND n_tiers = {t:String}`,
           query_params: { batchIds: realBatchIds, t: nTiers },
           format: "JSONEachRow",

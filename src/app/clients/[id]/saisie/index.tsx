@@ -114,6 +114,15 @@ interface FormLine {
   credit: string;
 }
 
+// Écriture = ensemble de lignes saisies partageant le même n° pièce.
+interface Ecriture {
+  numeroPiece: string;
+  dateTransaction: string;
+  codeJournal: string;
+  libelle: string;
+  lines: ManualEntry[];
+}
+
 // ==================== Helpers ====================
 const fmt = (n: number) =>
   n ? n.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "";
@@ -167,18 +176,15 @@ export default function SaisieTab({ clientId }: { clientId: string }) {
   const [sortBy, setSortBy] = useState<string>("date");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
 
-  // Formulaire d'ajout d'écriture (en-tête + lignes).
-  const [adding, setAdding] = useState(false);
+  // Formulaire (ajout ou modification d'une écriture entière).
+  const [formOpen, setFormOpen] = useState<null | "add" | "edit">(null);
+  const [editPiece, setEditPiece] = useState<string>("");
   const [ecrDate, setEcrDate] = useState("");
   const [ecrJournal, setEcrJournal] = useState("");
   const [ecrLibelle, setEcrLibelle] = useState("");
   const [ecrPiece, setEcrPiece] = useState("");
   const [lines, setLines] = useState<FormLine[]>([]);
   const [submitting, setSubmitting] = useState(false);
-
-  // Édition ligne à ligne.
-  const [editId, setEditId] = useState<string | null>(null);
-  const [editRow, setEditRow] = useState<FormLine | null>(null);
 
   const fetchData = useCallback(
     async (pid: string, pg: number, srch: string, sBy: string, sDir: string) => {
@@ -266,6 +272,24 @@ export default function SaisieTab({ clientId }: { clientId: string }) {
     [data],
   );
 
+  // Regroupe les lignes saisies en écritures (par n° pièce).
+  const ecritures: Ecriture[] = useMemo(() => {
+    const map = new Map<string, Ecriture>();
+    for (const m of data?.manual ?? []) {
+      const key = m.numeroPiece || m.id;
+      if (!map.has(key))
+        map.set(key, {
+          numeroPiece: m.numeroPiece,
+          dateTransaction: m.dateTransaction,
+          codeJournal: m.codeJournal,
+          libelle: m.libelle,
+          lines: [],
+        });
+      map.get(key)!.lines.push(m);
+    }
+    return [...map.values()];
+  }, [data]);
+
   const newLine = (): FormLine => ({
     compte: "",
     nTiers: "",
@@ -280,8 +304,28 @@ export default function SaisieTab({ clientId }: { clientId: string }) {
     setEcrJournal("");
     setEcrLibelle("");
     setEcrPiece("");
+    setEditPiece("");
     setLines([newLine(), newLine()]);
-    setAdding(true);
+    setFormOpen("add");
+  };
+
+  const openEdit = (e: Ecriture) => {
+    setEcrDate(isoToInput(e.dateTransaction));
+    setEcrJournal(e.codeJournal);
+    setEcrLibelle(e.libelle);
+    setEcrPiece(e.numeroPiece);
+    setEditPiece(e.numeroPiece);
+    setLines(
+      e.lines.map((l) => ({
+        compte: l.compte,
+        nTiers: l.nTiers,
+        typeTiers: l.typeTiers,
+        numeroFacture: l.numeroFacture,
+        debit: l.debit ? String(l.debit) : "",
+        credit: l.credit ? String(l.credit) : "",
+      })),
+    );
+    setFormOpen("edit");
   };
 
   const setLine = (i: number, patch: Partial<FormLine>) =>
@@ -302,36 +346,49 @@ export default function SaisieTab({ clientId }: { clientId: string }) {
     lines.every((l) => l.compte && (num(l.debit) > 0 || num(l.credit) > 0)) &&
     !submitting;
 
-  const submitEcriture = async () => {
+  const submitForm = async () => {
     if (!period) return;
     setSubmitting(true);
     try {
+      const payloadLines = lines.map((l) => ({
+        compte: l.compte.trim(),
+        nTiers: l.nTiers.trim(),
+        typeTiers: l.typeTiers.trim(),
+        numeroFacture: l.numeroFacture.trim(),
+        debit: num(l.debit),
+        credit: num(l.credit),
+      }));
+      const isEdit = formOpen === "edit";
       const res = await fetch(`/api/clients/${clientId}/saisie`, {
-        method: "POST",
+        method: isEdit ? "PUT" : "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          periodId: period.id,
-          dateTransaction: ecrDate,
-          codeJournal: ecrJournal,
-          libelle: ecrLibelle.trim(),
-          numeroPiece: ecrPiece.trim() || undefined,
-          lignes: lines.map((l) => ({
-            compte: l.compte.trim(),
-            nTiers: l.nTiers.trim(),
-            typeTiers: l.typeTiers.trim(),
-            numeroFacture: l.numeroFacture.trim(),
-            debit: num(l.debit),
-            credit: num(l.credit),
-          })),
-        }),
+        body: JSON.stringify(
+          isEdit
+            ? {
+                periodId: period.id,
+                numeroPiece: editPiece,
+                dateTransaction: ecrDate,
+                codeJournal: ecrJournal,
+                libelle: ecrLibelle.trim(),
+                lignes: payloadLines,
+              }
+            : {
+                periodId: period.id,
+                dateTransaction: ecrDate,
+                codeJournal: ecrJournal,
+                libelle: ecrLibelle.trim(),
+                numeroPiece: ecrPiece.trim() || undefined,
+                lignes: payloadLines,
+              },
+        ),
       });
       const json = await res.json().catch(() => ({}));
       if (!res.ok) {
         toast.error(json?.error || "Enregistrement refusé");
         return;
       }
-      toast.success("Écriture enregistrée");
-      setAdding(false);
+      toast.success(isEdit ? "Écriture modifiée" : "Écriture enregistrée");
+      setFormOpen(null);
       fetchData(period.id, page, search, sortBy, sortDir);
     } catch {
       toast.error("Erreur réseau");
@@ -340,49 +397,7 @@ export default function SaisieTab({ clientId }: { clientId: string }) {
     }
   };
 
-  const startEdit = (m: ManualEntry) => {
-    setEditId(m.id);
-    setEditRow({
-      compte: m.compte,
-      nTiers: m.nTiers,
-      typeTiers: m.typeTiers,
-      numeroFacture: m.numeroFacture,
-      debit: m.debit ? String(m.debit) : "",
-      credit: m.credit ? String(m.credit) : "",
-    });
-  };
-
-  const saveEdit = async () => {
-    if (!editId || !editRow || !period) return;
-    try {
-      const res = await fetch(`/api/clients/${clientId}/saisie/${editId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          compte: editRow.compte.trim(),
-          nTiers: editRow.nTiers.trim(),
-          typeTiers: editRow.typeTiers.trim(),
-          numeroFacture: editRow.numeroFacture.trim(),
-          debit: num(editRow.debit),
-          credit: num(editRow.credit),
-        }),
-      });
-      const json = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        toast.error(json?.error || "Modification refusée");
-        return;
-      }
-      if (json?.warning) toast.warning(json.warning);
-      else toast.success("Ligne modifiée");
-      setEditId(null);
-      setEditRow(null);
-      fetchData(period.id, page, search, sortBy, sortDir);
-    } catch {
-      toast.error("Erreur réseau");
-    }
-  };
-
-  const deleteEntry = async (m: ManualEntry) => {
+  const deleteLine = async (m: ManualEntry) => {
     if (!period) return;
     if (!window.confirm(`Supprimer cette ligne (${m.compte}${m.numeroPiece ? ` · ${m.numeroPiece}` : ""}) ?`)) return;
     try {
@@ -433,7 +448,7 @@ export default function SaisieTab({ clientId }: { clientId: string }) {
             value={periodId}
             onValueChange={(v) => {
               setPage(1);
-              setAdding(false);
+              setFormOpen(null);
               setPeriodId(v);
             }}
           >
@@ -469,26 +484,32 @@ export default function SaisieTab({ clientId }: { clientId: string }) {
         ))}
       </datalist>
 
-      {/* ===================== Mes saisies ===================== */}
+      {/* ===================== Mes écritures saisies ===================== */}
       <Card>
         <CardHeader className="flex flex-row items-center justify-between gap-4">
           <div>
             <CardTitle>Mes écritures saisies</CardTitle>
             <CardDescription>
-              Écritures ajoutées manuellement — modifiables / supprimables. Une écriture
-              doit être équilibrée (Σ débit = Σ crédit).
+              Écritures ajoutées manuellement — modifiables (écriture entière) et
+              supprimables ligne par ligne. Une écriture doit être équilibrée
+              (Σ débit = Σ crédit) pour être enregistrée.
             </CardDescription>
           </div>
-          {!adding && (
+          {!formOpen && (
             <Button onClick={openAdd} className="gap-2 rounded-lg">
               <Plus className="w-4 h-4" /> Ajouter une écriture
             </Button>
           )}
         </CardHeader>
         <CardContent className="space-y-4">
-          {/* Formulaire d'ajout */}
-          {adding && (
+          {/* Formulaire (ajout / modification) */}
+          {formOpen && (
             <div className="rounded-xl border border-dashed border-[#0077C3] bg-[#F5F9FF] p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <h4 className="font-semibold text-[#00122E] text-sm">
+                  {formOpen === "edit" ? `Modifier l'écriture ${editPiece}` : "Nouvelle écriture"}
+                </h4>
+              </div>
               {/* En-tête écriture */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                 <div>
@@ -512,7 +533,13 @@ export default function SaisieTab({ clientId }: { clientId: string }) {
                 </div>
                 <div>
                   <label className="text-xs text-[#335890]">N° pièce</label>
-                  <Input value={ecrPiece} onChange={(e) => setEcrPiece(e.target.value)} placeholder="Auto" className="h-9" />
+                  <Input
+                    value={ecrPiece}
+                    onChange={(e) => setEcrPiece(e.target.value)}
+                    placeholder="Auto"
+                    disabled={formOpen === "edit"}
+                    className={cn("h-9", formOpen === "edit" && "opacity-60")}
+                  />
                 </div>
                 <div>
                   <label className="text-xs text-[#335890]">Libellé opération</label>
@@ -588,10 +615,7 @@ export default function SaisieTab({ clientId }: { clientId: string }) {
                             />
                           </td>
                           <td className="p-1">
-                            <AutoCell
-                              value={central ? suggestTypeTiers(l.compte) : ""}
-                              className="w-24"
-                            />
+                            <AutoCell value={central ? suggestTypeTiers(l.compte) : ""} className="w-24" />
                           </td>
                           <td className="p-1">
                             <AutoCell value={info?.rubrique} className="w-20" />
@@ -634,10 +658,10 @@ export default function SaisieTab({ clientId }: { clientId: string }) {
                   {Math.abs(formDelta.delta) >= 0.01 && " — non équilibré"}
                 </div>
                 <div className="flex items-center gap-2">
-                  <Button variant="ghost" size="sm" onClick={() => setAdding(false)}>
+                  <Button variant="ghost" size="sm" onClick={() => setFormOpen(null)}>
                     Annuler
                   </Button>
-                  <Button size="sm" onClick={submitEcriture} disabled={!canSubmit} className="gap-1">
+                  <Button size="sm" onClick={submitForm} disabled={!canSubmit} className="gap-1">
                     {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
                     Enregistrer
                   </Button>
@@ -650,123 +674,87 @@ export default function SaisieTab({ clientId }: { clientId: string }) {
             </div>
           )}
 
-          {/* Table des écritures saisies */}
-          {data.manual.length === 0 && !adding ? (
+          {/* Liste des écritures saisies */}
+          {ecritures.length === 0 && !formOpen ? (
             <p className="text-sm text-muted-foreground py-4 text-center">
               Aucune écriture saisie pour cette période.
             </p>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-xs">
-                <thead>
-                  <tr className="text-[11px] text-muted-foreground text-left border-b">
-                    <th className="p-2">Date</th>
-                    <th className="p-2">Journal</th>
-                    <th className="p-2">Compte</th>
-                    <th className="p-2">Tiers</th>
-                    <th className="p-2">Type</th>
-                    <th className="p-2">Rubrique</th>
-                    <th className="p-2">N° Pièce</th>
-                    <th className="p-2">N° Facture</th>
-                    <th className="p-2">Libellé</th>
-                    <th className="p-2 text-right">Débit</th>
-                    <th className="p-2 text-right">Crédit</th>
-                    <th className="p-2 text-right">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {data.manual.map((m) => {
-                    const central = editRow ? isCentralizingAccount(editRow.compte) : false;
-                    return editId === m.id && editRow ? (
-                      <tr key={m.id} className="bg-[#F5F9FF]">
-                        <td className="p-2">{new Date(m.dateTransaction).toLocaleDateString("fr-FR")}</td>
-                        <td className="p-2">{m.codeJournal}</td>
-                        <td className="p-1">
-                          <Input
-                            list="saisie-comptes"
-                            value={editRow.compte}
-                            onChange={(e) => {
-                              const compte = e.target.value;
-                              const c = isCentralizingAccount(compte);
-                              setEditRow({
-                                ...editRow,
-                                compte,
-                                typeTiers: c ? suggestTypeTiers(compte) : "",
-                                nTiers: c ? editRow.nTiers : "",
-                              });
-                            }}
-                            className={cn(cellInput, "w-24")}
-                          />
-                        </td>
-                        <td className="p-1">
-                          <Input list="saisie-tiers-edit" value={editRow.nTiers} disabled={!central} onChange={(e) => setEditRow({ ...editRow, nTiers: e.target.value })} className={cn(cellInput, "w-24", !central && "opacity-40")} />
-                          {central && (
-                            <datalist id="saisie-tiers-edit">
-                              {tiersForCompte(editRow.compte).map((t) => (
-                                <option key={t.nTiers} value={t.nTiers} />
-                              ))}
-                            </datalist>
-                          )}
-                        </td>
-                        <td className="p-1">
-                          <AutoCell value={central ? suggestTypeTiers(editRow.compte) : ""} className="w-24" />
-                        </td>
-                        <td className="p-1">
-                          <AutoCell value={compteInfo(editRow.compte)?.rubrique || m.rubrique} className="w-20" />
-                        </td>
-                        <td className="p-2 text-muted-foreground">{m.numeroPiece}</td>
-                        <td className="p-1">
-                          <Input value={editRow.numeroFacture} onChange={(e) => setEditRow({ ...editRow, numeroFacture: e.target.value })} className={cn(cellInput, "w-24")} />
-                        </td>
-                        <td className="p-2 text-muted-foreground">{m.libelle}</td>
-                        <td className="p-1">
-                          <Input inputMode="decimal" value={editRow.debit} onChange={(e) => setEditRow({ ...editRow, debit: e.target.value, credit: "" })} className={cn(cellInput, "w-20 text-right")} />
-                        </td>
-                        <td className="p-1">
-                          <Input inputMode="decimal" value={editRow.credit} onChange={(e) => setEditRow({ ...editRow, credit: e.target.value, debit: "" })} className={cn(cellInput, "w-20 text-right")} />
-                        </td>
-                        <td className="p-1">
-                          <div className="flex items-center justify-end gap-1">
-                            <button onClick={saveEdit} className="text-green-600 hover:text-green-700" title="Enregistrer">
-                              <Save className="w-4 h-4" />
-                            </button>
-                            <button onClick={() => { setEditId(null); setEditRow(null); }} className="text-muted-foreground hover:text-[#00122E]" title="Annuler">
-                              <X className="w-4 h-4" />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ) : (
-                      <tr key={m.id} className="border-b hover:bg-muted/30">
-                        <td className="p-2 whitespace-nowrap">{new Date(m.dateTransaction).toLocaleDateString("fr-FR")}</td>
-                        <td className="p-2">{m.codeJournal}</td>
-                        <td className="p-2">
-                          <span className="font-medium">{m.compte}</span>
-                          <span className="text-muted-foreground"> {m.intituleCompte}</span>
-                        </td>
-                        <td className="p-2 text-muted-foreground">{m.nTiers ? `${m.nTiers} ${m.intituleTiers}` : "—"}</td>
-                        <td className="p-2 text-muted-foreground">{m.typeTiers || "—"}</td>
-                        <td className="p-2 text-muted-foreground">{m.rubrique || "—"}</td>
-                        <td className="p-2 text-muted-foreground">{m.numeroPiece}</td>
-                        <td className="p-2 text-muted-foreground">{m.numeroFacture || "—"}</td>
-                        <td className="p-2 text-muted-foreground max-w-[160px] truncate">{m.libelle}</td>
-                        <td className="p-2 text-right tabular-nums text-blue-700">{fmt(m.debit)}</td>
-                        <td className="p-2 text-right tabular-nums text-green-700">{fmt(m.credit)}</td>
-                        <td className="p-2">
-                          <div className="flex items-center justify-end gap-2">
-                            <button onClick={() => startEdit(m)} className="text-[#0077C3] hover:text-[#005992]" title="Modifier">
-                              <Pencil className="w-4 h-4" />
-                            </button>
-                            <button onClick={() => deleteEntry(m)} className="text-muted-foreground hover:text-red-600" title="Supprimer la ligne">
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+            <div className="space-y-4">
+              {ecritures.map((e) => {
+                const d = e.lines.reduce((s, l) => s + l.debit, 0);
+                const c = e.lines.reduce((s, l) => s + l.credit, 0);
+                const ecrBalanced = Math.abs(d - c) < 0.01;
+                return (
+                  <div key={e.numeroPiece} className="rounded-lg border overflow-hidden">
+                    {/* En-tête de l'écriture */}
+                    <div className="flex flex-wrap items-center justify-between gap-2 bg-muted/40 px-3 py-2">
+                      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+                        <span className="font-semibold text-[#00122E]">{e.numeroPiece || "—"}</span>
+                        <Badge variant="outline" className="text-[10px]">{e.codeJournal}</Badge>
+                        <span className="text-muted-foreground">
+                          {new Date(e.dateTransaction).toLocaleDateString("fr-FR")}
+                        </span>
+                        {e.libelle && <span className="text-muted-foreground">· {e.libelle}</span>}
+                        {!ecrBalanced && (
+                          <span className="inline-flex items-center gap-1 text-amber-700 font-medium">
+                            <AlertTriangle className="w-3 h-3" /> Δ {(d - c).toFixed(2)}
+                          </span>
+                        )}
+                      </div>
+                      <Button variant="outline" size="sm" onClick={() => openEdit(e)} disabled={!!formOpen} className="h-7 gap-1 text-xs">
+                        <Pencil className="w-3.5 h-3.5" /> Modifier
+                      </Button>
+                    </div>
+                    {/* Lignes de l'écriture */}
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-xs">
+                        <thead>
+                          <tr className="text-[11px] text-muted-foreground text-left border-b">
+                            <th className="p-2">Compte</th>
+                            <th className="p-2">Tiers</th>
+                            <th className="p-2">Type</th>
+                            <th className="p-2">Rubrique</th>
+                            <th className="p-2">N° Facture</th>
+                            <th className="p-2 text-right">Débit</th>
+                            <th className="p-2 text-right">Crédit</th>
+                            <th className="p-2 text-right">Suppr.</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {e.lines.map((m) => (
+                            <tr key={m.id} className="border-b last:border-0 hover:bg-muted/20">
+                              <td className="p-2">
+                                <span className="font-medium">{m.compte}</span>
+                                <span className="text-muted-foreground"> {m.intituleCompte}</span>
+                              </td>
+                              <td className="p-2 text-muted-foreground">{m.nTiers ? `${m.nTiers} ${m.intituleTiers}` : "—"}</td>
+                              <td className="p-2 text-muted-foreground">{m.typeTiers || "—"}</td>
+                              <td className="p-2 text-muted-foreground">{m.rubrique || "—"}</td>
+                              <td className="p-2 text-muted-foreground">{m.numeroFacture || "—"}</td>
+                              <td className="p-2 text-right tabular-nums text-blue-700">{fmt(m.debit)}</td>
+                              <td className="p-2 text-right tabular-nums text-green-700">{fmt(m.credit)}</td>
+                              <td className="p-2">
+                                <div className="flex justify-end">
+                                  <button onClick={() => deleteLine(m)} className="text-muted-foreground hover:text-red-600" title="Supprimer la ligne">
+                                    <Trash2 className="w-4 h-4" />
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                          <tr className="font-semibold bg-muted/20">
+                            <td className="p-2" colSpan={5}>Total écriture</td>
+                            <td className="p-2 text-right tabular-nums">{fmt(d)}</td>
+                            <td className="p-2 text-right tabular-nums">{fmt(c)}</td>
+                            <td></td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           )}
         </CardContent>
