@@ -5,7 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { requirePermission } from "@/lib/permissions";
 import { SAISIE_ACTIONS } from "@/lib/permissions/actions";
 import { getClickhouseDbName, syncManualBatch } from "@/lib/clickhouse/manual-sync";
-import { isCentralizingAccount } from "@/lib/comptable/saisie-refs";
+import { isCentralizingAccount, suggestTypeTiers } from "@/lib/comptable/saisie-refs";
 
 const clickhouse = createClickhouseClient({
   url: process.env.CLICKHOUSE_HOST || "http://localhost:8123",
@@ -85,7 +85,8 @@ export async function PATCH(
     // Tiers uniquement pour comptes centralisateurs (401/411) — sinon vidés.
     const central = isCentralizingAccount(compte);
     const nTiers = central ? p.nTiers ?? entry.nTiers : "";
-    const typeTiers = central ? p.typeTiers ?? entry.typeTiers : "";
+    // Type tiers dérivé du compte (même logique qu'à l'upload).
+    const typeTiers = central ? suggestTypeTiers(compte) || p.typeTiers || entry.typeTiers : "";
     let intituleCompte = entry.intituleCompte;
     let rubrique = entry.rubrique;
     let bilanRubrique = entry.bilanRubrique;
@@ -168,9 +169,9 @@ export async function PATCH(
 }
 
 // ============================================================================
-// DELETE — supprime l'ÉCRITURE complète (toutes les lignes du même numeroPiece
-// dans la période) pour préserver l'équilibre. Ne touche jamais les lignes
-// uploadées (aucune API d'écriture sur ClickHouse).
+// DELETE — supprime UNE SEULE ligne saisie (celle ciblée par entryId). Ne
+// touche jamais les lignes uploadées (aucune API d'écriture sur ClickHouse).
+// L'équilibre de l'écriture peut être rompu : on avertit alors le client.
 // ============================================================================
 export async function DELETE(
   _req: NextRequest,
@@ -187,12 +188,15 @@ export async function DELETE(
     });
     if (!entry) return NextResponse.json({ error: "Ligne introuvable" }, { status: 404 });
 
-    const del = await prisma.manualLedgerEntry.deleteMany({
-      where: { clientId: id, comptablePeriodId: entry.comptablePeriodId, numeroPiece: entry.numeroPiece },
-    });
-
+    await prisma.manualLedgerEntry.delete({ where: { id: entry.id } });
     await syncManualBatch(id, entry.year);
-    return NextResponse.json({ ok: true, deleted: del.count });
+
+    const balanced = await ecritureIsBalanced(id, entry.comptablePeriodId, entry.numeroPiece);
+    return NextResponse.json({
+      ok: true,
+      deleted: 1,
+      ...(balanced ? {} : { warning: "Écriture déséquilibrée : ajustez les lignes pour rétablir Σ débit = Σ crédit." }),
+    });
   } catch (error) {
     console.error("Saisie DELETE error:", error);
     return NextResponse.json({ error: "Erreur lors de la suppression" }, { status: 500 });

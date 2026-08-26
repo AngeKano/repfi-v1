@@ -39,7 +39,6 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import {
   CODES_JOURNAUX,
-  TYPES_TIERS,
   isCentralizingAccount,
   suggestTypeTiers,
 } from "@/lib/comptable/saisie-refs";
@@ -88,6 +87,7 @@ interface CompteRef {
 interface TiersRef {
   nTiers: string;
   intitule: string;
+  comptes: string[]; // comptes auxquels ce tiers est rattaché (pour filtrer)
 }
 interface SaisieData {
   client: { id: string; name: string };
@@ -260,6 +260,11 @@ export default function SaisieTab({ clientId }: { clientId: string }) {
     (t: string) => data?.refs.tiers.find((x) => x.nTiers === t),
     [data],
   );
+  // Tiers pertinents pour un compte donné (rattachés à ce compte dans le GL).
+  const tiersForCompte = useCallback(
+    (c: string) => (data?.refs.tiers ?? []).filter((t) => t.comptes?.includes(c)),
+    [data],
+  );
 
   const newLine = (): FormLine => ({
     compte: "",
@@ -379,7 +384,7 @@ export default function SaisieTab({ clientId }: { clientId: string }) {
 
   const deleteEntry = async (m: ManualEntry) => {
     if (!period) return;
-    if (!window.confirm(`Supprimer l'écriture ${m.numeroPiece || ""} (toutes ses lignes) ?`)) return;
+    if (!window.confirm(`Supprimer cette ligne (${m.compte}${m.numeroPiece ? ` · ${m.numeroPiece}` : ""}) ?`)) return;
     try {
       const res = await fetch(`/api/clients/${clientId}/saisie/${m.id}`, { method: "DELETE" });
       const json = await res.json().catch(() => ({}));
@@ -387,7 +392,8 @@ export default function SaisieTab({ clientId }: { clientId: string }) {
         toast.error(json?.error || "Suppression refusée");
         return;
       }
-      toast.success("Écriture supprimée");
+      if (json?.warning) toast.warning(json.warning);
+      else toast.success("Ligne supprimée");
       fetchData(period.id, page, search, sortBy, sortDir);
     } catch {
       toast.error("Erreur réseau");
@@ -456,24 +462,10 @@ export default function SaisieTab({ clientId }: { clientId: string }) {
         </div>
       </div>
 
-      {/* Datalists partagés (comptes / tiers existants) */}
+      {/* Datalist comptes : numéro seul (l'intitulé s'affiche en cellule auto). */}
       <datalist id="saisie-comptes">
         {data.refs.comptes.map((c) => (
-          <option key={c.compte} value={c.compte}>
-            {c.compte} — {c.intitule}
-          </option>
-        ))}
-      </datalist>
-      <datalist id="saisie-tiers">
-        {data.refs.tiers.map((t) => (
-          <option key={t.nTiers} value={t.nTiers}>
-            {t.nTiers} — {t.intitule}
-          </option>
-        ))}
-      </datalist>
-      <datalist id="saisie-types-tiers">
-        {TYPES_TIERS.map((t) => (
-          <option key={t} value={t} />
+          <option key={c.compte} value={c.compte} />
         ))}
       </datalist>
 
@@ -559,12 +551,11 @@ export default function SaisieTab({ clientId }: { clientId: string }) {
                               value={l.compte}
                               onChange={(e) => {
                                 const compte = e.target.value;
+                                const c = isCentralizingAccount(compte);
                                 setLine(i, {
                                   compte,
-                                  typeTiers: isCentralizingAccount(compte)
-                                    ? l.typeTiers || suggestTypeTiers(compte)
-                                    : "",
-                                  nTiers: isCentralizingAccount(compte) ? l.nTiers : "",
+                                  typeTiers: c ? suggestTypeTiers(compte) : "",
+                                  nTiers: c ? l.nTiers : "",
                                 });
                               }}
                               className={cn(cellInput, "w-28")}
@@ -575,13 +566,20 @@ export default function SaisieTab({ clientId }: { clientId: string }) {
                           </td>
                           <td className="p-1">
                             <Input
-                              list="saisie-tiers"
+                              list={`saisie-tiers-${i}`}
                               value={l.nTiers}
                               disabled={!central}
                               onChange={(e) => setLine(i, { nTiers: e.target.value })}
                               className={cn(cellInput, "w-24", !central && "opacity-40")}
                               placeholder={central ? "" : "—"}
                             />
+                            {central && (
+                              <datalist id={`saisie-tiers-${i}`}>
+                                {tiersForCompte(l.compte).map((t) => (
+                                  <option key={t.nTiers} value={t.nTiers} />
+                                ))}
+                              </datalist>
+                            )}
                           </td>
                           <td className="p-1">
                             <AutoCell
@@ -590,13 +588,9 @@ export default function SaisieTab({ clientId }: { clientId: string }) {
                             />
                           </td>
                           <td className="p-1">
-                            <Input
-                              list="saisie-types-tiers"
-                              value={l.typeTiers}
-                              disabled={!central}
-                              onChange={(e) => setLine(i, { typeTiers: e.target.value })}
-                              className={cn(cellInput, "w-24", !central && "opacity-40")}
-                              placeholder={central ? "" : "—"}
+                            <AutoCell
+                              value={central ? suggestTypeTiers(l.compte) : ""}
+                              className="w-24"
                             />
                           </td>
                           <td className="p-1">
@@ -688,13 +682,34 @@ export default function SaisieTab({ clientId }: { clientId: string }) {
                         <td className="p-2">{new Date(m.dateTransaction).toLocaleDateString("fr-FR")}</td>
                         <td className="p-2">{m.codeJournal}</td>
                         <td className="p-1">
-                          <Input list="saisie-comptes" value={editRow.compte} onChange={(e) => setEditRow({ ...editRow, compte: e.target.value })} className={cn(cellInput, "w-24")} />
+                          <Input
+                            list="saisie-comptes"
+                            value={editRow.compte}
+                            onChange={(e) => {
+                              const compte = e.target.value;
+                              const c = isCentralizingAccount(compte);
+                              setEditRow({
+                                ...editRow,
+                                compte,
+                                typeTiers: c ? suggestTypeTiers(compte) : "",
+                                nTiers: c ? editRow.nTiers : "",
+                              });
+                            }}
+                            className={cn(cellInput, "w-24")}
+                          />
                         </td>
                         <td className="p-1">
-                          <Input list="saisie-tiers" value={editRow.nTiers} disabled={!central} onChange={(e) => setEditRow({ ...editRow, nTiers: e.target.value })} className={cn(cellInput, "w-24", !central && "opacity-40")} />
+                          <Input list="saisie-tiers-edit" value={editRow.nTiers} disabled={!central} onChange={(e) => setEditRow({ ...editRow, nTiers: e.target.value })} className={cn(cellInput, "w-24", !central && "opacity-40")} />
+                          {central && (
+                            <datalist id="saisie-tiers-edit">
+                              {tiersForCompte(editRow.compte).map((t) => (
+                                <option key={t.nTiers} value={t.nTiers} />
+                              ))}
+                            </datalist>
+                          )}
                         </td>
                         <td className="p-1">
-                          <Input list="saisie-types-tiers" value={editRow.typeTiers} disabled={!central} onChange={(e) => setEditRow({ ...editRow, typeTiers: e.target.value })} className={cn(cellInput, "w-24", !central && "opacity-40")} />
+                          <AutoCell value={central ? suggestTypeTiers(editRow.compte) : ""} className="w-24" />
                         </td>
                         <td className="p-1">
                           <AutoCell value={compteInfo(editRow.compte)?.rubrique || m.rubrique} className="w-20" />
@@ -742,7 +757,7 @@ export default function SaisieTab({ clientId }: { clientId: string }) {
                             <button onClick={() => startEdit(m)} className="text-[#0077C3] hover:text-[#005992]" title="Modifier">
                               <Pencil className="w-4 h-4" />
                             </button>
-                            <button onClick={() => deleteEntry(m)} className="text-muted-foreground hover:text-red-600" title="Supprimer l'écriture">
+                            <button onClick={() => deleteEntry(m)} className="text-muted-foreground hover:text-red-600" title="Supprimer la ligne">
                               <Trash2 className="w-4 h-4" />
                             </button>
                           </div>

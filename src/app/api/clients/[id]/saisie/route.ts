@@ -10,6 +10,7 @@ import { getClickhouseDbName, syncManualBatch } from "@/lib/clickhouse/manual-sy
 import {
   CODE_JOURNAUX_SET,
   isCentralizingAccount,
+  suggestTypeTiers,
 } from "@/lib/comptable/saisie-refs";
 
 const clickhouse = createClickhouseClient({
@@ -185,8 +186,11 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     }
 
     // Listes de référence (comptes / tiers existants) sur tout le grand livre.
+    // Pour les tiers, on récupère aussi les comptes auxquels ils sont rattachés
+    // (groupUniqArray) afin de ne proposer, à la saisie, que les tiers pertinents
+    // pour le compte choisi.
     let comptes: Array<{ compte: string; intitule: string; rubrique: string; bilan: string }> = [];
-    let tiers: Array<{ nTiers: string; intitule: string }> = [];
+    let tiers: Array<{ nTiers: string; intitule: string; comptes: string[] }> = [];
     if (realBatchIds.length > 0) {
       try {
         const [cRes, tRes] = await Promise.all([
@@ -203,7 +207,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
           }),
           clickhouse.query({
             query: `
-              SELECT n_tiers AS nTiers, any(intitule_tiers) AS intitule
+              SELECT n_tiers AS nTiers, any(intitule_tiers) AS intitule,
+                     groupUniqArray(compte) AS comptes
               FROM ${dbName}.grand_livre
               WHERE batch_id IN ({batchIds:Array(String)}) AND n_tiers != ''
               GROUP BY n_tiers ORDER BY n_tiers
@@ -355,9 +360,11 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
           compte: l.compte,
           intituleCompte: c.intitule,
           // Champs tiers vidés si le compte n'est pas centralisateur (spec).
+          // Type tiers dérivé du compte (401→Fournisseur, 411→Client…), comme à
+          // l'upload — repli sur la valeur transmise si aucune règle ne s'applique.
           nTiers: central ? l.nTiers || "" : "",
           intituleTiers: central && l.nTiers ? tiersMap.get(l.nTiers) || "" : "",
-          typeTiers: central ? l.typeTiers || "" : "",
+          typeTiers: central ? suggestTypeTiers(l.compte) || l.typeTiers || "" : "",
           rubrique: c.rubrique,
           bilanRubrique: c.bilan,
           numeroPiece,
