@@ -397,18 +397,44 @@ export default function SaisieTab({ clientId }: { clientId: string }) {
     }
   };
 
-  const deleteLine = async (m: ManualEntry) => {
+  // Supprime une écriture entière (toutes ses lignes).
+  const deleteEcriture = async (e: Ecriture) => {
     if (!period) return;
-    if (!window.confirm(`Supprimer cette ligne (${m.compte}${m.numeroPiece ? ` · ${m.numeroPiece}` : ""}) ?`)) return;
+    const n = e.lines.length;
+    if (!window.confirm(`Supprimer toute l'écriture ${e.numeroPiece || ""} (${n} ligne${n > 1 ? "s" : ""}) ?`)) return;
     try {
-      const res = await fetch(`/api/clients/${clientId}/saisie/${m.id}`, { method: "DELETE" });
+      const qs = new URLSearchParams({ periodId: period.id, numeroPiece: e.numeroPiece });
+      const res = await fetch(`/api/clients/${clientId}/saisie?${qs}`, { method: "DELETE" });
       const json = await res.json().catch(() => ({}));
       if (!res.ok) {
         toast.error(json?.error || "Suppression refusée");
         return;
       }
-      if (json?.warning) toast.warning(json.warning);
-      else toast.success("Ligne supprimée");
+      toast.success("Écriture supprimée");
+      fetchData(period.id, page, search, sortBy, sortDir);
+    } catch {
+      toast.error("Erreur réseau");
+    }
+  };
+
+  // Supprime TOUTES les écritures saisies de la période courante.
+  const deleteAllEcritures = async () => {
+    if (!period) return;
+    if (
+      !window.confirm(
+        `Supprimer TOUTES les écritures saisies de cette période (${ecritures.length}) ? Cette action est irréversible.`,
+      )
+    )
+      return;
+    try {
+      const qs = new URLSearchParams({ periodId: period.id, scope: "all" });
+      const res = await fetch(`/api/clients/${clientId}/saisie?${qs}`, { method: "DELETE" });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        toast.error(json?.error || "Suppression refusée");
+        return;
+      }
+      toast.success("Toutes les écritures ont été supprimées");
       fetchData(period.id, page, search, sortBy, sortDir);
     } catch {
       toast.error("Erreur réseau");
@@ -496,9 +522,21 @@ export default function SaisieTab({ clientId }: { clientId: string }) {
             </CardDescription>
           </div>
           {!formOpen && (
-            <Button onClick={openAdd} className="gap-2 rounded-lg">
-              <Plus className="w-4 h-4" /> Ajouter une écriture
-            </Button>
+            <div className="flex items-center gap-2">
+              {ecritures.length > 0 && (
+                <Button
+                  variant="outline"
+                  onClick={deleteAllEcritures}
+                  className="gap-2 rounded-lg text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"
+                  title="Supprimer toutes les écritures saisies de la période"
+                >
+                  <Trash2 className="w-4 h-4" /> Tout supprimer
+                </Button>
+              )}
+              <Button onClick={openAdd} className="gap-2 rounded-lg">
+                <Plus className="w-4 h-4" /> Ajouter une écriture
+              </Button>
+            </div>
           )}
         </CardHeader>
         <CardContent className="space-y-4">
@@ -702,9 +740,21 @@ export default function SaisieTab({ clientId }: { clientId: string }) {
                           </span>
                         )}
                       </div>
-                      <Button variant="outline" size="sm" onClick={() => openEdit(e)} disabled={!!formOpen} className="h-7 gap-1 text-xs">
-                        <Pencil className="w-3.5 h-3.5" /> Modifier
-                      </Button>
+                      <div className="flex items-center gap-2">
+                        <Button variant="outline" size="sm" onClick={() => openEdit(e)} disabled={!!formOpen} className="h-7 gap-1 text-xs">
+                          <Pencil className="w-3.5 h-3.5" /> Modifier
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => deleteEcriture(e)}
+                          disabled={!!formOpen}
+                          className="h-7 gap-1 text-xs text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"
+                          title="Supprimer toute l'écriture"
+                        >
+                          <X className="w-3.5 h-3.5" /> Supprimer
+                        </Button>
+                      </div>
                     </div>
                     {/* Lignes de l'écriture */}
                     <div className="overflow-x-auto">
@@ -718,7 +768,6 @@ export default function SaisieTab({ clientId }: { clientId: string }) {
                             <th className="p-2">N° Facture</th>
                             <th className="p-2 text-right">Débit</th>
                             <th className="p-2 text-right">Crédit</th>
-                            <th className="p-2 text-right">Suppr.</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -734,20 +783,12 @@ export default function SaisieTab({ clientId }: { clientId: string }) {
                               <td className="p-2 text-muted-foreground">{m.numeroFacture || "—"}</td>
                               <td className="p-2 text-right tabular-nums text-blue-700">{fmt(m.debit)}</td>
                               <td className="p-2 text-right tabular-nums text-green-700">{fmt(m.credit)}</td>
-                              <td className="p-2">
-                                <div className="flex justify-end">
-                                  <button onClick={() => deleteLine(m)} className="text-muted-foreground hover:text-red-600" title="Supprimer la ligne">
-                                    <Trash2 className="w-4 h-4" />
-                                  </button>
-                                </div>
-                              </td>
                             </tr>
                           ))}
                           <tr className="font-semibold bg-muted/20">
                             <td className="p-2" colSpan={5}>Total écriture</td>
                             <td className="p-2 text-right tabular-nums">{fmt(d)}</td>
                             <td className="p-2 text-right tabular-nums">{fmt(c)}</td>
-                            <td></td>
                           </tr>
                         </tbody>
                       </table>

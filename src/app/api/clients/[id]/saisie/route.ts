@@ -500,3 +500,53 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     return NextResponse.json({ error: "Erreur lors de la modification" }, { status: 500 });
   }
 }
+
+// ============================================================================
+// DELETE — supprime soit UNE écriture entière (?periodId=&numeroPiece=), soit
+// TOUTES les écritures saisies de la période (?periodId=&scope=all). Ne touche
+// jamais les lignes uploadées. Pour retirer une seule ligne, passer par la
+// modification de l'écriture (PUT).
+// ============================================================================
+export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  try {
+    const perm = await requirePermission(SAISIE_ACTIONS.GERER);
+    if (perm instanceof NextResponse) return perm;
+
+    const { id } = await params;
+    const check = await requireClient(id, perm.user.companyId);
+    if (check.error) return check.error;
+
+    const { searchParams } = new URL(req.url);
+    const periodId = searchParams.get("periodId");
+    const numeroPiece = searchParams.get("numeroPiece");
+    const scope = searchParams.get("scope");
+    if (!periodId) return NextResponse.json({ error: "Période requise" }, { status: 400 });
+
+    const period = await prisma.comptablePeriod.findFirst({
+      where: { id: periodId, clientId: id },
+      select: { id: true, year: true },
+    });
+    if (!period) return NextResponse.json({ error: "Période introuvable" }, { status: 404 });
+
+    let deleted: number;
+    if (scope === "all") {
+      const del = await prisma.manualLedgerEntry.deleteMany({
+        where: { clientId: id, comptablePeriodId: period.id },
+      });
+      deleted = del.count;
+    } else {
+      if (!numeroPiece) return NextResponse.json({ error: "N° pièce requis" }, { status: 400 });
+      const del = await prisma.manualLedgerEntry.deleteMany({
+        where: { clientId: id, comptablePeriodId: period.id, numeroPiece },
+      });
+      if (del.count === 0) return NextResponse.json({ error: "Écriture introuvable" }, { status: 404 });
+      deleted = del.count;
+    }
+
+    await syncManualBatch(id, period.year);
+    return NextResponse.json({ ok: true, deleted });
+  } catch (error) {
+    console.error("Saisie DELETE error:", error);
+    return NextResponse.json({ error: "Erreur lors de la suppression" }, { status: 500 });
+  }
+}
