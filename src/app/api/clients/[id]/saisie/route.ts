@@ -261,14 +261,15 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   }
 }
 
-// Une écriture : en-tête partagé (date, code journal, libellé, n° pièce) + lignes.
+// Une écriture : en-tête partagé (date, code journal, libellé, n° pièce, n°
+// facture) + lignes. Débit/Crédit sont des valeurs numériques (positives ou
+// négatives). Le n° facture est unique au niveau de l'écriture (pas par ligne).
 const ligneSchema = z.object({
   compte: z.string().trim().min(1),
   nTiers: z.string().trim().optional().default(""),
   typeTiers: z.string().trim().max(40).optional().default(""),
-  numeroFacture: z.string().trim().max(60).optional().default(""),
-  debit: z.number().nonnegative().default(0),
-  credit: z.number().nonnegative().default(0),
+  debit: z.number().default(0),
+  credit: z.number().default(0),
 });
 const ecritureSchema = z.object({
   periodId: z.string().min(1),
@@ -276,6 +277,7 @@ const ecritureSchema = z.object({
   codeJournal: z.string().trim().min(1),
   libelle: z.string().trim().max(300).optional().default(""),
   numeroPiece: z.string().trim().max(60).optional().default(""),
+  numeroFacture: z.string().trim().max(60).optional().default(""),
   lignes: z.array(ligneSchema).min(1),
 });
 // Mise à jour : le n° pièce identifie l'écriture existante (obligatoire).
@@ -315,11 +317,12 @@ async function prepareEcritureRows(opts: {
   codeJournal: string;
   libelle: string;
   numeroPiece: string;
+  numeroFacture: string;
   dateStr: string;
   lignes: LigneInput[];
   createdById: string;
 }): Promise<{ rows: PreparedRow[] } | { error: NextResponse }> {
-  const { clientId, period, codeJournal, libelle, numeroPiece, dateStr, lignes, createdById } = opts;
+  const { clientId, period, codeJournal, libelle, numeroPiece, numeroFacture, dateStr, lignes, createdById } = opts;
 
   if (!CODE_JOURNAUX_SET.has(codeJournal))
     return { error: NextResponse.json({ error: `Code journal inconnu : ${codeJournal}.` }, { status: 400 }) };
@@ -341,11 +344,11 @@ async function prepareEcritureRows(opts: {
       ),
     };
 
+  // Chaque ligne doit porter au moins une valeur (débit ou crédit ≠ 0). Les
+  // montants peuvent être positifs ou négatifs.
   for (const l of lignes) {
     if (l.debit === 0 && l.credit === 0)
-      return { error: NextResponse.json({ error: "Chaque ligne doit avoir un débit ou un crédit." }, { status: 400 }) };
-    if (l.debit > 0 && l.credit > 0)
-      return { error: NextResponse.json({ error: "Une ligne ne peut avoir à la fois un débit et un crédit." }, { status: 400 }) };
+      return { error: NextResponse.json({ error: "Chaque ligne doit avoir un débit ou un crédit (valeur non nulle)." }, { status: 400 }) };
   }
 
   // Comptes existants ; tiers uniquement pour comptes centralisateurs (401/411).
@@ -384,7 +387,7 @@ async function prepareEcritureRows(opts: {
       rubrique: c.rubrique,
       bilanRubrique: c.bilan,
       numeroPiece,
-      numeroFacture: l.numeroFacture || "",
+      numeroFacture: numeroFacture || "",
       libelle: libelle || "",
       debit: l.debit,
       credit: l.credit,
@@ -426,6 +429,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       codeJournal,
       libelle,
       numeroPiece,
+      numeroFacture: parsed.data.numeroFacture,
       dateStr: parsed.data.dateTransaction,
       lignes,
       createdById: perm.user.id,
@@ -480,6 +484,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
       codeJournal,
       libelle,
       numeroPiece,
+      numeroFacture: parsed.data.numeroFacture,
       dateStr: parsed.data.dateTransaction,
       lignes,
       createdById: existing.createdById,

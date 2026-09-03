@@ -236,7 +236,8 @@ async function recupererTopParType(
         AND concat(substring(date_transaction, 7, 4), substring(date_transaction, 4, 2)) >= {startYM:String}
         AND concat(substring(date_transaction, 7, 4), substring(date_transaction, 4, 2)) <= {endYM:String}
       GROUP BY rubrique
-      ORDER BY montant_dette DESC
+      HAVING (montant_dette - montant_rembourse) > 0
+      ORDER BY (montant_dette - montant_rembourse) DESC
       LIMIT 10
     `,
     query_params: {
@@ -294,7 +295,7 @@ async function recupererTopParFournisseur(
           AND concat(substring(date_transaction, 7, 4), substring(date_transaction, 4, 2)) >= {startYM:String}
           AND concat(substring(date_transaction, 7, 4), substring(date_transaction, 4, 2)) <= {endYM:String}
         GROUP BY n_tiers, intitule_tiers
-        HAVING montant_dette > 0
+        HAVING (montant_dette - montant_rembourse) > 0
       )
       SELECT
         numero_fournisseur,
@@ -302,7 +303,7 @@ async function recupererTopParFournisseur(
         montant_dette,
         montant_rembourse
       FROM dettes_fournisseurs
-      ORDER BY montant_dette DESC
+      ORDER BY (montant_dette - montant_rembourse) DESC
       LIMIT 10
     `,
     query_params: {
@@ -409,7 +410,7 @@ export async function GET(
 
     const client = await prisma.client.findUnique({
       where: { id },
-      select: { id: true, name: true, companyId: true },
+      select: { id: true, name: true, companyId: true, excludeManualEntries: true },
     });
     if (!client) {
       return NextResponse.json({ error: "Client non trouvé" }, { status: 404 });
@@ -424,11 +425,12 @@ export async function GET(
       where: { clientId: id },
       select: { batchId: true, year: true },
     });
-    // + batchs des lignes saisies manuellement (intégrées au reporting).
+    // + batchs des lignes saisies manuellement (intégrées au reporting), sauf si
+    // le client a activé l'exclusion des saisies.
     const manualYears = [...new Set([...allPeriods.map((p) => p.year), endYear])];
     const allBatchIds = [
       ...allPeriods.map((p) => p.batchId).filter((b): b is string => !!b),
-      ...manualBatchIdsForYears(id, manualYears),
+      ...(client.excludeManualEntries ? [] : manualBatchIdsForYears(id, manualYears)),
     ];
 
     // Un seul mois sélectionné = start == end (ou start absent et endMonth seul).

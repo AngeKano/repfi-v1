@@ -34,6 +34,7 @@ import {
   ArrowUp,
   ArrowDown,
   ArrowUpDown,
+  Download,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -109,7 +110,6 @@ interface FormLine {
   compte: string;
   nTiers: string;
   typeTiers: string;
-  numeroFacture: string;
   debit: string;
   credit: string;
 }
@@ -120,6 +120,7 @@ interface Ecriture {
   dateTransaction: string;
   codeJournal: string;
   libelle: string;
+  numeroFacture: string;
   lines: ManualEntry[];
 }
 
@@ -183,8 +184,10 @@ export default function SaisieTab({ clientId }: { clientId: string }) {
   const [ecrJournal, setEcrJournal] = useState("");
   const [ecrLibelle, setEcrLibelle] = useState("");
   const [ecrPiece, setEcrPiece] = useState("");
+  const [ecrFacture, setEcrFacture] = useState("");
   const [lines, setLines] = useState<FormLine[]>([]);
   const [submitting, setSubmitting] = useState(false);
+  const [exporting, setExporting] = useState(false);
 
   const fetchData = useCallback(
     async (pid: string, pg: number, srch: string, sBy: string, sDir: string) => {
@@ -283,6 +286,7 @@ export default function SaisieTab({ clientId }: { clientId: string }) {
           dateTransaction: m.dateTransaction,
           codeJournal: m.codeJournal,
           libelle: m.libelle,
+          numeroFacture: m.numeroFacture,
           lines: [],
         });
       map.get(key)!.lines.push(m);
@@ -294,7 +298,6 @@ export default function SaisieTab({ clientId }: { clientId: string }) {
     compte: "",
     nTiers: "",
     typeTiers: "",
-    numeroFacture: "",
     debit: "",
     credit: "",
   });
@@ -304,6 +307,7 @@ export default function SaisieTab({ clientId }: { clientId: string }) {
     setEcrJournal("");
     setEcrLibelle("");
     setEcrPiece("");
+    setEcrFacture("");
     setEditPiece("");
     setLines([newLine(), newLine()]);
     setFormOpen("add");
@@ -314,13 +318,13 @@ export default function SaisieTab({ clientId }: { clientId: string }) {
     setEcrJournal(e.codeJournal);
     setEcrLibelle(e.libelle);
     setEcrPiece(e.numeroPiece);
+    setEcrFacture(e.numeroFacture);
     setEditPiece(e.numeroPiece);
     setLines(
       e.lines.map((l) => ({
         compte: l.compte,
         nTiers: l.nTiers,
         typeTiers: l.typeTiers,
-        numeroFacture: l.numeroFacture,
         debit: l.debit ? String(l.debit) : "",
         credit: l.credit ? String(l.credit) : "",
       })),
@@ -342,8 +346,8 @@ export default function SaisieTab({ clientId }: { clientId: string }) {
     !!ecrDate &&
     lines.length > 0 &&
     Math.abs(formDelta.delta) < 0.01 &&
-    formDelta.d > 0 &&
-    lines.every((l) => l.compte && (num(l.debit) > 0 || num(l.credit) > 0)) &&
+    (formDelta.d !== 0 || formDelta.c !== 0) &&
+    lines.every((l) => l.compte && (num(l.debit) !== 0 || num(l.credit) !== 0)) &&
     !submitting;
 
   const submitForm = async () => {
@@ -354,7 +358,6 @@ export default function SaisieTab({ clientId }: { clientId: string }) {
         compte: l.compte.trim(),
         nTiers: l.nTiers.trim(),
         typeTiers: l.typeTiers.trim(),
-        numeroFacture: l.numeroFacture.trim(),
         debit: num(l.debit),
         credit: num(l.credit),
       }));
@@ -370,6 +373,7 @@ export default function SaisieTab({ clientId }: { clientId: string }) {
                 dateTransaction: ecrDate,
                 codeJournal: ecrJournal,
                 libelle: ecrLibelle.trim(),
+                numeroFacture: ecrFacture.trim(),
                 lignes: payloadLines,
               }
             : {
@@ -378,6 +382,7 @@ export default function SaisieTab({ clientId }: { clientId: string }) {
                 codeJournal: ecrJournal,
                 libelle: ecrLibelle.trim(),
                 numeroPiece: ecrPiece.trim() || undefined,
+                numeroFacture: ecrFacture.trim(),
                 lignes: payloadLines,
               },
         ),
@@ -414,6 +419,35 @@ export default function SaisieTab({ clientId }: { clientId: string }) {
       fetchData(period.id, page, search, sortBy, sortDir);
     } catch {
       toast.error("Erreur réseau");
+    }
+  };
+
+  // Télécharge le récap Excel (grand livre uploadé + saisies, colonne Flags).
+  const exportExcel = async () => {
+    if (!period) return;
+    setExporting(true);
+    try {
+      const qs = new URLSearchParams({ periodId: period.id });
+      const res = await fetch(`/api/clients/${clientId}/saisie/export?${qs}`);
+      if (!res.ok) {
+        toast.error("Échec du téléchargement");
+        return;
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      const cd = res.headers.get("Content-Disposition") || "";
+      const m = cd.match(/filename="?([^"]+)"?/);
+      a.download = m?.[1] || `grand_livre_${period.year}.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch {
+      toast.error("Erreur réseau");
+    } finally {
+      setExporting(false);
     }
   };
 
@@ -501,6 +535,16 @@ export default function SaisieTab({ clientId }: { clientId: string }) {
           Saisies — D {fmt(data.balance.debit) || "0"} / C {fmt(data.balance.credit) || "0"}
           {!balanced && <span className="font-bold">· Δ {data.balance.delta.toFixed(2)}</span>}
         </div>
+        <Button
+          variant="outline"
+          onClick={exportExcel}
+          disabled={exporting}
+          className="gap-2 h-10 rounded-lg"
+          title="Télécharger le grand livre (uploadé + saisies) au format Excel"
+        >
+          {exporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+          Télécharger
+        </Button>
       </div>
 
       {/* Datalist comptes : numéro seul (l'intitulé s'affiche en cellule auto). */}
@@ -549,7 +593,7 @@ export default function SaisieTab({ clientId }: { clientId: string }) {
                 </h4>
               </div>
               {/* En-tête écriture */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
                 <div>
                   <label className="text-xs text-[#335890]">Date transaction *</label>
                   <Input type="date" min={dateMin} max={dateMax} value={ecrDate} onChange={(e) => setEcrDate(e.target.value)} className="h-9" />
@@ -580,6 +624,10 @@ export default function SaisieTab({ clientId }: { clientId: string }) {
                   />
                 </div>
                 <div>
+                  <label className="text-xs text-[#335890]">N° facture</label>
+                  <Input value={ecrFacture} onChange={(e) => setEcrFacture(e.target.value)} className="h-9" />
+                </div>
+                <div>
                   <label className="text-xs text-[#335890]">Libellé opération</label>
                   <Input value={ecrLibelle} onChange={(e) => setEcrLibelle(e.target.value)} className="h-9" />
                 </div>
@@ -597,7 +645,6 @@ export default function SaisieTab({ clientId }: { clientId: string }) {
                       <th className="p-1">Intitulé tiers</th>
                       <th className="p-1">Type Tiers</th>
                       <th className="p-1">Rubrique</th>
-                      <th className="p-1">N° Facture</th>
                       <th className="p-1 text-right">Débit</th>
                       <th className="p-1 text-right">Crédit</th>
                       <th className="p-1"></th>
@@ -659,13 +706,10 @@ export default function SaisieTab({ clientId }: { clientId: string }) {
                             <AutoCell value={info?.rubrique} className="w-20" />
                           </td>
                           <td className="p-1">
-                            <Input value={l.numeroFacture} onChange={(e) => setLine(i, { numeroFacture: e.target.value })} className={cn(cellInput, "w-24")} />
+                            <Input inputMode="decimal" value={l.debit} onChange={(e) => setLine(i, { debit: e.target.value })} className={cn(cellInput, "w-24 text-right")} />
                           </td>
                           <td className="p-1">
-                            <Input inputMode="decimal" value={l.debit} onChange={(e) => setLine(i, { debit: e.target.value, credit: "" })} className={cn(cellInput, "w-24 text-right")} />
-                          </td>
-                          <td className="p-1">
-                            <Input inputMode="decimal" value={l.credit} onChange={(e) => setLine(i, { credit: e.target.value, debit: "" })} className={cn(cellInput, "w-24 text-right")} />
+                            <Input inputMode="decimal" value={l.credit} onChange={(e) => setLine(i, { credit: e.target.value })} className={cn(cellInput, "w-24 text-right")} />
                           </td>
                           <td className="p-1">
                             <button onClick={() => setLines((ls) => ls.filter((_, j) => j !== i))} disabled={lines.length <= 1} className="text-muted-foreground hover:text-red-600 disabled:opacity-30" title="Retirer la ligne">
@@ -676,7 +720,7 @@ export default function SaisieTab({ clientId }: { clientId: string }) {
                       );
                     })}
                     <tr className="border-t font-semibold">
-                      <td className="p-1" colSpan={8}>
+                      <td className="p-1" colSpan={7}>
                         Total
                       </td>
                       <td className="p-1 text-right tabular-nums">{fmt(formDelta.d)}</td>
@@ -733,6 +777,7 @@ export default function SaisieTab({ clientId }: { clientId: string }) {
                         <span className="text-muted-foreground">
                           {new Date(e.dateTransaction).toLocaleDateString("fr-FR")}
                         </span>
+                        {e.numeroFacture && <span className="text-muted-foreground">· Fact. {e.numeroFacture}</span>}
                         {e.libelle && <span className="text-muted-foreground">· {e.libelle}</span>}
                         {!ecrBalanced && (
                           <span className="inline-flex items-center gap-1 text-amber-700 font-medium">
@@ -765,7 +810,6 @@ export default function SaisieTab({ clientId }: { clientId: string }) {
                             <th className="p-2">Tiers</th>
                             <th className="p-2">Type</th>
                             <th className="p-2">Rubrique</th>
-                            <th className="p-2">N° Facture</th>
                             <th className="p-2 text-right">Débit</th>
                             <th className="p-2 text-right">Crédit</th>
                           </tr>
@@ -780,13 +824,12 @@ export default function SaisieTab({ clientId }: { clientId: string }) {
                               <td className="p-2 text-muted-foreground">{m.nTiers ? `${m.nTiers} ${m.intituleTiers}` : "—"}</td>
                               <td className="p-2 text-muted-foreground">{m.typeTiers || "—"}</td>
                               <td className="p-2 text-muted-foreground">{m.rubrique || "—"}</td>
-                              <td className="p-2 text-muted-foreground">{m.numeroFacture || "—"}</td>
                               <td className="p-2 text-right tabular-nums text-blue-700">{fmt(m.debit)}</td>
                               <td className="p-2 text-right tabular-nums text-green-700">{fmt(m.credit)}</td>
                             </tr>
                           ))}
                           <tr className="font-semibold bg-muted/20">
-                            <td className="p-2" colSpan={5}>Total écriture</td>
+                            <td className="p-2" colSpan={4}>Total écriture</td>
                             <td className="p-2 text-right tabular-nums">{fmt(d)}</td>
                             <td className="p-2 text-right tabular-nums">{fmt(c)}</td>
                           </tr>
