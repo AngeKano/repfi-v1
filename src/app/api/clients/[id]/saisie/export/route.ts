@@ -78,7 +78,68 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     if (!period) return NextResponse.json({ error: "Aucune période" }, { status: 404 });
 
     const dbName = getClickhouseDbName(id);
+
+    // Diagnostic : ?debug=columns renvoie les noms de colonnes réels d'une ligne
+    // du grand livre (pour vérifier le nom exact de libelle / numero_facture…).
+    if (searchParams.get("debug") === "columns") {
+      try {
+        const dbg = await clickhouse.query({
+          query: `SELECT * FROM ${dbName}.grand_livre WHERE batch_id = {batchId:String} LIMIT 1`,
+          query_params: { batchId: period.batchId },
+          format: "JSONEachRow",
+        });
+        const first = ((await dbg.json()) as Array<Record<string, unknown>>)[0] || {};
+        return NextResponse.json({ columns: Object.keys(first), sample: first });
+      } catch (e) {
+        return NextResponse.json({ error: String(e) }, { status: 500 });
+      }
+    }
+
     const rows: (string | number)[][] = [];
+
+    // Tables de référence bâties sur TOUS les batchs du client : l'intitulé du
+    // compte / du tiers peut être absent d'un batch mais présent dans un autre
+    // (même logique que l'onglet Saisie, anyIf sur valeur non vide).
+    const allPeriods = await prisma.comptablePeriod.findMany({
+      where: { clientId: id },
+      select: { batchId: true },
+    });
+    const realBatchIds = allPeriods.map((p) => p.batchId).filter((b): b is string => !!b);
+    const compteMap = new Map<string, { intitule: string; rubrique: string; bilan: string }>();
+    const tiersMap = new Map<string, { intitule: string; type: string }>();
+    if (realBatchIds.length > 0) {
+      try {
+        const [cRes, tRes] = await Promise.all([
+          clickhouse.query({
+            query: `SELECT compte,
+                      anyIf(intitule_compte, intitule_compte != '') i,
+                      anyIf(rubrique, rubrique != '') r,
+                      anyIf(bilan_rubrique, bilan_rubrique != '') b
+                    FROM ${dbName}.grand_livre
+                    WHERE batch_id IN ({b:Array(String)}) AND compte != ''
+                    GROUP BY compte`,
+            query_params: { b: realBatchIds },
+            format: "JSONEachRow",
+          }),
+          clickhouse.query({
+            query: `SELECT n_tiers,
+                      anyIf(intitule_tiers, intitule_tiers != '') i,
+                      anyIf(type_tiers, type_tiers != '') t
+                    FROM ${dbName}.grand_livre
+                    WHERE batch_id IN ({b:Array(String)}) AND n_tiers != ''
+                    GROUP BY n_tiers`,
+            query_params: { b: realBatchIds },
+            format: "JSONEachRow",
+          }),
+        ]);
+        for (const r of (await cRes.json()) as Array<{ compte: string; i: string; r: string; b: string }>)
+          compteMap.set(r.compte, { intitule: r.i, rubrique: r.r, bilan: r.b });
+        for (const r of (await tRes.json()) as Array<{ n_tiers: string; i: string; t: string }>)
+          tiersMap.set(r.n_tiers, { intitule: r.i, type: r.t });
+      } catch (e) {
+        console.error("[saisie export] refs indisponibles:", e);
+      }
+    }
 
     // 1) Lignes uploadées (ClickHouse) — Flags = "Non". SELECT * pour rester
     // robuste aux colonnes ; on lit chaque champ par son nom snake_case.
@@ -97,34 +158,51 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       });
       const uploaded = (await res.json()) as Array<Record<string, unknown>>;
       for (const r of uploaded) {
-        const g = (k: string): string => (r[k] === undefined || r[k] === null ? "" : String(r[k]));
-        const debit = Number(r.debit ?? 0) || 0;
-        const credit = Number(r.credit ?? 0) || 0;
-        const solde = r.solde !== undefined && r.solde !== null ? Number(r.solde) || 0 : debit - credit;
+        // Index insensible à la casse des colonnes réelles (SELECT *).
+        const lk: Record<string, unknown> = {};
+        for (const k of Object.keys(r)) lk[k.toLowerCase()] = r[k];
+        const pick = (...cands: string[]): string => {
+          for (const c of cands) {
+            const v = lk[c];
+            if (v !== undefined && v !== null && String(v) !== "") return String(v);
+          }
+          return "";
+        };
+        const debit = Number(lk.debit ?? 0) || 0;
+        const credit = Number(lk.credit ?? 0) || 0;
+        const soldeRaw = lk.solde;
+        const solde = soldeRaw !== undefined && soldeRaw !== null ? Number(soldeRaw) || 0 : debit - credit;
+
+        const compte = pick("compte");
+        const cm = compteMap.get(compte);
+        const nTiers = pick("n_tiers", "numero_tiers");
+        const tm = tiersMap.get(nTiers);
+
         rows.push([
-          g("date_gl"),
-          g("entite") || client.name,
-          g("compte"),
-          g("intitule_compte"),
-          g("rubrique"),
-          g("bilan_rubrique"),
-          g("date_transaction"),
-          g("code_journal"),
-          g("numero_piece"),
-          g("numero_facture"),
-          g("libelle"),
-          g("n_tiers"),
-          g("intitule_tiers"),
-          g("type_tiers"),
+          pick("date_gl"),
+          pick("entite") || client.name,
+          compte,
+          // Intitulé/rubriques : valeur de la ligne, sinon référentiel du client.
+          pick("intitule_compte", "libelle_compte") || cm?.intitule || "",
+          pick("rubrique") || cm?.rubrique || "",
+          pick("bilan_rubrique", "rubrique_bilan") || cm?.bilan || "",
+          pick("date_transaction"),
+          pick("code_journal"),
+          pick("numero_piece", "n_piece"),
+          pick("numero_facture", "n_facture", "num_facture"),
+          pick("libelle", "libelle_ecriture", "libelle_operation"),
+          nTiers,
+          pick("intitule_tiers") || tm?.intitule || "",
+          pick("type_tiers") || tm?.type || "",
           debit,
           credit,
           solde,
-          g("periode"),
-          g("batch_id"),
-          g("row_id"),
-          g("compte_pcg_origine"),
-          r.hao === undefined || r.hao === null ? 0 : Number(r.hao) || 0,
-          g("mapping_status"),
+          pick("periode"),
+          pick("batch_id"),
+          pick("row_id"),
+          pick("compte_pcg_origine"),
+          lk.hao === undefined || lk.hao === null ? 0 : Number(lk.hao) || 0,
+          pick("mapping_status") || "none",
           "Non",
         ]);
       }
