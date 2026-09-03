@@ -19,6 +19,15 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
   Plus,
   Trash2,
   Pencil,
@@ -188,6 +197,12 @@ export default function SaisieTab({ clientId }: { clientId: string }) {
   const [lines, setLines] = useState<FormLine[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [exporting, setExporting] = useState(false);
+
+  // Pop-up de suppression multiple (sélection d'écritures).
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [selectedPieces, setSelectedPieces] = useState<Set<string>>(new Set());
+  const [modalPage, setModalPage] = useState(1);
+  const [deletingSel, setDeletingSel] = useState(false);
 
   const fetchData = useCallback(
     async (pid: string, pg: number, srch: string, sBy: string, sDir: string) => {
@@ -451,27 +466,44 @@ export default function SaisieTab({ clientId }: { clientId: string }) {
     }
   };
 
-  // Supprime TOUTES les écritures saisies de la période courante.
-  const deleteAllEcritures = async () => {
-    if (!period) return;
-    if (
-      !window.confirm(
-        `Supprimer TOUTES les écritures saisies de cette période (${ecritures.length}) ? Cette action est irréversible.`,
-      )
-    )
-      return;
+  // Ouvre la pop-up de suppression avec toutes les écritures pré-cochées.
+  const openDeleteModal = () => {
+    setSelectedPieces(new Set(ecritures.map((e) => e.numeroPiece).filter(Boolean)));
+    setModalPage(1);
+    setShowDeleteModal(true);
+  };
+  const togglePiece = (p: string) =>
+    setSelectedPieces((s) => {
+      const n = new Set(s);
+      if (n.has(p)) n.delete(p);
+      else n.add(p);
+      return n;
+    });
+  const toggleAllModal = () =>
+    setSelectedPieces((s) =>
+      s.size === ecritures.length ? new Set() : new Set(ecritures.map((e) => e.numeroPiece).filter(Boolean)),
+    );
+
+  // Supprime les écritures sélectionnées dans la pop-up.
+  const confirmDeleteSelected = async () => {
+    if (!period || selectedPieces.size === 0) return;
+    setDeletingSel(true);
     try {
-      const qs = new URLSearchParams({ periodId: period.id, scope: "all" });
+      const qs = new URLSearchParams({ periodId: period.id });
+      selectedPieces.forEach((p) => qs.append("numeroPiece", p));
       const res = await fetch(`/api/clients/${clientId}/saisie?${qs}`, { method: "DELETE" });
       const json = await res.json().catch(() => ({}));
       if (!res.ok) {
         toast.error(json?.error || "Suppression refusée");
         return;
       }
-      toast.success("Toutes les écritures ont été supprimées");
+      toast.success(`${selectedPieces.size} écriture(s) supprimée(s)`);
+      setShowDeleteModal(false);
       fetchData(period.id, page, search, sortBy, sortDir);
     } catch {
       toast.error("Erreur réseau");
+    } finally {
+      setDeletingSel(false);
     }
   };
 
@@ -493,6 +525,12 @@ export default function SaisieTab({ clientId }: { clientId: string }) {
 
   const balanced = Math.abs(data.balance.delta) < 0.01;
   const cellInput = "h-8 text-xs";
+
+  // Pagination de la pop-up de suppression.
+  const MODAL_SIZE = 8;
+  const modalTotalPages = Math.max(1, Math.ceil(ecritures.length / MODAL_SIZE));
+  const pagedEcritures = ecritures.slice((modalPage - 1) * MODAL_SIZE, modalPage * MODAL_SIZE);
+  const allSelected = ecritures.length > 0 && selectedPieces.size === ecritures.length;
 
   return (
     <div className="space-y-6">
@@ -570,9 +608,9 @@ export default function SaisieTab({ clientId }: { clientId: string }) {
               {ecritures.length > 0 && (
                 <Button
                   variant="outline"
-                  onClick={deleteAllEcritures}
+                  onClick={openDeleteModal}
                   className="gap-2 rounded-lg text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"
-                  title="Supprimer toutes les écritures saisies de la période"
+                  title="Sélectionner des écritures saisies à supprimer"
                 >
                   <Trash2 className="w-4 h-4" /> Tout supprimer
                 </Button>
@@ -949,6 +987,95 @@ export default function SaisieTab({ clientId }: { clientId: string }) {
         <Badge variant="outline" className="text-xs">Info</Badge>
         Les écritures saisies sont intégrées aux calculs du reporting. Seul le Loader Plus peut saisir.
       </p>
+
+      {/* ===================== Pop-up de suppression ===================== */}
+      <Dialog open={showDeleteModal} onOpenChange={setShowDeleteModal}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Supprimer des écritures</DialogTitle>
+            <DialogDescription>
+              Sélectionnez les écritures saisies à supprimer pour cette période. Cette action est irréversible.
+            </DialogDescription>
+          </DialogHeader>
+
+          {ecritures.length === 0 ? (
+            <p className="text-sm text-muted-foreground py-6 text-center">Aucune écriture à supprimer.</p>
+          ) : (
+            <>
+              <label className="flex items-center gap-2 text-xs font-medium cursor-pointer">
+                <Checkbox checked={allSelected} onCheckedChange={toggleAllModal} />
+                Tout sélectionner
+                <span className="text-muted-foreground">
+                  ({selectedPieces.size}/{ecritures.length})
+                </span>
+              </label>
+
+              <div className="border rounded-lg divide-y max-h-[45vh] overflow-y-auto">
+                {pagedEcritures.map((e) => {
+                  const checked = selectedPieces.has(e.numeroPiece);
+                  const d = e.lines.reduce((s, l) => s + l.debit, 0);
+                  return (
+                    <label
+                      key={e.numeroPiece}
+                      className="flex items-center gap-3 p-2 cursor-pointer hover:bg-muted/30 text-xs"
+                    >
+                      <Checkbox checked={checked} onCheckedChange={() => togglePiece(e.numeroPiece)} />
+                      <span className="font-semibold text-[#00122E] w-32 truncate">{e.numeroPiece || "—"}</span>
+                      <Badge variant="outline" className="text-[10px]">{e.codeJournal}</Badge>
+                      <span className="text-muted-foreground whitespace-nowrap">
+                        {new Date(e.dateTransaction).toLocaleDateString("fr-FR")}
+                      </span>
+                      <span className="text-muted-foreground truncate flex-1">{e.libelle}</span>
+                      <span className="text-muted-foreground whitespace-nowrap">{e.lines.length} l.</span>
+                      <span className="tabular-nums whitespace-nowrap">{fmt(d)}</span>
+                    </label>
+                  );
+                })}
+              </div>
+
+              {modalTotalPages > 1 && (
+                <div className="flex items-center justify-center gap-1">
+                  <Button variant="outline" size="sm" onClick={() => setModalPage((p) => Math.max(1, p - 1))} disabled={modalPage <= 1} className="h-8 w-8 p-0">
+                    <ChevronLeft className="w-4 h-4" />
+                  </Button>
+                  {pageWindow(modalPage, modalTotalPages).map((p, i) =>
+                    p === "…" ? (
+                      <span key={`m${i}`} className="px-2 text-muted-foreground select-none">…</span>
+                    ) : (
+                      <Button
+                        key={p}
+                        variant={p === modalPage ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setModalPage(p)}
+                        className={cn("h-8 min-w-8 px-2 tabular-nums", p === modalPage && "bg-[#0077C3] hover:bg-[#005992] text-white")}
+                      >
+                        {p}
+                      </Button>
+                    ),
+                  )}
+                  <Button variant="outline" size="sm" onClick={() => setModalPage((p) => Math.min(modalTotalPages, p + 1))} disabled={modalPage >= modalTotalPages} className="h-8 w-8 p-0">
+                    <ChevronRight className="w-4 h-4" />
+                  </Button>
+                </div>
+              )}
+            </>
+          )}
+
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setShowDeleteModal(false)}>
+              Annuler
+            </Button>
+            <Button
+              onClick={confirmDeleteSelected}
+              disabled={selectedPieces.size === 0 || deletingSel}
+              className="gap-2 bg-red-600 hover:bg-red-700 text-white"
+            >
+              {deletingSel ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+              Tout supprimer ({selectedPieces.size})
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

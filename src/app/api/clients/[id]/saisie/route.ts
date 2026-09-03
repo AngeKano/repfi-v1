@@ -507,10 +507,11 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
 }
 
 // ============================================================================
-// DELETE — supprime soit UNE écriture entière (?periodId=&numeroPiece=), soit
-// TOUTES les écritures saisies de la période (?periodId=&scope=all). Ne touche
-// jamais les lignes uploadées. Pour retirer une seule ligne, passer par la
-// modification de l'écriture (PUT).
+// DELETE — supprime des écritures saisies de la période. Trois modes :
+//   ?periodId=&scope=all                 → toutes les écritures de la période
+//   ?periodId=&numeroPiece=A&numeroPiece=B → les écritures sélectionnées (1..n)
+// Ne touche jamais les lignes uploadées. Pour retirer une seule ligne, passer
+// par la modification de l'écriture (PUT).
 // ============================================================================
 export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -523,7 +524,7 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
 
     const { searchParams } = new URL(req.url);
     const periodId = searchParams.get("periodId");
-    const numeroPiece = searchParams.get("numeroPiece");
+    const numeroPieces = searchParams.getAll("numeroPiece").filter((p) => p.trim() !== "");
     const scope = searchParams.get("scope");
     if (!periodId) return NextResponse.json({ error: "Période requise" }, { status: 400 });
 
@@ -540,11 +541,12 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
       });
       deleted = del.count;
     } else {
-      if (!numeroPiece) return NextResponse.json({ error: "N° pièce requis" }, { status: 400 });
+      if (numeroPieces.length === 0)
+        return NextResponse.json({ error: "Aucune écriture sélectionnée" }, { status: 400 });
       const del = await prisma.manualLedgerEntry.deleteMany({
-        where: { clientId: id, comptablePeriodId: period.id, numeroPiece },
+        where: { clientId: id, comptablePeriodId: period.id, numeroPiece: { in: numeroPieces } },
       });
-      if (del.count === 0) return NextResponse.json({ error: "Écriture introuvable" }, { status: 404 });
+      if (del.count === 0) return NextResponse.json({ error: "Écriture(s) introuvable(s)" }, { status: 404 });
       deleted = del.count;
     }
 
