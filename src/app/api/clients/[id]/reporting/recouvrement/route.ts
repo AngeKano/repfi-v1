@@ -260,7 +260,7 @@ export async function GET(
 
     const client = await prisma.client.findUnique({
       where: { id },
-      select: { id: true, name: true, companyId: true },
+      select: { id: true, name: true, companyId: true, excludeManualEntries: true },
     });
 
     if (!client) {
@@ -285,11 +285,12 @@ export async function GET(
       select: { batchId: true, periodStart: true, year: true },
     });
 
-    // + batchs des lignes saisies manuellement (intégrées au reporting).
+    // + batchs des lignes saisies manuellement (intégrées au reporting), sauf si
+    // le client a activé l'exclusion des saisies.
     const manualYears = [...new Set([...allPeriods.map((p) => p.year), endYear])];
     const allBatchIds = [
       ...allPeriods.map((p) => p.batchId).filter((b): b is string => !!b),
-      ...manualBatchIdsForYears(id, manualYears),
+      ...(client.excludeManualEntries ? [] : manualBatchIdsForYears(id, manualYears)),
     ];
 
     // Récupérer les données de recouvrement

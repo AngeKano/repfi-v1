@@ -1077,7 +1077,7 @@ export async function GET(
 
     const client = await prisma.client.findUnique({
       where: { id },
-      select: { id: true, name: true, companyId: true, assujettiTVA: true },
+      select: { id: true, name: true, companyId: true, assujettiTVA: true, excludeManualEntries: true },
     });
 
     if (!client) {
@@ -1141,14 +1141,15 @@ export async function GET(
     ].sort((a, b) => parseInt(b) - parseInt(a));
 
     // Inclut le batch des lignes saisies manuellement (année N / N-1) pour que
-    // le reporting les agrège comme les lignes uploadées.
+    // le reporting les agrège comme les lignes uploadées — sauf si le client a
+    // activé l'exclusion des saisies.
     const batchIds = [
       ...postgresPeriodsData.map((p) => p.batchId).filter((b): b is string => !!b),
-      manualBatchId(id, yearN),
+      ...(client.excludeManualEntries ? [] : [manualBatchId(id, yearN)]),
     ];
     const batchIdsN1 = [
       ...postgresPeriodsN1.map((p) => p.batchId).filter((b): b is string => !!b),
-      manualBatchId(id, yearN1),
+      ...(client.excludeManualEntries ? [] : [manualBatchId(id, yearN1)]),
     ];
 
     const monthNames = [

@@ -36,6 +36,7 @@ export type ClientMinAggregateOutputType = {
   companyId: string | null
   isSelfEntity: boolean | null
   assujettiTVA: boolean | null
+  excludeManualEntries: boolean | null
   createdById: string | null
   modifiedById: string | null
   createdAt: Date | null
@@ -54,6 +55,7 @@ export type ClientMaxAggregateOutputType = {
   companyId: string | null
   isSelfEntity: boolean | null
   assujettiTVA: boolean | null
+  excludeManualEntries: boolean | null
   createdById: string | null
   modifiedById: string | null
   createdAt: Date | null
@@ -72,6 +74,7 @@ export type ClientCountAggregateOutputType = {
   companyId: number
   isSelfEntity: number
   assujettiTVA: number
+  excludeManualEntries: number
   createdById: number
   modifiedById: number
   createdAt: number
@@ -92,6 +95,7 @@ export type ClientMinAggregateInputType = {
   companyId?: true
   isSelfEntity?: true
   assujettiTVA?: true
+  excludeManualEntries?: true
   createdById?: true
   modifiedById?: true
   createdAt?: true
@@ -110,6 +114,7 @@ export type ClientMaxAggregateInputType = {
   companyId?: true
   isSelfEntity?: true
   assujettiTVA?: true
+  excludeManualEntries?: true
   createdById?: true
   modifiedById?: true
   createdAt?: true
@@ -128,6 +133,7 @@ export type ClientCountAggregateInputType = {
   companyId?: true
   isSelfEntity?: true
   assujettiTVA?: true
+  excludeManualEntries?: true
   createdById?: true
   modifiedById?: true
   createdAt?: true
@@ -219,6 +225,7 @@ export type ClientGroupByOutputType = {
   companyId: string
   isSelfEntity: boolean
   assujettiTVA: boolean
+  excludeManualEntries: boolean
   createdById: string
   modifiedById: string | null
   createdAt: Date
@@ -258,6 +265,7 @@ export type ClientWhereInput = {
   companyId?: Prisma.StringFilter<"Client"> | string
   isSelfEntity?: Prisma.BoolFilter<"Client"> | boolean
   assujettiTVA?: Prisma.BoolFilter<"Client"> | boolean
+  excludeManualEntries?: Prisma.BoolFilter<"Client"> | boolean
   createdById?: Prisma.StringFilter<"Client"> | string
   modifiedById?: Prisma.StringNullableFilter<"Client"> | string | null
   createdAt?: Prisma.DateTimeFilter<"Client"> | Date | string
@@ -286,6 +294,7 @@ export type ClientOrderByWithRelationInput = {
   companyId?: Prisma.SortOrder
   isSelfEntity?: Prisma.SortOrder
   assujettiTVA?: Prisma.SortOrder
+  excludeManualEntries?: Prisma.SortOrder
   createdById?: Prisma.SortOrder
   modifiedById?: Prisma.SortOrderInput | Prisma.SortOrder
   createdAt?: Prisma.SortOrder
@@ -317,6 +326,7 @@ export type ClientWhereUniqueInput = Prisma.AtLeast<{
   companyId?: Prisma.StringFilter<"Client"> | string
   isSelfEntity?: Prisma.BoolFilter<"Client"> | boolean
   assujettiTVA?: Prisma.BoolFilter<"Client"> | boolean
+  excludeManualEntries?: Prisma.BoolFilter<"Client"> | boolean
   createdById?: Prisma.StringFilter<"Client"> | string
   modifiedById?: Prisma.StringNullableFilter<"Client"> | string | null
   createdAt?: Prisma.DateTimeFilter<"Client"> | Date | string
@@ -345,6 +355,7 @@ export type ClientOrderByWithAggregationInput = {
   companyId?: Prisma.SortOrder
   isSelfEntity?: Prisma.SortOrder
   assujettiTVA?: Prisma.SortOrder
+  excludeManualEntries?: Prisma.SortOrder
   createdById?: Prisma.SortOrder
   modifiedById?: Prisma.SortOrderInput | Prisma.SortOrder
   createdAt?: Prisma.SortOrder
@@ -369,6 +380,7 @@ export type ClientScalarWhereWithAggregatesInput = {
   companyId?: Prisma.StringWithAggregatesFilter<"Client"> | string
   isSelfEntity?: Prisma.BoolWithAggregatesFilter<"Client"> | boolean
   assujettiTVA?: Prisma.BoolWithAggregatesFilter<"Client"> | boolean
+  excludeManualEntries?: Prisma.BoolWithAggregatesFilter<"Client"> | boolean
   createdById?: Prisma.StringWithAggregatesFilter<"Client"> | string
   modifiedById?: Prisma.StringNullableWithAggregatesFilter<"Client"> | string | null
   createdAt?: Prisma.DateTimeWithAggregatesFilter<"Client"> | Date | string
@@ -386,6 +398,7 @@ export type ClientCreateInput = {
   website?: string | null
   isSelfEntity?: boolean
   assujettiTVA?: boolean
+  excludeManualEntries?: boolean
   createdAt?: Date | string
   updatedAt?: Date | string
   assignments?: Prisma.ClientAssignmentCreateNestedManyWithoutClientInput
@@ -412,6 +425,7 @@ export type ClientUncheckedCreateInput = {
   companyId: string
   isSelfEntity?: boolean
   assujettiTVA?: boolean
+  excludeManualEntries?: boolean
   createdById: string
   modifiedById?: string | null
   createdAt?: Date | string
@@ -436,6 +450,7 @@ export type ClientUpdateInput = {
   website?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   isSelfEntity?: Prisma.BoolFieldUpdateOperationsInput | boolean
   assujettiTVA?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  excludeManualEntries?: Prisma.BoolFieldUpdateOperationsInput | boolean
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   assignments?: Prisma.ClientAssignmentUpdateManyWithoutClientNestedInput
@@ -462,6 +477,7 @@ export type ClientUncheckedUpdateInput = {
   companyId?: Prisma.StringFieldUpdateOperationsInput | string
   isSelfEntity?: Prisma.BoolFieldUpdateOperationsInput | boolean
   assujettiTVA?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  excludeManualEntries?: Prisma.BoolFieldUpdateOperationsInput | boolean
   createdById?: Prisma.StringFieldUpdateOperationsInput | string
   modifiedById?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -487,6 +503,7 @@ export type ClientCreateManyInput = {
   companyId: string
   isSelfEntity?: boolean
   assujettiTVA?: boolean
+  excludeManualEntries?: boolean
   createdById: string
   modifiedById?: string | null
   createdAt?: Date | string
@@ -504,6 +521,7 @@ export type ClientUpdateManyMutationInput = {
   website?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   isSelfEntity?: Prisma.BoolFieldUpdateOperationsInput | boolean
   assujettiTVA?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  excludeManualEntries?: Prisma.BoolFieldUpdateOperationsInput | boolean
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -520,6 +538,7 @@ export type ClientUncheckedUpdateManyInput = {
   companyId?: Prisma.StringFieldUpdateOperationsInput | string
   isSelfEntity?: Prisma.BoolFieldUpdateOperationsInput | boolean
   assujettiTVA?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  excludeManualEntries?: Prisma.BoolFieldUpdateOperationsInput | boolean
   createdById?: Prisma.StringFieldUpdateOperationsInput | string
   modifiedById?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -548,6 +567,7 @@ export type ClientCountOrderByAggregateInput = {
   companyId?: Prisma.SortOrder
   isSelfEntity?: Prisma.SortOrder
   assujettiTVA?: Prisma.SortOrder
+  excludeManualEntries?: Prisma.SortOrder
   createdById?: Prisma.SortOrder
   modifiedById?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
@@ -566,6 +586,7 @@ export type ClientMaxOrderByAggregateInput = {
   companyId?: Prisma.SortOrder
   isSelfEntity?: Prisma.SortOrder
   assujettiTVA?: Prisma.SortOrder
+  excludeManualEntries?: Prisma.SortOrder
   createdById?: Prisma.SortOrder
   modifiedById?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
@@ -584,6 +605,7 @@ export type ClientMinOrderByAggregateInput = {
   companyId?: Prisma.SortOrder
   isSelfEntity?: Prisma.SortOrder
   assujettiTVA?: Prisma.SortOrder
+  excludeManualEntries?: Prisma.SortOrder
   createdById?: Prisma.SortOrder
   modifiedById?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
@@ -837,6 +859,7 @@ export type ClientCreateWithoutCompanyInput = {
   website?: string | null
   isSelfEntity?: boolean
   assujettiTVA?: boolean
+  excludeManualEntries?: boolean
   createdAt?: Date | string
   updatedAt?: Date | string
   assignments?: Prisma.ClientAssignmentCreateNestedManyWithoutClientInput
@@ -861,6 +884,7 @@ export type ClientUncheckedCreateWithoutCompanyInput = {
   website?: string | null
   isSelfEntity?: boolean
   assujettiTVA?: boolean
+  excludeManualEntries?: boolean
   createdById: string
   modifiedById?: string | null
   createdAt?: Date | string
@@ -915,6 +939,7 @@ export type ClientScalarWhereInput = {
   companyId?: Prisma.StringFilter<"Client"> | string
   isSelfEntity?: Prisma.BoolFilter<"Client"> | boolean
   assujettiTVA?: Prisma.BoolFilter<"Client"> | boolean
+  excludeManualEntries?: Prisma.BoolFilter<"Client"> | boolean
   createdById?: Prisma.StringFilter<"Client"> | string
   modifiedById?: Prisma.StringNullableFilter<"Client"> | string | null
   createdAt?: Prisma.DateTimeFilter<"Client"> | Date | string
@@ -932,6 +957,7 @@ export type ClientCreateWithoutCreatedByInput = {
   website?: string | null
   isSelfEntity?: boolean
   assujettiTVA?: boolean
+  excludeManualEntries?: boolean
   createdAt?: Date | string
   updatedAt?: Date | string
   assignments?: Prisma.ClientAssignmentCreateNestedManyWithoutClientInput
@@ -957,6 +983,7 @@ export type ClientUncheckedCreateWithoutCreatedByInput = {
   companyId: string
   isSelfEntity?: boolean
   assujettiTVA?: boolean
+  excludeManualEntries?: boolean
   modifiedById?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -990,6 +1017,7 @@ export type ClientCreateWithoutModifiedByInput = {
   website?: string | null
   isSelfEntity?: boolean
   assujettiTVA?: boolean
+  excludeManualEntries?: boolean
   createdAt?: Date | string
   updatedAt?: Date | string
   assignments?: Prisma.ClientAssignmentCreateNestedManyWithoutClientInput
@@ -1015,6 +1043,7 @@ export type ClientUncheckedCreateWithoutModifiedByInput = {
   companyId: string
   isSelfEntity?: boolean
   assujettiTVA?: boolean
+  excludeManualEntries?: boolean
   createdById: string
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -1080,6 +1109,7 @@ export type ClientCreateWithoutAssignmentsInput = {
   website?: string | null
   isSelfEntity?: boolean
   assujettiTVA?: boolean
+  excludeManualEntries?: boolean
   createdAt?: Date | string
   updatedAt?: Date | string
   company: Prisma.CompanyCreateNestedOneWithoutClientsInput
@@ -1105,6 +1135,7 @@ export type ClientUncheckedCreateWithoutAssignmentsInput = {
   companyId: string
   isSelfEntity?: boolean
   assujettiTVA?: boolean
+  excludeManualEntries?: boolean
   createdById: string
   modifiedById?: string | null
   createdAt?: Date | string
@@ -1144,6 +1175,7 @@ export type ClientUpdateWithoutAssignmentsInput = {
   website?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   isSelfEntity?: Prisma.BoolFieldUpdateOperationsInput | boolean
   assujettiTVA?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  excludeManualEntries?: Prisma.BoolFieldUpdateOperationsInput | boolean
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   company?: Prisma.CompanyUpdateOneRequiredWithoutClientsNestedInput
@@ -1169,6 +1201,7 @@ export type ClientUncheckedUpdateWithoutAssignmentsInput = {
   companyId?: Prisma.StringFieldUpdateOperationsInput | string
   isSelfEntity?: Prisma.BoolFieldUpdateOperationsInput | boolean
   assujettiTVA?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  excludeManualEntries?: Prisma.BoolFieldUpdateOperationsInput | boolean
   createdById?: Prisma.StringFieldUpdateOperationsInput | string
   modifiedById?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -1192,6 +1225,7 @@ export type ClientCreateWithoutFoldersInput = {
   website?: string | null
   isSelfEntity?: boolean
   assujettiTVA?: boolean
+  excludeManualEntries?: boolean
   createdAt?: Date | string
   updatedAt?: Date | string
   assignments?: Prisma.ClientAssignmentCreateNestedManyWithoutClientInput
@@ -1217,6 +1251,7 @@ export type ClientUncheckedCreateWithoutFoldersInput = {
   companyId: string
   isSelfEntity?: boolean
   assujettiTVA?: boolean
+  excludeManualEntries?: boolean
   createdById: string
   modifiedById?: string | null
   createdAt?: Date | string
@@ -1256,6 +1291,7 @@ export type ClientUpdateWithoutFoldersInput = {
   website?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   isSelfEntity?: Prisma.BoolFieldUpdateOperationsInput | boolean
   assujettiTVA?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  excludeManualEntries?: Prisma.BoolFieldUpdateOperationsInput | boolean
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   assignments?: Prisma.ClientAssignmentUpdateManyWithoutClientNestedInput
@@ -1281,6 +1317,7 @@ export type ClientUncheckedUpdateWithoutFoldersInput = {
   companyId?: Prisma.StringFieldUpdateOperationsInput | string
   isSelfEntity?: Prisma.BoolFieldUpdateOperationsInput | boolean
   assujettiTVA?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  excludeManualEntries?: Prisma.BoolFieldUpdateOperationsInput | boolean
   createdById?: Prisma.StringFieldUpdateOperationsInput | string
   modifiedById?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -1304,6 +1341,7 @@ export type ClientCreateWithoutSocialNetworksInput = {
   website?: string | null
   isSelfEntity?: boolean
   assujettiTVA?: boolean
+  excludeManualEntries?: boolean
   createdAt?: Date | string
   updatedAt?: Date | string
   assignments?: Prisma.ClientAssignmentCreateNestedManyWithoutClientInput
@@ -1329,6 +1367,7 @@ export type ClientUncheckedCreateWithoutSocialNetworksInput = {
   companyId: string
   isSelfEntity?: boolean
   assujettiTVA?: boolean
+  excludeManualEntries?: boolean
   createdById: string
   modifiedById?: string | null
   createdAt?: Date | string
@@ -1368,6 +1407,7 @@ export type ClientUpdateWithoutSocialNetworksInput = {
   website?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   isSelfEntity?: Prisma.BoolFieldUpdateOperationsInput | boolean
   assujettiTVA?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  excludeManualEntries?: Prisma.BoolFieldUpdateOperationsInput | boolean
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   assignments?: Prisma.ClientAssignmentUpdateManyWithoutClientNestedInput
@@ -1393,6 +1433,7 @@ export type ClientUncheckedUpdateWithoutSocialNetworksInput = {
   companyId?: Prisma.StringFieldUpdateOperationsInput | string
   isSelfEntity?: Prisma.BoolFieldUpdateOperationsInput | boolean
   assujettiTVA?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  excludeManualEntries?: Prisma.BoolFieldUpdateOperationsInput | boolean
   createdById?: Prisma.StringFieldUpdateOperationsInput | string
   modifiedById?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -1416,6 +1457,7 @@ export type ClientCreateWithoutNormalFilesInput = {
   website?: string | null
   isSelfEntity?: boolean
   assujettiTVA?: boolean
+  excludeManualEntries?: boolean
   createdAt?: Date | string
   updatedAt?: Date | string
   assignments?: Prisma.ClientAssignmentCreateNestedManyWithoutClientInput
@@ -1441,6 +1483,7 @@ export type ClientUncheckedCreateWithoutNormalFilesInput = {
   companyId: string
   isSelfEntity?: boolean
   assujettiTVA?: boolean
+  excludeManualEntries?: boolean
   createdById: string
   modifiedById?: string | null
   createdAt?: Date | string
@@ -1480,6 +1523,7 @@ export type ClientUpdateWithoutNormalFilesInput = {
   website?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   isSelfEntity?: Prisma.BoolFieldUpdateOperationsInput | boolean
   assujettiTVA?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  excludeManualEntries?: Prisma.BoolFieldUpdateOperationsInput | boolean
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   assignments?: Prisma.ClientAssignmentUpdateManyWithoutClientNestedInput
@@ -1505,6 +1549,7 @@ export type ClientUncheckedUpdateWithoutNormalFilesInput = {
   companyId?: Prisma.StringFieldUpdateOperationsInput | string
   isSelfEntity?: Prisma.BoolFieldUpdateOperationsInput | boolean
   assujettiTVA?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  excludeManualEntries?: Prisma.BoolFieldUpdateOperationsInput | boolean
   createdById?: Prisma.StringFieldUpdateOperationsInput | string
   modifiedById?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -1528,6 +1573,7 @@ export type ClientCreateWithoutComptableFilesInput = {
   website?: string | null
   isSelfEntity?: boolean
   assujettiTVA?: boolean
+  excludeManualEntries?: boolean
   createdAt?: Date | string
   updatedAt?: Date | string
   assignments?: Prisma.ClientAssignmentCreateNestedManyWithoutClientInput
@@ -1553,6 +1599,7 @@ export type ClientUncheckedCreateWithoutComptableFilesInput = {
   companyId: string
   isSelfEntity?: boolean
   assujettiTVA?: boolean
+  excludeManualEntries?: boolean
   createdById: string
   modifiedById?: string | null
   createdAt?: Date | string
@@ -1592,6 +1639,7 @@ export type ClientUpdateWithoutComptableFilesInput = {
   website?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   isSelfEntity?: Prisma.BoolFieldUpdateOperationsInput | boolean
   assujettiTVA?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  excludeManualEntries?: Prisma.BoolFieldUpdateOperationsInput | boolean
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   assignments?: Prisma.ClientAssignmentUpdateManyWithoutClientNestedInput
@@ -1617,6 +1665,7 @@ export type ClientUncheckedUpdateWithoutComptableFilesInput = {
   companyId?: Prisma.StringFieldUpdateOperationsInput | string
   isSelfEntity?: Prisma.BoolFieldUpdateOperationsInput | boolean
   assujettiTVA?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  excludeManualEntries?: Prisma.BoolFieldUpdateOperationsInput | boolean
   createdById?: Prisma.StringFieldUpdateOperationsInput | string
   modifiedById?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -1640,6 +1689,7 @@ export type ClientCreateWithoutComptablePeriodsInput = {
   website?: string | null
   isSelfEntity?: boolean
   assujettiTVA?: boolean
+  excludeManualEntries?: boolean
   createdAt?: Date | string
   updatedAt?: Date | string
   assignments?: Prisma.ClientAssignmentCreateNestedManyWithoutClientInput
@@ -1665,6 +1715,7 @@ export type ClientUncheckedCreateWithoutComptablePeriodsInput = {
   companyId: string
   isSelfEntity?: boolean
   assujettiTVA?: boolean
+  excludeManualEntries?: boolean
   createdById: string
   modifiedById?: string | null
   createdAt?: Date | string
@@ -1704,6 +1755,7 @@ export type ClientUpdateWithoutComptablePeriodsInput = {
   website?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   isSelfEntity?: Prisma.BoolFieldUpdateOperationsInput | boolean
   assujettiTVA?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  excludeManualEntries?: Prisma.BoolFieldUpdateOperationsInput | boolean
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   assignments?: Prisma.ClientAssignmentUpdateManyWithoutClientNestedInput
@@ -1729,6 +1781,7 @@ export type ClientUncheckedUpdateWithoutComptablePeriodsInput = {
   companyId?: Prisma.StringFieldUpdateOperationsInput | string
   isSelfEntity?: Prisma.BoolFieldUpdateOperationsInput | boolean
   assujettiTVA?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  excludeManualEntries?: Prisma.BoolFieldUpdateOperationsInput | boolean
   createdById?: Prisma.StringFieldUpdateOperationsInput | string
   modifiedById?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -1752,6 +1805,7 @@ export type ClientCreateWithoutManualEntriesInput = {
   website?: string | null
   isSelfEntity?: boolean
   assujettiTVA?: boolean
+  excludeManualEntries?: boolean
   createdAt?: Date | string
   updatedAt?: Date | string
   assignments?: Prisma.ClientAssignmentCreateNestedManyWithoutClientInput
@@ -1777,6 +1831,7 @@ export type ClientUncheckedCreateWithoutManualEntriesInput = {
   companyId: string
   isSelfEntity?: boolean
   assujettiTVA?: boolean
+  excludeManualEntries?: boolean
   createdById: string
   modifiedById?: string | null
   createdAt?: Date | string
@@ -1816,6 +1871,7 @@ export type ClientUpdateWithoutManualEntriesInput = {
   website?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   isSelfEntity?: Prisma.BoolFieldUpdateOperationsInput | boolean
   assujettiTVA?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  excludeManualEntries?: Prisma.BoolFieldUpdateOperationsInput | boolean
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   assignments?: Prisma.ClientAssignmentUpdateManyWithoutClientNestedInput
@@ -1841,6 +1897,7 @@ export type ClientUncheckedUpdateWithoutManualEntriesInput = {
   companyId?: Prisma.StringFieldUpdateOperationsInput | string
   isSelfEntity?: Prisma.BoolFieldUpdateOperationsInput | boolean
   assujettiTVA?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  excludeManualEntries?: Prisma.BoolFieldUpdateOperationsInput | boolean
   createdById?: Prisma.StringFieldUpdateOperationsInput | string
   modifiedById?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -1864,6 +1921,7 @@ export type ClientCreateManyCompanyInput = {
   website?: string | null
   isSelfEntity?: boolean
   assujettiTVA?: boolean
+  excludeManualEntries?: boolean
   createdById: string
   modifiedById?: string | null
   createdAt?: Date | string
@@ -1881,6 +1939,7 @@ export type ClientUpdateWithoutCompanyInput = {
   website?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   isSelfEntity?: Prisma.BoolFieldUpdateOperationsInput | boolean
   assujettiTVA?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  excludeManualEntries?: Prisma.BoolFieldUpdateOperationsInput | boolean
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   assignments?: Prisma.ClientAssignmentUpdateManyWithoutClientNestedInput
@@ -1905,6 +1964,7 @@ export type ClientUncheckedUpdateWithoutCompanyInput = {
   website?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   isSelfEntity?: Prisma.BoolFieldUpdateOperationsInput | boolean
   assujettiTVA?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  excludeManualEntries?: Prisma.BoolFieldUpdateOperationsInput | boolean
   createdById?: Prisma.StringFieldUpdateOperationsInput | string
   modifiedById?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -1929,6 +1989,7 @@ export type ClientUncheckedUpdateManyWithoutCompanyInput = {
   website?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   isSelfEntity?: Prisma.BoolFieldUpdateOperationsInput | boolean
   assujettiTVA?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  excludeManualEntries?: Prisma.BoolFieldUpdateOperationsInput | boolean
   createdById?: Prisma.StringFieldUpdateOperationsInput | string
   modifiedById?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -1947,6 +2008,7 @@ export type ClientCreateManyCreatedByInput = {
   companyId: string
   isSelfEntity?: boolean
   assujettiTVA?: boolean
+  excludeManualEntries?: boolean
   modifiedById?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -1964,6 +2026,7 @@ export type ClientCreateManyModifiedByInput = {
   companyId: string
   isSelfEntity?: boolean
   assujettiTVA?: boolean
+  excludeManualEntries?: boolean
   createdById: string
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -1980,6 +2043,7 @@ export type ClientUpdateWithoutCreatedByInput = {
   website?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   isSelfEntity?: Prisma.BoolFieldUpdateOperationsInput | boolean
   assujettiTVA?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  excludeManualEntries?: Prisma.BoolFieldUpdateOperationsInput | boolean
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   assignments?: Prisma.ClientAssignmentUpdateManyWithoutClientNestedInput
@@ -2005,6 +2069,7 @@ export type ClientUncheckedUpdateWithoutCreatedByInput = {
   companyId?: Prisma.StringFieldUpdateOperationsInput | string
   isSelfEntity?: Prisma.BoolFieldUpdateOperationsInput | boolean
   assujettiTVA?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  excludeManualEntries?: Prisma.BoolFieldUpdateOperationsInput | boolean
   modifiedById?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -2029,6 +2094,7 @@ export type ClientUncheckedUpdateManyWithoutCreatedByInput = {
   companyId?: Prisma.StringFieldUpdateOperationsInput | string
   isSelfEntity?: Prisma.BoolFieldUpdateOperationsInput | boolean
   assujettiTVA?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  excludeManualEntries?: Prisma.BoolFieldUpdateOperationsInput | boolean
   modifiedById?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -2045,6 +2111,7 @@ export type ClientUpdateWithoutModifiedByInput = {
   website?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   isSelfEntity?: Prisma.BoolFieldUpdateOperationsInput | boolean
   assujettiTVA?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  excludeManualEntries?: Prisma.BoolFieldUpdateOperationsInput | boolean
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   assignments?: Prisma.ClientAssignmentUpdateManyWithoutClientNestedInput
@@ -2070,6 +2137,7 @@ export type ClientUncheckedUpdateWithoutModifiedByInput = {
   companyId?: Prisma.StringFieldUpdateOperationsInput | string
   isSelfEntity?: Prisma.BoolFieldUpdateOperationsInput | boolean
   assujettiTVA?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  excludeManualEntries?: Prisma.BoolFieldUpdateOperationsInput | boolean
   createdById?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -2094,6 +2162,7 @@ export type ClientUncheckedUpdateManyWithoutModifiedByInput = {
   companyId?: Prisma.StringFieldUpdateOperationsInput | string
   isSelfEntity?: Prisma.BoolFieldUpdateOperationsInput | boolean
   assujettiTVA?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  excludeManualEntries?: Prisma.BoolFieldUpdateOperationsInput | boolean
   createdById?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -2196,6 +2265,7 @@ export type ClientSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs =
   companyId?: boolean
   isSelfEntity?: boolean
   assujettiTVA?: boolean
+  excludeManualEntries?: boolean
   createdById?: boolean
   modifiedById?: boolean
   createdAt?: boolean
@@ -2225,6 +2295,7 @@ export type ClientSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extens
   companyId?: boolean
   isSelfEntity?: boolean
   assujettiTVA?: boolean
+  excludeManualEntries?: boolean
   createdById?: boolean
   modifiedById?: boolean
   createdAt?: boolean
@@ -2246,6 +2317,7 @@ export type ClientSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extens
   companyId?: boolean
   isSelfEntity?: boolean
   assujettiTVA?: boolean
+  excludeManualEntries?: boolean
   createdById?: boolean
   modifiedById?: boolean
   createdAt?: boolean
@@ -2267,13 +2339,14 @@ export type ClientSelectScalar = {
   companyId?: boolean
   isSelfEntity?: boolean
   assujettiTVA?: boolean
+  excludeManualEntries?: boolean
   createdById?: boolean
   modifiedById?: boolean
   createdAt?: boolean
   updatedAt?: boolean
 }
 
-export type ClientOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "name" | "denomination" | "description" | "companyType" | "email" | "phone" | "website" | "companyId" | "isSelfEntity" | "assujettiTVA" | "createdById" | "modifiedById" | "createdAt" | "updatedAt", ExtArgs["result"]["client"]>
+export type ClientOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "name" | "denomination" | "description" | "companyType" | "email" | "phone" | "website" | "companyId" | "isSelfEntity" | "assujettiTVA" | "excludeManualEntries" | "createdById" | "modifiedById" | "createdAt" | "updatedAt", ExtArgs["result"]["client"]>
 export type ClientInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   assignments?: boolean | Prisma.Client$assignmentsArgs<ExtArgs>
   company?: boolean | Prisma.CompanyDefaultArgs<ExtArgs>
@@ -2324,6 +2397,7 @@ export type $ClientPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs
     companyId: string
     isSelfEntity: boolean
     assujettiTVA: boolean
+    excludeManualEntries: boolean
     createdById: string
     modifiedById: string | null
     createdAt: Date
@@ -2772,6 +2846,7 @@ export interface ClientFieldRefs {
   readonly companyId: Prisma.FieldRef<"Client", 'String'>
   readonly isSelfEntity: Prisma.FieldRef<"Client", 'Boolean'>
   readonly assujettiTVA: Prisma.FieldRef<"Client", 'Boolean'>
+  readonly excludeManualEntries: Prisma.FieldRef<"Client", 'Boolean'>
   readonly createdById: Prisma.FieldRef<"Client", 'String'>
   readonly modifiedById: Prisma.FieldRef<"Client", 'String'>
   readonly createdAt: Prisma.FieldRef<"Client", 'DateTime'>

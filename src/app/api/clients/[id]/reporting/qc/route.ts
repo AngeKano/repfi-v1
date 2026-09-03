@@ -57,7 +57,7 @@ export async function GET(
 
     const client = await prisma.client.findUnique({
       where: { id },
-      select: { id: true, name: true, companyId: true, assujettiTVA: true },
+      select: { id: true, name: true, companyId: true, assujettiTVA: true, excludeManualEntries: true },
     });
     if (!client) {
       return NextResponse.json({ error: "Client non trouvé" }, { status: 404 });
@@ -73,7 +73,7 @@ export async function GET(
     });
     const batchIds = [
       ...periods.map((p) => p.batchId).filter((b): b is string => !!b),
-      manualBatchId(id, parseInt(year, 10)),
+      ...(client.excludeManualEntries ? [] : [manualBatchId(id, parseInt(year, 10))]),
     ];
 
     const startYM = `${year}01`;

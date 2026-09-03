@@ -11,6 +11,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -107,6 +108,35 @@ export default function ClientDetailsClient({
   const [showUploadDialog, setShowUploadDialog] = useState(false);
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  // Exclusion des écritures saisies de TOUS les calculs du reporting (avant/après).
+  const [excludeManual, setExcludeManual] = useState<boolean>(
+    !!initialClient?.excludeManualEntries,
+  );
+  const [togglingManual, setTogglingManual] = useState(false);
+
+  const toggleExcludeManual = async (next: boolean) => {
+    setTogglingManual(true);
+    setExcludeManual(next);
+    try {
+      const res = await fetch(`/api/clients/${client.id}/reporting-settings`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ excludeManualEntries: next }),
+      });
+      if (!res.ok) {
+        setExcludeManual(!next);
+        setError("Impossible de mettre à jour l'inclusion des saisies.");
+        return;
+      }
+      // Recharger pour refléter l'avant/après sur l'ensemble du reporting.
+      window.location.reload();
+    } catch {
+      setExcludeManual(!next);
+      setError("Erreur réseau.");
+    } finally {
+      setTogglingManual(false);
+    }
+  };
 
   const initialPeriodType = (() => {
     const qp = searchParams.get("periodType");
@@ -319,6 +349,23 @@ export default function ClientDetailsClient({
 
             {/* Action buttons */}
             <div className="flex items-center justify-end gap-2 mb-6">
+              {hasReporting && (
+                <div
+                  className="flex items-center gap-2 rounded-full border border-[#D0E3F5] px-4 h-9"
+                  title="Masquer les écritures saisies de tous les calculs du reporting"
+                >
+                  <span className="text-xs text-[#335890] whitespace-nowrap">
+                    Masquer saisies
+                  </span>
+                  <Switch
+                    checked={excludeManual}
+                    onCheckedChange={toggleExcludeManual}
+                    disabled={togglingManual}
+                    aria-label="Masquer les saisies du reporting"
+                  />
+                </div>
+              )}
+
               {canDelete && !client.isSelfEntity && (
                 <Button
                   variant="outline"
