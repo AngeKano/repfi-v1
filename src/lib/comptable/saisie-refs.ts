@@ -37,6 +37,6 @@ export function suggestTypeTiers(compte: string): string {
 }
 
 // Origine d'une ligne du grand livre (colonne "Flags" de l'export / filtres).
-export const FLAG_IMPORT = "Import (Brut)";
-export const FLAG_SAISIE = "Saisie (Utilisateur)";
+export const FLAG_IMPORT = "Import";
+export const FLAG_SAISIE = "Saisie";
 export const FLAGS: string[] = [FLAG_IMPORT, FLAG_SAISIE];
