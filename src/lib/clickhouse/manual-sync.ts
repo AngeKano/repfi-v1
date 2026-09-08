@@ -58,6 +58,16 @@ interface GrandLivreRow {
   credit: number;
 }
 
+// Colonnes enrichies : présentes dans le grand livre alimenté par l'ETL, mais
+// on ne peut pas garantir qu'elles existent sur toutes les installations. On
+// tente l'insertion complète puis on retombe sur le jeu de base si ça échoue.
+interface GrandLivreRowFull extends GrandLivreRow {
+  code_journal: string;
+  type_tiers: string;
+  numero_facture: string;
+  libelle: string;
+}
+
 // Reconstruit intégralement le batch manuel d'un client/année dans ClickHouse
 // à partir de la source de vérité Postgres (idempotent).
 export async function syncManualBatch(
@@ -79,7 +89,7 @@ export async function syncManualBatch(
 
     // 2. Réinsérer l'état courant.
     if (entries.length > 0) {
-      const rows: GrandLivreRow[] = entries.map((e) => ({
+      const rowsFull: GrandLivreRowFull[] = entries.map((e) => ({
         batch_id: batch,
         date_transaction: formatDateFR(e.dateTransaction),
         compte: e.compte,
@@ -91,12 +101,39 @@ export async function syncManualBatch(
         numero_piece: e.numeroPiece,
         debit: e.debit,
         credit: e.credit,
+        code_journal: e.codeJournal,
+        type_tiers: e.typeTiers,
+        numero_facture: e.numeroFacture,
+        libelle: e.libelle,
       }));
-      await clickhouseClient.insert({
-        table: `${dbName}.grand_livre`,
-        values: rows,
-        format: "JSONEachRow",
-      });
+      try {
+        await clickhouseClient.insert({
+          table: `${dbName}.grand_livre`,
+          values: rowsFull,
+          format: "JSONEachRow",
+        });
+      } catch (errFull) {
+        // Repli : certaines colonnes enrichies n'existent pas sur cette table.
+        console.warn(`[manual-sync] insertion enrichie refusée, repli colonnes de base:`, errFull);
+        const rowsBase: GrandLivreRow[] = rowsFull.map((r) => ({
+          batch_id: r.batch_id,
+          date_transaction: r.date_transaction,
+          compte: r.compte,
+          intitule_compte: r.intitule_compte,
+          n_tiers: r.n_tiers,
+          intitule_tiers: r.intitule_tiers,
+          rubrique: r.rubrique,
+          bilan_rubrique: r.bilan_rubrique,
+          numero_piece: r.numero_piece,
+          debit: r.debit,
+          credit: r.credit,
+        }));
+        await clickhouseClient.insert({
+          table: `${dbName}.grand_livre`,
+          values: rowsBase,
+          format: "JSONEachRow",
+        });
+      }
     }
   } catch (err) {
     // Si la base/table ClickHouse n'existe pas encore (aucun upload), on

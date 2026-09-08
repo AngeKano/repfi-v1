@@ -28,6 +28,13 @@ import {
 } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
+  GlFiltersPanel,
+  EMPTY_GL_FILTERS,
+  glFiltersToQuery,
+  countActiveFilters,
+  type GlFilterValues,
+} from "./gl-filters-panel";
+import {
   Plus,
   Trash2,
   Pencil,
@@ -44,11 +51,13 @@ import {
   ArrowDown,
   ArrowUpDown,
   Download,
+  SlidersHorizontal,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import {
   CODES_JOURNAUX,
+  FLAG_SAISIE,
   isCentralizingAccount,
   suggestTypeTiers,
 } from "@/lib/comptable/saisie-refs";
@@ -67,10 +76,14 @@ interface UploadedRow {
   n_tiers: string;
   intitule_tiers: string;
   numero_piece: string;
+  numero_facture: string;
+  code_journal: string;
   rubrique: string;
   bilan_rubrique: string;
   debit: number;
   credit: number;
+  batch_id: string;
+  flags: string; // "Import (Brut)" | "Saisie (Utilisateur)"
 }
 interface ManualEntry {
   id: string;
@@ -111,7 +124,13 @@ interface SaisieData {
     totalPages: number;
   };
   manual: ManualEntry[];
-  refs: { comptes: CompteRef[]; tiers: TiersRef[] };
+  refs: {
+    comptes: CompteRef[];
+    tiers: TiersRef[];
+    journaux: string[];
+    pieces: string[];
+    factures: string[];
+  };
   balance: { debit: number; credit: number; delta: number };
 }
 
@@ -185,6 +204,11 @@ export default function SaisieTab({ clientId }: { clientId: string }) {
   const [search, setSearch] = useState("");
   const [sortBy, setSortBy] = useState<string>("date");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
+  // Filtres de vue directe du grand livre (partagés avec l'export).
+  const [filters, setFilters] = useState<GlFilterValues>({ ...EMPTY_GL_FILTERS });
+  const [showFilters, setShowFilters] = useState(false);
+  const [showExportDialog, setShowExportDialog] = useState(false);
+  const [exportFilters, setExportFilters] = useState<GlFilterValues>({ ...EMPTY_GL_FILTERS });
 
   // Formulaire (ajout ou modification d'une écriture entière).
   const [formOpen, setFormOpen] = useState<null | "add" | "edit">(null);
@@ -208,7 +232,7 @@ export default function SaisieTab({ clientId }: { clientId: string }) {
     async (pid: string, pg: number, srch: string, sBy: string, sDir: string) => {
       setLoading(true);
       try {
-        const qs = new URLSearchParams();
+        const qs = glFiltersToQuery(filters);
         if (pid) qs.set("periodId", pid);
         qs.set("page", String(pg));
         if (srch) qs.set("search", srch);
@@ -226,7 +250,7 @@ export default function SaisieTab({ clientId }: { clientId: string }) {
         setLoading(false);
       }
     },
-    [clientId],
+    [clientId, filters],
   );
 
   useEffect(() => {
@@ -243,7 +267,7 @@ export default function SaisieTab({ clientId }: { clientId: string }) {
   useEffect(() => {
     fetchData(periodId, page, search, sortBy, sortDir);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [clientId, periodId, page, search, sortBy, sortDir]);
+  }, [clientId, periodId, page, search, sortBy, sortDir, filters]);
 
   const toggleSort = (col: string) => {
     if (sortBy === col) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
@@ -438,11 +462,12 @@ export default function SaisieTab({ clientId }: { clientId: string }) {
   };
 
   // Télécharge le récap Excel (grand livre uploadé + saisies, colonne Flags).
-  const exportExcel = async () => {
+  const exportExcel = async (flt: GlFilterValues) => {
     if (!period) return;
     setExporting(true);
     try {
-      const qs = new URLSearchParams({ periodId: period.id });
+      const qs = glFiltersToQuery(flt);
+      qs.set("periodId", period.id);
       const res = await fetch(`/api/clients/${clientId}/saisie/export?${qs}`);
       if (!res.ok) {
         toast.error("Échec du téléchargement");
@@ -459,11 +484,25 @@ export default function SaisieTab({ clientId }: { clientId: string }) {
       a.click();
       a.remove();
       URL.revokeObjectURL(url);
+      setShowExportDialog(false);
     } catch {
       toast.error("Erreur réseau");
     } finally {
       setExporting(false);
     }
+  };
+
+  // Ouvre la boîte de dialogue de téléchargement, pré-remplie avec les filtres
+  // de la vue courante.
+  const openExportDialog = () => {
+    setExportFilters({ ...filters });
+    setShowExportDialog(true);
+  };
+
+  // Applique des filtres de vue (retour en page 1).
+  const applyFilters = (v: GlFilterValues) => {
+    setFilters(v);
+    setPage(1);
   };
 
   // Ouvre la pop-up de suppression avec toutes les écritures pré-cochées.
@@ -575,7 +614,7 @@ export default function SaisieTab({ clientId }: { clientId: string }) {
         </div>
         <Button
           variant="outline"
-          onClick={exportExcel}
+          onClick={openExportDialog}
           disabled={exporting}
           className="gap-2 h-10 rounded-lg"
           title="Télécharger le grand livre (uploadé + saisies) au format Excel"
@@ -889,10 +928,11 @@ export default function SaisieTab({ clientId }: { clientId: string }) {
             <div className="flex items-center gap-2">
               <Lock className="w-4 h-4 text-muted-foreground" />
               <div>
-                <CardTitle>Grand livre importé</CardTitle>
+                <CardTitle>Grand livre</CardTitle>
                 <CardDescription>
-                  Lignes issues de l&apos;import — lecture seule ({data.uploaded.total}{" "}
-                  ligne{data.uploaded.total > 1 ? "s" : ""}).
+                  Lignes importées et saisies — lecture seule ({data.uploaded.total}{" "}
+                  ligne{data.uploaded.total > 1 ? "s" : ""}). L&apos;origine de chaque
+                  ligne est indiquée par la colonne Flags.
                 </CardDescription>
               </div>
             </div>
@@ -906,6 +946,50 @@ export default function SaisieTab({ clientId }: { clientId: string }) {
               />
             </div>
           </div>
+
+          {/* Filtres de vue directe + téléchargement du résultat filtré */}
+          <div className="flex flex-wrap items-center gap-2 pt-3">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowFilters((f) => !f)}
+              className="gap-2 h-9"
+            >
+              <SlidersHorizontal className="w-4 h-4" />
+              Filtres
+              {countActiveFilters(filters) > 0 && (
+                <Badge variant="secondary" className="text-[10px]">
+                  {countActiveFilters(filters)}
+                </Badge>
+              )}
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => exportExcel(filters)}
+              disabled={exporting}
+              className="gap-2 h-9"
+              title="Télécharger le grand livre filtré (Excel)"
+            >
+              {exporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+              Télécharger
+            </Button>
+          </div>
+          {showFilters && (
+            <div className="pt-3">
+              <GlFiltersPanel
+                value={filters}
+                onChange={applyFilters}
+                options={{
+                  journaux: data.refs.journaux,
+                  comptes: data.refs.comptes.map((c) => c.compte),
+                  pieces: data.refs.pieces,
+                  tiers: data.refs.tiers.map((t) => t.nTiers),
+                  factures: data.refs.factures,
+                }}
+              />
+            </div>
+          )}
         </CardHeader>
         <CardContent>
           <div className="overflow-x-auto">
@@ -918,12 +1002,13 @@ export default function SaisieTab({ clientId }: { clientId: string }) {
                   {sortTh("piece", "N° pièce")}
                   {sortTh("debit", "Débit", true)}
                   {sortTh("credit", "Crédit", true)}
+                  <th className="p-2 font-medium text-left">Flags</th>
                 </tr>
               </thead>
               <tbody>
                 {data.uploaded.rows.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="p-6 text-center text-muted-foreground">
+                    <td colSpan={7} className="p-6 text-center text-muted-foreground">
                       Aucune ligne pour cette période.
                     </td>
                   </tr>
@@ -941,6 +1026,19 @@ export default function SaisieTab({ clientId }: { clientId: string }) {
                       <td className="p-2 text-muted-foreground">{r.numero_piece}</td>
                       <td className="p-2 text-right tabular-nums text-blue-700">{fmt(r.debit)}</td>
                       <td className="p-2 text-right tabular-nums text-green-700">{fmt(r.credit)}</td>
+                      <td className="p-2">
+                        <Badge
+                          variant="outline"
+                          className={cn(
+                            "text-[10px] whitespace-nowrap",
+                            r.flags === FLAG_SAISIE
+                              ? "bg-[#EBF5FF] text-[#0077C3] border-[#D0E3F5]"
+                              : "bg-muted text-muted-foreground",
+                          )}
+                        >
+                          {r.flags}
+                        </Badge>
+                      </td>
                     </tr>
                   ))
                 )}
@@ -987,6 +1085,46 @@ export default function SaisieTab({ clientId }: { clientId: string }) {
         <Badge variant="outline" className="text-xs">Info</Badge>
         Les écritures saisies sont intégrées aux calculs du reporting. Seul le Loader Plus peut saisir.
       </p>
+
+      {/* ============ Téléchargement du grand livre (filtres 1..n) ============ */}
+      <Dialog open={showExportDialog} onOpenChange={setShowExportDialog}>
+        <DialogContent className="max-w-3xl overflow-visible">
+          <DialogHeader>
+            <DialogTitle>Télécharger le grand livre</DialogTitle>
+            <DialogDescription>
+              Export Excel du grand livre importé <strong>et</strong> des écritures
+              saisies. Affinez la sélection ci-dessous (les listes sont en
+              multisélection).
+            </DialogDescription>
+          </DialogHeader>
+
+          <GlFiltersPanel
+            value={exportFilters}
+            onChange={setExportFilters}
+            options={{
+              journaux: data.refs.journaux,
+              comptes: data.refs.comptes.map((c) => c.compte),
+              pieces: data.refs.pieces,
+              tiers: data.refs.tiers.map((t) => t.nTiers),
+              factures: data.refs.factures,
+            }}
+          />
+
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setShowExportDialog(false)}>
+              Annuler
+            </Button>
+            <Button
+              onClick={() => exportExcel(exportFilters)}
+              disabled={exporting}
+              className="gap-2"
+            >
+              {exporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+              Exporter
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* ===================== Pop-up de suppression ===================== */}
       <Dialog open={showDeleteModal} onOpenChange={setShowDeleteModal}>

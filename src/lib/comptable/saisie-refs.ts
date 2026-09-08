@@ -35,3 +35,8 @@ export function suggestTypeTiers(compte: string): string {
   if (c.startsWith("44")) return "État";
   return "";
 }
+
+// Origine d'une ligne du grand livre (colonne "Flags" de l'export / filtres).
+export const FLAG_IMPORT = "Import (Brut)";
+export const FLAG_SAISIE = "Saisie (Utilisateur)";
+export const FLAGS: string[] = [FLAG_IMPORT, FLAG_SAISIE];
