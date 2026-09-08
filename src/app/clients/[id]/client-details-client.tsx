@@ -352,16 +352,16 @@ export default function ClientDetailsClient({
               {hasReporting && (
                 <div
                   className="flex items-center gap-2 rounded-full border border-[#D0E3F5] px-4 h-9"
-                  title="Masquer les écritures saisies de tous les calculs du reporting"
+                  title="Inclure les écritures saisies de l'utilisateur dans tous les calculs du reporting (désactivé = masquées)"
                 >
                   <span className="text-xs text-[#335890] whitespace-nowrap">
-                    Masquer saisies
+                    Prendre en compte les saisies
                   </span>
                   <Switch
-                    checked={excludeManual}
-                    onCheckedChange={toggleExcludeManual}
+                    checked={!excludeManual}
+                    onCheckedChange={(v) => toggleExcludeManual(!v)}
                     disabled={togglingManual}
-                    aria-label="Masquer les saisies du reporting"
+                    aria-label="Prendre en compte les saisies utilisateur dans le reporting"
                   />
                 </div>
               )}

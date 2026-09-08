@@ -69,7 +69,7 @@ model Client {
   assujettiTVA     Boolean            @default(true)
   // Si true, les écritures saisies manuellement sont EXCLUES de tous les calculs
   // du reporting (permet de comparer l'avant/après saisies).
-  excludeManualEntries Boolean        @default(false)
+  excludeManualEntries Boolean        @default(true)
   createdById      String
   modifiedById     String?
   createdAt        DateTime           @default(now())

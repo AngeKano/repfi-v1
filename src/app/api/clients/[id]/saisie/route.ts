@@ -6,9 +6,16 @@ import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import { prisma } from "@/lib/prisma";
 import { requirePermission } from "@/lib/permissions";
 import { SAISIE_ACTIONS } from "@/lib/permissions/actions";
-import { getClickhouseDbName, syncManualBatch } from "@/lib/clickhouse/manual-sync";
+import {
+  getClickhouseDbName,
+  syncManualBatch,
+  manualBatchId,
+} from "@/lib/clickhouse/manual-sync";
+import { parseGlFilters, buildClickhouseFilter } from "@/lib/comptable/gl-filters";
 import {
   CODE_JOURNAUX_SET,
+  FLAG_IMPORT,
+  FLAG_SAISIE,
   isCentralizingAccount,
   suggestTypeTiers,
 } from "@/lib/comptable/saisie-refs";
@@ -121,7 +128,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
         period: null,
         uploaded: { rows: [], page: 1, pageSize: PAGE_SIZE, total: 0, totalPages: 0 },
         manual: [],
-        refs: { comptes: [], tiers: [] },
+        refs: { comptes: [], tiers: [], journaux: [], pieces: [], factures: [] },
         balance: { debit: 0, credit: 0, delta: 0 },
       });
     }
@@ -151,7 +158,12 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
              OR positionCaseInsensitive(numero_piece, {s:String}) > 0
              OR positionCaseInsensitive(date_transaction, {s:String}) > 0)`
       : "";
-    const qParams: Record<string, unknown> = { batchId: period.batchId };
+    // La vue du grand livre couvre le batch importé ET le batch des saisies de
+    // la période : l'origine de chaque ligne est exposée via la colonne Flags.
+    const viewBatchIds = [period.batchId, manualBatchId(id, period.year)].filter(Boolean);
+    const glFilters = parseGlFilters(searchParams);
+    const chFilter = buildClickhouseFilter(glFilters);
+    const qParams: Record<string, unknown> = { viewBatchIds, ...chFilter.params };
     if (search) qParams.s = search;
 
     // Lignes uploadées de la période sélectionnée (lecture seule), paginées.
@@ -163,9 +175,11 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
         clickhouse.query({
           query: `
             SELECT date_transaction, compte, intitule_compte, n_tiers, intitule_tiers,
-                   numero_piece, rubrique, bilan_rubrique, debit, credit
+                   numero_piece, rubrique, bilan_rubrique, debit, credit,
+                   code_journal, numero_facture, batch_id
             FROM ${dbName}.grand_livre
-            WHERE batch_id = {batchId:String} ${searchFilter}
+            WHERE batch_id IN ({viewBatchIds:Array(String)}) ${searchFilter}
+            ${chFilter.sql}
             ORDER BY ${orderBy}
             LIMIT ${PAGE_SIZE} OFFSET ${offset}
           `,
@@ -173,12 +187,16 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
           format: "JSONEachRow",
         }),
         clickhouse.query({
-          query: `SELECT count() AS c FROM ${dbName}.grand_livre WHERE batch_id = {batchId:String} ${searchFilter}`,
+          query: `SELECT count() AS c FROM ${dbName}.grand_livre WHERE batch_id IN ({viewBatchIds:Array(String)}) ${searchFilter} ${chFilter.sql}`,
           query_params: qParams,
           format: "JSONEachRow",
         }),
       ]);
-      uploadedRows = (await dataRes.json()) as unknown[];
+      const rawRows = (await dataRes.json()) as Array<Record<string, unknown>>;
+      uploadedRows = rawRows.map((r) => ({
+        ...r,
+        flags: String(r.batch_id || "").startsWith("manual_") ? FLAG_SAISIE : FLAG_IMPORT,
+      }));
       const cRows = (await countRes.json()) as Array<{ c: string }>;
       total = parseInt(cRows[0]?.c || "0", 10);
     } catch (e) {
@@ -191,6 +209,29 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     // pour le compte choisi.
     let comptes: Array<{ compte: string; intitule: string; rubrique: string; bilan: string }> = [];
     let tiers: Array<{ nTiers: string; intitule: string; comptes: string[] }> = [];
+    // Options des filtres (valeurs distinctes présentes dans la vue).
+    let journaux: string[] = [];
+    let pieces: string[] = [];
+    let factures: string[] = [];
+    try {
+      const distinct = async (col: string, limit: number) => {
+        const r = await clickhouse.query({
+          query: `SELECT DISTINCT ${col} AS v FROM ${dbName}.grand_livre
+                  WHERE batch_id IN ({viewBatchIds:Array(String)}) AND ${col} != ''
+                  ORDER BY v LIMIT ${limit}`,
+          query_params: { viewBatchIds },
+          format: "JSONEachRow",
+        });
+        return ((await r.json()) as Array<{ v: string }>).map((x) => x.v);
+      };
+      [journaux, pieces, factures] = await Promise.all([
+        distinct("code_journal", 300),
+        distinct("numero_piece", 5000),
+        distinct("numero_facture", 5000),
+      ]);
+    } catch (e) {
+      console.error("[saisie GET] options de filtres indisponibles:", e);
+    }
     if (realBatchIds.length > 0) {
       try {
         const [cRes, tRes] = await Promise.all([
@@ -252,7 +293,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
         totalPages: Math.max(1, Math.ceil(total / PAGE_SIZE)),
       },
       manual,
-      refs: { comptes, tiers },
+      refs: { comptes, tiers, journaux, pieces, factures },
       balance: { debit, credit, delta: debit - credit },
     });
   } catch (error) {

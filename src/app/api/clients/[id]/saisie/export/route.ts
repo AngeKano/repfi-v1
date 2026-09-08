@@ -5,6 +5,12 @@ import { createClient as createClickhouseClient } from "@clickhouse/client";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import { prisma } from "@/lib/prisma";
 import { getClickhouseDbName, manualBatchId } from "@/lib/clickhouse/manual-sync";
+import { FLAG_IMPORT, FLAG_SAISIE } from "@/lib/comptable/saisie-refs";
+import {
+  parseGlFilters,
+  buildClickhouseFilter,
+  buildManualWhere,
+} from "@/lib/comptable/gl-filters";
 
 const clickhouse = createClickhouseClient({
   url: process.env.CLICKHOUSE_HOST || "http://localhost:8123",
@@ -19,7 +25,6 @@ const HEADERS = [
   "Compte",
   "Intitulé Compte",
   "Rubrique",
-  "Rubrique Bilan",
   "Date Transaction",
   "Code Journal",
   "N° Pièce",
@@ -95,6 +100,13 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       }
     }
 
+    // Filtres partagés avec la vue « Grand livre » : l'export reflète
+    // exactement ce que l'utilisateur a filtré à l'écran.
+    const glFilters = parseGlFilters(searchParams);
+    const chFilter = buildClickhouseFilter(glFilters);
+    const skipUploaded =
+      glFilters.flags.length === 1 && glFilters.flags[0] === FLAG_SAISIE;
+
     const rows: (string | number)[][] = [];
 
     // Tables de référence bâties sur TOUS les batchs du client : l'intitulé du
@@ -144,16 +156,18 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     // 1) Lignes uploadées (ClickHouse) — Flags = "Non". SELECT * pour rester
     // robuste aux colonnes ; on lit chaque champ par son nom snake_case.
     try {
+      if (skipUploaded) throw new Error("__skip__");
       const res = await clickhouse.query({
         query: `
           SELECT *
           FROM ${dbName}.grand_livre
           WHERE batch_id = {batchId:String}
+          ${chFilter.sql}
           ORDER BY substring(date_transaction, 7, 4),
                    substring(date_transaction, 4, 2),
                    substring(date_transaction, 1, 2)
         `,
-        query_params: { batchId: period.batchId },
+        query_params: { batchId: period.batchId, ...chFilter.params },
         format: "JSONEachRow",
       });
       const uploaded = (await res.json()) as Array<Record<string, unknown>>;
@@ -184,8 +198,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
           compte,
           // Intitulé/rubriques : valeur de la ligne, sinon référentiel du client.
           pick("intitule_compte", "libelle_compte") || cm?.intitule || "",
-          pick("rubrique") || cm?.rubrique || "",
-          pick("bilan_rubrique", "rubrique_bilan") || cm?.bilan || "",
+          // Rubrique unique : rubrique de gestion, sinon rubrique bilan.
+          pick("rubrique") || cm?.rubrique || pick("bilan_rubrique", "rubrique_bilan") || cm?.bilan || "",
           pick("date_transaction"),
           pick("code_journal"),
           pick("numero_piece", "n_piece"),
@@ -203,26 +217,30 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
           pick("compte_pcg_origine"),
           lk.hao === undefined || lk.hao === null ? 0 : Number(lk.hao) || 0,
           pick("mapping_status") || "none",
-          "Non",
+          FLAG_IMPORT,
         ]);
       }
     } catch (e) {
-      console.error("[saisie export] ClickHouse indisponible:", e);
+      if ((e as Error)?.message !== "__skip__")
+        console.error("[saisie export] ClickHouse indisponible:", e);
     }
 
     // 2) Lignes saisies (Postgres) — Flags = "Oui".
-    const manual = await prisma.manualLedgerEntry.findMany({
-      where: { clientId: id, comptablePeriodId: period.id },
-      orderBy: [{ dateTransaction: "asc" }, { numeroPiece: "asc" }, { createdAt: "asc" }],
-    });
+    const manualWhere = buildManualWhere(glFilters);
+    const manual =
+      manualWhere === null
+        ? []
+        : await prisma.manualLedgerEntry.findMany({
+            where: { clientId: id, comptablePeriodId: period.id, ...manualWhere },
+            orderBy: [{ dateTransaction: "asc" }, { numeroPiece: "asc" }, { createdAt: "asc" }],
+          });
     for (const m of manual) {
       rows.push([
         fmtDateFR(m.createdAt),
         client.name,
         m.compte,
         m.intituleCompte,
-        m.rubrique,
-        m.bilanRubrique,
+        m.rubrique || m.bilanRubrique,
         fmtDateFR(m.dateTransaction),
         m.codeJournal,
         m.numeroPiece,
@@ -240,7 +258,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
         "",
         0,
         "SAISIE",
-        "Oui",
+        FLAG_SAISIE,
       ]);
     }
 
