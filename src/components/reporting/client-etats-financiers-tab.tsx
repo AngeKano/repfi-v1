@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 import {
   Card,
   CardContent,
@@ -48,6 +48,10 @@ interface EtatsData {
   resultat: LigneResultat[];
 }
 
+// ==================== Styles (grille type état officiel) ====================
+const TH = "border border-[#9AA9BC] bg-[#EDEDED] px-3 py-2 text-center text-xs font-semibold text-[#1A1A1A] whitespace-nowrap";
+const TD = "border border-[#9AA9BC] px-3 py-1.5 align-middle";
+
 // Les états financiers s'expriment en unités monétaires entières.
 const fmt = (n: number, showZero: boolean) => {
   if (!n) return showZero ? "0" : "";
@@ -58,19 +62,14 @@ function Amount({ value, total }: { value: number; total: boolean }) {
   return (
     <td
       className={cn(
-        "p-2 text-right tabular-nums whitespace-nowrap",
+        TD,
+        "text-right tabular-nums whitespace-nowrap",
         total && "font-bold",
         value < 0 && "text-red-600",
       )}
     >
       {fmt(value, total)}
     </td>
-  );
-}
-
-function RefCell({ ref_, total }: { ref_: string; total: boolean }) {
-  return (
-    <td className={cn("p-2 font-mono text-xs whitespace-nowrap", total && "font-bold")}>{ref_}</td>
   );
 }
 
@@ -122,7 +121,13 @@ export default function ClientEtatsFinanciersTab({ clientId }: { clientId: strin
   }
 
   const ex = data.exercices;
-  const exLabel = (i: number) => `EXERCICE au ${ex[i].label}`;
+  // Ligne de libellé : les sous-totaux du modèle sont en gras majuscules.
+  const libCell = (libelle: string, total: boolean, extra?: ReactNode) => (
+    <td className={cn(TD, total && "font-bold uppercase")}>
+      {libelle}
+      {extra}
+    </td>
+  );
 
   return (
     <div className="space-y-6">
@@ -151,7 +156,7 @@ export default function ClientEtatsFinanciersTab({ clientId }: { clientId: strin
             <div>
               <CardTitle>BILAN</CardTitle>
               <CardDescription>
-                Système Normal SYSCOHADA — Actif (BRUT / AMORT. et DÉPRÉC. / NET) et Passif (NET).
+                Système Normal SYSCOHADA — Actif (BRUT / AMORT et DEPREC. / NET) et Passif (NET).
               </CardDescription>
             </div>
           </div>
@@ -161,38 +166,42 @@ export default function ClientEtatsFinanciersTab({ clientId }: { clientId: strin
           <div className="overflow-x-auto">
             <table className="w-full text-sm border-collapse">
               <thead>
-                <tr className="bg-muted/50 text-xs text-muted-foreground">
-                  <th className="p-2 text-left w-16">REF</th>
-                  <th className="p-2 text-left min-w-[320px]">ACTIF</th>
-                  <th className="p-2 text-right whitespace-nowrap">BRUT</th>
-                  <th className="p-2 text-right whitespace-nowrap">AMORT. et DÉPRÉC.</th>
-                  <th className="p-2 text-right whitespace-nowrap">NET</th>
-                  {ex.slice(1).map((e, i) => (
-                    <th key={e.year} className="p-2 text-right whitespace-nowrap">
-                      NET {exLabel(i + 1).replace("EXERCICE au ", "")}
+                <tr>
+                  <th rowSpan={2} className={cn(TH, "w-16")}>
+                    REF
+                  </th>
+                  <th rowSpan={2} className={cn(TH, "text-left min-w-[320px]")}>
+                    ACTIF
+                  </th>
+                  <th colSpan={3} className={TH}>
+                    EXERCICE au {ex[0].label}
+                  </th>
+                  {ex.slice(1).map((e) => (
+                    <th key={e.year} className={TH}>
+                      EXERCICE AU
+                      <br />
+                      {e.label}
                     </th>
                   ))}
                 </tr>
-                <tr className="bg-muted/20 text-[11px] text-muted-foreground">
-                  <th colSpan={2}></th>
-                  <th colSpan={3} className="p-1 text-center border-x">
-                    {exLabel(0)}
-                  </th>
+                <tr>
+                  <th className={TH}>BRUT</th>
+                  <th className={TH}>AMORT et DEPREC.</th>
+                  <th className={TH}>NET</th>
                   {ex.slice(1).map((e) => (
-                    <th key={e.year} className="p-1 text-center">
-                      EXERCICE au {e.label}
+                    <th key={e.year} className={TH}>
+                      NET
                     </th>
                   ))}
                 </tr>
               </thead>
               <tbody>
                 {data.actif.map((l) => (
-                  <tr
-                    key={l.ref}
-                    className={cn("border-b", l.total ? "bg-muted/40" : "hover:bg-muted/20")}
-                  >
-                    <RefCell ref_={l.ref} total={l.total} />
-                    <td className={cn("p-2", l.total && "font-bold uppercase")}>{l.libelle}</td>
+                  <tr key={l.ref} className={cn(l.total ? "bg-[#F2F2F2]" : "hover:bg-muted/20")}>
+                    <td className={cn(TD, "font-mono text-xs text-center", l.total && "font-bold")}>
+                      {l.ref}
+                    </td>
+                    {libCell(l.libelle, l.total)}
                     <Amount value={l.brut} total={l.total} />
                     <Amount value={l.amort} total={l.total} />
                     <Amount value={l.nets[0] ?? 0} total={l.total} />
@@ -209,24 +218,36 @@ export default function ClientEtatsFinanciersTab({ clientId }: { clientId: strin
           <div className="overflow-x-auto">
             <table className="w-full text-sm border-collapse">
               <thead>
-                <tr className="bg-muted/50 text-xs text-muted-foreground">
-                  <th className="p-2 text-left w-16">REF</th>
-                  <th className="p-2 text-left min-w-[320px]">PASSIF</th>
+                <tr>
+                  <th rowSpan={2} className={cn(TH, "w-16")}>
+                    REF
+                  </th>
+                  <th rowSpan={2} className={cn(TH, "text-left min-w-[320px]")}>
+                    PASSIF
+                  </th>
+                  {ex.map((e, i) => (
+                    <th key={e.year} className={TH}>
+                      {i === 0 ? "EXERCICE au " : "EXERCICE AU "}
+                      <br />
+                      {e.label}
+                    </th>
+                  ))}
+                </tr>
+                <tr>
                   {ex.map((e) => (
-                    <th key={e.year} className="p-2 text-right whitespace-nowrap">
-                      NET — EXERCICE au {e.label}
+                    <th key={e.year} className={TH}>
+                      NET
                     </th>
                   ))}
                 </tr>
               </thead>
               <tbody>
                 {data.passif.map((l) => (
-                  <tr
-                    key={l.ref}
-                    className={cn("border-b", l.total ? "bg-muted/40" : "hover:bg-muted/20")}
-                  >
-                    <RefCell ref_={l.ref} total={l.total} />
-                    <td className={cn("p-2", l.total && "font-bold uppercase")}>{l.libelle}</td>
+                  <tr key={l.ref} className={cn(l.total ? "bg-[#F2F2F2]" : "hover:bg-muted/20")}>
+                    <td className={cn(TD, "font-mono text-xs text-center", l.total && "font-bold")}>
+                      {l.ref}
+                    </td>
+                    {libCell(l.libelle, l.total)}
                     {ex.map((e, i) => (
                       <Amount key={e.year} value={l.nets[i] ?? 0} total={l.total} />
                     ))}
@@ -244,7 +265,7 @@ export default function ClientEtatsFinanciersTab({ clientId }: { clientId: strin
           <div className="flex items-center gap-2">
             <PiChartDonutDuotone className="w-5 h-5 text-[#0077C3]" />
             <div>
-              <CardTitle>COMPTE DE RÉSULTAT</CardTitle>
+              <CardTitle>COMPTE DE RESULTAT</CardTitle>
               <CardDescription>
                 Système Normal SYSCOHADA — montants nets par exercice.
               </CardDescription>
@@ -255,32 +276,47 @@ export default function ClientEtatsFinanciersTab({ clientId }: { clientId: strin
           <div className="overflow-x-auto">
             <table className="w-full text-sm border-collapse">
               <thead>
-                <tr className="bg-muted/50 text-xs text-muted-foreground">
-                  <th className="p-2 text-left w-16">REF</th>
-                  <th className="p-2 text-left min-w-[360px]">LIBELLÉS</th>
+                <tr>
+                  <th rowSpan={2} className={cn(TH, "w-16")}>
+                    REF
+                  </th>
+                  <th rowSpan={2} className={cn(TH, "text-left min-w-[360px]")}>
+                    LIBELLES
+                  </th>
                   {ex.map((e) => (
-                    <th key={e.year} className="p-2 text-right whitespace-nowrap">
-                      EXERCICE au {e.label}
+                    <th key={e.year} className={TH}>
+                      EXERCICE AU
+                      <br />
+                      {e.label}
+                    </th>
+                  ))}
+                </tr>
+                <tr>
+                  {ex.map((e) => (
+                    <th key={e.year} className={TH}>
+                      NET (1)
                     </th>
                   ))}
                 </tr>
               </thead>
               <tbody>
                 {data.resultat.map((l) => (
-                  <tr
-                    key={l.ref}
-                    className={cn("border-b", l.total ? "bg-muted/40" : "hover:bg-muted/20")}
-                  >
-                    <RefCell ref_={l.ref} total={l.total} />
-                    <td className={cn("p-2", l.total && "font-bold uppercase")}>
-                      {l.libelle}
-                      {l.repere && (
-                        <span className="ml-2 text-xs text-muted-foreground">({l.repere})</span>
-                      )}
-                      {l.sens && !l.total && (
-                        <span className="ml-2 text-xs text-muted-foreground">{l.sens}</span>
-                      )}
+                  <tr key={l.ref} className={cn(l.total ? "bg-[#F2F2F2]" : "hover:bg-muted/20")}>
+                    <td className={cn(TD, "font-mono text-xs text-center", l.total && "font-bold")}>
+                      {l.ref}
                     </td>
+                    {libCell(
+                      l.libelle,
+                      l.total,
+                      <>
+                        {l.repere && (
+                          <span className="ml-2 text-xs text-muted-foreground">({l.repere})</span>
+                        )}
+                        {l.sens && !l.total && (
+                          <span className="ml-2 text-xs text-muted-foreground">{l.sens}</span>
+                        )}
+                      </>,
+                    )}
                     {ex.map((e, i) => (
                       <Amount key={e.year} value={l.montants[i] ?? 0} total={l.total} />
                     ))}
@@ -290,9 +326,9 @@ export default function ClientEtatsFinanciersTab({ clientId }: { clientId: strin
             </table>
           </div>
           <p className="text-[11px] text-muted-foreground mt-3">
-            Les montants sont précédés du signe (+) ou (−) selon leur solde dans la balance
-            générale. Les signes de la colonne libellés indiquent le sens structurel des soldes ;
-            ils ne jouent pas le rôle de signes opérateurs.
+            (1) Les montants sont précédés du signe (+) ou (−) en fonction de leurs soldes dans la
+            balance générale. (2) Les signes affichés à côté des libellés indiquent le sens
+            structurel des soldes ; ils ne jouent pas le rôle de signes opérateurs.
           </p>
         </CardContent>
       </Card>
