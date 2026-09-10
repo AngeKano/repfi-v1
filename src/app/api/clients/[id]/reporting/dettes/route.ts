@@ -255,7 +255,7 @@ async function recupererTopParType(
     montant_rembourse: string;
   }>;
 
-  return rows.map((row) => {
+  const mapped = rows.map((row) => {
     const montantDette = parseFloat(row.montant_dette) || 0;
     const montantRembourse = parseFloat(row.montant_rembourse) || 0;
     return {
@@ -263,9 +263,16 @@ async function recupererTopParType(
       montantDette,
       montantRembourse,
       solde: montantDette - montantRembourse,
-      pourcentage: montantDette !== 0 ? (montantRembourse / montantDette) * 100 : 0,
+      pourcentage: 0,
     };
   });
+  // % = part du solde dans le total des soldes du Top 10 (total = 100 %),
+  // même logique que « Analyse des Créances - Top 10 ».
+  const totalSolde = mapped.reduce((s, r) => s + r.solde, 0);
+  return mapped.map((r) => ({
+    ...r,
+    pourcentage: totalSolde !== 0 ? (r.solde / totalSolde) * 100 : 0,
+  }));
 }
 
 // ----------------------------------------------------------------------------
@@ -322,7 +329,7 @@ async function recupererTopParFournisseur(
     montant_rembourse: string;
   }>;
 
-  return rows.map((row) => {
+  const mapped = rows.map((row) => {
     const montantDette = parseFloat(row.montant_dette) || 0;
     const montantRembourse = parseFloat(row.montant_rembourse) || 0;
     return {
@@ -331,9 +338,15 @@ async function recupererTopParFournisseur(
       montantDette,
       montantRembourse,
       solde: montantDette - montantRembourse,
-      pourcentage: montantDette !== 0 ? (montantRembourse / montantDette) * 100 : 0,
+      pourcentage: 0,
     };
   });
+  // % = part du solde dans le total des soldes du Top 10 (total = 100 %).
+  const totalSolde = mapped.reduce((s, r) => s + r.solde, 0);
+  return mapped.map((r) => ({
+    ...r,
+    pourcentage: totalSolde !== 0 ? (r.solde / totalSolde) * 100 : 0,
+  }));
 }
 
 // Somme des soldes (crédit - débit) d'une rubrique sur une map de totaux.
