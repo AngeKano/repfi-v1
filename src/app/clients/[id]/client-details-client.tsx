@@ -30,6 +30,7 @@ import {
   PiHandCoinsDuotone,
   PiScalesDuotone,
   PiBookOpenDuotone,
+  PiFileTextDuotone,
   PiUsersThreeDuotone,
   PiChartBarHorizontalDuotone,
   PiFilesDuotone,
@@ -42,6 +43,7 @@ import DeclarationTabs from "./declaration/declaration-tabs";
 import ClientReportingChart from "@/components/reporting/client-reporting-chart";
 import ClientDettesTab from "@/components/reporting/client-dettes-tab";
 import ClientBilanTab from "@/components/reporting/client-bilan-tab";
+import ClientEtatsFinanciersTab from "@/components/reporting/client-etats-financiers-tab";
 import { UploadFileDialog } from "./upload-file-dialog";
 import { ClientDetailsDialog } from "@/app/clients/client-details-dialog";
 import { DeleteClientDialog } from "@/app/clients/delete-client-dialog";
@@ -66,6 +68,7 @@ const CLIENT_TABS = [
   { id: "resultats", label: "Résultats", icon: PiChartDonutDuotone },
   { id: "recouvrement", label: "Recouvrement", icon: PiHandCoinsDuotone },
   { id: "dettes", label: "Dettes", icon: PiScalesDuotone },
+  { id: "etats", label: "États Financiers", icon: PiFileTextDuotone },
   { id: "bilan", label: "Bilan d'activité", icon: PiBookOpenDuotone },
   { id: "members", label: "Membres", icon: PiUsersThreeDuotone },
   {
@@ -84,6 +87,7 @@ const REPORTING_TAB_IDS = new Set([
   "resultats",
   "recouvrement",
   "dettes",
+  "etats",
   "bilan",
   "saisie",
 ]);
@@ -505,6 +509,20 @@ export default function ClientDetailsClient({
               {/* Bilan — composant dédié minimaliste, partage les mêmes
                   filtres que les autres onglets reporting via les props
                   ci-dessous. Contenu à enrichir ultérieurement. */}
+              {activeTab === "etats" &&
+                (hasReporting ? (
+                  <ClientEtatsFinanciersTab clientId={client.id} />
+                ) : (
+                  <Card className="p-12 border-[#D0E3F5] text-center">
+                    <h3 className="text-lg font-semibold text-[#00122E] mb-1">
+                      Aucun reporting financier
+                    </h3>
+                    <p className="text-sm text-[#335890]">
+                      Importez un grand livre pour générer les états financiers.
+                    </p>
+                  </Card>
+                ))}
+
               {activeTab === "bilan" &&
                 (hasReporting ? (
                   <ClientBilanTab
