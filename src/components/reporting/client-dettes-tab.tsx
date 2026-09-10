@@ -764,18 +764,6 @@ export default function ClientDettesTab({
   );
 }
 
-// Mise en avant du % remboursé : plus il est élevé, mieux la dette est honorée.
-function pctClasses(p: number): string {
-  if (p >= 75) return "bg-green-100 text-green-700 border-green-200";
-  if (p >= 40) return "bg-amber-100 text-amber-700 border-amber-200";
-  return "bg-red-100 text-red-700 border-red-200";
-}
-function pctBarClasses(p: number): string {
-  if (p >= 75) return "bg-green-500";
-  if (p >= 40) return "bg-amber-500";
-  return "bg-red-500";
-}
-
 // ==================== TABLEAU GÉNÉRIQUE TOP DETTES ====================
 function DetteTable({
   title,
@@ -792,10 +780,8 @@ function DetteTable({
   rows: TopDette[];
   getSubLabel?: (row: TopDette) => string | undefined;
 }) {
-  const totalDette = rows.reduce((s, r) => s + r.montantDette, 0);
-  const totalRembourse = rows.reduce((s, r) => s + r.montantRembourse, 0);
+  // Total du Top 10 : seul le solde est totalisé (le % du total fait 100 %).
   const totalSolde = rows.reduce((s, r) => s + r.solde, 0);
-  const totalPct = totalDette !== 0 ? (totalRembourse / totalDette) * 100 : 0;
 
   return (
     <Card>
@@ -817,7 +803,7 @@ function DetteTable({
               <div className="col-span-2 text-right">Montant dette</div>
               <div className="col-span-2 text-right">Montant remboursé</div>
               <div className="col-span-2 text-right">Solde</div>
-              <div className="col-span-2 text-right">% remboursé</div>
+              <div className="col-span-2 text-right">%</div>
             </div>
             {rows.map((row, index) => {
               const sub = getSubLabel?.(row);
@@ -857,18 +843,10 @@ function DetteTable({
                   <div className="col-span-2 text-right font-bold text-orange-600">
                     {formatCompactOnly(row.solde)}
                   </div>
-                  <div className="col-span-2">
-                    <div className="flex flex-col items-end gap-1">
-                      <Badge className={cn("text-xs font-bold border", pctClasses(row.pourcentage))}>
-                        {row.pourcentage.toFixed(1)}%
-                      </Badge>
-                      <div className="w-full h-1.5 rounded-full bg-muted overflow-hidden">
-                        <div
-                          className={cn("h-full rounded-full", pctBarClasses(row.pourcentage))}
-                          style={{ width: `${Math.min(100, Math.max(0, row.pourcentage))}%` }}
-                        />
-                      </div>
-                    </div>
+                  <div className="col-span-2 text-right">
+                    <Badge variant="outline" className="text-xs">
+                      {row.pourcentage.toFixed(1)}%
+                    </Badge>
                   </div>
                 </div>
               );
@@ -876,18 +854,14 @@ function DetteTable({
             <div className="grid grid-cols-12 gap-4 p-3 bg-muted font-medium text-sm border-t">
               <div className="col-span-1"></div>
               <div className="col-span-3">Total Top 10</div>
-              <div className="col-span-2 text-right font-bold text-blue-600">
-                {formatCompactOnly(totalDette)}
-              </div>
-              <div className="col-span-2 text-right font-bold text-green-600">
-                {formatCompactOnly(totalRembourse)}
-              </div>
+              <div className="col-span-2 text-right"></div>
+              <div className="col-span-2 text-right"></div>
               <div className="col-span-2 text-right font-bold text-orange-600">
                 {formatCompactOnly(totalSolde)}
               </div>
               <div className="col-span-2 text-right">
-                <Badge className={cn("text-xs font-bold border", pctClasses(totalPct))}>
-                  {totalPct.toFixed(1)}%
+                <Badge variant="outline" className="text-xs">
+                  100%
                 </Badge>
               </div>
             </div>
