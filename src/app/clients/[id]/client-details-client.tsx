@@ -249,12 +249,14 @@ export default function ClientDetailsClient({
           </div>
 
           <nav className="space-y-1">
-            {CLIENT_TABS.map((tab, idx) => {
+            {CLIENT_TABS.map((tab) => {
               const active = activeTab === tab.id;
-              // Separator before "Membres" (index 6) — Dettes (idx=4) et
-              // Bilan (idx=5) restent groupés avec les onglets reporting
-              // (Synthèse, Chiffres, Résultats, Recouvrement).
-              const showSeparator = idx === 6;
+              // Séparateur juste avant "Membres" : tous les onglets de reporting
+              // (Synthèse, Chiffres, Résultats, Recouvrement, Dettes, États
+              // Financiers, Bilan d'activité) restent groupés au-dessus.
+              // Repéré par identifiant et non par index, pour ne pas dériver
+              // lorsqu'un onglet est ajouté.
+              const showSeparator = tab.id === "members";
               const permanentlyDisabled = DISABLED_TAB_IDS.has(tab.id);
               const disabled =
                 permanentlyDisabled ||
@@ -511,7 +513,17 @@ export default function ClientDetailsClient({
                   ci-dessous. Contenu à enrichir ultérieurement. */}
               {activeTab === "etats" &&
                 (hasReporting ? (
-                  <ClientEtatsFinanciersTab clientId={client.id} />
+                  <ClientEtatsFinanciersTab
+                    clientId={client.id}
+                    year={year}
+                    setYear={setYear}
+                    periodType={periodType}
+                    setPeriodType={setPeriodType}
+                    selectedMonth={selectedMonth}
+                    setSelectedMonth={setSelectedMonth}
+                    cumulGranularity={cumulGranularity}
+                    setCumulGranularity={setCumulGranularity}
+                  />
                 ) : (
                   <Card className="p-12 border-[#D0E3F5] text-center">
                     <h3 className="text-lg font-semibold text-[#00122E] mb-1">
