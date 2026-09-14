@@ -27,6 +27,8 @@ const RESULTAT_REFS = new Set(COMPTE_RESULTAT.map((l) => l.ref));
 // Condition SQL « le compte est un compte d'amortissement / dépréciation ».
 // Les préfixes sont des constantes du modèle (aucune entrée utilisateur).
 const IS_AMORT = AMORT_PREFIXES.map((p) => `startsWith(compte, '${p}')`).join(" OR ");
+// date_transaction est une String "DD/MM/YYYY" → période comparable "YYYYMM".
+const YM = "concat(substring(date_transaction, 7, 4), substring(date_transaction, 4, 2))";
 
 interface BilanRow {
   ref: string;
@@ -38,6 +40,11 @@ interface ResultatRow {
   ref: string;
   solde: string;
 }
+
+const MOIS = [
+  "janvier", "février", "mars", "avril", "mai", "juin",
+  "juillet", "août", "septembre", "octobre", "novembre", "décembre",
+];
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -53,9 +60,31 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     if (client.companyId !== session.user.companyId)
       return NextResponse.json({ error: "Accès non autorisé" }, { status: 403 });
 
+    const { searchParams } = new URL(req.url);
+    // Filtres partagés avec les autres onglets de reporting.
+    const periodType = searchParams.get("periodType") || "ytd";
+    const cumule = periodType === "ytd" || periodType === "ytd-day";
+    const surAnnee = periodType === "year";
+    const month = (searchParams.get("month") || "12").padStart(2, "0");
+    const selectedYear = parseInt(searchParams.get("year") || "", 10);
+
+    // Fenêtre de périodes (YYYYMM) appliquée à CHAQUE exercice, pour que la
+    // comparaison N / N-1 / N-2 porte sur le même intervalle de l'année.
+    const fenetre = (y: number) => {
+      if (cumule) return { start: `${y}01`, end: `${y}${month}` };
+      if (surAnnee) return { start: `${y}01`, end: `${y}12` };
+      return { start: `${y}${month}`, end: `${y}${month}` };
+    };
+    const periodeLabel = cumule
+      ? `Janvier - ${MOIS[parseInt(month, 10) - 1]}`
+      : surAnnee
+        ? "Janvier - Décembre"
+        : MOIS[parseInt(month, 10) - 1];
+
     const dbName = getClickhouseDbName(id);
 
-    // Exercices disponibles (N, N-1, N-2, … n), du plus récent au plus ancien.
+    // Exercices disponibles, du plus récent au plus ancien. Si une année est
+    // sélectionnée, elle devient l'exercice N (les suivantes sont ignorées).
     const periods = await prisma.comptablePeriod.findMany({
       where: { clientId: id },
       select: { batchId: true, year: true, periodEnd: true },
@@ -73,17 +102,22 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       }
     }
 
-    const years = [...byYear.keys()].sort((a, b) => b - a);
+    // Toutes les années présentes (sert au sélecteur "Année" du filtre).
+    const availableYears = [...byYear.keys()].sort((a, b) => b - a);
+
+    const years = [...byYear.keys()]
+      .filter((y) => (Number.isFinite(selectedYear) ? y <= selectedYear : true))
+      .sort((a, b) => b - a);
+
     const exercices = years.map((y) => {
-      const e = byYear.get(y)!;
-      const d = e.periodEnd;
+      const d = byYear.get(y)!.periodEnd;
       return {
         year: y,
+        // Date de clôture réelle de l'exercice (ex. 31/12/2025).
         label: `${String(d.getUTCDate()).padStart(2, "0")}/${String(d.getUTCMonth() + 1).padStart(2, "0")}/${d.getUTCFullYear()}`,
       };
     });
 
-    // Valeurs par exercice.
     const actifBrut: Record<string, number>[] = [];
     const actifAmort: Record<string, number>[] = [];
     const actifNet: Record<string, number>[] = [];
@@ -93,6 +127,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     for (const y of years) {
       const batchIds = [...byYear.get(y)!.batchIds];
       if (!client.excludeManualEntries) batchIds.push(manualBatchId(id, y));
+      const { start, end } = fenetre(y);
 
       const brut: Record<string, number> = {};
       const amort: Record<string, number> = {};
@@ -101,6 +136,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 
       if (batchIds.length > 0) {
         try {
+          const qp = { batchIds, startYM: start, endYM: end };
           const [bRes, rRes] = await Promise.all([
             clickhouse.query({
               query: `
@@ -109,20 +145,24 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
                        sumIf(credit - debit, ${IS_AMORT})       AS amort,
                        sum(credit - debit)                      AS solde_credit
                 FROM ${dbName}.grand_livre
-                WHERE batch_id IN ({batchIds:Array(String)}) AND bilan_rubrique != ''
+                WHERE batch_id IN ({batchIds:Array(String)})
+                  AND bilan_rubrique != ''
+                  AND ${YM} >= {startYM:String} AND ${YM} <= {endYM:String}
                 GROUP BY bilan_rubrique
               `,
-              query_params: { batchIds },
+              query_params: qp,
               format: "JSONEachRow",
             }),
             clickhouse.query({
               query: `
                 SELECT rubrique AS ref, sum(credit - debit) AS solde
                 FROM ${dbName}.grand_livre
-                WHERE batch_id IN ({batchIds:Array(String)}) AND rubrique != ''
+                WHERE batch_id IN ({batchIds:Array(String)})
+                  AND rubrique != ''
+                  AND ${YM} >= {startYM:String} AND ${YM} <= {endYM:String}
                 GROUP BY rubrique
               `,
-              query_params: { batchIds },
+              query_params: qp,
               format: "JSONEachRow",
             }),
           ]);
@@ -168,14 +208,17 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     return NextResponse.json({
       client: { id: client.id, name: client.name },
       exercices,
+      availableYears,
       manualIncluded: !client.excludeManualEntries,
+      periodeLabel,
+      // BRUT / AMORT sont fournis pour CHAQUE exercice : la colonne détaillée
+      // suit l'exercice affiché en premier dans la fenêtre de comparaison.
       actif: BILAN_ACTIF.map((l) => ({
         ref: l.ref,
         libelle: l.libelle,
         total: !!l.total,
-        // BRUT / AMORT ne concernent que l'exercice N (comme le modèle officiel).
-        brut: actifBrut[0]?.[l.ref] || 0,
-        amort: actifAmort[0]?.[l.ref] || 0,
+        bruts: at(actifBrut, l.ref),
+        amorts: at(actifAmort, l.ref),
         nets: at(actifNet, l.ref),
       })),
       passif: BILAN_PASSIF.map((l) => ({
