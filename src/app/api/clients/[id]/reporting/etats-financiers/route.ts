@@ -196,11 +196,18 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
         net[l.ref] = (brut[l.ref] || 0) - (amort[l.ref] || 0);
       }
 
+      // Résultat net de l'exercice (CJ) : il ne porte pas de bilan_rubrique
+      // tant que les comptes de gestion ne sont pas soldés — on l'alimente donc
+      // depuis le compte de résultat (XI). Si les comptes ont été clôturés, XI
+      // vaut 0 et le solde déjà classé en CJ subsiste : pas de double compte.
+      const sig = computeResultatTotals(res);
+      passif.CJ = (passif.CJ || 0) + sig.XI;
+
       actifBrut.push(applyTotals(BILAN_ACTIF, brut));
       actifAmort.push(applyTotals(BILAN_ACTIF, amort));
       actifNet.push(applyTotals(BILAN_ACTIF, net));
       passifNet.push(applyTotals(BILAN_PASSIF, passif));
-      resultatVals.push(computeResultatTotals(res));
+      resultatVals.push(sig);
     }
 
     const at = (arr: Record<string, number>[], ref: string) => arr.map((v) => v[ref] || 0);

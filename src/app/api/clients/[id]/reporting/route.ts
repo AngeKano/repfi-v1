@@ -4,6 +4,7 @@ import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import { createClient as createClickhouseClient } from "@clickhouse/client";
 import { prisma } from "@/lib/prisma";
 import { manualBatchId } from "@/lib/clickhouse/manual-sync";
+import { CREANCES_CLIENTS_SQL } from "@/lib/reporting/creances";
 
 const clickhouseClient = createClickhouseClient({
   url: process.env.CLICKHOUSE_HOST || "http://localhost:8123",
@@ -448,8 +449,8 @@ async function recupererRecouvrementParMois(
     query: `
       SELECT
         substring(date_transaction, 4, 2) as period,
-        sum(CASE WHEN startsWith(compte, '41') AND NOT startsWith(compte, '418') AND NOT startsWith(compte, '419') AND NOT startsWith(n_tiers, '418') AND NOT startsWith(n_tiers, '419') THEN debit ELSE 0 END) as ca_ttc_total,
-        sum(CASE WHEN startsWith(compte, '41') AND NOT startsWith(compte, '418') AND NOT startsWith(compte, '419') AND NOT startsWith(n_tiers, '418') AND NOT startsWith(n_tiers, '419') THEN credit ELSE 0 END) as ca_encaisse_ttc
+        sum(CASE WHEN ${CREANCES_CLIENTS_SQL} THEN debit ELSE 0 END) as ca_ttc_total,
+        sum(CASE WHEN ${CREANCES_CLIENTS_SQL} THEN credit ELSE 0 END) as ca_encaisse_ttc
       FROM ${dbName}.grand_livre
       WHERE batch_id IN ({batchIds:Array(String)})
       GROUP BY period
@@ -490,8 +491,8 @@ async function recupererRecouvrementParJour(
     query: `
       SELECT
         substring(date_transaction, 1, 2) as period,
-        sum(CASE WHEN startsWith(compte, '41') AND NOT startsWith(compte, '418') AND NOT startsWith(compte, '419') AND NOT startsWith(n_tiers, '418') AND NOT startsWith(n_tiers, '419') THEN debit ELSE 0 END) as ca_ttc_total,
-        sum(CASE WHEN startsWith(compte, '41') AND NOT startsWith(compte, '418') AND NOT startsWith(compte, '419') AND NOT startsWith(n_tiers, '418') AND NOT startsWith(n_tiers, '419') THEN credit ELSE 0 END) as ca_encaisse_ttc
+        sum(CASE WHEN ${CREANCES_CLIENTS_SQL} THEN debit ELSE 0 END) as ca_ttc_total,
+        sum(CASE WHEN ${CREANCES_CLIENTS_SQL} THEN credit ELSE 0 END) as ca_encaisse_ttc
       FROM ${dbName}.grand_livre
       WHERE batch_id IN ({batchIds:Array(String)})
         AND substring(date_transaction, 4, 2) = {monthFilter:String}
@@ -1006,7 +1007,8 @@ function calculerIndicateursPeriode(
   const tauxRecouvrement =
     caTTCTotalSum !== 0 ? (caEncaisseTTCSum / caTTCTotalSum) * 100 : 0;
 
-  // CA : comptes 70* (XB) si assujetti TVA, comptes 41* (débits) sinon
+  // CA : comptes 70* (XB) si assujetti TVA, sinon débits du périmètre
+  // créances (41* hors 418/419 + 4495 subventions à recevoir).
   const chiffreAffaires = assujettiTVA ? sig.XB : caTTCTotalSum;
 
   return {

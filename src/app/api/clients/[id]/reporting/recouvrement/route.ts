@@ -4,6 +4,7 @@ import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import { createClient as createClickhouseClient } from "@clickhouse/client";
 import { prisma } from "@/lib/prisma";
 import { manualBatchIdsForYears } from "@/lib/clickhouse/manual-sync";
+import { CREANCES_CLIENTS_SQL } from "@/lib/reporting/creances";
 
 const clickhouseClient = createClickhouseClient({
   url: process.env.CLICKHOUSE_HOST || "http://localhost:8123",
@@ -79,8 +80,8 @@ async function recupererRecouvrementParYearMonth(
       SELECT
         substring(date_transaction, 7, 4) as year,
         substring(date_transaction, 4, 2) as month,
-        sum(CASE WHEN startsWith(compte, '41') AND NOT startsWith(compte, '418') AND NOT startsWith(compte, '419') AND NOT startsWith(n_tiers, '418') AND NOT startsWith(n_tiers, '419') THEN debit ELSE 0 END) as ca_ttc_total,
-        sum(CASE WHEN startsWith(compte, '41') AND NOT startsWith(compte, '418') AND NOT startsWith(compte, '419') AND NOT startsWith(n_tiers, '418') AND NOT startsWith(n_tiers, '419') THEN credit ELSE 0 END) as ca_encaisse_ttc
+        sum(CASE WHEN ${CREANCES_CLIENTS_SQL} THEN debit ELSE 0 END) as ca_ttc_total,
+        sum(CASE WHEN ${CREANCES_CLIENTS_SQL} THEN credit ELSE 0 END) as ca_encaisse_ttc
       FROM ${dbName}.grand_livre
       WHERE batch_id IN ({batchIds:Array(String)})
       GROUP BY year, month
@@ -110,7 +111,9 @@ async function recupererRecouvrementParYearMonth(
 
 // ============================================================================
 // TOP 10 CRÉANCES - Clients avec les créances les plus élevées
-// Créance = Créances Clients TTC (débit 41* hors 418/419) - Encaissements Clients TTC (crédit 41* hors 418/419)
+// Créance = Créances TTC (débits) - Encaissements TTC (crédits), sur le
+// périmètre CREANCES_CLIENTS_SQL : comptes 41* hors 418/419 + compte 4495
+// (État, subventions à recevoir).
 // Le filtre période est défini par (startYear, startMonth) → (endYear, endMonth).
 // ============================================================================
 
@@ -163,11 +166,7 @@ async function recupererTop10Creances(
           sum(debit) - sum(credit) AS solde_creance
         FROM ${dbName}.grand_livre
         WHERE batch_id IN ({batchIds:Array(String)})
-          AND startsWith(compte, '41')
-          AND NOT startsWith(compte, '418')
-          AND NOT startsWith(compte, '419')
-          AND NOT startsWith(n_tiers, '418')
-          AND NOT startsWith(n_tiers, '419')
+          AND ${CREANCES_CLIENTS_SQL}
           AND n_tiers != ''
           AND intitule_tiers != ''
           ${periodFilter}
