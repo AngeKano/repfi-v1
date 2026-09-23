@@ -145,13 +145,23 @@ export const RESULTAT_LEAF_REFS = COMPTE_RESULTAT.filter((l) => !l.total).map((l
 // « AMORT. et DÉPREC. » de l'Actif, jamais la colonne BRUT.
 export const AMORT_PREFIXES = ["28", "29", "39", "49", "59"];
 
-/** Normalise un code du grand livre vers un REF du modèle (ex. "DK1" → "DK"). */
+/**
+ * Normalise un code du grand livre vers un REF du modèle.
+ *
+ * L'ETL subdivise certaines lignes avec un suffixe, qui peut être numérique
+ * ("DK1", "DK2", "DK3" -> DK Dettes fiscales et sociales ; "AM1", "AN1" ->
+ * amortissements de AM / AN) OU alphabétique ("BSA" caisse, "BSB" banques ->
+ * BS). On réduit donc le code par la droite jusqu'à retrouver un REF connu
+ * (tous les REF du modèle font 2 caractères).
+ */
 export function normalizeRef(raw: string, known: Set<string>): string | null {
   const code = (raw || "").trim().toUpperCase();
   if (!code) return null;
-  if (known.has(code)) return code;
-  const stripped = code.replace(/\d+$/, "");
-  return known.has(stripped) ? stripped : null;
+  for (let len = code.length; len >= 2; len--) {
+    const candidate = code.slice(0, len);
+    if (known.has(candidate)) return candidate;
+  }
+  return null;
 }
 
 /** Applique les sous-totaux « children » dans l'ordre de définition. */

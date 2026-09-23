@@ -4,6 +4,7 @@ import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import { createClient as createClickhouseClient } from "@clickhouse/client";
 import { prisma } from "@/lib/prisma";
 import { manualBatchId } from "@/lib/clickhouse/manual-sync";
+import { CREANCES_CLIENTS_SQL } from "@/lib/reporting/creances";
 import {
   checkAttributedNotExceedTotal,
   checkNoForbiddenPrefix,
@@ -92,7 +93,7 @@ export async function GET(
       });
     }
 
-    // --- Q1 : créances / encaissements clients (41* hors 418/419) -----------
+    // --- Q1 : créances / encaissements (41* hors 418/419 + 4495) ------------
     const q1 = await clickhouseClient.query({
       query: `
         SELECT
@@ -100,11 +101,7 @@ export async function GET(
           sum(credit) AS ca_encaisse
         FROM ${dbName}.grand_livre
         WHERE batch_id IN ({batchIds:Array(String)})
-          AND startsWith(compte, '41')
-          AND NOT startsWith(compte, '418')
-          AND NOT startsWith(compte, '419')
-          AND NOT startsWith(n_tiers, '418')
-          AND NOT startsWith(n_tiers, '419')
+          AND ${CREANCES_CLIENTS_SQL}
           ${PERIOD_FILTER}
       `,
       query_params: baseParams,
@@ -132,11 +129,7 @@ export async function GET(
           SELECT n_tiers, sum(debit) - sum(credit) AS solde
           FROM ${dbName}.grand_livre
           WHERE batch_id IN ({batchIds:Array(String)})
-            AND startsWith(compte, '41')
-            AND NOT startsWith(compte, '418')
-            AND NOT startsWith(compte, '419')
-            AND NOT startsWith(n_tiers, '418')
-            AND NOT startsWith(n_tiers, '419')
+            AND ${CREANCES_CLIENTS_SQL}
             AND n_tiers != ''
             AND intitule_tiers != ''
             ${PERIOD_FILTER}
