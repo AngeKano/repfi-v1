@@ -111,9 +111,8 @@ async function recupererRecouvrementParYearMonth(
 
 // ============================================================================
 // TOP 10 CRÉANCES - Clients avec les créances les plus élevées
-// Créance = Créances TTC (débits) - Encaissements TTC (crédits), sur le
-// périmètre CREANCES_CLIENTS_SQL : comptes 41* hors 418/419 + compte 4495
-// (État, subventions à recevoir).
+// Créance = Créances Clients TTC (débits) - Encaissements Clients TTC
+// (crédits), sur le périmètre CREANCES_CLIENTS_SQL (41* hors 418/419).
 // Le filtre période est défini par (startYear, startMonth) → (endYear, endMonth).
 // ============================================================================
 
@@ -159,18 +158,26 @@ async function recupererTop10Creances(
     query: `
       WITH creances_clients AS (
         SELECT
-          n_tiers AS numero_client,
-          intitule_tiers AS nom_client,
+          -- Une créance sans tiers (subventions à recevoir, par exemple) est
+          -- regroupée sous son compte : elle figure ainsi au classement au
+          -- même titre que les créances clients.
+          if(n_tiers != '', n_tiers, compte) AS numero_client,
+          -- Le libellé est résolu PAR AGRÉGAT et non ligne à ligne : un tiers
+          -- dont certaines écritures n'ont pas d'intitulé reste un seul et
+          -- même client au classement.
+          multiIf(
+            anyIf(intitule_tiers, intitule_tiers != '') != '', anyIf(intitule_tiers, intitule_tiers != ''),
+            anyIf(intitule_compte, intitule_compte != '') != '', anyIf(intitule_compte, intitule_compte != ''),
+            any(compte)
+          ) AS nom_client,
           sum(debit) AS ca_ttc_total,
           sum(credit) AS ca_encaisse_ttc,
           sum(debit) - sum(credit) AS solde_creance
         FROM ${dbName}.grand_livre
         WHERE batch_id IN ({batchIds:Array(String)})
           AND ${CREANCES_CLIENTS_SQL}
-          AND n_tiers != ''
-          AND intitule_tiers != ''
           ${periodFilter}
-        GROUP BY n_tiers, intitule_tiers
+        GROUP BY numero_client
         HAVING solde_creance > 0
       )
       SELECT

@@ -1007,8 +1007,7 @@ function calculerIndicateursPeriode(
   const tauxRecouvrement =
     caTTCTotalSum !== 0 ? (caEncaisseTTCSum / caTTCTotalSum) * 100 : 0;
 
-  // CA : comptes 70* (XB) si assujetti TVA, sinon débits du périmètre
-  // créances (41* hors 418/419 + 4495 subventions à recevoir).
+  // CA : comptes 70* (XB) si assujetti TVA, comptes 41* (débits) sinon
   const chiffreAffaires = assujettiTVA ? sig.XB : caTTCTotalSum;
 
   return {
