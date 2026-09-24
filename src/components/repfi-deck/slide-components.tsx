@@ -1725,14 +1725,14 @@ const EXPORT_AFTER_SLIDES = [SlideContactCard];
 export const DECKS: Record<DeckMode, DeckDef> = {
   client: {
     label: "Client final",
-    slides: [...COMMON_SLIDES, SlidePricingClient, ...AFTER_SLIDES],
-    titles: [...COMMON_TITLES, "Offre client", ...AFTER_TITLES],
-    themes: [...COMMON_THEMES, "dark", ...AFTER_THEMES],
-    exportSlides: [
-      ...COMMON_SLIDES,
-      SlidePricingClient,
-      ...EXPORT_AFTER_SLIDES,
-    ],
+    // La slide tarifaire est MASQUÉE pour les clients finaux (en ligne comme à
+    // l'export). `SlidePricingClient` reste exportée : pour la réactiver, il
+    // suffit de la réinsérer ici, dans `titles` ("Offre client") et dans
+    // `themes` ("dark"), ainsi que dans `exportSlides`.
+    slides: [...COMMON_SLIDES, ...AFTER_SLIDES],
+    titles: [...COMMON_TITLES, ...AFTER_TITLES],
+    themes: [...COMMON_THEMES, ...AFTER_THEMES],
+    exportSlides: [...COMMON_SLIDES, ...EXPORT_AFTER_SLIDES],
   },
   cabinet: {
     label: "Cabinet",
