@@ -93,7 +93,7 @@ export async function GET(
       });
     }
 
-    // --- Q1 : créances / encaissements (41* hors 418/419 + 4495) ------------
+    // --- Q1 : créances / encaissements clients (41* hors 418/419) -----------
     const q1 = await clickhouseClient.query({
       query: `
         SELECT
@@ -126,12 +126,11 @@ export async function GET(
     const q2 = await clickhouseClient.query({
       query: `
         WITH creances AS (
-          SELECT n_tiers, sum(debit) - sum(credit) AS solde
+          SELECT if(n_tiers != '', n_tiers, compte) AS n_tiers,
+                 sum(debit) - sum(credit) AS solde
           FROM ${dbName}.grand_livre
           WHERE batch_id IN ({batchIds:Array(String)})
             AND ${CREANCES_CLIENTS_SQL}
-            AND n_tiers != ''
-            AND intitule_tiers != ''
             ${PERIOD_FILTER}
           GROUP BY n_tiers
           HAVING solde > 0

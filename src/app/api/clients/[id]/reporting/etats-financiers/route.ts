@@ -4,6 +4,7 @@ import { createClient as createClickhouseClient } from "@clickhouse/client";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import { prisma } from "@/lib/prisma";
 import { getClickhouseDbName, manualBatchId } from "@/lib/clickhouse/manual-sync";
+import { BILAN_REF_SQL, BILAN_INCLUDE_SQL } from "@/lib/reporting/creances";
 import {
   BILAN_ACTIF,
   BILAN_PASSIF,
@@ -140,15 +141,15 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
           const [bRes, rRes] = await Promise.all([
             clickhouse.query({
               query: `
-                SELECT bilan_rubrique AS ref,
+                SELECT ${BILAN_REF_SQL} AS ref,
                        sumIf(debit - credit, NOT (${IS_AMORT})) AS brut,
                        sumIf(credit - debit, ${IS_AMORT})       AS amort,
                        sum(credit - debit)                      AS solde_credit
                 FROM ${dbName}.grand_livre
                 WHERE batch_id IN ({batchIds:Array(String)})
-                  AND bilan_rubrique != ''
+                  AND ${BILAN_INCLUDE_SQL}
                   AND ${YM} >= {startYM:String} AND ${YM} <= {endYM:String}
-                GROUP BY bilan_rubrique
+                GROUP BY ref
               `,
               query_params: qp,
               format: "JSONEachRow",
