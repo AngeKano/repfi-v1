@@ -6,6 +6,7 @@ import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import { prisma } from "@/lib/prisma";
 import { getClickhouseDbName, manualBatchId } from "@/lib/clickhouse/manual-sync";
 import { FLAG_IMPORT, FLAG_SAISIE } from "@/lib/comptable/saisie-refs";
+import { bilanRefExpr } from "@/lib/clickhouse/schema";
 import {
   parseGlFilters,
   buildClickhouseFilter,
@@ -83,6 +84,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     if (!period) return NextResponse.json({ error: "Aucune période" }, { status: 404 });
 
     const dbName = getClickhouseDbName(id);
+    const refExpr = await bilanRefExpr(clickhouse, dbName);
 
     // Diagnostic : ?debug=columns renvoie les noms de colonnes réels d'une ligne
     // du grand livre (pour vérifier le nom exact de libelle / numero_facture…).
@@ -126,7 +128,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
             query: `SELECT compte,
                       anyIf(intitule_compte, intitule_compte != '') i,
                       anyIf(rubrique, rubrique != '') r,
-                      anyIf(bilan_rubrique, bilan_rubrique != '') b
+                      anyIf(${refExpr}, ${refExpr} != '') b
                     FROM ${dbName}.grand_livre
                     WHERE batch_id IN ({b:Array(String)}) AND compte != ''
                     GROUP BY compte`,
@@ -199,7 +201,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
           // Intitulé/rubriques : valeur de la ligne, sinon référentiel du client.
           pick("intitule_compte", "libelle_compte") || cm?.intitule || "",
           // Rubrique unique : rubrique de gestion, sinon rubrique bilan.
-          pick("rubrique") || cm?.rubrique || pick("bilan_rubrique", "rubrique_bilan") || cm?.bilan || "",
+          pick("rubrique") || cm?.rubrique || pick("bilan_rubrique") || cm?.bilan || "",
           pick("date_transaction"),
           pick("code_journal"),
           pick("numero_piece", "n_piece"),

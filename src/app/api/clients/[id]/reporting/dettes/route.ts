@@ -4,6 +4,7 @@ import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import { createClient as createClickhouseClient } from "@clickhouse/client";
 import { prisma } from "@/lib/prisma";
 import { manualBatchIdsForYears } from "@/lib/clickhouse/manual-sync";
+import { bilanRefExpr } from "@/lib/clickhouse/schema";
 
 const clickhouseClient = createClickhouseClient({
   url: process.env.CLICKHOUSE_HOST || "http://localhost:8123",
@@ -110,6 +111,7 @@ type RubriqueTotals = { credit: number; debit: number };
 async function recupererDettesParYearMonth(
   dbName: string,
   batchIds: string[],
+  refExpr: string,
 ): Promise<Map<string, Map<string, RubriqueTotals>>> {
   const result = new Map<string, Map<string, RubriqueTotals>>();
   if (batchIds.length === 0) return result;
@@ -119,12 +121,12 @@ async function recupererDettesParYearMonth(
       SELECT
         substring(date_transaction, 7, 4) as year,
         substring(date_transaction, 4, 2) as month,
-        bilan_rubrique as rubrique,
+        ${refExpr} as rubrique,
         sum(credit) as dette_nee,
         sum(debit) as rembourse
       FROM ${dbName}.grand_livre
       WHERE batch_id IN ({batchIds:Array(String)})
-        AND bilan_rubrique IN ({rubriques:Array(String)})
+        AND ${refExpr} IN ({rubriques:Array(String)})
       GROUP BY year, month, rubrique
       ORDER BY year, month
     `,
@@ -163,6 +165,7 @@ async function recupererDettesParJour(
   batchIds: string[],
   year: number,
   month: number,
+  refExpr: string,
 ): Promise<Map<string, Map<string, RubriqueTotals>>> {
   const result = new Map<string, Map<string, RubriqueTotals>>();
   if (batchIds.length === 0) return result;
@@ -174,12 +177,12 @@ async function recupererDettesParJour(
     query: `
       SELECT
         substring(date_transaction, 1, 2) as day,
-        bilan_rubrique as rubrique,
+        ${refExpr} as rubrique,
         sum(credit) as dette_nee,
         sum(debit) as rembourse
       FROM ${dbName}.grand_livre
       WHERE batch_id IN ({batchIds:Array(String)})
-        AND bilan_rubrique IN ({rubriques:Array(String)})
+        AND ${refExpr} IN ({rubriques:Array(String)})
         AND substring(date_transaction, 7, 4) = {year:String}
         AND substring(date_transaction, 4, 2) = {month:String}
       GROUP BY day, rubrique
@@ -221,18 +224,19 @@ async function recupererTopParType(
   batchIds: string[],
   startYM: string,
   endYM: string,
+  refExpr: string,
 ): Promise<TopDette[]> {
   if (batchIds.length === 0) return [];
 
   const data = await clickhouseClient.query({
     query: `
       SELECT
-        bilan_rubrique as rubrique,
+        ${refExpr} as rubrique,
         sum(credit) as montant_dette,
         sum(debit) as montant_rembourse
       FROM ${dbName}.grand_livre
       WHERE batch_id IN ({batchIds:Array(String)})
-        AND bilan_rubrique IN ({rubriques:Array(String)})
+        AND ${refExpr} IN ({rubriques:Array(String)})
         AND concat(substring(date_transaction, 7, 4), substring(date_transaction, 4, 2)) >= {startYM:String}
         AND concat(substring(date_transaction, 7, 4), substring(date_transaction, 4, 2)) <= {endYM:String}
       GROUP BY rubrique
@@ -283,6 +287,7 @@ async function recupererTopParFournisseur(
   batchIds: string[],
   startYM: string,
   endYM: string,
+  refExpr: string,
 ): Promise<TopDetteFournisseur[]> {
   if (batchIds.length === 0) return [];
 
@@ -296,7 +301,7 @@ async function recupererTopParFournisseur(
           sum(debit) AS montant_rembourse
         FROM ${dbName}.grand_livre
         WHERE batch_id IN ({batchIds:Array(String)})
-          AND bilan_rubrique = {rubriqueDJ:String}
+          AND ${refExpr} = {rubriqueDJ:String}
           AND n_tiers != ''
           AND intitule_tiers != ''
           AND concat(substring(date_transaction, 7, 4), substring(date_transaction, 4, 2)) >= {startYM:String}
@@ -433,6 +438,8 @@ export async function GET(
     }
 
     const dbName = getClickhouseDbName(id);
+    // Schéma fusionné (une seule colonne `rubrique`) ou schéma d'origine.
+    const refExpr = await bilanRefExpr(clickhouseClient, dbName);
 
     const allPeriods = await prisma.comptablePeriod.findMany({
       where: { clientId: id },
@@ -455,7 +462,7 @@ export async function GET(
       startYear === endYear &&
       startMonth === endMonth;
 
-    const monthlyData = await recupererDettesParYearMonth(dbName, allBatchIds);
+    const monthlyData = await recupererDettesParYearMonth(dbName, allBatchIds, refExpr);
 
     const chartData: DetteDataPoint[] = [];
     let cumulDetteNee = 0;
@@ -479,6 +486,7 @@ export async function GET(
         allBatchIds,
         endYear,
         endMonth,
+        refExpr,
       );
       const daysInMonth = new Date(endYear, endMonth, 0).getDate();
 
@@ -569,8 +577,8 @@ export async function GET(
     const endYM = `${endYear}${endMonth.toString().padStart(2, "0")}`;
 
     const [topByType, topByFournisseur] = await Promise.all([
-      recupererTopParType(dbName, allBatchIds, startYM, endYM),
-      recupererTopParFournisseur(dbName, allBatchIds, startYM, endYM),
+      recupererTopParType(dbName, allBatchIds, startYM, endYM, refExpr),
+      recupererTopParFournisseur(dbName, allBatchIds, startYM, endYM, refExpr),
     ]);
 
     return NextResponse.json({

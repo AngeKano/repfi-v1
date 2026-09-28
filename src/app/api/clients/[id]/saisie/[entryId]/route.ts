@@ -6,6 +6,7 @@ import { requirePermission } from "@/lib/permissions";
 import { SAISIE_ACTIONS } from "@/lib/permissions/actions";
 import { getClickhouseDbName, syncManualBatch } from "@/lib/clickhouse/manual-sync";
 import { isCentralizingAccount, suggestTypeTiers } from "@/lib/comptable/saisie-refs";
+import { bilanRefExpr } from "@/lib/clickhouse/schema";
 
 const clickhouse = createClickhouseClient({
   url: process.env.CLICKHOUSE_HOST || "http://localhost:8123",
@@ -94,6 +95,7 @@ export async function PATCH(
 
     // Si compte/tiers changent, revérifier l'existence + réhériter les rubriques.
     const dbName = getClickhouseDbName(id);
+    const refExpr = await bilanRefExpr(clickhouse, dbName);
     const realBatchIds = (
       await prisma.comptablePeriod.findMany({ where: { clientId: id }, select: { batchId: true } })
     )
@@ -105,7 +107,7 @@ export async function PATCH(
         await clickhouse.query({
           query: `SELECT anyIf(intitule_compte, intitule_compte != '') i,
                          anyIf(rubrique, rubrique != '') r,
-                         anyIf(bilan_rubrique, bilan_rubrique != '') b,
+                         anyIf(${refExpr}, ${refExpr} != '') b,
                          count() c
                   FROM ${dbName}.grand_livre
                   WHERE batch_id IN ({batchIds:Array(String)}) AND compte = {compte:String}`,
