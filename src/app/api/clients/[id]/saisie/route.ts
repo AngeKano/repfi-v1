@@ -12,6 +12,7 @@ import {
   manualBatchId,
 } from "@/lib/clickhouse/manual-sync";
 import { parseGlFilters, buildClickhouseFilter } from "@/lib/comptable/gl-filters";
+import { bilanRefExpr } from "@/lib/clickhouse/schema";
 import {
   CODE_JOURNAUX_SET,
   FLAG_IMPORT,
@@ -39,6 +40,7 @@ async function lookupComptes(
   dbName: string,
   batchIds: string[],
   comptes: string[],
+  refExpr: string,
 ): Promise<Map<string, { intitule: string; rubrique: string; bilan: string }>> {
   const map = new Map<string, { intitule: string; rubrique: string; bilan: string }>();
   if (batchIds.length === 0 || comptes.length === 0) return map;
@@ -48,7 +50,7 @@ async function lookupComptes(
         SELECT compte,
                anyIf(intitule_compte, intitule_compte != '') AS intitule,
                anyIf(rubrique, rubrique != '')               AS rubrique,
-               anyIf(bilan_rubrique, bilan_rubrique != '')   AS bilan
+               anyIf(${refExpr}, ${refExpr} != '')           AS bilan
         FROM ${dbName}.grand_livre
         WHERE batch_id IN ({batchIds:Array(String)})
           AND compte IN ({comptes:Array(String)})
@@ -114,6 +116,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     const { searchParams } = new URL(req.url);
     const page = Math.max(1, parseInt(searchParams.get("page") || "1", 10) || 1);
     const dbName = getClickhouseDbName(id);
+    // Schéma fusionné (une seule colonne `rubrique`) ou schéma d'origine.
+    const glRefExpr = await bilanRefExpr(clickhouse, dbName);
 
     // Périodes du client (sélecteur).
     const periods = await prisma.comptablePeriod.findMany({
@@ -175,7 +179,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
         clickhouse.query({
           query: `
             SELECT date_transaction, compte, intitule_compte, n_tiers, intitule_tiers,
-                   numero_piece, rubrique, bilan_rubrique, debit, credit,
+                   numero_piece, rubrique, debit, credit,
                    code_journal, numero_facture, batch_id
             FROM ${dbName}.grand_livre
             WHERE batch_id IN ({viewBatchIds:Array(String)}) ${searchFilter}
@@ -240,7 +244,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
               SELECT compte,
                      anyIf(intitule_compte, intitule_compte != '') AS intitule,
                      anyIf(rubrique, rubrique != '')               AS rubrique,
-                     anyIf(bilan_rubrique, bilan_rubrique != '')   AS bilan
+                     anyIf(${glRefExpr}, ${glRefExpr} != '')       AS bilan
               FROM ${dbName}.grand_livre
               WHERE batch_id IN ({batchIds:Array(String)}) AND compte != ''
               GROUP BY compte ORDER BY compte
@@ -394,9 +398,10 @@ async function prepareEcritureRows(opts: {
 
   // Comptes existants ; tiers uniquement pour comptes centralisateurs (401/411).
   const dbName = getClickhouseDbName(clientId);
+  const refExpr = await bilanRefExpr(clickhouse, dbName);
   const allPeriods = await prisma.comptablePeriod.findMany({ where: { clientId }, select: { batchId: true } });
   const realBatchIds = allPeriods.map((p) => p.batchId).filter(Boolean);
-  const compteMap = await lookupComptes(dbName, realBatchIds, [...new Set(lignes.map((l) => l.compte))]);
+  const compteMap = await lookupComptes(dbName, realBatchIds, [...new Set(lignes.map((l) => l.compte))], refExpr);
   const wantedTiers = [
     ...new Set(lignes.filter((l) => isCentralizingAccount(l.compte) && l.nTiers).map((l) => l.nTiers)),
   ];

@@ -4,7 +4,8 @@ import { createClient as createClickhouseClient } from "@clickhouse/client";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import { prisma } from "@/lib/prisma";
 import { getClickhouseDbName, manualBatchId } from "@/lib/clickhouse/manual-sync";
-import { BILAN_REF_SQL, BILAN_INCLUDE_SQL } from "@/lib/reporting/creances";
+import { bilanRefSql, bilanIncludeSql } from "@/lib/reporting/creances";
+import { bilanRefExpr } from "@/lib/clickhouse/schema";
 import {
   BILAN_ACTIF,
   BILAN_PASSIF,
@@ -83,6 +84,11 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
         : MOIS[parseInt(month, 10) - 1];
 
     const dbName = getClickhouseDbName(id);
+    // Schéma fusionné (une seule colonne `rubrique`) ou schéma d'origine :
+    // l'expression est résolue à partir des colonnes réellement présentes.
+    const REF_EXPR = await bilanRefExpr(clickhouse, dbName);
+    const BILAN_REF = bilanRefSql(REF_EXPR);
+    const BILAN_INCLUDE = bilanIncludeSql(REF_EXPR);
 
     // Exercices disponibles, du plus récent au plus ancien. Si une année est
     // sélectionnée, elle devient l'exercice N (les suivantes sont ignorées).
@@ -141,13 +147,13 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
           const [bRes, rRes] = await Promise.all([
             clickhouse.query({
               query: `
-                SELECT ${BILAN_REF_SQL} AS ref,
+                SELECT ${BILAN_REF} AS ref,
                        sumIf(debit - credit, NOT (${IS_AMORT})) AS brut,
                        sumIf(credit - debit, ${IS_AMORT})       AS amort,
                        sum(credit - debit)                      AS solde_credit
                 FROM ${dbName}.grand_livre
                 WHERE batch_id IN ({batchIds:Array(String)})
-                  AND ${BILAN_INCLUDE_SQL}
+                  AND ${BILAN_INCLUDE}
                   AND ${YM} >= {startYM:String} AND ${YM} <= {endYM:String}
                 GROUP BY ref
               `,

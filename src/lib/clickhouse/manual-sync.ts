@@ -10,6 +10,7 @@
 // ============================================================================
 import { createClient as createClickhouseClient } from "@clickhouse/client";
 import { prisma } from "@/lib/prisma";
+import { hasBilanRubrique } from "./schema";
 
 const clickhouseClient = createClickhouseClient({
   url: process.env.CLICKHOUSE_HOST || "http://localhost:8123",
@@ -88,6 +89,7 @@ export async function syncManualBatch(
     });
 
     // 2. Réinsérer l'état courant.
+    const colonneBilan = await hasBilanRubrique(clickhouseClient, dbName);
     if (entries.length > 0) {
       const rowsFull: GrandLivreRowFull[] = entries.map((e) => ({
         batch_id: batch,
@@ -96,7 +98,10 @@ export async function syncManualBatch(
         intitule_compte: e.intituleCompte,
         n_tiers: e.nTiers,
         intitule_tiers: e.intituleTiers,
-        rubrique: e.rubrique,
+        // Schéma fusionné : la colonne `rubrique` porte les deux familles de
+        // codes ; un compte de bilan n'a pas de rubrique de gestion, on y écrit
+        // donc son code bilan. Sur l'ancien schéma, les deux colonnes coexistent.
+        rubrique: colonneBilan ? e.rubrique : e.rubrique || e.bilanRubrique,
         bilan_rubrique: e.bilanRubrique,
         numero_piece: e.numeroPiece,
         debit: e.debit,
@@ -106,16 +111,27 @@ export async function syncManualBatch(
         numero_facture: e.numeroFacture,
         libelle: e.libelle,
       }));
+      // Sur le schéma fusionné, la colonne `bilan_rubrique` n'existe plus :
+      // on la retire du payload pour ne pas faire échouer l'insertion.
+      // ClickHouse accepte n'importe quelle forme d'objet en JSONEachRow ; le
+      // type générique du client impose la ligne complète, d'où la conversion.
+      const values = (colonneBilan
+        ? rowsFull
+        : rowsFull.map((r) => {
+            const copie: Record<string, unknown> = { ...r };
+            delete copie.bilan_rubrique;
+            return copie;
+          })) as unknown as GrandLivreRowFull[];
       try {
         await clickhouseClient.insert({
           table: `${dbName}.grand_livre`,
-          values: rowsFull,
+          values,
           format: "JSONEachRow",
         });
       } catch (errFull) {
         // Repli : certaines colonnes enrichies n'existent pas sur cette table.
         console.warn(`[manual-sync] insertion enrichie refusée, repli colonnes de base:`, errFull);
-        const rowsBase: GrandLivreRow[] = rowsFull.map((r) => ({
+        const rowsBase: Partial<GrandLivreRow>[] = rowsFull.map((r) => ({
           batch_id: r.batch_id,
           date_transaction: r.date_transaction,
           compte: r.compte,
@@ -123,7 +139,7 @@ export async function syncManualBatch(
           n_tiers: r.n_tiers,
           intitule_tiers: r.intitule_tiers,
           rubrique: r.rubrique,
-          bilan_rubrique: r.bilan_rubrique,
+          ...(colonneBilan ? { bilan_rubrique: r.bilan_rubrique } : {}),
           numero_piece: r.numero_piece,
           debit: r.debit,
           credit: r.credit,

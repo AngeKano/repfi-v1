@@ -30,9 +30,12 @@ export const CREANCES_CLIENTS_SQL =
 // À terme, ce reclassement a vocation à être porté par le mapping Airflow ;
 // cette expression pourra alors être retirée sans changer les chiffres.
 // ---------------------------------------------------------------------------
-export const BILAN_REF_SQL = "if(startsWith(compte, '4495'), 'BJ', bilan_rubrique)";
+export function bilanRefSql(refExpr: string): string {
+  return `if(startsWith(compte, '4495'), 'BJ', ${refExpr})`;
+}
 
 // Une ligne entre au Bilan si l'ETL lui a donné un code, ou s'il s'agit d'un
 // 4495 (que l'on reclasse nous-mêmes).
-export const BILAN_INCLUDE_SQL =
-  "(bilan_rubrique != '' OR startsWith(compte, '4495'))";
+export function bilanIncludeSql(refExpr: string): string {
+  return `(${refExpr} != '' OR startsWith(compte, '4495'))`;
+}
