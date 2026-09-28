@@ -95,6 +95,7 @@ interface ManualEntry {
   intituleTiers: string;
   typeTiers: string;
   rubrique: string;
+  bilanRubrique: string;
   numeroPiece: string;
   numeroFacture: string;
   libelle: string;
@@ -156,6 +157,10 @@ interface Ecriture {
 const fmt = (n: number) =>
   n ? n.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "";
 const isoToInput = (iso: string) => (iso ? iso.slice(0, 10) : "");
+// Rubrique unique : un compte relève SOIT d'une rubrique de gestion (compte de
+// résultat), SOIT d'une rubrique de bilan — jamais des deux. On expose donc une
+// seule colonne, alimentée par celle qui s'applique.
+const rubriqueUnique = (gestion?: string, bilan?: string) => gestion || bilan || "";
 const num = (s: string) => {
   const v = parseFloat((s || "").replace(",", "."));
   return isNaN(v) ? 0 : v;
@@ -780,7 +785,7 @@ export default function SaisieTab({ clientId }: { clientId: string }) {
                             <AutoCell value={central ? suggestTypeTiers(l.compte) : ""} className="w-24" />
                           </td>
                           <td className="p-1">
-                            <AutoCell value={info?.rubrique} className="w-20" />
+                            <AutoCell value={rubriqueUnique(info?.rubrique, info?.bilan)} className="w-20" />
                           </td>
                           <td className="p-1">
                             <Input inputMode="decimal" value={l.debit} onChange={(e) => setLine(i, { debit: e.target.value })} className={cn(cellInput, "w-24 text-right")} />
@@ -900,7 +905,7 @@ export default function SaisieTab({ clientId }: { clientId: string }) {
                               </td>
                               <td className="p-2 text-muted-foreground">{m.nTiers ? `${m.nTiers} ${m.intituleTiers}` : "—"}</td>
                               <td className="p-2 text-muted-foreground">{m.typeTiers || "—"}</td>
-                              <td className="p-2 text-muted-foreground">{m.rubrique || "—"}</td>
+                              <td className="p-2 text-muted-foreground">{rubriqueUnique(m.rubrique, m.bilanRubrique) || "—"}</td>
                               <td className="p-2 text-right tabular-nums text-blue-700">{fmt(m.debit)}</td>
                               <td className="p-2 text-right tabular-nums text-green-700">{fmt(m.credit)}</td>
                             </tr>
