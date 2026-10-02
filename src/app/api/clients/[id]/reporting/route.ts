@@ -192,6 +192,11 @@ const RUBRIQUES_LIST = [
   "RS",
 ];
 
+// Natures composant le chiffre d'affaires (XB = TA + TB + TC + TD au sens
+// SYSCOHADA) : ventes de marchandises, de produits fabriqués, travaux et
+// services vendus, produits accessoires.
+const CA_RUBRIQUES = ["TA", "TB", "TC", "TD"];
+
 function getDaysInMonth(year: number, month: number): number {
   return new Date(year, month, 0).getDate();
 }
@@ -569,12 +574,12 @@ async function recupererCAParNature(
           sum(credit - debit) as montant
         FROM ${dbName}.grand_livre
         WHERE batch_id IN ({batchIds:Array(String)})
-          AND rubrique = 'TC'
+          AND rubrique IN ({caRubriques:Array(String)})
           ${periodFilter}
         GROUP BY compte
         ORDER BY montant DESC
       `,
-      query_params: { ...baseParams, batchIds },
+      query_params: { ...baseParams, batchIds, caRubriques: CA_RUBRIQUES },
       format: "JSONEachRow",
     });
 

@@ -7,6 +7,7 @@ import { prisma } from "@/lib/prisma";
 import { getClickhouseDbName, manualBatchId } from "@/lib/clickhouse/manual-sync";
 import { FLAG_IMPORT, FLAG_SAISIE } from "@/lib/comptable/saisie-refs";
 import { bilanRefExpr } from "@/lib/clickhouse/schema";
+import { planComptesMap, intituleCompte } from "@/lib/clickhouse/plan-comptable";
 import {
   parseGlFilters,
   buildClickhouseFilter,
@@ -146,8 +147,13 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
             format: "JSONEachRow",
           }),
         ]);
+        const plan = await planComptesMap(clickhouse, dbName);
         for (const r of (await cRes.json()) as Array<{ compte: string; i: string; r: string; b: string }>)
-          compteMap.set(r.compte, { intitule: r.i, rubrique: r.r, bilan: r.b });
+          compteMap.set(r.compte, {
+            intitule: intituleCompte(plan, r.compte, r.i),
+            rubrique: r.r,
+            bilan: r.b,
+          });
         for (const r of (await tRes.json()) as Array<{ n_tiers: string; i: string; t: string }>)
           tiersMap.set(r.n_tiers, { intitule: r.i, type: r.t });
       } catch (e) {
