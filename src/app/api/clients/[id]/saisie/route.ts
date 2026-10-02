@@ -13,6 +13,7 @@ import {
 } from "@/lib/clickhouse/manual-sync";
 import { parseGlFilters, buildClickhouseFilter } from "@/lib/comptable/gl-filters";
 import { bilanRefExpr } from "@/lib/clickhouse/schema";
+import { planComptesMap, intituleCompte } from "@/lib/clickhouse/plan-comptable";
 import {
   CODE_JOURNAUX_SET,
   FLAG_IMPORT,
@@ -60,7 +61,13 @@ async function lookupComptes(
       format: "JSONEachRow",
     })
     .then((r) => r.json() as Promise<Array<{ compte: string; intitule: string; rubrique: string; bilan: string }>>);
-  for (const r of rows) map.set(r.compte, { intitule: r.intitule, rubrique: r.rubrique, bilan: r.bilan });
+  const plan = await planComptesMap(clickhouse, dbName);
+  for (const r of rows)
+    map.set(r.compte, {
+      intitule: intituleCompte(plan, r.compte, r.intitule),
+      rubrique: r.rubrique,
+      bilan: r.bilan,
+    });
   return map;
 }
 
@@ -266,6 +273,14 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
           }),
         ]);
         comptes = (await cRes.json()) as typeof comptes;
+        // Le plan comptable fait autorité sur l'intitulé.
+        const plan = await planComptesMap(clickhouse, dbName);
+        if (plan.size > 0) {
+          comptes = comptes.map((c) => ({
+            ...c,
+            intitule: intituleCompte(plan, c.compte, c.intitule),
+          }));
+        }
         tiers = (await tRes.json()) as typeof tiers;
       } catch (e) {
         console.error("[saisie GET] refs indisponibles:", e);

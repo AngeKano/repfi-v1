@@ -1023,10 +1023,17 @@ export default function SaisieTab({ clientId }: { clientId: string }) {
                       <td className="p-2">{r.date_transaction}</td>
                       <td className="p-2">
                         <span className="font-medium">{r.compte}</span>
-                        <span className="text-muted-foreground"> {r.intitule_compte}</span>
+                        {/* L'intitulé peut manquer sur la ligne : on retombe
+                            alors sur le référentiel (plan comptable). */}
+                        <span className="text-muted-foreground">
+                          {" "}
+                          {r.intitule_compte || compteInfo(r.compte)?.intitule || ""}
+                        </span>
                       </td>
                       <td className="p-2 text-muted-foreground">
-                        {r.n_tiers ? `${r.n_tiers} ${r.intitule_tiers}` : "—"}
+                        {r.n_tiers
+                          ? `${r.n_tiers} ${r.intitule_tiers || tiersInfo(r.n_tiers)?.intitule || ""}`.trim()
+                          : "—"}
                       </td>
                       <td className="p-2 text-muted-foreground">{r.numero_piece}</td>
                       <td className="p-2 text-right tabular-nums text-blue-700">{fmt(r.debit)}</td>

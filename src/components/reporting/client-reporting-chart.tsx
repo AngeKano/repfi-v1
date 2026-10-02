@@ -1646,7 +1646,8 @@ export default function ClientReportingChart({
     );
   };
 
-  // Composant CA par Nature — Détail des comptes TC avec comparaison N vs N-1
+  // Composant CA par Nature — Détail des comptes composant le chiffre
+  // d'affaires (TA, TB, TC, TD) avec comparaison N vs N-1.
   const CAParNature = () => {
     const natureData = data?.caParNature ?? [];
 
@@ -1661,7 +1662,7 @@ export default function ClientReportingChart({
           <div>
             <CardTitle>CA par Nature</CardTitle>
             <CardDescription>
-              Détail des comptes (rubrique TC) — {yearN} vs {yearN1}
+              Détail des comptes (TA, TB, TC, TD) — {yearN} vs {yearN1}
             </CardDescription>
           </div>
           <ChartLegend
