@@ -68,3 +68,58 @@ export function intituleCompte(
   }
   return fallback;
 }
+
+// ---------------------------------------------------------------------------
+// Référentiel des tiers (table `plan_tiers`).
+//
+// Son schéma varie selon les installations (le numéro peut s'appeler
+// `compte_tiers` ou `n_tiers`). On lit donc les colonnes réellement présentes
+// plutôt que de les supposer.
+// ---------------------------------------------------------------------------
+import { tableColumns } from "./schema";
+
+export interface TiersRef {
+  nTiers: string;
+  intitule: string;
+  type: string;
+}
+
+const tiersCache = new Map<string, { at: number; list: Promise<TiersRef[]> }>();
+
+export function planTiersList(
+  client: ClickHouseClient,
+  dbName: string,
+): Promise<TiersRef[]> {
+  const hit = tiersCache.get(dbName);
+  if (hit && Date.now() - hit.at < TTL_MS) return hit.list;
+
+  const list = (async (): Promise<TiersRef[]> => {
+    try {
+      const cols = await tableColumns(client, dbName, "plan_tiers");
+      if (cols.size === 0) return [];
+      const pick = (...noms: string[]) => noms.find((n) => cols.has(n));
+      const colNum = pick("compte_tiers", "n_tiers", "numero_tiers", "compte");
+      const colLib = pick("intitule_tiers", "intitule", "libelle");
+      const colType = pick("type_tiers", "type");
+      if (!colNum) return [];
+
+      const res = await client.query({
+        query: `SELECT ${colNum} AS n,
+                       ${colLib ? colLib : "''"} AS i,
+                       ${colType ? colType : "''"} AS t
+                FROM ${dbName}.plan_tiers
+                WHERE ${colNum} != ''`,
+        format: "JSONEachRow",
+      });
+      return ((await res.json()) as Array<{ n: string; i: string; t: string }>).map(
+        (r) => ({ nTiers: String(r.n).trim(), intitule: r.i || "", type: r.t || "" }),
+      );
+    } catch (e) {
+      console.error(`[plan-tiers] référentiel indisponible (${dbName}):`, e);
+      return [];
+    }
+  })();
+
+  tiersCache.set(dbName, { at: Date.now(), list });
+  return list;
+}

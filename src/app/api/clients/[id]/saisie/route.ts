@@ -13,7 +13,11 @@ import {
 } from "@/lib/clickhouse/manual-sync";
 import { parseGlFilters, buildClickhouseFilter } from "@/lib/comptable/gl-filters";
 import { bilanRefExpr } from "@/lib/clickhouse/schema";
-import { planComptesMap, intituleCompte } from "@/lib/clickhouse/plan-comptable";
+import {
+  planComptesMap,
+  planTiersList,
+  intituleCompte,
+} from "@/lib/clickhouse/plan-comptable";
 import {
   CODE_JOURNAUX_SET,
   FLAG_IMPORT,
@@ -44,30 +48,76 @@ async function lookupComptes(
   refExpr: string,
 ): Promise<Map<string, { intitule: string; rubrique: string; bilan: string }>> {
   const map = new Map<string, { intitule: string; rubrique: string; bilan: string }>();
-  if (batchIds.length === 0 || comptes.length === 0) return map;
-  const rows = await clickhouse
-    .query({
-      query: `
-        SELECT compte,
-               anyIf(intitule_compte, intitule_compte != '') AS intitule,
-               anyIf(rubrique, rubrique != '')               AS rubrique,
-               anyIf(${refExpr}, ${refExpr} != '')           AS bilan
-        FROM ${dbName}.grand_livre
-        WHERE batch_id IN ({batchIds:Array(String)})
-          AND compte IN ({comptes:Array(String)})
-        GROUP BY compte
-      `,
-      query_params: { batchIds, comptes },
-      format: "JSONEachRow",
-    })
-    .then((r) => r.json() as Promise<Array<{ compte: string; intitule: string; rubrique: string; bilan: string }>>);
+  if (comptes.length === 0) return map;
+
+  // Rubriques observées dans le grand livre, tous comptes confondus : elles
+  // servent aussi à faire hériter un compte neuf de son collectif.
+  const observe = new Map<string, { intitule: string; rubrique: string; bilan: string }>();
+  if (batchIds.length > 0) {
+    try {
+      const rows = await clickhouse
+        .query({
+          query: `
+            SELECT compte,
+                   anyIf(intitule_compte, intitule_compte != '') AS intitule,
+                   anyIf(rubrique, rubrique != '')               AS rubrique,
+                   anyIf(${refExpr}, ${refExpr} != '')           AS bilan
+            FROM ${dbName}.grand_livre
+            WHERE batch_id IN ({batchIds:Array(String)}) AND compte != ''
+            GROUP BY compte
+          `,
+          query_params: { batchIds },
+          format: "JSONEachRow",
+        })
+        .then((r) => r.json() as Promise<Array<{ compte: string; intitule: string; rubrique: string; bilan: string }>>);
+      for (const r of rows)
+        observe.set(r.compte, { intitule: r.intitule, rubrique: r.rubrique, bilan: r.bilan });
+    } catch (e) {
+      console.error("[saisie] rubriques du grand livre indisponibles:", e);
+    }
+  }
+
   const plan = await planComptesMap(clickhouse, dbName);
-  for (const r of rows)
-    map.set(r.compte, {
-      intitule: intituleCompte(plan, r.compte, r.intitule),
-      rubrique: r.rubrique,
-      bilan: r.bilan,
-    });
+
+  // Rubriques d'un compte jamais mouvementé : on les hérite du compte le plus
+  // proche par la gauche (401200 → 401100 → 4011 …), sans quoi l'écriture
+  // n'entrerait dans aucun état financier.
+  const heriter = (compte: string) => {
+    for (let len = compte.length; len >= 3; len--) {
+      const prefixe = compte.slice(0, len);
+      const hit = observe.get(prefixe);
+      if (hit && (hit.rubrique || hit.bilan)) return hit;
+      if (len < compte.length) {
+        for (const [c, v] of observe) {
+          if (c.startsWith(prefixe) && (v.rubrique || v.bilan)) return v;
+        }
+      }
+    }
+    return undefined;
+  };
+
+  for (const compte of comptes) {
+    const exact = observe.get(compte);
+    if (exact) {
+      map.set(compte, {
+        intitule: intituleCompte(plan, compte, exact.intitule),
+        rubrique: exact.rubrique,
+        bilan: exact.bilan,
+      });
+      continue;
+    }
+    // Compte présent au plan comptable mais pas encore mouvementé : il reste
+    // utilisable à la saisie.
+    const auPlan = intituleCompte(plan, compte, "");
+    if (auPlan) {
+      const h = heriter(compte);
+      map.set(compte, {
+        intitule: auPlan,
+        rubrique: h?.rubrique ?? "",
+        bilan: h?.bilan ?? "",
+      });
+    }
+  }
   return map;
 }
 
@@ -243,49 +293,111 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     } catch (e) {
       console.error("[saisie GET] options de filtres indisponibles:", e);
     }
+    // ---- Référentiel des COMPTES ----------------------------------------
+    // Le plan comptable fait foi : il contient tous les comptes utilisables,
+    // y compris ceux jamais mouvementés. Le grand livre n'apporte que les
+    // rubriques observées. Chaque source est isolée : si l'une échoue, les
+    // autres restent exploitables (auparavant un seul Promise.all faisait
+    // tomber comptes ET tiers ensemble).
+    const plan = await planComptesMap(clickhouse, dbName);
+
+    const rubParCompte = new Map<
+      string,
+      { intitule: string; rubrique: string; bilan: string }
+    >();
     if (realBatchIds.length > 0) {
       try {
-        const [cRes, tRes] = await Promise.all([
-          clickhouse.query({
-            query: `
-              SELECT compte,
-                     anyIf(intitule_compte, intitule_compte != '') AS intitule,
-                     anyIf(rubrique, rubrique != '')               AS rubrique,
-                     anyIf(${glRefExpr}, ${glRefExpr} != '')       AS bilan
-              FROM ${dbName}.grand_livre
-              WHERE batch_id IN ({batchIds:Array(String)}) AND compte != ''
-              GROUP BY compte ORDER BY compte
-            `,
-            query_params: { batchIds: realBatchIds },
-            format: "JSONEachRow",
-          }),
-          clickhouse.query({
-            query: `
-              SELECT n_tiers AS nTiers,
-                     anyIf(intitule_tiers, intitule_tiers != '') AS intitule,
-                     groupUniqArray(compte) AS comptes
-              FROM ${dbName}.grand_livre
-              WHERE batch_id IN ({batchIds:Array(String)}) AND n_tiers != ''
-              GROUP BY n_tiers ORDER BY n_tiers
-            `,
-            query_params: { batchIds: realBatchIds },
-            format: "JSONEachRow",
-          }),
-        ]);
-        comptes = (await cRes.json()) as typeof comptes;
-        // Le plan comptable fait autorité sur l'intitulé.
-        const plan = await planComptesMap(clickhouse, dbName);
-        if (plan.size > 0) {
-          comptes = comptes.map((c) => ({
-            ...c,
-            intitule: intituleCompte(plan, c.compte, c.intitule),
-          }));
+        const cRes = await clickhouse.query({
+          query: `
+            SELECT compte,
+                   anyIf(intitule_compte, intitule_compte != '') AS intitule,
+                   anyIf(rubrique, rubrique != '')               AS rubrique,
+                   anyIf(${glRefExpr}, ${glRefExpr} != '')       AS bilan
+            FROM ${dbName}.grand_livre
+            WHERE batch_id IN ({batchIds:Array(String)}) AND compte != ''
+            GROUP BY compte
+          `,
+          query_params: { batchIds: realBatchIds },
+          format: "JSONEachRow",
+        });
+        for (const r of (await cRes.json()) as Array<{
+          compte: string;
+          intitule: string;
+          rubrique: string;
+          bilan: string;
+        }>) {
+          rubParCompte.set(r.compte, {
+            intitule: r.intitule,
+            rubrique: r.rubrique,
+            bilan: r.bilan,
+          });
         }
-        tiers = (await tRes.json()) as typeof tiers;
       } catch (e) {
-        console.error("[saisie GET] refs indisponibles:", e);
+        console.error("[saisie GET] rubriques du grand livre indisponibles:", e);
       }
     }
+
+    comptes = [...new Set([...plan.keys(), ...rubParCompte.keys()])]
+      .sort()
+      .map((c) => {
+        const gl = rubParCompte.get(c);
+        return {
+          compte: c,
+          intitule: intituleCompte(plan, c, gl?.intitule ?? ""),
+          rubrique: gl?.rubrique ?? "",
+          bilan: gl?.bilan ?? "",
+        };
+      });
+
+    // ---- Référentiel des TIERS ------------------------------------------
+    const tiersParNum = new Map<string, { intitule: string; comptes: Set<string> }>();
+    if (realBatchIds.length > 0) {
+      try {
+        const tRes = await clickhouse.query({
+          query: `
+            SELECT n_tiers AS nTiers,
+                   anyIf(intitule_tiers, intitule_tiers != '') AS intitule,
+                   groupUniqArray(compte) AS comptes
+            FROM ${dbName}.grand_livre
+            WHERE batch_id IN ({batchIds:Array(String)}) AND n_tiers != ''
+            GROUP BY n_tiers
+          `,
+          query_params: { batchIds: realBatchIds },
+          format: "JSONEachRow",
+        });
+        for (const r of (await tRes.json()) as Array<{
+          nTiers: string;
+          intitule: string;
+          comptes: string[];
+        }>) {
+          tiersParNum.set(r.nTiers, {
+            intitule: r.intitule,
+            comptes: new Set(r.comptes ?? []),
+          });
+        }
+      } catch (e) {
+        console.error("[saisie GET] tiers du grand livre indisponibles:", e);
+      }
+    }
+
+    // Le plan des tiers complète la liste (tiers jamais mouvementés) et fait
+    // foi sur l'intitulé.
+    for (const t of await planTiersList(clickhouse, dbName)) {
+      const existant = tiersParNum.get(t.nTiers);
+      if (existant) {
+        if (t.intitule) existant.intitule = t.intitule;
+      } else {
+        tiersParNum.set(t.nTiers, { intitule: t.intitule, comptes: new Set() });
+      }
+    }
+
+    tiers = [...tiersParNum.entries()]
+      .sort((a, b) => a[0].localeCompare(b[0]))
+      .map(([nTiers, v]) => ({
+        nTiers,
+        intitule: v.intitule,
+        comptes: [...v.comptes],
+      }));
 
     // Lignes saisies de la période (éditables).
     const manual = await prisma.manualLedgerEntry.findMany({
