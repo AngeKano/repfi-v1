@@ -16,19 +16,22 @@ import type { ClickHouseClient } from "@clickhouse/client";
 const TTL_MS = 60_000;
 const cache = new Map<string, { at: number; cols: Promise<Set<string>> }>();
 
-export function grandLivreColumns(
+/** Colonnes d'une table de la base client (cache court). */
+export function tableColumns(
   client: ClickHouseClient,
   dbName: string,
+  table: string,
 ): Promise<Set<string>> {
-  const hit = cache.get(dbName);
+  const key = `${dbName}.${table}`;
+  const hit = cache.get(key);
   if (hit && Date.now() - hit.at < TTL_MS) return hit.cols;
 
   const cols = (async () => {
     try {
       const res = await client.query({
         query: `SELECT name FROM system.columns
-                WHERE database = {db:String} AND table = 'grand_livre'`,
-        query_params: { db: dbName },
+                WHERE database = {db:String} AND table = {tbl:String}`,
+        query_params: { db: dbName, tbl: table },
         format: "JSONEachRow",
       });
       const rows = (await res.json()) as Array<{ name: string }>;
@@ -40,8 +43,16 @@ export function grandLivreColumns(
     }
   })();
 
-  cache.set(dbName, { at: Date.now(), cols });
+  cache.set(key, { at: Date.now(), cols });
   return cols;
+}
+
+/** Colonnes de `grand_livre`. */
+export function grandLivreColumns(
+  client: ClickHouseClient,
+  dbName: string,
+): Promise<Set<string>> {
+  return tableColumns(client, dbName, "grand_livre");
 }
 
 /**
