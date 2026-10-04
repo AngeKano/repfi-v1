@@ -22,8 +22,6 @@ import {
   Plus,
   RefreshCw,
   ChevronLeft,
-  ChevronDown,
-  ChevronRight,
 } from "lucide-react";
 import {
   PiChartScatterDuotone,
@@ -85,15 +83,6 @@ const CLIENT_TABS = [
   { id: "files", label: "Autres Fichiers", icon: PiFilesDuotone },
 ];
 
-// Les trois vues de performance sont regroupées dans un menu dépliant :
-// elles répondent à la même question (où en est l'activité ?) et occupaient à
-// elles seules le haut de la barre latérale.
-const GROUPE_PERFORMANCE = {
-  label: "Performance",
-  icon: PiChartScatterDuotone,
-  tabIds: ["overview", "chiffres", "resultats"] as const,
-};
-
 // Onglets de reporting financier qui dépendent de la présence d'au moins
 // un reporting. Ils sont grisés tant qu'aucun reporting n'existe.
 const REPORTING_TAB_IDS = new Set([
@@ -127,8 +116,6 @@ export default function ClientDetailsClient({
   const [showUploadDialog, setShowUploadDialog] = useState(false);
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
-  // Le groupe « Performance » reste ouvert tant qu'on s'y trouve.
-  const [performanceOuvert, setPerformanceOuvert] = useState(true);
   // Exclusion des écritures saisies de TOUS les calculs du reporting (avant/après).
   const [excludeManual, setExcludeManual] = useState<boolean>(
     !!initialClient?.excludeManualEntries,
@@ -201,12 +188,6 @@ export default function ClientDetailsClient({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [client.id, hasReporting, initialPeriodType]);
 
-  useEffect(() => {
-    if ((GROUPE_PERFORMANCE.tabIds as readonly string[]).includes(activeTab)) {
-      setPerformanceOuvert(true);
-    }
-  }, [activeTab]);
-
   const roleLabel = getRoleLabel(session.user.role);
   const roleBadgeVariant = getRoleBadgeVariant(session.user.role);
 
@@ -272,20 +253,22 @@ export default function ClientDetailsClient({
           </div>
 
           <nav className="space-y-1">
-            {(() => {
-              // Rendu d'un onglet — style commun à toute la barre latérale.
-              const renderTab = (
-                tab: (typeof CLIENT_TABS)[number],
-                indente = false,
-              ) => {
-                const active = activeTab === tab.id;
-                const permanentlyDisabled = DISABLED_TAB_IDS.has(tab.id);
-                const disabled =
-                  permanentlyDisabled ||
-                  (REPORTING_TAB_IDS.has(tab.id) && !hasReporting);
-                return (
+            {CLIENT_TABS.map((tab) => {
+              const active = activeTab === tab.id;
+              // Séparateur juste avant "Membres" : tous les onglets de reporting
+              // (Synthèse, Chiffres, Résultats, Recouvrement, Dettes, États
+              // Financiers, Bilan d'activité) restent groupés au-dessus.
+              // Repéré par identifiant et non par index, pour ne pas dériver
+              // lorsqu'un onglet est ajouté.
+              const showSeparator = tab.id === "members";
+              const permanentlyDisabled = DISABLED_TAB_IDS.has(tab.id);
+              const disabled =
+                permanentlyDisabled ||
+                (REPORTING_TAB_IDS.has(tab.id) && !hasReporting);
+              return (
+                <div key={tab.id}>
+                  {showSeparator && <div className="h-px bg-[#D0E3F5] my-2" />}
                   <button
-                    key={tab.id}
                     onClick={() => {
                       if (disabled) return;
                       setActiveTab(tab.id);
@@ -299,9 +282,7 @@ export default function ClientDetailsClient({
                           : undefined
                     }
                     aria-disabled={disabled}
-                    className={`flex items-center gap-3 w-full py-3 rounded-lg text-sm font-medium transition-colors ${
-                      indente ? "pl-9 pr-4" : "px-4"
-                    } ${
+                    className={`flex items-center gap-3 w-full px-4 py-3 rounded-lg text-sm font-medium transition-colors ${
                       active
                         ? "bg-[#0077C3] text-white"
                         : disabled
@@ -312,64 +293,9 @@ export default function ClientDetailsClient({
                     <tab.icon className="w-5 h-5" />
                     {tab.label}
                   </button>
-                );
-              };
-
-              const idsGroupe = GROUPE_PERFORMANCE.tabIds as readonly string[];
-              const GroupeIcon = GROUPE_PERFORMANCE.icon;
-              const groupeActif = idsGroupe.includes(activeTab);
-
-              return CLIENT_TABS.map((tab) => {
-                // Le groupe n'est rendu qu'une fois, à son premier onglet ;
-                // les suivants sont pris en charge par ce rendu.
-                if (idsGroupe.includes(tab.id)) {
-                  if (tab.id !== idsGroupe[0]) return null;
-                  return (
-                    <div key="groupe-performance">
-                      <button
-                        onClick={() => setPerformanceOuvert((o) => !o)}
-                        aria-expanded={performanceOuvert}
-                        className={`flex items-center gap-3 w-full px-4 py-3 rounded-lg text-sm font-medium transition-colors ${
-                          groupeActif && !performanceOuvert
-                            ? "bg-[#EBF5FF] text-[#0077C3]"
-                            : "text-[#335890] hover:bg-[#EBF5FF] hover:text-[#0077C3]"
-                        }`}
-                      >
-                        <GroupeIcon className="w-5 h-5" />
-                        <span className="flex-1 text-left">
-                          {GROUPE_PERFORMANCE.label}
-                        </span>
-                        {performanceOuvert ? (
-                          <ChevronDown className="w-4 h-4" />
-                        ) : (
-                          <ChevronRight className="w-4 h-4" />
-                        )}
-                      </button>
-                      {performanceOuvert && (
-                        <div className="space-y-1 mt-1">
-                          {idsGroupe.map((id) => {
-                            const sous = CLIENT_TABS.find((t) => t.id === id);
-                            return sous ? renderTab(sous, true) : null;
-                          })}
-                        </div>
-                      )}
-                    </div>
-                  );
-                }
-
-                // Séparateur juste avant "Membres" : les onglets de reporting
-                // restent groupés au-dessus. Repéré par identifiant et non par
-                // index, pour ne pas dériver lorsqu'un onglet est ajouté.
-                return (
-                  <div key={tab.id}>
-                    {tab.id === "members" && (
-                      <div className="h-px bg-[#D0E3F5] my-2" />
-                    )}
-                    {renderTab(tab)}
-                  </div>
-                );
-              });
-            })()}
+                </div>
+              );
+            })}
           </nav>
 
           {/* Currency info */}
