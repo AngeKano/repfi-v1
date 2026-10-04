@@ -1,7 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Card, CardContent } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+} from "@/components/ui/card";
 import {
   Select,
   SelectContent,
@@ -239,44 +244,45 @@ export default function ClientDettesCourtTermeTab({
         </p>
       </div>
 
-      {/* Total */}
-      <Card className="border-[#D0E3F5]">
-        <CardContent className="p-6 flex items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-full bg-[#EBF5FF] flex items-center justify-center">
-              <PiScalesDuotone className="w-6 h-6 text-[#0077C3]" />
-            </div>
-            <div>
-              <p className="text-sm text-[#335890]">Total Dettes Court Terme</p>
-              <p className="text-xs text-muted-foreground">
-                Fournisseurs + sociales + personnel + fiscales + HAO
-              </p>
-            </div>
-          </div>
-          <p className="text-3xl font-bold text-[#00122E] tabular-nums">
-            {formatCompactOnly(total)}
-          </p>
-        </CardContent>
-      </Card>
-
-      {/* Détail par composante */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-        {COMPOSANTES.map((c) => {
-          const valeur = k[c.key] ?? 0;
-          const part = total !== 0 ? (valeur / total) * 100 : 0;
+      {/* KPI — même disposition que les autres onglets de reporting :
+          grille 3 colonnes, carte libellé + valeur + icône. */}
+      <div className="grid grid-cols-3 gap-4">
+        {[
+          {
+            id: "total",
+            label: "Total Dettes Court Terme",
+            valeur: total,
+            color: "text-[#0077C3]",
+            icon: PiScalesDuotone,
+          },
+          ...COMPOSANTES.map((c) => ({
+            id: c.key,
+            label: c.label,
+            valeur: k[c.key] ?? 0,
+            color: c.color,
+            icon: c.icon,
+          })),
+        ].map((kpi) => {
+          const Icon = kpi.icon;
           return (
-            <Card key={c.key} className="border-[#D0E3F5]">
-              <CardContent className="p-4 space-y-2">
-                <div className="flex items-center gap-2">
-                  <c.icon className={cn("w-5 h-5", c.color)} />
-                  <span className="text-xs text-[#335890]">{c.label}</span>
+            <Card key={kpi.id} className="relative overflow-hidden">
+              <CardHeader className="pb-2">
+                <CardDescription className="text-sm font-medium">
+                  {kpi.label}
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="pt-0">
+                <div className="flex items-end justify-between gap-2">
+                  <div
+                    className={cn(
+                      "text-3xl font-bold truncate",
+                      kpi.valeur < 0 ? "text-red-600" : "text-[#00122E]",
+                    )}
+                  >
+                    {formatCompactOnly(kpi.valeur)}
+                  </div>
+                  <Icon className={`w-8 h-8 shrink-0 ${kpi.color}`} />
                 </div>
-                <p className={cn("text-xl font-bold tabular-nums", c.color)}>
-                  {formatCompactOnly(valeur)}
-                </p>
-                <p className="text-[11px] text-muted-foreground">
-                  {part.toFixed(1)}% du total
-                </p>
               </CardContent>
             </Card>
           );
