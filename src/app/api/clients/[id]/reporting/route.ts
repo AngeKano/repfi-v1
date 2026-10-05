@@ -693,6 +693,9 @@ async function recupererTop10Clients(
           FROM ${dbName}.grand_livre
           WHERE batch_id IN ({batchIds:Array(String)})
             AND rubrique = 'TC'
+            AND rubrique = 'TD'
+            AND rubrique = 'TA'
+            AND rubrique = 'TB'
             ${periodFilter}
         ),
         -- Un seul tiers client par (pièce, date) pour éviter le fan-out de
@@ -746,6 +749,9 @@ async function recupererTop10Clients(
         FROM ${dbName}.grand_livre
         WHERE batch_id IN ({batchIds:Array(String)})
           AND rubrique = 'TC'
+            AND rubrique = 'TD'
+            AND rubrique = 'TA'
+            AND rubrique = 'TB'
           ${periodFilter}
       `,
       query_params: queryParams,
