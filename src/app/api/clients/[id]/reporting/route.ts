@@ -4,6 +4,7 @@ import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import { createClient as createClickhouseClient } from "@clickhouse/client";
 import { prisma } from "@/lib/prisma";
 import { manualBatchId } from "@/lib/clickhouse/manual-sync";
+import { CA_RUBRIQUES } from "@/lib/reporting/etats-financiers";
 import { CREANCES_CLIENTS_SQL } from "@/lib/reporting/creances";
 
 const clickhouseClient = createClickhouseClient({
@@ -191,11 +192,6 @@ const RUBRIQUES_LIST = [
   "RQ",
   "RS",
 ];
-
-// Natures composant le chiffre d'affaires (XB = TA + TB + TC + TD au sens
-// SYSCOHADA) : ventes de marchandises, de produits fabriqués, travaux et
-// services vendus, produits accessoires.
-const CA_RUBRIQUES = ["TA", "TB", "TC", "TD"];
 
 function getDaysInMonth(year: number, month: number): number {
   return new Date(year, month, 0).getDate();
@@ -661,7 +657,7 @@ async function recupererTop10Clients(
   // Construire le filtre de période selon le mode sélectionné
   // date_transaction format: DD/MM/YYYY
   let periodFilter = "";
-  const queryParams: Record<string, unknown> = { batchIds };
+  const queryParams: Record<string, unknown> = { batchIds, caRubriques: CA_RUBRIQUES };
 
   if (periodType === "month" && selectedMonth) {
     periodFilter = `AND substring(date_transaction, 4, 2) = {monthFilter:String}`;
@@ -692,7 +688,7 @@ async function recupererTop10Clients(
             (credit - debit) AS montant_ht
           FROM ${dbName}.grand_livre
           WHERE batch_id IN ({batchIds:Array(String)})
-            AND rubrique = 'TC'
+            AND rubrique IN ({caRubriques:Array(String)})
             ${periodFilter}
         ),
         -- Un seul tiers client par (pièce, date) pour éviter le fan-out de
@@ -745,7 +741,7 @@ async function recupererTop10Clients(
         SELECT sum(credit - debit) as ca_total
         FROM ${dbName}.grand_livre
         WHERE batch_id IN ({batchIds:Array(String)})
-          AND rubrique = 'TC'
+          AND rubrique IN ({caRubriques:Array(String)})
           ${periodFilter}
       `,
       query_params: queryParams,
