@@ -732,6 +732,11 @@ async function recupererTop10Clients(
           sum(montant_ht) AS ca_client
         FROM correspondances
         GROUP BY n_tiers, intitule_tiers
+        -- Seuls les clients ayant réellement contribué au chiffre d'affaires
+        -- figurent au classement : les comptes techniques (consignes, stocks
+        -- outils…) ressortent à zéro ou en négatif et n'ont pas leur place
+        -- dans un « Top clients ».
+        HAVING ca_client > 0
         ORDER BY ca_client DESC
         LIMIT 10
       `,
@@ -775,6 +780,7 @@ async function recupererTop10Clients(
           AND n_tiers != ''
           ${periodFilter}
         GROUP BY n_tiers, intitule_tiers
+        HAVING ca_client > 0
         ORDER BY ca_client DESC
         LIMIT 10
       `,
