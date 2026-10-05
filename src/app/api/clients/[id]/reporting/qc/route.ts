@@ -5,6 +5,7 @@ import { createClient as createClickhouseClient } from "@clickhouse/client";
 import { prisma } from "@/lib/prisma";
 import { manualBatchId } from "@/lib/clickhouse/manual-sync";
 import { CREANCES_CLIENTS_SQL } from "@/lib/reporting/creances";
+import { CA_RUBRIQUES } from "@/lib/reporting/etats-financiers";
 import {
   checkAttributedNotExceedTotal,
   checkNoForbiddenPrefix,
@@ -79,7 +80,7 @@ export async function GET(
 
     const startYM = `${year}01`;
     const endYM = `${year}${endMonth}`;
-    const baseParams = { batchIds, startYM, endYM };
+    const baseParams = { batchIds, startYM, endYM, caRubriques: CA_RUBRIQUES };
 
     const checks: QcCheck[] = [];
 
@@ -177,7 +178,7 @@ export async function GET(
             SELECT sum(credit - debit) AS total_ca
             FROM ${dbName}.grand_livre
             WHERE batch_id IN ({batchIds:Array(String)})
-              AND rubrique = 'TC'
+              AND rubrique IN ({caRubriques:Array(String)})
               ${PERIOD_FILTER}
           `,
           query_params: baseParams,
@@ -189,7 +190,7 @@ export async function GET(
               SELECT numero_piece, date_transaction, (credit - debit) AS montant_ht
               FROM ${dbName}.grand_livre
               WHERE batch_id IN ({batchIds:Array(String)})
-                AND rubrique = 'TC'
+                AND rubrique IN ({caRubriques:Array(String)})
                 ${PERIOD_FILTER}
             ),
             tiers_piece AS (
