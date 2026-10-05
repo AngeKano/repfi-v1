@@ -5,7 +5,11 @@ import { createClient as createClickhouseClient } from "@clickhouse/client";
 import { prisma } from "@/lib/prisma";
 import { manualBatchId } from "@/lib/clickhouse/manual-sync";
 import { CREANCES_CLIENTS_SQL } from "@/lib/reporting/creances";
-import { CA_RUBRIQUES } from "@/lib/reporting/etats-financiers";
+import {
+  CA_RUBRIQUES,
+  CA_PERIMETRE_SQL,
+  CA_MONTANT_SQL,
+} from "@/lib/reporting/chiffre-affaires";
 import {
   checkAttributedNotExceedTotal,
   checkNoForbiddenPrefix,
@@ -175,10 +179,10 @@ export async function GET(
       const [qTotal, qAttr] = await Promise.all([
         clickhouseClient.query({
           query: `
-            SELECT sum(credit - debit) AS total_ca
+            SELECT sum(${CA_MONTANT_SQL}) AS total_ca
             FROM ${dbName}.grand_livre
             WHERE batch_id IN ({batchIds:Array(String)})
-              AND rubrique IN ({caRubriques:Array(String)})
+              AND ${CA_PERIMETRE_SQL}
               ${PERIOD_FILTER}
           `,
           query_params: baseParams,
@@ -187,10 +191,10 @@ export async function GET(
         clickhouseClient.query({
           query: `
             WITH ventes_ht AS (
-              SELECT numero_piece, date_transaction, (credit - debit) AS montant_ht
+              SELECT numero_piece, date_transaction, ${CA_MONTANT_SQL} AS montant_ht
               FROM ${dbName}.grand_livre
               WHERE batch_id IN ({batchIds:Array(String)})
-                AND rubrique IN ({caRubriques:Array(String)})
+                AND ${CA_PERIMETRE_SQL}
                 ${PERIOD_FILTER}
             ),
             tiers_piece AS (

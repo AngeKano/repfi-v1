@@ -4,7 +4,11 @@ import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import { createClient as createClickhouseClient } from "@clickhouse/client";
 import { prisma } from "@/lib/prisma";
 import { manualBatchId } from "@/lib/clickhouse/manual-sync";
-import { CA_RUBRIQUES } from "@/lib/reporting/etats-financiers";
+import {
+  CA_RUBRIQUES,
+  CA_PERIMETRE_SQL,
+  CA_MONTANT_SQL,
+} from "@/lib/reporting/chiffre-affaires";
 import { CREANCES_CLIENTS_SQL } from "@/lib/reporting/creances";
 
 const clickhouseClient = createClickhouseClient({
@@ -567,10 +571,10 @@ async function recupererCAParNature(
         SELECT
           compte,
           any(intitule_compte) as intitule_compte,
-          sum(credit - debit) as montant
+          sum(${CA_MONTANT_SQL}) as montant
         FROM ${dbName}.grand_livre
         WHERE batch_id IN ({batchIds:Array(String)})
-          AND rubrique IN ({caRubriques:Array(String)})
+          AND ${CA_PERIMETRE_SQL}
           ${periodFilter}
         GROUP BY compte
         ORDER BY montant DESC
@@ -685,10 +689,10 @@ async function recupererTop10Clients(
           SELECT
             numero_piece,
             date_transaction,
-            (credit - debit) AS montant_ht
+            ${CA_MONTANT_SQL} AS montant_ht
           FROM ${dbName}.grand_livre
           WHERE batch_id IN ({batchIds:Array(String)})
-            AND rubrique IN ({caRubriques:Array(String)})
+            AND ${CA_PERIMETRE_SQL}
             ${periodFilter}
         ),
         -- Un seul tiers client par (pièce, date) pour éviter le fan-out de
@@ -738,10 +742,10 @@ async function recupererTop10Clients(
 
     const totalQuery = await clickhouseClient.query({
       query: `
-        SELECT sum(credit - debit) as ca_total
+        SELECT sum(${CA_MONTANT_SQL}) as ca_total
         FROM ${dbName}.grand_livre
         WHERE batch_id IN ({batchIds:Array(String)})
-          AND rubrique IN ({caRubriques:Array(String)})
+          AND ${CA_PERIMETRE_SQL}
           ${periodFilter}
       `,
       query_params: queryParams,

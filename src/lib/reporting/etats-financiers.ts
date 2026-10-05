@@ -141,7 +141,7 @@ export const COMPTE_RESULTAT: LigneEtat[] = [
 // Rubriques composant le CHIFFRE D'AFFAIRES (ligne XB du modèle officiel :
 // XB = TA + TB + TC + TD). Toute analyse de CA — Top clients, CA par nature —
 // doit porter sur ces quatre natures, et non sur la seule TC.
-export const CA_RUBRIQUES = ["TA", "TB", "TC", "TD"];
+export const CA_RUBRIQUES = ["TA", "TB", "TC", "TD", "4495*"];
 
 // REF « feuilles » du compte de résultat réellement présents dans le grand livre.
 export const RESULTAT_LEAF_REFS = COMPTE_RESULTAT.filter((l) => !l.total).map((l) => l.ref);
