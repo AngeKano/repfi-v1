@@ -123,6 +123,8 @@ interface SaisieData {
     pageSize: number;
     total: number;
     totalPages: number;
+    totalDebit: number;
+    totalCredit: number;
   };
   manual: ManualEntry[];
   refs: {
@@ -131,6 +133,7 @@ interface SaisieData {
     journaux: string[];
     pieces: string[];
     factures: string[];
+    rubriques: string[];
   };
   balance: { debit: number; credit: number; delta: number };
 }
@@ -991,6 +994,7 @@ export default function SaisieTab({ clientId }: { clientId: string }) {
                   pieces: data.refs.pieces,
                   tiers: data.refs.tiers.map((t) => t.nTiers),
                   factures: data.refs.factures,
+                  rubriques: data.refs.rubriques,
                 }}
               />
             </div>
@@ -1005,6 +1009,7 @@ export default function SaisieTab({ clientId }: { clientId: string }) {
                   {sortTh("compte", "Compte")}
                   {sortTh("tiers", "Tiers")}
                   {sortTh("piece", "N° pièce")}
+                  <th className="p-2 font-medium text-left">Rubrique</th>
                   {sortTh("debit", "Débit", true)}
                   {sortTh("credit", "Crédit", true)}
                   <th className="p-2 font-medium text-left">Flags</th>
@@ -1013,7 +1018,7 @@ export default function SaisieTab({ clientId }: { clientId: string }) {
               <tbody>
                 {data.uploaded.rows.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="p-6 text-center text-muted-foreground">
+                    <td colSpan={8} className="p-6 text-center text-muted-foreground">
                       Aucune ligne pour cette période.
                     </td>
                   </tr>
@@ -1036,6 +1041,7 @@ export default function SaisieTab({ clientId }: { clientId: string }) {
                           : "—"}
                       </td>
                       <td className="p-2 text-muted-foreground">{r.numero_piece}</td>
+                      <td className="p-2 text-muted-foreground">{r.rubrique || "—"}</td>
                       <td className="p-2 text-right tabular-nums text-blue-700">{fmt(r.debit)}</td>
                       <td className="p-2 text-right tabular-nums text-green-700">{fmt(r.credit)}</td>
                       <td className="p-2">
@@ -1055,6 +1061,35 @@ export default function SaisieTab({ clientId }: { clientId: string }) {
                   ))
                 )}
               </tbody>
+              {/* Totaux sur l'ENSEMBLE des lignes filtrées (pas la seule page
+                  affichée) : ils sont calculés côté serveur. L'écart met en
+                  évidence un déséquilibre éventuel du périmètre filtré. */}
+              {data.uploaded.total > 0 && (
+                <tfoot>
+                  <tr className="border-t-2 bg-muted/40 font-semibold">
+                    <td className="p-2" colSpan={4}>
+                      Total ({data.uploaded.total} ligne
+                      {data.uploaded.total > 1 ? "s" : ""})
+                    </td>
+                    <td className="p-2 text-right tabular-nums text-blue-700">
+                      {fmt(data.uploaded.totalDebit) || "0"}
+                    </td>
+                    <td className="p-2 text-right tabular-nums text-green-700">
+                      {fmt(data.uploaded.totalCredit) || "0"}
+                    </td>
+                    <td className="p-2">
+                      {Math.abs(data.uploaded.totalDebit - data.uploaded.totalCredit) >= 0.01 && (
+                        <Badge
+                          variant="outline"
+                          className="text-[10px] whitespace-nowrap bg-amber-50 text-amber-700 border-amber-200"
+                        >
+                          Δ {fmt(data.uploaded.totalDebit - data.uploaded.totalCredit)}
+                        </Badge>
+                      )}
+                    </td>
+                  </tr>
+                </tfoot>
+              )}
             </table>
           </div>
 
@@ -1119,6 +1154,7 @@ export default function SaisieTab({ clientId }: { clientId: string }) {
               pieces: data.refs.pieces,
               tiers: data.refs.tiers.map((t) => t.nTiers),
               factures: data.refs.factures,
+              rubriques: data.refs.rubriques,
             }}
           />
 

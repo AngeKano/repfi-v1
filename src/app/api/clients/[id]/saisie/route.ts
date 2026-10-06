@@ -187,9 +187,9 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
         client: { id: check.client!.id, name: check.client!.name },
         periods: [],
         period: null,
-        uploaded: { rows: [], page: 1, pageSize: PAGE_SIZE, total: 0, totalPages: 0 },
+        uploaded: { rows: [], page: 1, pageSize: PAGE_SIZE, total: 0, totalPages: 0, totalDebit: 0, totalCredit: 0 },
         manual: [],
-        refs: { comptes: [], tiers: [], journaux: [], pieces: [], factures: [] },
+        refs: { comptes: [], tiers: [], journaux: [], pieces: [], factures: [], rubriques: [] },
         balance: { debit: 0, credit: 0, delta: 0 },
       });
     }
@@ -217,7 +217,16 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
              OR positionCaseInsensitive(n_tiers, {s:String}) > 0
              OR positionCaseInsensitive(intitule_tiers, {s:String}) > 0
              OR positionCaseInsensitive(numero_piece, {s:String}) > 0
-             OR positionCaseInsensitive(date_transaction, {s:String}) > 0)`
+             OR positionCaseInsensitive(numero_facture, {s:String}) > 0
+             OR positionCaseInsensitive(code_journal, {s:String}) > 0
+             OR positionCaseInsensitive(rubrique, {s:String}) > 0
+             OR positionCaseInsensitive(date_transaction, {s:String}) > 0
+             -- Montants : on compare la valeur brute et la valeur arrondie,
+             -- pour retrouver aussi bien « 470000 » que « 470000.5 ».
+             OR positionCaseInsensitive(toString(debit), {s:String}) > 0
+             OR positionCaseInsensitive(toString(credit), {s:String}) > 0
+             OR positionCaseInsensitive(toString(toInt64(round(debit))), {s:String}) > 0
+             OR positionCaseInsensitive(toString(toInt64(round(credit))), {s:String}) > 0)`
       : "";
     // La vue du grand livre couvre le batch importé ET le batch des saisies de
     // la période : l'origine de chaque ligne est exposée via la colonne Flags.
@@ -231,8 +240,11 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     const offset = (page - 1) * PAGE_SIZE;
     let uploadedRows: unknown[] = [];
     let total = 0;
+    // Totaux sur TOUTES les lignes filtrées, pas seulement la page affichée.
+    let totalDebit = 0;
+    let totalCredit = 0;
     try {
-      const [dataRes, countRes] = await Promise.all([
+      const [dataRes, countRes, sumRes] = await Promise.all([
         clickhouse.query({
           query: `
             SELECT date_transaction, compte, intitule_compte, n_tiers, intitule_tiers,
@@ -252,6 +264,13 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
           query_params: qParams,
           format: "JSONEachRow",
         }),
+        clickhouse.query({
+          query: `SELECT sum(debit) AS d, sum(credit) AS c
+                  FROM ${dbName}.grand_livre
+                  WHERE batch_id IN ({viewBatchIds:Array(String)}) ${searchFilter} ${chFilter.sql}`,
+          query_params: qParams,
+          format: "JSONEachRow",
+        }),
       ]);
       const rawRows = (await dataRes.json()) as Array<Record<string, unknown>>;
       uploadedRows = rawRows.map((r) => ({
@@ -260,6 +279,9 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       }));
       const cRows = (await countRes.json()) as Array<{ c: string }>;
       total = parseInt(cRows[0]?.c || "0", 10);
+      const sRows = (await sumRes.json()) as Array<{ d: string; c: string }>;
+      totalDebit = parseFloat(sRows[0]?.d || "0") || 0;
+      totalCredit = parseFloat(sRows[0]?.c || "0") || 0;
     } catch (e) {
       console.error("[saisie GET] ClickHouse indisponible:", e);
     }
@@ -274,6 +296,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     let journaux: string[] = [];
     let pieces: string[] = [];
     let factures: string[] = [];
+    let rubriques: string[] = [];
     try {
       const distinct = async (col: string, limit: number) => {
         const r = await clickhouse.query({
@@ -285,10 +308,11 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
         });
         return ((await r.json()) as Array<{ v: string }>).map((x) => x.v);
       };
-      [journaux, pieces, factures] = await Promise.all([
+      [journaux, pieces, factures, rubriques] = await Promise.all([
         distinct("code_journal", 300),
         distinct("numero_piece", 5000),
         distinct("numero_facture", 5000),
+        distinct("rubrique", 300),
       ]);
     } catch (e) {
       console.error("[saisie GET] options de filtres indisponibles:", e);
@@ -422,9 +446,11 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
         pageSize: PAGE_SIZE,
         total,
         totalPages: Math.max(1, Math.ceil(total / PAGE_SIZE)),
+        totalDebit,
+        totalCredit,
       },
       manual,
-      refs: { comptes, tiers, journaux, pieces, factures },
+      refs: { comptes, tiers, journaux, pieces, factures, rubriques },
       balance: { debit, credit, delta: debit - credit },
     });
   } catch (error) {
