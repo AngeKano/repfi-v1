@@ -196,7 +196,7 @@ const DeclarationTabs: React.FC<DeclarationTabsProps> = ({ clientId }) => {
         <Card className="p-6 border-[#D0E3F5]">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-semibold text-[#00122E]">
-              Périodes de reporting financier
+              Documents / Fichiers Comptables
             </h2>
             {/* Filters */}
             <div className="flex flex-wrap items-center gap-3 mb-4">
@@ -387,7 +387,7 @@ const DeclarationTabs: React.FC<DeclarationTabsProps> = ({ clientId }) => {
                 className="gap-2 bg-gradient-to-r from-[#0077C3] to-[#0095F4] hover:from-[#005992] hover:to-[#0077C3] rounded-full"
               >
                 <Plus className="w-4 h-4" />
-                Créer un reporting
+                Importer documents
               </Button>
             </div>
           )}

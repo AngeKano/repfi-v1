@@ -393,7 +393,7 @@ export function UploadFileDialog({
           <div className="flex items-start justify-between mb-5">
             <div>
               <DialogTitle className="text-lg font-bold text-[#00122E]">
-                Créer un reporting
+                Importer documents
               </DialogTitle>
               <DialogDescription className="text-sm text-[#335890]">
                 {step === 1

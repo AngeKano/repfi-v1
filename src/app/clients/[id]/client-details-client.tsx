@@ -33,7 +33,7 @@ import {
   PiBookOpenDuotone,
   PiFileTextDuotone,
   PiUsersThreeDuotone,
-  PiChartBarHorizontalDuotone,
+  PiUploadSimpleDuotone,
   PiFilesDuotone,
   PiNotePencilDuotone,
 } from "react-icons/pi";
@@ -77,7 +77,7 @@ const CLIENT_TABS = [
   {
     id: "declaration",
     label: "Import",
-    icon: PiChartBarHorizontalDuotone,
+    icon: PiUploadSimpleDuotone,
   },
   { id: "saisie", label: "Comptabilité", icon: PiNotePencilDuotone },
   { id: "files", label: "Autres Fichiers", icon: PiFilesDuotone },
@@ -403,7 +403,7 @@ export default function ClientDetailsClient({
                 className="gap-2 bg-gradient-to-r from-[#0077C3] to-[#0095F4] hover:from-[#005992] hover:to-[#0077C3] rounded-full"
               >
                 <Plus className="w-4 h-4" />
-                Créer un reporting
+                Importer documents
               </Button>
             </div>
 
@@ -452,7 +452,7 @@ export default function ClientDetailsClient({
                         className="gap-2 bg-gradient-to-r from-[#0077C3] to-[#0095F4] hover:from-[#005992] hover:to-[#0077C3] rounded-full"
                       >
                         <Plus className="w-4 h-4" />
-                        Créer un reporting
+                        Importer documents
                       </Button>
                     </Card>
                   );
@@ -507,7 +507,7 @@ export default function ClientDetailsClient({
                       className="gap-2 bg-gradient-to-r from-[#0077C3] to-[#0095F4] hover:from-[#005992] hover:to-[#0077C3] rounded-full"
                     >
                       <Plus className="w-4 h-4" />
-                      Créer un reporting
+                      Importer documents
                     </Button>
                   </Card>
                 ))}
@@ -593,7 +593,7 @@ export default function ClientDetailsClient({
                       className="gap-2 bg-gradient-to-r from-[#0077C3] to-[#0095F4] hover:from-[#005992] hover:to-[#0077C3] rounded-full"
                     >
                       <Plus className="w-4 h-4" />
-                      Créer un reporting
+                      Importer documents
                     </Button>
                   </Card>
                 ))}
@@ -721,7 +721,7 @@ export default function ClientDetailsClient({
                       className="gap-2 bg-gradient-to-r from-[#0077C3] to-[#0095F4] hover:from-[#005992] hover:to-[#0077C3] rounded-full"
                     >
                       <Plus className="w-4 h-4" />
-                      Créer un reporting
+                      Importer documents
                     </Button>
                   </Card>
                 ))}
