@@ -18,6 +18,7 @@ export interface GlFilters {
   pieces: string[];
   tiers: string[];
   factures: string[];
+  rubriques: string[];
   flags: string[];
 }
 
@@ -37,6 +38,7 @@ export function parseGlFilters(sp: URLSearchParams): GlFilters {
     pieces: list("piece"),
     tiers: list("tiers"),
     factures: list("facture"),
+    rubriques: list("rubrique"),
     flags: list("flag"),
   };
 }
@@ -50,6 +52,7 @@ export function hasAnyFilter(f: GlFilters): boolean {
     f.pieces.length > 0 ||
     f.tiers.length > 0 ||
     f.factures.length > 0 ||
+    f.rubriques.length > 0 ||
     (f.flags.length > 0 && f.flags.length < 2)
   );
 }
@@ -96,6 +99,10 @@ export function buildClickhouseFilter(f: GlFilters): {
     parts.push(`AND numero_facture IN ({fFactures:Array(String)})`);
     params.fFactures = f.factures;
   }
+  if (f.rubriques.length) {
+    parts.push(`AND rubrique IN ({fRubriques:Array(String)})`);
+    params.fRubriques = f.rubriques;
+  }
 
   // Flags : dérivés du batch_id (les saisies vivent dans le batch `manual_…`).
   const wantImport = f.flags.includes(FLAG_IMPORT);
@@ -129,5 +136,7 @@ export function buildManualWhere(f: GlFilters): Record<string, unknown> | null {
   if (f.pieces.length) where.numeroPiece = { in: f.pieces };
   if (f.tiers.length) where.nTiers = { in: f.tiers };
   if (f.factures.length) where.numeroFacture = { in: f.factures };
+  // Les saisies portent la rubrique héritée du compte.
+  if (f.rubriques.length) where.rubrique = { in: f.rubriques };
   return where;
 }

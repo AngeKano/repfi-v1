@@ -18,6 +18,7 @@ export interface GlFilterValues {
   pieces: string[];
   tiers: string[];
   factures: string[];
+  rubriques: string[];
   flags: string[];
 }
 
@@ -29,6 +30,7 @@ export const EMPTY_GL_FILTERS: GlFilterValues = {
   pieces: [],
   tiers: [],
   factures: [],
+  rubriques: [],
   flags: [],
 };
 
@@ -38,6 +40,7 @@ export interface GlFilterOptions {
   pieces: string[];
   tiers: string[];
   factures: string[];
+  rubriques: string[];
 }
 
 // Sérialise les filtres pour les routes /saisie et /saisie/export.
@@ -50,6 +53,7 @@ export function glFiltersToQuery(f: GlFilterValues): URLSearchParams {
   f.pieces.forEach((v) => qs.append("piece", v));
   f.tiers.forEach((v) => qs.append("tiers", v));
   f.factures.forEach((v) => qs.append("facture", v));
+  f.rubriques.forEach((v) => qs.append("rubrique", v));
   f.flags.forEach((v) => qs.append("flag", v));
   return qs;
 }
@@ -63,6 +67,7 @@ export function countActiveFilters(f: GlFilterValues): number {
     f.pieces.length +
     f.tiers.length +
     f.factures.length +
+    f.rubriques.length +
     f.flags.length
   );
 }
@@ -219,6 +224,12 @@ export function GlFiltersPanel({
           options={options.factures}
           selected={value.factures}
           onChange={(v) => set({ factures: v })}
+        />
+        <MultiSelect
+          label="Rubrique"
+          options={options.rubriques}
+          selected={value.rubriques}
+          onChange={(v) => set({ rubriques: v })}
         />
         <MultiSelect
           label="Flags"

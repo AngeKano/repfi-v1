@@ -68,18 +68,18 @@ const CLIENT_TABS = [
   { id: "overview", label: "Synthèse Financière", icon: PiChartScatterDuotone },
   { id: "chiffres", label: "Chiffres d'affaires", icon: PiCoinsDuotone },
   { id: "resultats", label: "Résultats", icon: PiChartDonutDuotone },
-  { id: "recouvrement", label: "Recouvrement", icon: PiHandCoinsDuotone },
-  { id: "dettes", label: "Dettes", icon: PiScalesDuotone },
+  { id: "recouvrement", label: "Recouvrement Clients", icon: PiHandCoinsDuotone },
+  { id: "dettes", label: "Règlement Fournisseurs", icon: PiScalesDuotone },
   { id: "dettes-ct", label: "Dettes court terme", icon: PiMoneyWavyDuotone },
   { id: "etats", label: "États Financiers", icon: PiFileTextDuotone },
   { id: "bilan", label: "Bilan d'activité", icon: PiBookOpenDuotone },
   { id: "members", label: "Membres", icon: PiUsersThreeDuotone },
   {
     id: "declaration",
-    label: "Reporting Financier",
+    label: "Import",
     icon: PiChartBarHorizontalDuotone,
   },
-  { id: "saisie", label: "Saisie", icon: PiNotePencilDuotone },
+  { id: "saisie", label: "Comptabilité", icon: PiNotePencilDuotone },
   { id: "files", label: "Autres Fichiers", icon: PiFilesDuotone },
 ];
 
