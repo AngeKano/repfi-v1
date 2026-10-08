@@ -30,6 +30,7 @@ import {
   PiHandCoinsDuotone,
   PiScalesDuotone,
   PiMoneyWavyDuotone,
+  PiWalletDuotone,
   PiBookOpenDuotone,
   PiFileTextDuotone,
   PiUsersThreeDuotone,
@@ -44,6 +45,7 @@ import DeclarationTabs from "./declaration/declaration-tabs";
 import ClientReportingChart from "@/components/reporting/client-reporting-chart";
 import ClientDettesTab from "@/components/reporting/client-dettes-tab";
 import ClientDettesCourtTermeTab from "@/components/reporting/client-dettes-court-terme-tab";
+import ClientTresorerieTab from "@/components/reporting/client-tresorerie-tab";
 import ClientBilanTab from "@/components/reporting/client-bilan-tab";
 import ClientEtatsFinanciersTab from "@/components/reporting/client-etats-financiers-tab";
 import { UploadFileDialog } from "./upload-file-dialog";
@@ -71,6 +73,7 @@ const CLIENT_TABS = [
   { id: "recouvrement", label: "Recouvrement Clients", icon: PiHandCoinsDuotone },
   { id: "dettes", label: "Règlement Fournisseurs", icon: PiScalesDuotone },
   { id: "dettes-ct", label: "Dettes court terme", icon: PiMoneyWavyDuotone },
+  { id: "tresorerie", label: "Trésorerie", icon: PiWalletDuotone },
   { id: "etats", label: "États Financiers", icon: PiFileTextDuotone },
   { id: "bilan", label: "Bilan d'activité", icon: PiBookOpenDuotone },
   { id: "members", label: "Membres", icon: PiUsersThreeDuotone },
@@ -91,6 +94,7 @@ const REPORTING_TAB_IDS = new Set([
   "recouvrement",
   "dettes",
   "dettes-ct",
+  "tresorerie",
   "etats",
   "bilan",
   "saisie",
@@ -535,6 +539,30 @@ export default function ClientDetailsClient({
                     </h3>
                     <p className="text-sm text-[#335890]">
                       Importez un grand livre pour analyser les dettes court terme.
+                    </p>
+                  </Card>
+                ))}
+
+              {activeTab === "tresorerie" &&
+                (hasReporting ? (
+                  <ClientTresorerieTab
+                    clientId={client.id}
+                    year={year}
+                    setYear={setYear}
+                    periodType={periodType}
+                    setPeriodType={setPeriodType}
+                    selectedMonth={selectedMonth}
+                    setSelectedMonth={setSelectedMonth}
+                    cumulGranularity={cumulGranularity}
+                    setCumulGranularity={setCumulGranularity}
+                  />
+                ) : (
+                  <Card className="p-12 border-[#D0E3F5] text-center">
+                    <h3 className="text-lg font-semibold text-[#00122E] mb-1">
+                      Aucun reporting financier
+                    </h3>
+                    <p className="text-sm text-[#335890]">
+                      Importez un grand livre pour analyser la trésorerie.
                     </p>
                   </Card>
                 ))}
