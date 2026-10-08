@@ -159,7 +159,7 @@ async function requireClient(id: string, companyId: string) {
 
 // ============================================================================
 // GET — récap paginé du grand livre + lignes saisies + listes de référence.
-// ?periodId=<id>&page=<n>
+// ?year=<AAAA>&page=<n>
 // ============================================================================
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -186,7 +186,10 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       return NextResponse.json({
         client: { id: check.client!.id, name: check.client!.name },
         periods: [],
-        period: null,
+        annees: [],
+        annee: null,
+        periodesAnnee: [],
+        bornes: null,
         uploaded: { rows: [], page: 1, pageSize: PAGE_SIZE, total: 0, totalPages: 0, totalDebit: 0, totalCredit: 0 },
         manual: [],
         refs: { comptes: [], tiers: [], journaux: [], pieces: [], factures: [], rubriques: [] },
@@ -194,8 +197,21 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       });
     }
 
-    const periodId = searchParams.get("periodId") || periods[0].id;
-    const period = periods.find((p) => p.id === periodId) || periods[0];
+    // On raisonne par EXERCICE et non par période d'import : un utilisateur
+    // pense en années comptables, pas en lots de fichiers déposés.
+    const annees = [...new Set(periods.map((p) => p.year))].sort((a, b) => b - a);
+    const anneeDemandee = parseInt(searchParams.get("year") || "", 10);
+    const annee = annees.includes(anneeDemandee) ? anneeDemandee : annees[0];
+    const periodesAnnee = periods.filter((p) => p.year === annee);
+    // Bornes de saisie : du début de la première période à la fin de la dernière.
+    const debutAnnee = periodesAnnee.reduce(
+      (min, p) => (p.periodStart < min ? p.periodStart : min),
+      periodesAnnee[0].periodStart,
+    );
+    const finAnnee = periodesAnnee.reduce(
+      (max, p) => (p.periodEnd > max ? p.periodEnd : max),
+      periodesAnnee[0].periodEnd,
+    );
     const realBatchIds = periods.map((p) => p.batchId).filter(Boolean);
 
     // Recherche + tri (colonnes whitelistées → pas d'injection ; la valeur de
@@ -230,7 +246,10 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       : "";
     // La vue du grand livre couvre le batch importé ET le batch des saisies de
     // la période : l'origine de chaque ligne est exposée via la colonne Flags.
-    const viewBatchIds = [period.batchId, manualBatchId(id, period.year)].filter(Boolean);
+    const viewBatchIds = [
+      ...periodesAnnee.map((p) => p.batchId),
+      manualBatchId(id, annee),
+    ].filter(Boolean);
     const glFilters = parseGlFilters(searchParams);
     const chFilter = buildClickhouseFilter(glFilters);
     const qParams: Record<string, unknown> = { viewBatchIds, ...chFilter.params };
@@ -425,7 +444,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 
     // Lignes saisies de la période (éditables).
     const manual = await prisma.manualLedgerEntry.findMany({
-      where: { clientId: id, comptablePeriodId: period.id },
+      where: { clientId: id, year: annee },
       orderBy: [{ dateTransaction: "asc" }, { numeroPiece: "asc" }, { createdAt: "asc" }],
     });
     const debit = manual.reduce((s, m) => s + m.debit, 0);
@@ -439,7 +458,16 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
         periodStart: p.periodStart,
         periodEnd: p.periodEnd,
       })),
-      period: { id: period.id, year: period.year, periodStart: period.periodStart, periodEnd: period.periodEnd },
+      annees,
+      annee,
+      // Périodes de l'exercice : servent à rattacher une écriture saisie à la
+      // bonne période comptable au moment de l'enregistrement.
+      periodesAnnee: periodesAnnee.map((p) => ({
+        id: p.id,
+        periodStart: p.periodStart,
+        periodEnd: p.periodEnd,
+      })),
+      bornes: { debut: debutAnnee, fin: finAnnee },
       uploaded: {
         rows: uploadedRows,
         page,
@@ -470,7 +498,7 @@ const ligneSchema = z.object({
   credit: z.number().default(0),
 });
 const ecritureSchema = z.object({
-  periodId: z.string().min(1),
+  year: z.number().int().min(1900).max(2999),
   dateTransaction: z.string().min(1),
   codeJournal: z.string().trim().min(1),
   libelle: z.string().trim().max(300).optional().default(""),
@@ -529,7 +557,7 @@ async function prepareEcritureRows(opts: {
   if (isNaN(dateEcriture.getTime()))
     return { error: NextResponse.json({ error: "Date invalide." }, { status: 400 }) };
   if (dateEcriture < new Date(period.periodStart) || dateEcriture > new Date(period.periodEnd))
-    return { error: NextResponse.json({ error: "La date doit être dans la période sélectionnée." }, { status: 400 }) };
+    return { error: NextResponse.json({ error: "La date doit être dans l'exercice sélectionné." }, { status: 400 }) };
 
   // Équilibre (bloquant).
   const sumD = lignes.reduce((s, l) => s + l.debit, 0);
@@ -596,6 +624,33 @@ async function prepareEcritureRows(opts: {
   return { rows };
 }
 
+/**
+ * Résout un EXERCICE en contexte de saisie. L'utilisateur choisit une année,
+ * pas un lot de fichiers : on rattache la ligne saisie à la période d'import
+ * qui contient sa date (à défaut la dernière de l'exercice), tout en bornant
+ * la validation à l'exercice entier.
+ */
+async function resolveExercice(
+  clientId: string,
+  year: number,
+  dateStr: string,
+): Promise<PeriodLite | null> {
+  const periods = await prisma.comptablePeriod.findMany({
+    where: { clientId, year },
+    orderBy: { periodStart: "asc" },
+    select: { id: true, periodStart: true, periodEnd: true },
+  });
+  if (periods.length === 0) return null;
+  const d = new Date(dateStr);
+  const dans = !isNaN(d.getTime())
+    ? periods.find((p) => d >= new Date(p.periodStart) && d <= new Date(p.periodEnd))
+    : undefined;
+  const rattachement = dans ?? periods[periods.length - 1];
+  const debut = periods.reduce((min, p) => (p.periodStart < min ? p.periodStart : min), periods[0].periodStart);
+  const fin = periods.reduce((max, p) => (p.periodEnd > max ? p.periodEnd : max), periods[0].periodEnd);
+  return { id: rattachement.id, year, periodStart: debut, periodEnd: fin };
+}
+
 // ============================================================================
 // POST — crée une écriture (ensemble de lignes) équilibrée.
 // ============================================================================
@@ -612,13 +667,10 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     const parsed = ecritureSchema.safeParse(body);
     if (!parsed.success)
       return NextResponse.json({ error: parsed.error.issues[0]?.message || "Données invalides" }, { status: 400 });
-    const { periodId, codeJournal, libelle, lignes } = parsed.data;
+    const { year, codeJournal, libelle, lignes } = parsed.data;
 
-    const period = await prisma.comptablePeriod.findFirst({
-      where: { id: periodId, clientId: id },
-      select: { id: true, year: true, periodStart: true, periodEnd: true },
-    });
-    if (!period) return NextResponse.json({ error: "Période introuvable" }, { status: 404 });
+    const period = await resolveExercice(id, year, parsed.data.dateTransaction);
+    if (!period) return NextResponse.json({ error: "Exercice introuvable" }, { status: 404 });
 
     const numeroPiece = parsed.data.numeroPiece || `SAI-${period.year}-${Date.now().toString().slice(-6)}`;
 
@@ -662,17 +714,16 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     const parsed = ecritureUpdateSchema.safeParse(body);
     if (!parsed.success)
       return NextResponse.json({ error: parsed.error.issues[0]?.message || "Données invalides" }, { status: 400 });
-    const { periodId, codeJournal, libelle, lignes, numeroPiece } = parsed.data;
+    const { year, codeJournal, libelle, lignes, numeroPiece } = parsed.data;
 
-    const period = await prisma.comptablePeriod.findFirst({
-      where: { id: periodId, clientId: id },
-      select: { id: true, year: true, periodStart: true, periodEnd: true },
-    });
-    if (!period) return NextResponse.json({ error: "Période introuvable" }, { status: 404 });
+    const period = await resolveExercice(id, year, parsed.data.dateTransaction);
+    if (!period) return NextResponse.json({ error: "Exercice introuvable" }, { status: 404 });
 
-    // L'écriture doit exister (lignes manuelles partageant ce n° pièce).
+    // L'écriture doit exister (lignes manuelles partageant ce n° pièce) ;
+    // elle est recherchée sur tout l'exercice, ses lignes pouvant être
+    // rattachées à des périodes d'import différentes.
     const existing = await prisma.manualLedgerEntry.findFirst({
-      where: { clientId: id, comptablePeriodId: period.id, numeroPiece },
+      where: { clientId: id, year, numeroPiece },
       select: { id: true, createdById: true },
     });
     if (!existing) return NextResponse.json({ error: "Écriture introuvable" }, { status: 404 });
@@ -693,7 +744,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     // Remplace atomiquement toutes les lignes de l'écriture.
     await prisma.$transaction([
       prisma.manualLedgerEntry.deleteMany({
-        where: { clientId: id, comptablePeriodId: period.id, numeroPiece },
+        where: { clientId: id, year, numeroPiece },
       }),
       prisma.manualLedgerEntry.createMany({ data: prepared.rows }),
     ]);
@@ -707,8 +758,8 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
 
 // ============================================================================
 // DELETE — supprime des écritures saisies de la période. Trois modes :
-//   ?periodId=&scope=all                 → toutes les écritures de la période
-//   ?periodId=&numeroPiece=A&numeroPiece=B → les écritures sélectionnées (1..n)
+//   ?year=&scope=all                 → toutes les écritures de l'exercice
+//   ?year=&numeroPiece=A&numeroPiece=B → les écritures sélectionnées (1..n)
 // Ne touche jamais les lignes uploadées. Pour retirer une seule ligne, passer
 // par la modification de l'écriture (PUT).
 // ============================================================================
@@ -722,34 +773,29 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
     if (check.error) return check.error;
 
     const { searchParams } = new URL(req.url);
-    const periodId = searchParams.get("periodId");
     const numeroPieces = searchParams.getAll("numeroPiece").filter((p) => p.trim() !== "");
     const scope = searchParams.get("scope");
-    if (!periodId) return NextResponse.json({ error: "Période requise" }, { status: 400 });
-
-    const period = await prisma.comptablePeriod.findFirst({
-      where: { id: periodId, clientId: id },
-      select: { id: true, year: true },
-    });
-    if (!period) return NextResponse.json({ error: "Période introuvable" }, { status: 404 });
+    const annee = parseInt(searchParams.get("year") || "", 10);
+    if (!Number.isFinite(annee))
+      return NextResponse.json({ error: "Exercice requis" }, { status: 400 });
 
     let deleted: number;
     if (scope === "all") {
       const del = await prisma.manualLedgerEntry.deleteMany({
-        where: { clientId: id, comptablePeriodId: period.id },
+        where: { clientId: id, year: annee },
       });
       deleted = del.count;
     } else {
       if (numeroPieces.length === 0)
         return NextResponse.json({ error: "Aucune écriture sélectionnée" }, { status: 400 });
       const del = await prisma.manualLedgerEntry.deleteMany({
-        where: { clientId: id, comptablePeriodId: period.id, numeroPiece: { in: numeroPieces } },
+        where: { clientId: id, year: annee, numeroPiece: { in: numeroPieces } },
       });
       if (del.count === 0) return NextResponse.json({ error: "Écriture(s) introuvable(s)" }, { status: 404 });
       deleted = del.count;
     }
 
-    await syncManualBatch(id, period.year);
+    await syncManualBatch(id, annee);
     return NextResponse.json({ ok: true, deleted });
   } catch (error) {
     console.error("Saisie DELETE error:", error);

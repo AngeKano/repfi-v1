@@ -71,18 +71,23 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       return NextResponse.json({ error: "Accès non autorisé" }, { status: 403 });
 
     const { searchParams } = new URL(req.url);
-    const periodId = searchParams.get("periodId");
-    const period = periodId
-      ? await prisma.comptablePeriod.findFirst({
-          where: { id: periodId, clientId: id },
-          select: { id: true, year: true, batchId: true, periodStart: true, periodEnd: true },
-        })
-      : await prisma.comptablePeriod.findFirst({
-          where: { clientId: id },
-          orderBy: [{ year: "desc" }, { periodStart: "desc" }],
-          select: { id: true, year: true, batchId: true, periodStart: true, periodEnd: true },
-        });
-    if (!period) return NextResponse.json({ error: "Aucune période" }, { status: 404 });
+    // Exercice exporté : ?year=AAAA, sinon le plus récent. Un exercice peut
+    // regrouper plusieurs imports, donc plusieurs batchs ClickHouse.
+    const periods = await prisma.comptablePeriod.findMany({
+      where: { clientId: id },
+      orderBy: [{ year: "desc" }, { periodStart: "desc" }],
+      select: { id: true, year: true, batchId: true },
+    });
+    if (periods.length === 0)
+      return NextResponse.json({ error: "Aucune période" }, { status: 404 });
+    const anneeDemandee = parseInt(searchParams.get("year") || "", 10);
+    const annee = periods.some((p) => p.year === anneeDemandee)
+      ? anneeDemandee
+      : periods[0].year;
+    const batchIds = periods
+      .filter((p) => p.year === annee)
+      .map((p) => p.batchId)
+      .filter((b): b is string => !!b);
 
     const dbName = getClickhouseDbName(id);
     const refExpr = await bilanRefExpr(clickhouse, dbName);
@@ -92,8 +97,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     if (searchParams.get("debug") === "columns") {
       try {
         const dbg = await clickhouse.query({
-          query: `SELECT * FROM ${dbName}.grand_livre WHERE batch_id = {batchId:String} LIMIT 1`,
-          query_params: { batchId: period.batchId },
+          query: `SELECT * FROM ${dbName}.grand_livre WHERE batch_id IN ({batchIds:Array(String)}) LIMIT 1`,
+          query_params: { batchIds },
           format: "JSONEachRow",
         });
         const first = ((await dbg.json()) as Array<Record<string, unknown>>)[0] || {};
@@ -115,11 +120,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     // Tables de référence bâties sur TOUS les batchs du client : l'intitulé du
     // compte / du tiers peut être absent d'un batch mais présent dans un autre
     // (même logique que l'onglet Saisie, anyIf sur valeur non vide).
-    const allPeriods = await prisma.comptablePeriod.findMany({
-      where: { clientId: id },
-      select: { batchId: true },
-    });
-    const realBatchIds = allPeriods.map((p) => p.batchId).filter((b): b is string => !!b);
+    const realBatchIds = periods.map((p) => p.batchId).filter((b): b is string => !!b);
     const compteMap = new Map<string, { intitule: string; rubrique: string; bilan: string }>();
     const tiersMap = new Map<string, { intitule: string; type: string }>();
     if (realBatchIds.length > 0) {
@@ -169,13 +170,13 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
         query: `
           SELECT *
           FROM ${dbName}.grand_livre
-          WHERE batch_id = {batchId:String}
+          WHERE batch_id IN ({batchIds:Array(String)})
           ${chFilter.sql}
           ORDER BY substring(date_transaction, 7, 4),
                    substring(date_transaction, 4, 2),
                    substring(date_transaction, 1, 2)
         `,
-        query_params: { batchId: period.batchId, ...chFilter.params },
+        query_params: { batchIds, ...chFilter.params },
         format: "JSONEachRow",
       });
       const uploaded = (await res.json()) as Array<Record<string, unknown>>;
@@ -239,7 +240,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       manualWhere === null
         ? []
         : await prisma.manualLedgerEntry.findMany({
-            where: { clientId: id, comptablePeriodId: period.id, ...manualWhere },
+            where: { clientId: id, year: annee, ...manualWhere },
             orderBy: [{ dateTransaction: "asc" }, { numeroPiece: "asc" }, { createdAt: "asc" }],
           });
     for (const m of manual) {
@@ -276,7 +277,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     const buf = XLSX.write(wb, { type: "buffer", bookType: "xlsx" }) as Buffer;
 
     const safeName = client.name.replace(/[^a-zA-Z0-9]/g, "_");
-    const fileName = `GRAND_LIVRE_${safeName}_${period.year}_saisies.xlsx`;
+    const fileName = `GRAND_LIVRE_${safeName}_${annee}_saisies.xlsx`;
 
     return new NextResponse(new Uint8Array(buf), {
       status: 200,

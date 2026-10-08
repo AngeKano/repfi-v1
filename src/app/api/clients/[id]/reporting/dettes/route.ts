@@ -102,7 +102,14 @@ function getYearToDateMonths(
   return months;
 }
 
-type RubriqueTotals = { credit: number; debit: number };
+type RubriqueTotals = {
+  credit: number;
+  debit: number;
+  // Mêmes flux en excluant les comptes 408* (fournisseurs, factures non
+  // parvenues) : ils ne correspondent pas à un règlement fournisseur réel.
+  creditH408: number;
+  debitH408: number;
+};
 
 // ----------------------------------------------------------------------------
 // Récupère, par (année, mois, rubrique bilan), la somme des crédits (dette née)
@@ -123,7 +130,9 @@ async function recupererDettesParYearMonth(
         substring(date_transaction, 4, 2) as month,
         ${refExpr} as rubrique,
         sum(credit) as dette_nee,
-        sum(debit) as rembourse
+        sum(debit) as rembourse,
+        sumIf(credit, NOT startsWith(compte, '408')) as dette_nee_h408,
+        sumIf(debit, NOT startsWith(compte, '408')) as rembourse_h408
       FROM ${dbName}.grand_livre
       WHERE batch_id IN ({batchIds:Array(String)})
         AND ${refExpr} IN ({rubriques:Array(String)})
@@ -140,6 +149,8 @@ async function recupererDettesParYearMonth(
     rubrique: string;
     dette_nee: string;
     rembourse: string;
+    dette_nee_h408: string;
+    rembourse_h408: string;
   }>;
 
   for (const row of rows) {
@@ -149,6 +160,8 @@ async function recupererDettesParYearMonth(
     byRubrique.set(row.rubrique, {
       credit: parseFloat(row.dette_nee) || 0,
       debit: parseFloat(row.rembourse) || 0,
+      creditH408: parseFloat(row.dette_nee_h408) || 0,
+      debitH408: parseFloat(row.rembourse_h408) || 0,
     });
   }
 
@@ -179,7 +192,9 @@ async function recupererDettesParJour(
         substring(date_transaction, 1, 2) as day,
         ${refExpr} as rubrique,
         sum(credit) as dette_nee,
-        sum(debit) as rembourse
+        sum(debit) as rembourse,
+        sumIf(credit, NOT startsWith(compte, '408')) as dette_nee_h408,
+        sumIf(debit, NOT startsWith(compte, '408')) as rembourse_h408
       FROM ${dbName}.grand_livre
       WHERE batch_id IN ({batchIds:Array(String)})
         AND ${refExpr} IN ({rubriques:Array(String)})
@@ -202,6 +217,8 @@ async function recupererDettesParJour(
     rubrique: string;
     dette_nee: string;
     rembourse: string;
+    dette_nee_h408: string;
+    rembourse_h408: string;
   }>;
 
   for (const row of rows) {
@@ -210,6 +227,8 @@ async function recupererDettesParJour(
     result.get(day)!.set(row.rubrique, {
       credit: parseFloat(row.dette_nee) || 0,
       debit: parseFloat(row.rembourse) || 0,
+      creditH408: parseFloat(row.dette_nee_h408) || 0,
+      debitH408: parseFloat(row.rembourse_h408) || 0,
     });
   }
 
@@ -364,22 +383,23 @@ function netForRubrique(
   return t ? t.credit - t.debit : 0;
 }
 
-function flowsForAllDebts(byRubrique: Map<string, RubriqueTotals> | undefined): {
+/**
+ * Flux du RÈGLEMENT FOURNISSEURS : rubrique DJ uniquement, hors comptes 408*.
+ *
+ * L'onglet suit le cycle d'achat fournisseur — ni les dettes sociales, ni
+ * fiscales, ni HAO (elles ont leur propre onglet « Dettes court terme »). Les
+ * comptes 408* (factures non parvenues) sont écartés : ce sont des charges
+ * estimées, pas des dettes à décaisser.
+ */
+function flowsFournisseurs(byRubrique: Map<string, RubriqueTotals> | undefined): {
   detteNee: number;
   rembourse: number;
 } {
-  let detteNee = 0;
-  let rembourse = 0;
-  if (byRubrique) {
-    for (const code of ALL_DEBT_RUBRIQUE_CODES) {
-      const t = byRubrique.get(code);
-      if (t) {
-        detteNee += t.credit;
-        rembourse += t.debit;
-      }
-    }
-  }
-  return { detteNee, rembourse };
+  const t = byRubrique?.get(DEBT_RUBRIQUES.fournisseurs);
+  return {
+    detteNee: t?.creditH408 ?? 0,
+    rembourse: t?.debitH408 ?? 0,
+  };
 }
 
 export async function GET(
@@ -475,7 +495,7 @@ export async function GET(
       if (dailyBaseline) {
         for (let m = 1; m < endMonth; m++) {
           const key = `${endYear}-${m.toString().padStart(2, "0")}`;
-          const { detteNee, rembourse } = flowsForAllDebts(monthlyData.get(key));
+          const { detteNee, rembourse } = flowsFournisseurs(monthlyData.get(key));
           cumulDetteNee += detteNee;
           cumulRembourse += rembourse;
         }
@@ -493,7 +513,7 @@ export async function GET(
       for (let d = 1; d <= daysInMonth; d++) {
         const dayKey = d.toString().padStart(2, "0");
         const byRubrique = dailyData.get(dayKey);
-        const { detteNee, rembourse } = flowsForAllDebts(byRubrique);
+        const { detteNee, rembourse } = flowsFournisseurs(byRubrique);
         const dj = byRubrique?.get(DEBT_RUBRIQUES.fournisseurs);
 
         cumulDetteNee += detteNee;
@@ -519,7 +539,7 @@ export async function GET(
       for (const monthInfo of ytdMonths) {
         const key = `${monthInfo.year}-${monthInfo.month.toString().padStart(2, "0")}`;
         const byRubrique = monthlyData.get(key);
-        const { detteNee, rembourse } = flowsForAllDebts(byRubrique);
+        const { detteNee, rembourse } = flowsFournisseurs(byRubrique);
         const dj = byRubrique?.get(DEBT_RUBRIQUES.fournisseurs);
 
         cumulDetteNee += detteNee;
@@ -559,6 +579,9 @@ export async function GET(
     }
 
     const kpis = {
+      // Règlement fournisseurs (DJ hors 408*).
+      dettesFournisseursTTC: cumulDetteNee,
+      decaissementFournisseursTTC: cumulRembourse,
       dettesFournisseurs: netDJ,
       dettesPersonnel: netDK1,
       dettesSociales: netDK2,
