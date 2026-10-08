@@ -322,6 +322,25 @@ export default function SaisieTab({ clientId }: { clientId: string }) {
     [data],
   );
 
+  // Options de filtre affichées « code — libellé ». La valeur filtrée reste le
+  // code ; le libellé n'est là que pour reconnaître la ligne d'un coup d'œil.
+  const optionsJournaux = useMemo(
+    () =>
+      (data?.refs.journaux ?? []).map((code) => ({
+        code,
+        libelle: CODES_JOURNAUX.find((j) => j.code === code)?.label,
+      })),
+    [data],
+  );
+  const optionsComptes = useMemo(
+    () =>
+      (data?.refs.comptes ?? []).map((c) => ({
+        code: c.compte,
+        libelle: c.intitule || undefined,
+      })),
+    [data],
+  );
+
   // Regroupe les lignes saisies en écritures (par n° pièce).
   const ecritures: Ecriture[] = useMemo(() => {
     const map = new Map<string, Ecriture>();
@@ -989,8 +1008,8 @@ export default function SaisieTab({ clientId }: { clientId: string }) {
                 value={filters}
                 onChange={applyFilters}
                 options={{
-                  journaux: data.refs.journaux,
-                  comptes: data.refs.comptes.map((c) => c.compte),
+                  journaux: optionsJournaux,
+                  comptes: optionsComptes,
                   pieces: data.refs.pieces,
                   tiers: data.refs.tiers.map((t) => t.nTiers),
                   factures: data.refs.factures,
@@ -1149,8 +1168,8 @@ export default function SaisieTab({ clientId }: { clientId: string }) {
             value={exportFilters}
             onChange={setExportFilters}
             options={{
-              journaux: data.refs.journaux,
-              comptes: data.refs.comptes.map((c) => c.compte),
+              journaux: optionsJournaux,
+              comptes: optionsComptes,
               pieces: data.refs.pieces,
               tiers: data.refs.tiers.map((t) => t.nTiers),
               factures: data.refs.factures,

@@ -8,6 +8,8 @@ import {
   CA_RUBRIQUES,
   CA_PERIMETRE_SQL,
   CA_MONTANT_SQL,
+  PRODUITS_RUBRIQUES,
+  PRODUITS_PERIMETRE_SQL,
 } from "@/lib/reporting/chiffre-affaires";
 import { CREANCES_CLIENTS_SQL } from "@/lib/reporting/creances";
 
@@ -95,6 +97,7 @@ interface IndicateursFinanciers {
   caTC: number; // Travaux et services vendus
   caTD: number; // Production stockée
   // Agrégats narratifs (onglet Bilan / tunnel de résultat)
+  subventions: number; // TG — subventions d'exploitation
   produitsAdditionnels: number; // TE + TF + TG + TH + TI
   totalAchats: number; // |RA + RB + RC + RD + RE + RF + RG + RH + RI + RJ|
   impotResultat: number; // |RS| (impôts sur le résultat)
@@ -115,6 +118,11 @@ interface DataPoint {
   // CA périodique — valeur du mois seul (sans cumul)
   chiffreAffairesPeriodique: number;
   chiffreAffairesPeriodiqueN1: number;
+  // Subventions d'exploitation (TG), cumulées et périodiques.
+  subventions: number;
+  subventionsN1: number;
+  subventionsPeriodique: number;
+  subventionsPeriodiqueN1: number;
   soldeTresorerie: number;
   soldeTresorerieN1: number;
   margeCommerciale: number;
@@ -574,12 +582,12 @@ async function recupererCAParNature(
           sum(${CA_MONTANT_SQL}) as montant
         FROM ${dbName}.grand_livre
         WHERE batch_id IN ({batchIds:Array(String)})
-          AND ${CA_PERIMETRE_SQL}
+          AND ${PRODUITS_PERIMETRE_SQL}
           ${periodFilter}
         GROUP BY compte
         ORDER BY montant DESC
       `,
-      query_params: { ...baseParams, batchIds, caRubriques: CA_RUBRIQUES },
+      query_params: { ...baseParams, batchIds, produitsRubriques: PRODUITS_RUBRIQUES },
       format: "JSONEachRow",
     });
 
@@ -1045,6 +1053,7 @@ function calculerIndicateursPeriode(
     caTC: rubriquesAgregees.TC,
     caTD: rubriquesAgregees.TD,
     // Agrégats narratifs (onglet Bilan / tunnel de résultat)
+    subventions: rubriquesAgregees.TG,
     produitsAdditionnels:
       rubriquesAgregees.TE +
       rubriquesAgregees.TF +
@@ -1252,6 +1261,8 @@ export async function GET(
       let cumulativeCaTTCN1 = 0;
       let cumulativeCA70N = 0;
       let cumulativeCA70N1 = 0;
+      let cumulTGN = 0;
+      let cumulTGN1 = 0;
       let cumulativeCaEncaisseN1 = 0;
 
       // Baseline : en mode "ytd-day", on pré-charge le cumul des mois
@@ -1310,6 +1321,8 @@ export async function GET(
 
         const sigN = calculerSIG(rubriquesN);
         const sigN1 = calculerSIG(rubriquesN1Jour);
+        cumulTGN += rubriquesN.TG;
+        cumulTGN1 += rubriquesN1Jour.TG;
 
         const tresoJourN = tresorerieParJourN.get(dayStr) || 0;
         const tresoJourN1 = tresorerieParJourN1.get(dayStr) || 0;
@@ -1365,6 +1378,10 @@ export async function GET(
           nbTransactions: fluxN.nbTransactions,
           chiffreAffaires: cumulativeCA70N,
           chiffreAffairesN1: cumulativeCA70N1,
+          subventions: cumulTGN,
+          subventionsN1: cumulTGN1,
+          subventionsPeriodique: rubriquesN.TG,
+          subventionsPeriodiqueN1: rubriquesN1Jour.TG,
           chiffreAffairesPeriodique: ca70JourN,
           chiffreAffairesPeriodiqueN1: ca70JourN1,
           soldeTresorerie: cumulativeTresoN,
@@ -1463,6 +1480,10 @@ export async function GET(
         ),
         tauxRecouvrement:
           indicateursN.tauxRecouvrement - indicateursN1.tauxRecouvrement,
+        subventions: calculerVariation(
+          indicateursN.subventions,
+          indicateursN1.subventions,
+        ),
         caTA: calculerVariation(indicateursN.caTA, indicateursN1.caTA),
         caTB: calculerVariation(indicateursN.caTB, indicateursN1.caTB),
         caTC: calculerVariation(indicateursN.caTC, indicateursN1.caTC),
@@ -1546,6 +1567,8 @@ export async function GET(
     let cumulativeCaEncaisseN1 = 0;
     let cumulativeCA70N = 0;
     let cumulativeCA70N1 = 0;
+    let cumulTGN = 0;
+    let cumulTGN1 = 0;
 
     const endMonth =
       periodType === "ytd" && selectedMonth ? parseInt(selectedMonth) : 12;
@@ -1562,6 +1585,8 @@ export async function GET(
 
       const sigN = calculerSIG(rubriquesN);
       const sigN1 = calculerSIG(rubriquesN1Mois);
+      cumulTGN += rubriquesN.TG;
+      cumulTGN1 += rubriquesN1Mois.TG;
 
       const tresoMoisN = tresorerieParMoisN.get(monthStr) || 0;
       const tresoMoisN1 = tresorerieParMoisN1.get(monthStr) || 0;
@@ -1619,6 +1644,10 @@ export async function GET(
         chiffreAffaires: cumulativeCA70N,
         chiffreAffairesN1: cumulativeCA70N1,
         // CA périodique (valeur du mois seul) — utilisé par le mode Périodique
+        subventions: cumulTGN,
+        subventionsN1: cumulTGN1,
+        subventionsPeriodique: rubriquesN.TG,
+        subventionsPeriodiqueN1: rubriquesN1Mois.TG,
         chiffreAffairesPeriodique: ca70MoisN,
         chiffreAffairesPeriodiqueN1: ca70MoisN1,
         soldeTresorerie: cumulativeTresorerieN,
@@ -1717,6 +1746,10 @@ export async function GET(
       ),
       tauxRecouvrement:
         indicateursN.tauxRecouvrement - indicateursN1.tauxRecouvrement,
+      subventions: calculerVariation(
+        indicateursN.subventions,
+        indicateursN1.subventions,
+      ),
       caTA: calculerVariation(indicateursN.caTA, indicateursN1.caTA),
       caTB: calculerVariation(indicateursN.caTB, indicateursN1.caTB),
       caTC: calculerVariation(indicateursN.caTC, indicateursN1.caTC),
