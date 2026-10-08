@@ -63,12 +63,6 @@ import {
 } from "@/lib/comptable/saisie-refs";
 
 // ==================== Types ====================
-interface PeriodOpt {
-  id: string;
-  year: number;
-  periodStart: string;
-  periodEnd: string;
-}
 interface UploadedRow {
   date_transaction: string;
   compte: string;
@@ -115,8 +109,10 @@ interface TiersRef {
 }
 interface SaisieData {
   client: { id: string; name: string };
-  periods: PeriodOpt[];
-  period: PeriodOpt | null;
+  // Exercices disponibles : la vue se pilote à l'année, pas au lot d'import.
+  annees: number[];
+  annee: number | null;
+  bornes: { debut: string; fin: string } | null;
   uploaded: {
     rows: UploadedRow[];
     page: number;
@@ -206,7 +202,7 @@ function pageWindow(current: number, total: number, size = 5): (number | "…")[
 export default function SaisieTab({ clientId }: { clientId: string }) {
   const [data, setData] = useState<SaisieData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [periodId, setPeriodId] = useState<string>("");
+  const [annee, setAnnee] = useState<number | null>(null);
   const [page, setPage] = useState(1);
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
@@ -237,11 +233,11 @@ export default function SaisieTab({ clientId }: { clientId: string }) {
   const [deletingSel, setDeletingSel] = useState(false);
 
   const fetchData = useCallback(
-    async (pid: string, pg: number, srch: string, sBy: string, sDir: string) => {
+    async (an: number | null, pg: number, srch: string, sBy: string, sDir: string) => {
       setLoading(true);
       try {
         const qs = glFiltersToQuery(filters);
-        if (pid) qs.set("periodId", pid);
+        if (an) qs.set("year", String(an));
         qs.set("page", String(pg));
         if (srch) qs.set("search", srch);
         qs.set("sortBy", sBy);
@@ -250,7 +246,7 @@ export default function SaisieTab({ clientId }: { clientId: string }) {
         if (!res.ok) throw new Error("Erreur API saisie");
         const json = (await res.json()) as SaisieData;
         setData(json);
-        if (json.period && json.period.id !== pid) setPeriodId(json.period.id);
+        if (json.annee && json.annee !== an) setAnnee(json.annee);
       } catch (e) {
         console.error(e);
         toast.error("Erreur lors du chargement de la saisie");
@@ -273,9 +269,9 @@ export default function SaisieTab({ clientId }: { clientId: string }) {
   }, [searchInput]);
 
   useEffect(() => {
-    fetchData(periodId, page, search, sortBy, sortDir);
+    fetchData(annee, page, search, sortBy, sortDir);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [clientId, periodId, page, search, sortBy, sortDir, filters]);
+  }, [clientId, annee, page, search, sortBy, sortDir, filters]);
 
   const toggleSort = (col: string) => {
     if (sortBy === col) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
@@ -304,9 +300,11 @@ export default function SaisieTab({ clientId }: { clientId: string }) {
     </th>
   );
 
-  const period = data?.period ?? null;
-  const dateMin = period ? isoToInput(period.periodStart) : "";
-  const dateMax = period ? isoToInput(period.periodEnd) : "";
+  // L'exercice courant tel que résolu par l'API (le 1er si aucun demandé).
+  const exercice = data?.annee ?? null;
+  const bornes = data?.bornes ?? null;
+  const dateMin = bornes ? isoToInput(bornes.debut) : "";
+  const dateMax = bornes ? isoToInput(bornes.fin) : "";
 
   const compteInfo = useCallback(
     (c: string) => data?.refs.comptes.find((x) => x.compte === c),
@@ -417,7 +415,7 @@ export default function SaisieTab({ clientId }: { clientId: string }) {
     !submitting;
 
   const submitForm = async () => {
-    if (!period) return;
+    if (!exercice) return;
     setSubmitting(true);
     try {
       const payloadLines = lines.map((l) => ({
@@ -434,7 +432,7 @@ export default function SaisieTab({ clientId }: { clientId: string }) {
         body: JSON.stringify(
           isEdit
             ? {
-                periodId: period.id,
+                year: exercice,
                 numeroPiece: editPiece,
                 dateTransaction: ecrDate,
                 codeJournal: ecrJournal,
@@ -443,7 +441,7 @@ export default function SaisieTab({ clientId }: { clientId: string }) {
                 lignes: payloadLines,
               }
             : {
-                periodId: period.id,
+                year: exercice,
                 dateTransaction: ecrDate,
                 codeJournal: ecrJournal,
                 libelle: ecrLibelle.trim(),
@@ -460,7 +458,7 @@ export default function SaisieTab({ clientId }: { clientId: string }) {
       }
       toast.success(isEdit ? "Écriture modifiée" : "Écriture enregistrée");
       setFormOpen(null);
-      fetchData(period.id, page, search, sortBy, sortDir);
+      fetchData(exercice, page, search, sortBy, sortDir);
     } catch {
       toast.error("Erreur réseau");
     } finally {
@@ -470,11 +468,11 @@ export default function SaisieTab({ clientId }: { clientId: string }) {
 
   // Supprime une écriture entière (toutes ses lignes).
   const deleteEcriture = async (e: Ecriture) => {
-    if (!period) return;
+    if (!exercice) return;
     const n = e.lines.length;
     if (!window.confirm(`Supprimer toute l'écriture ${e.numeroPiece || ""} (${n} ligne${n > 1 ? "s" : ""}) ?`)) return;
     try {
-      const qs = new URLSearchParams({ periodId: period.id, numeroPiece: e.numeroPiece });
+      const qs = new URLSearchParams({ year: String(exercice), numeroPiece: e.numeroPiece });
       const res = await fetch(`/api/clients/${clientId}/saisie?${qs}`, { method: "DELETE" });
       const json = await res.json().catch(() => ({}));
       if (!res.ok) {
@@ -482,7 +480,7 @@ export default function SaisieTab({ clientId }: { clientId: string }) {
         return;
       }
       toast.success("Écriture supprimée");
-      fetchData(period.id, page, search, sortBy, sortDir);
+      fetchData(exercice, page, search, sortBy, sortDir);
     } catch {
       toast.error("Erreur réseau");
     }
@@ -490,11 +488,11 @@ export default function SaisieTab({ clientId }: { clientId: string }) {
 
   // Télécharge le récap Excel (grand livre uploadé + saisies, colonne Flags).
   const exportExcel = async (flt: GlFilterValues) => {
-    if (!period) return;
+    if (!exercice) return;
     setExporting(true);
     try {
       const qs = glFiltersToQuery(flt);
-      qs.set("periodId", period.id);
+      qs.set("year", String(exercice));
       const res = await fetch(`/api/clients/${clientId}/saisie/export?${qs}`);
       if (!res.ok) {
         toast.error("Échec du téléchargement");
@@ -506,7 +504,7 @@ export default function SaisieTab({ clientId }: { clientId: string }) {
       a.href = url;
       const cd = res.headers.get("Content-Disposition") || "";
       const m = cd.match(/filename="?([^"]+)"?/);
-      a.download = m?.[1] || `grand_livre_${period.year}.xlsx`;
+      a.download = m?.[1] || `grand_livre_${exercice}.xlsx`;
       document.body.appendChild(a);
       a.click();
       a.remove();
@@ -552,10 +550,10 @@ export default function SaisieTab({ clientId }: { clientId: string }) {
 
   // Supprime les écritures sélectionnées dans la pop-up.
   const confirmDeleteSelected = async () => {
-    if (!period || selectedPieces.size === 0) return;
+    if (!exercice || selectedPieces.size === 0) return;
     setDeletingSel(true);
     try {
-      const qs = new URLSearchParams({ periodId: period.id });
+      const qs = new URLSearchParams({ year: String(exercice) });
       selectedPieces.forEach((p) => qs.append("numeroPiece", p));
       const res = await fetch(`/api/clients/${clientId}/saisie?${qs}`, { method: "DELETE" });
       const json = await res.json().catch(() => ({}));
@@ -565,7 +563,7 @@ export default function SaisieTab({ clientId }: { clientId: string }) {
       }
       toast.success(`${selectedPieces.size} écriture(s) supprimée(s)`);
       setShowDeleteModal(false);
-      fetchData(period.id, page, search, sortBy, sortDir);
+      fetchData(exercice, page, search, sortBy, sortDir);
     } catch {
       toast.error("Erreur réseau");
     } finally {
@@ -581,7 +579,7 @@ export default function SaisieTab({ clientId }: { clientId: string }) {
       </div>
     );
   }
-  if (!data || data.periods.length === 0) {
+  if (!data || data.annees.length === 0) {
     return (
       <div className="flex items-center justify-center h-64 text-muted-foreground">
         Aucune période comptable disponible.
@@ -607,23 +605,22 @@ export default function SaisieTab({ clientId }: { clientId: string }) {
           <span className="font-semibold text-[#00122E]">{data.client.name}</span>
         </div>
         <div className="flex items-center gap-2 border border-[#D0E3F5] rounded-lg px-4 h-10">
-          <span className="text-xs text-[#335890]">Période :</span>
+          <span className="text-xs text-[#335890]">Exercice :</span>
           <Select
-            value={periodId}
+            value={exercice ? String(exercice) : ""}
             onValueChange={(v) => {
               setPage(1);
               setFormOpen(null);
-              setPeriodId(v);
+              setAnnee(parseInt(v, 10));
             }}
           >
-            <SelectTrigger className="border-0 p-0 h-auto shadow-none min-w-[180px] font-semibold text-[#00122E]">
+            <SelectTrigger className="border-0 p-0 h-auto shadow-none min-w-[80px] font-semibold text-[#00122E]">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {data.periods.map((p) => (
-                <SelectItem key={p.id} value={p.id}>
-                  {new Date(p.periodStart).toLocaleDateString("fr-FR")} —{" "}
-                  {new Date(p.periodEnd).toLocaleDateString("fr-FR")} ({p.year})
+              {data.annees.map((a) => (
+                <SelectItem key={a} value={String(a)}>
+                  {a}
                 </SelectItem>
               ))}
             </SelectContent>

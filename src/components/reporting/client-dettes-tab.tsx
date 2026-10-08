@@ -41,9 +41,6 @@ import {
 import {
   PiCoinsDuotone,
   PiMoneyWavyDuotone,
-  PiWalletDuotone,
-  PiChartDonutDuotone,
-  PiReceiptDuotone,
   PiGearDuotone,
   PiPercentDuotone,
   PiWarningDuotone,
@@ -80,6 +77,8 @@ interface TopDetteFournisseur extends TopDette {
 }
 
 interface DetteKpis {
+  dettesFournisseursTTC: number;
+  decaissementFournisseursTTC: number;
   dettesFournisseurs: number;
   dettesPersonnel: number;
   dettesSociales: number;
@@ -117,54 +116,29 @@ interface DetteKpiItem {
 }
 
 const DEFAULT_DETTE_KPIS: DetteKpiItem[] = [
+  // Cet onglet suit le cycle fournisseur. Les dettes sociales, personnel,
+  // fiscales et HAO ont leur propre onglet « Dettes court terme ».
   {
-    id: "fournisseurs",
-    label: "Dettes fournisseurs",
-    key: "dettesFournisseurs",
+    id: "dettesFournisseursTTC",
+    label: "Dettes fournisseurs TTC",
+    key: "dettesFournisseursTTC",
     color: "text-blue-600",
     icon: PiCoinsDuotone,
     visible: true,
     order: 0,
   },
   {
-    id: "sociales",
-    label: "Dettes sociales",
-    key: "dettesSociales",
-    color: "text-orange-600",
+    id: "decaissementFournisseursTTC",
+    label: "Décaissement Fournisseurs TTC",
+    key: "decaissementFournisseursTTC",
+    color: "text-emerald-600",
     icon: PiMoneyWavyDuotone,
     visible: true,
     order: 1,
   },
   {
-    id: "personnel",
-    label: "Dettes personnel",
-    key: "dettesPersonnel",
-    color: "text-fuchsia-500",
-    icon: PiWalletDuotone,
-    visible: true,
-    order: 2,
-  },
-  {
-    id: "fiscales",
-    label: "Dettes fiscales",
-    key: "dettesFiscales",
-    color: "text-indigo-600",
-    icon: PiReceiptDuotone,
-    visible: true,
-    order: 3,
-  },
-  {
-    id: "hao",
-    label: "Dettes HAO",
-    key: "dettesHAO",
-    color: "text-cyan-600",
-    icon: PiChartDonutDuotone,
-    visible: true,
-    order: 4,
-  },
-  {
     id: "taux",
-    label: "Taux de remboursement",
+    label: "Taux de décaissement",
     key: "tauxRemboursement",
     color: "text-violet-600",
     icon: PiPercentDuotone,
@@ -591,7 +565,7 @@ export default function ClientDettesTab({
       {/* Chart 1 — Évolution du taux de remboursement */}
       <Card>
         <CardHeader>
-          <CardTitle>Évolution du Taux de Remboursement des Dettes</CardTitle>
+          <CardTitle>Évolution du Taux de Décaissement Fournisseurs</CardTitle>
           <CardDescription>
             (Remboursements / Dettes ) × 100 — taux cumulé et périodique
           </CardDescription>
@@ -667,10 +641,10 @@ export default function ClientDettesTab({
       <Card>
         <CardHeader>
           <CardTitle>
-            Dette Fournisseurs vs Dettes Fournisseurs Remboursées
+            Dettes Fournisseurs TTC vs Décaissement Fournisseurs TTC
           </CardTitle>
           <CardDescription>
-            Dettes fournisseurs (crédit DJ) vs remboursées (débit DJ)
+            Crédit DJ vs débit DJ, hors comptes 408* (factures non parvenues)
           </CardDescription>
         </CardHeader>
         <CardContent>
