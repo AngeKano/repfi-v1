@@ -34,9 +34,16 @@ export const EMPTY_GL_FILTERS: GlFilterValues = {
   flags: [],
 };
 
+// Une option de filtre : le `code` est la valeur envoyée au serveur, le
+// `libelle` n'est qu'un confort de lecture.
+export interface OptionFiltre {
+  code: string;
+  libelle?: string;
+}
+
 export interface GlFilterOptions {
-  journaux: string[];
-  comptes: string[];
+  journaux: OptionFiltre[];
+  comptes: OptionFiltre[];
   pieces: string[];
   tiers: string[];
   factures: string[];
@@ -80,17 +87,26 @@ function MultiSelect({
   onChange,
 }: {
   label: string;
-  options: string[];
+  // Chaîne simple ou couple code / libellé : la valeur filtrée reste le code.
+  options: (string | OptionFiltre)[];
   selected: string[];
   onChange: (v: string[]) => void;
 }) {
+  const normalisees: OptionFiltre[] = options.map((o) =>
+    typeof o === "string" ? { code: o } : o,
+  );
+  const texte = (o: OptionFiltre) => (o.libelle ? `${o.code} — ${o.libelle}` : o.code);
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
 
   const filtered = useMemo(() => {
     const needle = q.trim().toLowerCase();
-    const src = needle ? options.filter((o) => o.toLowerCase().includes(needle)) : options;
+    // La recherche porte sur le code ET sur le libellé.
+    const src = needle
+      ? normalisees.filter((o) => texte(o).toLowerCase().includes(needle))
+      : normalisees;
     return src.slice(0, 300); // borne le rendu pour les très longues listes
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [options, q]);
 
   const toggle = (v: string) =>
@@ -130,17 +146,22 @@ function MultiSelect({
               ) : (
                 filtered.map((o) => (
                   <label
-                    key={o}
+                    key={o.code}
                     className="flex items-center gap-2 text-xs p-1 rounded hover:bg-muted/50 cursor-pointer"
                   >
-                    <Checkbox checked={selected.includes(o)} onCheckedChange={() => toggle(o)} />
-                    <span className="truncate">{o}</span>
+                    <Checkbox
+                      checked={selected.includes(o.code)}
+                      onCheckedChange={() => toggle(o.code)}
+                    />
+                    <span className="truncate" title={texte(o)}>
+                      {texte(o)}
+                    </span>
                   </label>
                 ))
               )}
-              {options.length > filtered.length && !q && (
+              {normalisees.length > filtered.length && !q && (
                 <p className="text-[10px] text-muted-foreground p-1">
-                  {options.length - filtered.length} autres — affinez la recherche
+                  {normalisees.length - filtered.length} autres — affinez la recherche
                 </p>
               )}
             </div>

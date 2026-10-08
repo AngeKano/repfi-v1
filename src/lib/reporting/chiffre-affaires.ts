@@ -30,3 +30,17 @@ export const CA_PERIMETRE_SQL =
  */
 export const CA_MONTANT_SQL =
   `if(startsWith(compte, '${COMPTE_SUBVENTIONS}'), debit - credit, credit - debit)`;
+
+// ---------------------------------------------------------------------------
+// Histogramme « Produits par Nature ».
+//
+// Il élargit le chiffre d'affaires aux SUBVENTIONS D'EXPLOITATION (rubrique
+// TG), d'où son nom : ce n'est plus le seul CA. Le compte 4495 en est
+// volontairement exclu — il porte la CRÉANCE de subvention, dont le produit
+// correspondant est déjà en TG ; compter les deux reviendrait à doubler la
+// subvention.
+// ---------------------------------------------------------------------------
+export const PRODUITS_RUBRIQUES = [...CA_RUBRIQUES, "TG"];
+
+export const PRODUITS_PERIMETRE_SQL =
+  "rubrique IN ({produitsRubriques:Array(String)})";

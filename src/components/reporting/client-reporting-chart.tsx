@@ -62,6 +62,7 @@ import {
 } from "lucide-react";
 import {
   PiCoinsDuotone,
+  PiHandCoinsDuotone,
   PiMoneyWavyDuotone,
   PiWalletDuotone,
   PiChartDonutDuotone,
@@ -86,6 +87,10 @@ interface DataPoint {
   cumulativeBalance: number;
   nbTransactions: number;
   chiffreAffaires: number;
+  subventions: number;
+  subventionsN1: number;
+  subventionsPeriodique: number;
+  subventionsPeriodiqueN1: number;
   chiffreAffairesN1: number;
   soldeTresorerie: number;
   soldeTresorerieN1: number;
@@ -111,6 +116,7 @@ interface Period {
 
 interface IndicateursFinanciers {
   chiffreAffaires: number;
+  subventions: number;
   masseSalariale: number;
   ratioMasseSalarialeCA: number;
   resultatExploitation: number;
@@ -133,6 +139,7 @@ interface IndicateursFinanciers {
 
 interface Variations {
   chiffreAffaires: number;
+  subventions: number;
   masseSalariale: number;
   ratioMasseSalarialeCA: number;
   resultatExploitation: number;
@@ -636,6 +643,13 @@ const chartConfigCA: ChartConfig = {
 const chartConfigTresorerie: ChartConfig = {
   soldeTresorerie: { label: "Trésorerie N", color: "hsl(174, 72%, 46%)" },
   soldeTresorerieN1: { label: "Trésorerie N-1", color: "hsl(174, 72%, 66%)" },
+};
+
+const chartConfigSubventions: ChartConfig = {
+  subventions: { label: "Subventions N", color: "#059669" },
+  subventionsN1: { label: "Subventions N-1", color: "#6ee7b7" },
+  subventionsPeriodique: { label: "Subventions N", color: "#059669" },
+  subventionsPeriodiqueN1: { label: "Subventions N-1", color: "#6ee7b7" },
 };
 
 const chartConfigCANature: ChartConfig = {
@@ -1646,8 +1660,80 @@ export default function ClientReportingChart({
     );
   };
 
-  // Composant CA par Nature — Détail des comptes composant le chiffre
-  // d'affaires (TA, TB, TC, TD) avec comparaison N vs N-1.
+  // Évolution des subventions d'exploitation (rubrique TG), N vs N-1.
+  // Même lecture que l'évolution du CA : cumulé ou périodique selon le mode.
+  const EvolutionSubventions = () => {
+    const isCumule = periodType === "ytd" || periodType === "ytd-day";
+    const keyN = isCumule ? "subventions" : "subventionsPeriodique";
+    const keyN1 = isCumule ? "subventionsN1" : "subventionsPeriodiqueN1";
+    const modeLabel = isCumule ? "cumulé" : "périodique";
+
+    return (
+      <Card>
+        <CardHeader className="flex flex-row items-start justify-between gap-4">
+          <div>
+            <CardTitle>Évolution des subventions d&apos;exploitation</CardTitle>
+            <CardDescription>
+              Rubrique TG — comparaison {yearN} vs {yearN1} ({modeLabel}) — par{" "}
+              {getXAxisLabel().toLowerCase()}
+            </CardDescription>
+          </div>
+          <ChartLegend
+            labelN={yearN}
+            labelN1={yearN1}
+            colorN="#059669"
+            colorN1="#6ee7b7"
+            solid
+          />
+        </CardHeader>
+        <CardContent>
+          <ChartContainer config={chartConfigSubventions} className="h-[400px] w-full">
+            <BarChart
+              data={visibleChartData}
+              margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
+              barCategoryGap="20%"
+            >
+              <CartesianGrid strokeDasharray="3 3" vertical={false} />
+              <XAxis dataKey="label" tickLine={false} axisLine={false} fontSize={12} />
+              <YAxis
+                tickLine={false}
+                axisLine={false}
+                tickFormatter={(value) => formatCompactOnly(value as number)}
+                fontSize={12}
+              />
+              <ChartTooltip
+                content={
+                  <ChartTooltipContent
+                    formatter={(value, name) => [
+                      formatCompactOnly(value as number),
+                      name as string,
+                    ]}
+                  />
+                }
+              />
+              <Bar
+                dataKey={keyN1}
+                name={`Subventions ${yearN1}`}
+                fill="#6ee7b7"
+                barSize={24}
+                radius={[4, 4, 0, 0]}
+              />
+              <Bar
+                dataKey={keyN}
+                name={`Subventions ${yearN}`}
+                fill="#059669"
+                barSize={24}
+                radius={[4, 4, 0, 0]}
+              />
+            </BarChart>
+          </ChartContainer>
+        </CardContent>
+      </Card>
+    );
+  };
+
+  // Composant Produits par Nature — détail des comptes de produits
+  // (TA, TB, TC, TD et les subventions TG), comparaison N vs N-1.
   const CAParNature = () => {
     const natureData = data?.caParNature ?? [];
 
@@ -1660,9 +1746,9 @@ export default function ClientReportingChart({
       <Card>
         <CardHeader className="flex flex-row items-start justify-between gap-4">
           <div>
-            <CardTitle>CA par Nature</CardTitle>
+            <CardTitle>Produits par Nature</CardTitle>
             <CardDescription>
-              Détail des comptes (TA, TB, TC, TD) — {yearN} vs {yearN1}
+              Détail des comptes (TA, TB, TC, TD, TG) — {yearN} vs {yearN1}
             </CardDescription>
           </div>
           <ChartLegend
@@ -2054,8 +2140,9 @@ export default function ClientReportingChart({
               </div>
             )}
 
-            {/* KPI CA en haut */}
-            <div className="grid grid-cols-2 gap-4">
+            {/* KPI en haut : le couple Chiffre d'affaires fait face au
+                couple Subventions d'exploitation (rubrique TG). */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
               <Card>
                 <CardHeader className="pb-2">
                   <div className="flex items-center justify-between">
@@ -2123,12 +2210,75 @@ export default function ClientReportingChart({
                   </div>
                 </CardContent>
               </Card>
+              <Card>
+                <CardHeader className="pb-2">
+                  <div className="flex items-center justify-between">
+                    <CardDescription className="flex items-center gap-2 text-sm font-medium">
+                      Subventions d&apos;exploitation {yearN}
+                      <Badge variant="outline" className="text-[10px] px-1 py-0">
+                        TG
+                      </Badge>
+                    </CardDescription>
+                    <VariationBadge
+                      value={data.indicateurs.variations.subventions}
+                    />
+                  </div>
+                </CardHeader>
+                <CardContent className="pt-0">
+                  <div className="flex items-end justify-between gap-2">
+                    <div className="min-w-0">
+                      <div
+                        className={cn(
+                          "text-3xl font-bold truncate",
+                          data.indicateurs.anneeN.subventions < 0
+                            ? "text-red-600"
+                            : "text-[#00122E]",
+                        )}
+                      >
+                        {formatCompactOnly(data.indicateurs.anneeN.subventions)}
+                      </div>
+                    </div>
+                    <PiHandCoinsDuotone className="w-8 h-8 shrink-0 text-emerald-500" />
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardDescription className="flex items-center gap-2 text-sm font-medium">
+                    Subventions d&apos;exploitation {yearN1}
+                    <Badge variant="outline" className="text-[10px] px-1 py-0">
+                      TG
+                    </Badge>
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="pt-0">
+                  <div className="flex items-end justify-between gap-2">
+                    <div className="min-w-0">
+                      <div
+                        className={cn(
+                          "text-3xl font-bold truncate",
+                          data.indicateurs.anneeN1.subventions < 0
+                            ? "text-red-600"
+                            : "text-[#00122E]",
+                        )}
+                      >
+                        {formatCompactOnly(data.indicateurs.anneeN1.subventions)}
+                      </div>
+                    </div>
+                    <PiHandCoinsDuotone className="w-8 h-8 shrink-0 text-emerald-300" />
+                  </div>
+                </CardContent>
+              </Card>
             </div>
 
             {/* Graphique Evolution CA */}
             <EvolutionCA />
 
-            {/* CA par Nature — Histogramme horizontal N vs N-1 */}
+            {/* Graphique Evolution des subventions d'exploitation (TG) */}
+            <EvolutionSubventions />
+
+            {/* Produits par Nature — Histogramme horizontal N vs N-1 */}
             <CAParNature />
 
             {/* Top 10 Clients par CA */}
