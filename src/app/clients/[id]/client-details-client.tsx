@@ -31,6 +31,7 @@ import {
   PiScalesDuotone,
   PiMoneyWavyDuotone,
   PiWalletDuotone,
+  PiPercentDuotone,
   PiBookOpenDuotone,
   PiFileTextDuotone,
   PiUsersThreeDuotone,
@@ -46,6 +47,7 @@ import ClientReportingChart from "@/components/reporting/client-reporting-chart"
 import ClientDettesTab from "@/components/reporting/client-dettes-tab";
 import ClientDettesCourtTermeTab from "@/components/reporting/client-dettes-court-terme-tab";
 import ClientTresorerieTab from "@/components/reporting/client-tresorerie-tab";
+import ClientRatiosTab from "@/components/reporting/client-ratios-tab";
 import ClientBilanTab from "@/components/reporting/client-bilan-tab";
 import ClientEtatsFinanciersTab from "@/components/reporting/client-etats-financiers-tab";
 import { UploadFileDialog } from "./upload-file-dialog";
@@ -74,6 +76,7 @@ const CLIENT_TABS = [
   { id: "dettes", label: "Règlement Fournisseurs", icon: PiScalesDuotone },
   { id: "dettes-ct", label: "Dettes court terme", icon: PiMoneyWavyDuotone },
   { id: "tresorerie", label: "Trésorerie", icon: PiWalletDuotone },
+  { id: "ratios", label: "Ratios bilantiels", icon: PiPercentDuotone },
   { id: "etats", label: "États Financiers", icon: PiFileTextDuotone },
   { id: "bilan", label: "Bilan d'activité", icon: PiBookOpenDuotone },
   { id: "members", label: "Membres", icon: PiUsersThreeDuotone },
@@ -95,6 +98,7 @@ const REPORTING_TAB_IDS = new Set([
   "dettes",
   "dettes-ct",
   "tresorerie",
+  "ratios",
   "etats",
   "bilan",
   "saisie",
@@ -195,12 +199,17 @@ export default function ClientDetailsClient({
   const roleLabel = getRoleLabel(session.user.role);
   const roleBadgeVariant = getRoleBadgeVariant(session.user.role);
 
-  // Onglets Dettes et Recouvrement : le mode de calcul est verrouillé sur
-  // "Cumulé". La granularité courante (mois/annee) détermine le periodType
-  // précis : "ytd-day" (vue jour avec baseline Jan→mois-1) ou "ytd" (mensuel
-  // Jan→Déc).
+  // Onglets Dettes, Recouvrement, Dettes court terme et Ratios bilantiels :
+  // le mode de calcul est verrouillé sur "Cumulé". La granularité courante
+  // (mois/annee) détermine le periodType précis : "ytd-day" (vue jour avec
+  // baseline Jan→mois-1) ou "ytd" (mensuel Jan→Déc).
   useEffect(() => {
-    if (activeTab === "dettes" || activeTab === "recouvrement") {
+    if (
+      activeTab === "dettes" ||
+      activeTab === "recouvrement" ||
+      activeTab === "dettes-ct" ||
+      activeTab === "ratios"
+    ) {
       const target = cumulGranularity === "annee" ? "ytd" : "ytd-day";
       if (periodType !== target) setPeriodType(target);
     }
@@ -563,6 +572,30 @@ export default function ClientDetailsClient({
                     </h3>
                     <p className="text-sm text-[#335890]">
                       Importez un grand livre pour analyser la trésorerie.
+                    </p>
+                  </Card>
+                ))}
+
+              {activeTab === "ratios" &&
+                (hasReporting ? (
+                  <ClientRatiosTab
+                    clientId={client.id}
+                    year={year}
+                    setYear={setYear}
+                    periodType={periodType}
+                    setPeriodType={setPeriodType}
+                    selectedMonth={selectedMonth}
+                    setSelectedMonth={setSelectedMonth}
+                    cumulGranularity={cumulGranularity}
+                    setCumulGranularity={setCumulGranularity}
+                  />
+                ) : (
+                  <Card className="p-12 border-[#D0E3F5] text-center">
+                    <h3 className="text-lg font-semibold text-[#00122E] mb-1">
+                      Aucun reporting financier
+                    </h3>
+                    <p className="text-sm text-[#335890]">
+                      Importez un grand livre pour calculer les ratios bilantiels.
                     </p>
                   </Card>
                 ))}
