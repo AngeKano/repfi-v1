@@ -13,7 +13,6 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import {
   Select,
   SelectContent,
@@ -34,9 +33,6 @@ import {
   ChevronLeft,
   ChevronRight,
   CalendarRange,
-  TrendingUp,
-  TrendingDown,
-  Minus,
 } from "lucide-react";
 import {
   PiScalesDuotone,
@@ -49,8 +45,13 @@ import {
   PiClockCountdownDuotone,
 } from "react-icons/pi";
 import { toast } from "sonner";
-import { cn } from "@/lib/utils";
-import { formatCompactOnly } from "./dette-table";
+import {
+  KpiGrid,
+  formatCompactOnly,
+  formatJours,
+  type KpiDef,
+  type KpiValue,
+} from "./kpi-grid";
 import { RATIOS_FORMULES } from "@/lib/reporting/ratios-bilantiels";
 
 type PeriodType = "year" | "month" | "ytd" | "ytd-day";
@@ -112,7 +113,8 @@ const MONTHS = [
 ];
 
 // Indicateurs affichés, dans l'ordre des quatre blocs de la spécification.
-const KPI_ORDER: { id: string; icon: React.ElementType; color: string; jours?: boolean }[] = [
+// Le DSO s'exprime en jours, les autres en montants.
+const KPI_HABILLAGE: { id: string; icon: React.ElementType; color: string; jours?: boolean }[] = [
   { id: "frng", icon: PiScalesDuotone, color: "text-[#0077C3]" },
   { id: "bfrGlobal", icon: PiArrowsClockwiseDuotone, color: "text-indigo-600" },
   { id: "bfrExploitation", icon: PiFactoryDuotone, color: "text-blue-600" },
@@ -122,6 +124,14 @@ const KPI_ORDER: { id: string; icon: React.ElementType; color: string; jours?: b
   { id: "creditBail", icon: PiKeyDuotone, color: "text-rose-600" },
   { id: "dso", icon: PiClockCountdownDuotone, color: "text-emerald-600", jours: true },
 ];
+
+const KPI_DEFS: KpiDef[] = KPI_HABILLAGE.map((h) => ({
+  id: h.id,
+  label: RATIOS_FORMULES[h.id]?.label ?? h.id,
+  formule: RATIOS_FORMULES[h.id]?.formule,
+  icon: h.icon,
+  color: h.color,
+}));
 
 const chartConfigRatios: ChartConfig = {
   frng: { label: "FRNG N", color: "hsl(221, 83%, 53%)" },
@@ -134,37 +144,6 @@ const chartConfigRatios: ChartConfig = {
   dso: { label: "DSO", color: "hsl(160, 84%, 39%)" },
   dsoN1: { label: "DSO N-1", color: "hsl(160, 60%, 70%)" },
 };
-
-const formatJours = (v: number) => `${Math.round(v).toLocaleString("fr-FR")} j`;
-
-function formatVariation(value: number): string {
-  return `${value > 0 ? "+" : ""}${value.toFixed(1)}%`;
-}
-
-function VariationBadge({ value }: { value: number }) {
-  if (value === 0) {
-    return (
-      <Badge variant="outline" className="text-gray-500 text-xs">
-        <Minus className="w-3 h-3 mr-1" /> 0%
-      </Badge>
-    );
-  }
-  return (
-    <Badge
-      variant="outline"
-      className={`text-xs ${
-        value > 0 ? "text-green-600 border-green-200" : "text-red-600 border-red-200"
-      }`}
-    >
-      {value > 0 ? (
-        <TrendingUp className="w-3 h-3 mr-1" />
-      ) : (
-        <TrendingDown className="w-3 h-3 mr-1" />
-      )}
-      {formatVariation(value)}
-    </Badge>
-  );
-}
 
 function LegendLine({ color, dashed }: { color: string; dashed?: boolean }) {
   return (
@@ -342,6 +321,23 @@ export default function ClientRatiosTab({
     return value.toString();
   };
 
+  // Le DSO sort en jours, les autres indicateurs en montants.
+  const kpiValues: Record<string, KpiValue> = Object.fromEntries(
+    KPI_HABILLAGE.map((h) => {
+      const v = data.kpis[h.id] ?? { valeurN: 0, valeurN1: 0, variation: 0 };
+      return [
+        h.id,
+        {
+          valeur: v.valeurN,
+          valeurN1: v.valeurN1,
+          labelN1: data.yearN1,
+          variation: v.variation,
+          format: h.jours ? formatJours : formatCompactOnly,
+        },
+      ];
+    }),
+  );
+
   return (
     <div className="space-y-6">
       {filtres}
@@ -354,50 +350,11 @@ export default function ClientRatiosTab({
         </p>
       </div>
 
-      {/* KPI — grille 3 colonnes, formule de calcul sous le libellé. */}
-      <div className="grid grid-cols-3 gap-4">
-        {KPI_ORDER.map((item) => {
-          const v = data.kpis[item.id] ?? { valeurN: 0, valeurN1: 0, variation: 0 };
-          const meta = RATIOS_FORMULES[item.id];
-          const Icon = item.icon;
-          const fmt = item.jours ? formatJours : formatCompactOnly;
-          return (
-            <Card key={item.id} className="relative overflow-hidden">
-              <CardHeader className="pb-2">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0">
-                    <CardDescription className="text-sm font-medium">
-                      {meta?.label ?? item.id}
-                    </CardDescription>
-                    <p className="text-xs text-muted-foreground italic mt-1">
-                      {meta?.formule}
-                    </p>
-                  </div>
-                  <VariationBadge value={v.variation} />
-                </div>
-              </CardHeader>
-              <CardContent className="pt-0">
-                <div className="flex items-end justify-between gap-2">
-                  <div className="min-w-0">
-                    <div
-                      className={cn(
-                        "text-3xl font-bold truncate",
-                        v.valeurN < 0 ? "text-red-600" : "text-[#00122E]",
-                      )}
-                    >
-                      {fmt(v.valeurN)}
-                    </div>
-                    <p className="text-sm text-muted-foreground mt-1">
-                      {data.yearN1} : {fmt(v.valeurN1)}
-                    </p>
-                  </div>
-                  <Icon className={`w-8 h-8 shrink-0 ${item.color}`} />
-                </div>
-              </CardContent>
-            </Card>
-          );
-        })}
-      </div>
+      <KpiGrid
+        storageKey={`ratios-${clientId}`}
+        defs={KPI_DEFS}
+        values={kpiValues}
+      />
 
       {/* FRNG — courbes N vs N-1 */}
       <Card>

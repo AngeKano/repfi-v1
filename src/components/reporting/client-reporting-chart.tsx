@@ -76,6 +76,7 @@ import {
 } from "react-icons/pi";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { KpiGrid, type KpiDef, type KpiValue } from "./kpi-grid";
 
 interface DataPoint {
   label: string;
@@ -2126,7 +2127,51 @@ export default function ClientReportingChart({
           </div>
         );
 
-      case "chiffre-affaires":
+      case "chiffre-affaires": {
+        // Le régime de TVA du client détermine la pastille HT / TTC.
+        const uniteCA = data.client.assujettiTVA ? "HT" : "TTC";
+        const caKpiDefs: KpiDef[] = [
+          {
+            id: "ca",
+            label: `Chiffre d'affaires ${yearN}`,
+            tag: uniteCA,
+            icon: PiCoinsDuotone,
+            color: "text-blue-600",
+          },
+          {
+            id: "caN1",
+            label: `Chiffre d'affaires ${yearN1}`,
+            tag: uniteCA,
+            icon: PiCoinsDuotone,
+            color: "text-blue-400",
+          },
+          {
+            id: "subventions",
+            label: `Subventions d'exploitation ${yearN}`,
+            tag: "TG",
+            icon: PiHandCoinsDuotone,
+            color: "text-emerald-500",
+          },
+          {
+            id: "subventionsN1",
+            label: `Subventions d'exploitation ${yearN1}`,
+            tag: "TG",
+            icon: PiHandCoinsDuotone,
+            color: "text-emerald-300",
+          },
+        ];
+        const caKpiValues: Record<string, KpiValue> = {
+          ca: {
+            valeur: data.indicateurs.anneeN.chiffreAffaires,
+            variation: data.indicateurs.variations.chiffreAffaires,
+          },
+          caN1: { valeur: data.indicateurs.anneeN1.chiffreAffaires },
+          subventions: {
+            valeur: data.indicateurs.anneeN.subventions,
+            variation: data.indicateurs.variations.subventions,
+          },
+          subventionsN1: { valeur: data.indicateurs.anneeN1.subventions },
+        };
         return (
           <div className="space-y-6">
             {/* Indicateur mode CA */}
@@ -2142,135 +2187,11 @@ export default function ClientReportingChart({
 
             {/* KPI en haut : le couple Chiffre d'affaires fait face au
                 couple Subventions d'exploitation (rubrique TG). */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-              <Card>
-                <CardHeader className="pb-2">
-                  <div className="flex items-center justify-between">
-                    <CardDescription className="flex items-center gap-2 text-sm font-medium">
-                      Chiffre d&apos;Affaires {yearN}
-                      <Badge
-                        variant="outline"
-                        className="text-[10px] px-1 py-0"
-                      >
-                        {data.client.assujettiTVA ? "HT" : "TTC"}
-                      </Badge>
-                    </CardDescription>
-                    <VariationBadge
-                      value={data.indicateurs.variations.chiffreAffaires}
-                    />
-                  </div>
-                </CardHeader>
-                <CardContent className="pt-0">
-                  <div className="flex items-end justify-between gap-2">
-                    <div className="min-w-0">
-                      <div
-                        className={cn(
-                          "text-3xl font-bold truncate",
-                          data.indicateurs.anneeN.chiffreAffaires < 0
-                            ? "text-red-600"
-                            : "text-[#00122E]",
-                        )}
-                      >
-                        {formatCompactOnly(
-                          data.indicateurs.anneeN.chiffreAffaires,
-                        )}
-                      </div>
-                    </div>
-                    <PiCoinsDuotone className="w-8 h-8 shrink-0 text-blue-600" />
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardDescription className="flex items-center gap-2 text-sm font-medium">
-                    Chiffre d&apos;Affaires {yearN1}
-                    <Badge variant="outline" className="text-[10px] px-1 py-0">
-                      {data.client.assujettiTVA ? "HT" : "TTC"}
-                    </Badge>
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="pt-0">
-                  <div className="flex items-end justify-between gap-2">
-                    <div className="min-w-0">
-                      <div
-                        className={cn(
-                          "text-3xl font-bold truncate",
-                          data.indicateurs.anneeN1.chiffreAffaires < 0
-                            ? "text-red-600"
-                            : "text-[#00122E]",
-                        )}
-                      >
-                        {formatCompactOnly(
-                          data.indicateurs.anneeN1.chiffreAffaires,
-                        )}
-                      </div>
-                    </div>
-                    <PiCoinsDuotone className="w-8 h-8 shrink-0 text-blue-400" />
-                  </div>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardHeader className="pb-2">
-                  <div className="flex items-center justify-between">
-                    <CardDescription className="flex items-center gap-2 text-sm font-medium">
-                      Subventions d&apos;exploitation {yearN}
-                      <Badge variant="outline" className="text-[10px] px-1 py-0">
-                        TG
-                      </Badge>
-                    </CardDescription>
-                    <VariationBadge
-                      value={data.indicateurs.variations.subventions}
-                    />
-                  </div>
-                </CardHeader>
-                <CardContent className="pt-0">
-                  <div className="flex items-end justify-between gap-2">
-                    <div className="min-w-0">
-                      <div
-                        className={cn(
-                          "text-3xl font-bold truncate",
-                          data.indicateurs.anneeN.subventions < 0
-                            ? "text-red-600"
-                            : "text-[#00122E]",
-                        )}
-                      >
-                        {formatCompactOnly(data.indicateurs.anneeN.subventions)}
-                      </div>
-                    </div>
-                    <PiHandCoinsDuotone className="w-8 h-8 shrink-0 text-emerald-500" />
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardDescription className="flex items-center gap-2 text-sm font-medium">
-                    Subventions d&apos;exploitation {yearN1}
-                    <Badge variant="outline" className="text-[10px] px-1 py-0">
-                      TG
-                    </Badge>
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="pt-0">
-                  <div className="flex items-end justify-between gap-2">
-                    <div className="min-w-0">
-                      <div
-                        className={cn(
-                          "text-3xl font-bold truncate",
-                          data.indicateurs.anneeN1.subventions < 0
-                            ? "text-red-600"
-                            : "text-[#00122E]",
-                        )}
-                      >
-                        {formatCompactOnly(data.indicateurs.anneeN1.subventions)}
-                      </div>
-                    </div>
-                    <PiHandCoinsDuotone className="w-8 h-8 shrink-0 text-emerald-300" />
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
+            <KpiGrid
+              storageKey={`chiffre-affaires-${clientId}`}
+              defs={caKpiDefs}
+              values={caKpiValues}
+            />
 
             {/* Graphique Evolution CA */}
             <EvolutionCA />
@@ -2363,6 +2284,7 @@ export default function ClientReportingChart({
             </Card>
           </div>
         );
+      }
 
       case "resultat":
         return (
