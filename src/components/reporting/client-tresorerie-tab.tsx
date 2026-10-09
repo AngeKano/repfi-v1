@@ -2,11 +2,10 @@
 
 // ============================================================================
 // Onglet « Trésorerie » — KPI par rubrique BS… et détail par compte.
-// Reprend la barre de filtres, les cartes KPI et l'histogramme horizontal
-// déjà utilisés dans les autres onglets de reporting.
+// Reprend la barre de filtres, la grille de KPI partagée et l'histogramme
+// horizontal déjà utilisés dans les autres onglets de reporting.
 // ============================================================================
 import { useCallback, useEffect, useState } from "react";
-import type { DragEvent } from "react";
 import {
   Card,
   CardContent,
@@ -14,8 +13,6 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import {
   Select,
   SelectContent,
@@ -36,11 +33,6 @@ import {
   ChevronLeft,
   ChevronRight,
   CalendarRange,
-  TrendingUp,
-  TrendingDown,
-  Minus,
-  Eye,
-  EyeOffIcon,
 } from "lucide-react";
 import {
   PiWalletDuotone,
@@ -51,16 +43,16 @@ import {
   PiChartDonutDuotone,
   PiDeviceMobileDuotone,
   PiCertificateDuotone,
-  PiGearDuotone,
 } from "react-icons/pi";
 import { toast } from "sonner";
-import { cn } from "@/lib/utils";
-import { formatCompactOnly } from "./dette-table";
 import {
-  TRESORERIE_KPIS,
-  formuleTresorerie,
-  type TresorerieKpiDef,
-} from "@/lib/reporting/tresorerie";
+  KpiGrid,
+  VariationBadge,
+  formatCompactOnly,
+  type KpiDef,
+  type KpiValue,
+} from "./kpi-grid";
+import { TRESORERIE_KPIS, formuleTresorerie } from "@/lib/reporting/tresorerie";
 
 type PeriodType = "year" | "month" | "ytd" | "ytd-day";
 
@@ -123,79 +115,21 @@ const HABILLAGE: Record<string, { icon: React.ElementType; color: string }> = {
   accreditifs: { icon: PiCertificateDuotone, color: "text-rose-600" },
 };
 
-// Configuration des KPI propre à l'onglet : visibilité et ordre, mémorisés
-// par client. Les indicateurs masqués par défaut (monnaie électronique,
-// accréditifs) restent accessibles via « Configurer les KPIs ».
-interface TresorerieKpiItem {
-  id: string;
-  visible: boolean;
-  order: number;
-}
-
-const DEFAULT_KPI_CONFIG: TresorerieKpiItem[] = TRESORERIE_KPIS.map((k, i) => ({
+// Les rubriques résiduelles (monnaie électronique, accréditifs) sont masquées
+// par défaut, mais restent accessibles via « Configurer les KPIs ».
+const KPI_DEFS: KpiDef[] = TRESORERIE_KPIS.map((k) => ({
   id: k.id,
+  label: k.label,
+  formule: formuleTresorerie(k),
+  icon: HABILLAGE[k.id]?.icon ?? PiWalletDuotone,
+  color: HABILLAGE[k.id]?.color ?? "text-[#0077C3]",
   visible: k.visible,
-  order: i,
 }));
-
-function loadKpiConfig(clientId: string): TresorerieKpiItem[] {
-  if (typeof window === "undefined") return DEFAULT_KPI_CONFIG;
-  try {
-    const brut = localStorage.getItem(`kpi-config-tresorerie-${clientId}`);
-    if (!brut) return DEFAULT_KPI_CONFIG;
-    const enregistre = JSON.parse(brut) as TresorerieKpiItem[];
-    return DEFAULT_KPI_CONFIG.map((d) => {
-      const e = enregistre.find((x) => x.id === d.id);
-      return e ? { ...d, visible: e.visible, order: e.order } : d;
-    }).sort((a, b) => a.order - b.order);
-  } catch {
-    return DEFAULT_KPI_CONFIG;
-  }
-}
-
-function saveKpiConfig(clientId: string, items: TresorerieKpiItem[]) {
-  if (typeof window === "undefined") return;
-  try {
-    localStorage.setItem(`kpi-config-tresorerie-${clientId}`, JSON.stringify(items));
-  } catch {
-    // Stockage indisponible (navigation privée) : la config reste en mémoire.
-  }
-}
 
 const chartConfigTresorerie: ChartConfig = {
   montantN: { label: "Année N", color: "hsl(221, 83%, 53%)" },
   montantN1: { label: "Année N-1", color: "hsl(221, 83%, 73%)" },
 };
-
-function formatVariation(value: number): string {
-  const sign = value > 0 ? "+" : "";
-  return `${sign}${value.toFixed(1)}%`;
-}
-
-function VariationBadge({ value }: { value: number }) {
-  if (value === 0) {
-    return (
-      <Badge variant="outline" className="text-gray-500 text-xs">
-        <Minus className="w-3 h-3 mr-1" /> 0%
-      </Badge>
-    );
-  }
-  return (
-    <Badge
-      variant="outline"
-      className={`text-xs ${
-        value > 0 ? "text-green-600 border-green-200" : "text-red-600 border-red-200"
-      }`}
-    >
-      {value > 0 ? (
-        <TrendingUp className="w-3 h-3 mr-1" />
-      ) : (
-        <TrendingDown className="w-3 h-3 mr-1" />
-      )}
-      {formatVariation(value)}
-    </Badge>
-  );
-}
 
 function LegendLine({ color, dashed }: { color: string; dashed?: boolean }) {
   return (
@@ -224,32 +158,6 @@ export default function ClientTresorerieTab({
 }: ClientTresorerieTabProps) {
   const [data, setData] = useState<TresorerieData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [kpiConfig, setKpiConfig] = useState<TresorerieKpiItem[]>(() =>
-    loadKpiConfig(clientId),
-  );
-  const [kpiEditMode, setKpiEditMode] = useState(false);
-  const [kpiDragId, setKpiDragId] = useState<string | null>(null);
-
-  const updateKpiConfig = (items: TresorerieKpiItem[]) => {
-    const reordonne = items.map((k, i) => ({ ...k, order: i }));
-    setKpiConfig(reordonne);
-    saveKpiConfig(clientId, reordonne);
-  };
-  const toggleKpiVisible = (id: string) =>
-    updateKpiConfig(
-      kpiConfig.map((k) => (k.id === id ? { ...k, visible: !k.visible } : k)),
-    );
-  const handleKpiDragOver = (e: DragEvent, targetId: string) => {
-    e.preventDefault();
-    if (!kpiDragId || kpiDragId === targetId) return;
-    const items = [...kpiConfig];
-    const from = items.findIndex((k) => k.id === kpiDragId);
-    const to = items.findIndex((k) => k.id === targetId);
-    if (from === -1 || to === -1) return;
-    const [deplace] = items.splice(from, 1);
-    items.splice(to, 0, deplace);
-    updateKpiConfig(items);
-  };
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -413,15 +321,21 @@ export default function ClientTresorerieTab({
     );
   }
 
-  // En mode édition, tous les indicateurs sont rendus pour pouvoir les
-  // réactiver ; hors édition, seuls ceux cochés sont affichés.
-  const kpis = kpiConfig
-    .map((c) => {
-      const def = TRESORERIE_KPIS.find((k) => k.id === c.id);
-      return def ? { def, visible: c.visible } : null;
-    })
-    .filter((x): x is { def: TresorerieKpiDef; visible: boolean } => x !== null)
-    .filter((x) => kpiEditMode || x.visible);
+  const kpiValues: Record<string, KpiValue> = Object.fromEntries(
+    TRESORERIE_KPIS.map((k) => {
+      const v = data.kpis[k.id] ?? { valeurN: 0, valeurN1: 0, variation: 0 };
+      return [
+        k.id,
+        {
+          valeur: v.valeurN,
+          valeurN1: v.valeurN1,
+          labelN1: data.yearN1,
+          variation: v.variation,
+        },
+      ];
+    }),
+  );
+
   // Libellé d'axe « 571100 - Caisse Siège » : numéro et intitulé du compte.
   const comptesChart = data.comptes.map((c) => ({
     ...c,
@@ -443,103 +357,7 @@ export default function ClientTresorerieTab({
         </p>
       </div>
 
-      {/* KPI — grille 3 colonnes, formule de calcul et rappel de l'exercice N-1.
-          « Configurer les KPIs » donne accès aux indicateurs masqués par
-          défaut et permet de réordonner les cartes par glisser-déposer. */}
-      <div>
-        <div className="flex items-center justify-between mb-3">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setKpiEditMode(!kpiEditMode)}
-            className={cn(
-              "gap-2 h-9 rounded-lg transition-colors",
-              kpiEditMode
-                ? "bg-[#0077C3] text-white border-[#0077C3] hover:bg-[#005992]"
-                : "border-[#D0E3F5] text-[#335890] hover:bg-[#EBF5FF]",
-            )}
-          >
-            <PiGearDuotone className="w-4 h-4" />
-            {kpiEditMode ? "Terminer" : "Configurer les KPIs"}
-          </Button>
-        </div>
-
-        <div className="grid grid-cols-3 gap-4">
-          {kpis.map(({ def: kpi, visible }) => {
-            const v = data.kpis[kpi.id] ?? { valeurN: 0, valeurN1: 0, variation: 0 };
-            const hab = HABILLAGE[kpi.id] ?? { icon: PiWalletDuotone, color: "text-[#0077C3]" };
-            const Icon = hab.icon;
-            const isDragging = kpiDragId === kpi.id;
-            return (
-              <div
-                key={kpi.id}
-                draggable={kpiEditMode}
-                onDragStart={() => setKpiDragId(kpi.id)}
-                onDragOver={(e) => handleKpiDragOver(e, kpi.id)}
-                onDragEnd={() => setKpiDragId(null)}
-                className={cn(
-                  "transition-all duration-200",
-                  kpiEditMode && "cursor-grab active:cursor-grabbing",
-                  isDragging && "opacity-50 rotate-2 scale-95",
-                  !visible && "opacity-40",
-                )}
-              >
-              <Card
-                className={cn(
-                  "relative overflow-hidden h-full",
-                  kpiEditMode && "border-dashed border-[#0077C3] ring-1 ring-[#0077C3]/20",
-                )}
-              >
-                {kpiEditMode && (
-                  <button
-                    onClick={() => toggleKpiVisible(kpi.id)}
-                    className="absolute top-2 right-2 z-10 w-6 h-6 rounded-full flex items-center justify-center bg-white border border-[#D0E3F5] text-[#94A3B8] hover:text-[#0077C3] transition-colors"
-                    title={visible ? "Masquer" : "Afficher"}
-                  >
-                    {visible ? (
-                      <Eye className="w-3.5 h-3.5" />
-                    ) : (
-                      <EyeOffIcon className="w-3.5 h-3.5" />
-                    )}
-                  </button>
-                )}
-                <CardHeader className="pb-2">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0">
-                      <CardDescription className="text-sm font-medium">
-                        {kpi.label}
-                      </CardDescription>
-                      <p className="text-xs text-muted-foreground italic mt-1">
-                        {formuleTresorerie(kpi)}
-                      </p>
-                    </div>
-                    {!kpiEditMode && <VariationBadge value={v.variation} />}
-                  </div>
-                </CardHeader>
-                <CardContent className="pt-0">
-                  <div className="flex items-end justify-between gap-2">
-                    <div className="min-w-0">
-                      <div
-                        className={cn(
-                          "text-3xl font-bold truncate",
-                          v.valeurN < 0 ? "text-red-600" : "text-[#00122E]",
-                        )}
-                      >
-                        {formatCompactOnly(v.valeurN)}
-                      </div>
-                      <p className="text-sm text-muted-foreground mt-1">
-                        {data.yearN1} : {formatCompactOnly(v.valeurN1)}
-                      </p>
-                    </div>
-                    <Icon className={`w-8 h-8 shrink-0 ${hab.color}`} />
-                  </div>
-                </CardContent>
-              </Card>
-              </div>
-            );
-          })}
-        </div>
-      </div>
+      <KpiGrid storageKey={`tresorerie-${clientId}`} defs={KPI_DEFS} values={kpiValues} />
 
       {/* Histogramme horizontal — détail par compte de trésorerie. */}
       {data.comptes.length > 0 && (

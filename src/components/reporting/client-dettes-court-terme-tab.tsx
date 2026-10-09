@@ -2,12 +2,6 @@
 
 import { useCallback, useEffect, useState } from "react";
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-} from "@/components/ui/card";
-import {
   Select,
   SelectContent,
   SelectItem,
@@ -24,8 +18,8 @@ import {
   PiScalesDuotone,
 } from "react-icons/pi";
 import { toast } from "sonner";
-import { cn } from "@/lib/utils";
-import { DetteTable, formatCompactOnly, type TopDette } from "./dette-table";
+import { DetteTable, type TopDette } from "./dette-table";
+import { KpiGrid, type KpiDef, type KpiValue } from "./kpi-grid";
 
 type PeriodType = "year" | "month" | "ytd" | "ytd-day";
 
@@ -79,6 +73,24 @@ const COMPOSANTES = [
   { key: "dettesFiscales", label: "Dettes fiscales", color: "text-indigo-600", icon: PiReceiptDuotone },
   { key: "dettesHAO", label: "Dettes HAO", color: "text-cyan-600", icon: PiChartDonutDuotone },
 ] as const;
+
+// Le total chapeaute les cinq composantes : ce que l'utilisateur additionne
+// à l'écran correspond toujours au total annoncé.
+const KPI_DEFS: KpiDef[] = [
+  {
+    id: "total",
+    label: "Total Dettes Court Terme",
+    formule: "Somme des cinq composantes du passif circulant",
+    icon: PiScalesDuotone,
+    color: "text-[#0077C3]",
+  },
+  ...COMPOSANTES.map((c) => ({
+    id: c.key,
+    label: c.label,
+    icon: c.icon,
+    color: c.color,
+  })),
+];
 
 export default function ClientDettesCourtTermeTab({
   clientId,
@@ -229,9 +241,11 @@ export default function ClientDettesCourtTermeTab({
   }
 
   const k = data.kpis;
-  // Le total est la somme des composantes affichées : ce que l'utilisateur
-  // additionne à l'écran correspond toujours au total annoncé.
   const total = COMPOSANTES.reduce((s, c) => s + (k[c.key] ?? 0), 0);
+  const kpiValues: Record<string, KpiValue> = {
+    total: { valeur: total },
+    ...Object.fromEntries(COMPOSANTES.map((c) => [c.key, { valeur: k[c.key] ?? 0 }])),
+  };
 
   return (
     <div className="space-y-6">
@@ -244,50 +258,12 @@ export default function ClientDettesCourtTermeTab({
         </p>
       </div>
 
-      {/* KPI — même disposition que les autres onglets de reporting :
-          grille 3 colonnes, carte libellé + valeur + icône. */}
-      <div className="grid grid-cols-3 gap-4">
-        {[
-          {
-            id: "total",
-            label: "Total Dettes Court Terme",
-            valeur: total,
-            color: "text-[#0077C3]",
-            icon: PiScalesDuotone,
-          },
-          ...COMPOSANTES.map((c) => ({
-            id: c.key,
-            label: c.label,
-            valeur: k[c.key] ?? 0,
-            color: c.color,
-            icon: c.icon,
-          })),
-        ].map((kpi) => {
-          const Icon = kpi.icon;
-          return (
-            <Card key={kpi.id} className="relative overflow-hidden">
-              <CardHeader className="pb-2">
-                <CardDescription className="text-sm font-medium">
-                  {kpi.label}
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="pt-0">
-                <div className="flex items-end justify-between gap-2">
-                  <div
-                    className={cn(
-                      "text-3xl font-bold truncate",
-                      kpi.valeur < 0 ? "text-red-600" : "text-[#00122E]",
-                    )}
-                  >
-                    {formatCompactOnly(kpi.valeur)}
-                  </div>
-                  <Icon className={`w-8 h-8 shrink-0 ${kpi.color}`} />
-                </div>
-              </CardContent>
-            </Card>
-          );
-        })}
-      </div>
+      {/* KPI — grille partagée : 3 cartes par ligne, configurables. */}
+      <KpiGrid
+        storageKey={`dettes-ct-${clientId}`}
+        defs={KPI_DEFS}
+        values={kpiValues}
+      />
 
       {/* Top 10 par type (déplacé depuis l'onglet Dettes) */}
       <DetteTable
