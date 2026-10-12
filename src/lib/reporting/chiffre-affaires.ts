@@ -31,6 +31,12 @@ export const CA_PERIMETRE_SQL =
 export const CA_MONTANT_SQL =
   `if(startsWith(compte, '${COMPTE_SUBVENTIONS}'), debit - credit, credit - debit)`;
 
+/** « La ligne est une subvention à recevoir ». */
+export const CA_EST_SUBVENTION_SQL = `startsWith(compte, '${COMPTE_SUBVENTIONS}')`;
+
+/** Les seules natures de VENTE, hors subventions. */
+export const CA_VENTES_SQL = "rubrique IN ({caRubriques:Array(String)})";
+
 // ---------------------------------------------------------------------------
 // Histogramme « Produits par Nature ».
 //

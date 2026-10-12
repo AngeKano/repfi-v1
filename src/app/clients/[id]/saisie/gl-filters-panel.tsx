@@ -45,7 +45,7 @@ export interface GlFilterOptions {
   journaux: OptionFiltre[];
   comptes: OptionFiltre[];
   pieces: string[];
-  tiers: string[];
+  tiers: OptionFiltre[];
   factures: string[];
   rubriques: string[];
 }

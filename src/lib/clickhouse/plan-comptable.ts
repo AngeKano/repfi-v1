@@ -78,6 +78,52 @@ export function intituleCompte(
 // ---------------------------------------------------------------------------
 import { tableColumns } from "./schema";
 
+// ---------------------------------------------------------------------------
+// Référentiel des journaux (table `code_journal`).
+//
+// Comme pour les tiers, le nom des colonnes varie selon les installations ;
+// la table peut aussi être absente. On retombe alors sur la liste standard
+// embarquée dans l'application.
+// ---------------------------------------------------------------------------
+const journauxCache = new Map<string, { at: number; map: Promise<Map<string, string>> }>();
+
+/** code journal → libellé. Map vide si la table manque. */
+export function codeJournauxMap(
+  client: ClickHouseClient,
+  dbName: string,
+): Promise<Map<string, string>> {
+  const hit = journauxCache.get(dbName);
+  if (hit && Date.now() - hit.at < TTL_MS) return hit.map;
+
+  const map = (async () => {
+    const out = new Map<string, string>();
+    try {
+      const cols = await tableColumns(client, dbName, "code_journal");
+      if (cols.size === 0) return out;
+      const pick = (...noms: string[]) => noms.find((n) => cols.has(n));
+      const colCode = pick("code_journal", "code", "journal");
+      const colLib = pick("libelle_journal", "intitule_journal", "libelle", "intitule");
+      if (!colCode || !colLib) return out;
+
+      const res = await client.query({
+        query: `SELECT ${colCode} AS c, ${colLib} AS l
+                FROM ${dbName}.code_journal
+                WHERE ${colCode} != ''`,
+        format: "JSONEachRow",
+      });
+      for (const r of (await res.json()) as Array<{ c: string; l: string }>) {
+        if (r.l) out.set(String(r.c).trim(), r.l);
+      }
+    } catch (e) {
+      console.error(`[code-journal] référentiel indisponible (${dbName}):`, e);
+    }
+    return out;
+  })();
+
+  journauxCache.set(dbName, { at: Date.now(), map });
+  return map;
+}
+
 export interface TiersRef {
   nTiers: string;
   intitule: string;

@@ -126,7 +126,7 @@ interface SaisieData {
   refs: {
     comptes: CompteRef[];
     tiers: TiersRef[];
-    journaux: string[];
+    journaux: { code: string; libelle: string }[];
     pieces: string[];
     factures: string[];
     rubriques: string[];
@@ -324,9 +324,18 @@ export default function SaisieTab({ clientId }: { clientId: string }) {
   // code ; le libellé n'est là que pour reconnaître la ligne d'un coup d'œil.
   const optionsJournaux = useMemo(
     () =>
-      (data?.refs.journaux ?? []).map((code) => ({
-        code,
-        libelle: CODES_JOURNAUX.find((j) => j.code === code)?.label,
+      (data?.refs.journaux ?? []).map((j) => ({
+        code: j.code,
+        // Repli sur la liste standard si la table code_journal est absente.
+        libelle: j.libelle || CODES_JOURNAUX.find((c) => c.code === j.code)?.label,
+      })),
+    [data],
+  );
+  const optionsTiers = useMemo(
+    () =>
+      (data?.refs.tiers ?? []).map((t) => ({
+        code: t.nTiers,
+        libelle: t.intitule || undefined,
       })),
     [data],
   );
@@ -1008,7 +1017,7 @@ export default function SaisieTab({ clientId }: { clientId: string }) {
                   journaux: optionsJournaux,
                   comptes: optionsComptes,
                   pieces: data.refs.pieces,
-                  tiers: data.refs.tiers.map((t) => t.nTiers),
+                  tiers: optionsTiers,
                   factures: data.refs.factures,
                   rubriques: data.refs.rubriques,
                 }}
@@ -1168,7 +1177,7 @@ export default function SaisieTab({ clientId }: { clientId: string }) {
               journaux: optionsJournaux,
               comptes: optionsComptes,
               pieces: data.refs.pieces,
-              tiers: data.refs.tiers.map((t) => t.nTiers),
+              tiers: optionsTiers,
               factures: data.refs.factures,
               rubriques: data.refs.rubriques,
             }}
