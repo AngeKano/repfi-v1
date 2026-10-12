@@ -60,7 +60,6 @@ interface ClientTresorerieTabProps {
   clientId: string;
   year: string;
   setYear: (y: string) => void;
-  periodType: PeriodType;
   setPeriodType: (p: PeriodType) => void;
   selectedMonth: string;
   setSelectedMonth: (m: string) => void;
@@ -149,7 +148,6 @@ export default function ClientTresorerieTab({
   clientId,
   year,
   setYear,
-  periodType,
   setPeriodType,
   selectedMonth,
   setSelectedMonth,
@@ -159,12 +157,17 @@ export default function ClientTresorerieTab({
   const [data, setData] = useState<TresorerieData | null>(null);
   const [loading, setLoading] = useState(true);
 
+  // Les soldes de trésorerie sont des encours : toujours cumulés depuis
+  // janvier, jusqu'au mois sélectionné (ou décembre en granularité annuelle).
+  const moisFin = cumulGranularity === "annee" ? "12" : selectedMonth;
+
   const load = useCallback(async () => {
     setLoading(true);
     try {
+      // Toujours cumulé : janvier → mois de fin.
       const url =
         `/api/clients/${clientId}/reporting/tresorerie` +
-        `?year=${year}&periodType=${periodType}&month=${selectedMonth}`;
+        `?year=${year}&periodType=ytd&month=${moisFin}`;
       const res = await fetch(url);
       if (!res.ok) throw new Error("Erreur API Trésorerie");
       setData((await res.json()) as TresorerieData);
@@ -174,43 +177,24 @@ export default function ClientTresorerieTab({
     } finally {
       setLoading(false);
     }
-  }, [clientId, year, periodType, selectedMonth]);
+  }, [clientId, year, moisFin]);
 
   useEffect(() => {
     load();
   }, [load]);
 
-  const monthLabel = MONTHS.find((m) => m.value === selectedMonth)?.label ?? "Décembre";
-  const cumule = periodType === "ytd" || periodType === "ytd-day";
-  const periodLabel = cumule
-    ? `Janvier - ${monthLabel} ${year}`
-    : periodType === "year"
-      ? `Janvier - Décembre ${year}`
-      : `${monthLabel} ${year}`;
+  const monthLabel = MONTHS.find((m) => m.value === moisFin)?.label ?? "Décembre";
+  const periodLabel = `Janvier - ${monthLabel} ${year}`;
 
   const filtres = (
     <div className="flex flex-wrap items-center gap-3">
-      <div className="flex items-center gap-2 border border-[#D0E3F5] rounded-lg px-4 h-10">
+      {/* Un solde de trésorerie se lit sur un encours : mode verrouillé. */}
+      <div
+        className="flex items-center gap-2 border border-[#D0E3F5] rounded-lg px-4 h-10 opacity-70"
+        title="La trésorerie est toujours calculée en cumulé"
+      >
         <span className="text-xs text-[#335890]">Mode calcul :</span>
-        <Select
-          value={cumule ? "cumule" : "periodique"}
-          onValueChange={(v: string) => {
-            if (v === "cumule") {
-              setPeriodType(cumulGranularity === "annee" ? "ytd" : "ytd-day");
-              if (cumulGranularity === "annee") setSelectedMonth("12");
-            } else {
-              setPeriodType(cumulGranularity === "annee" ? "year" : "month");
-            }
-          }}
-        >
-          <SelectTrigger className="border-0 p-0 h-auto shadow-none min-w-[90px] font-semibold text-[#00122E]">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="periodique">Périodique</SelectItem>
-            <SelectItem value="cumule">Cumulé</SelectItem>
-          </SelectContent>
-        </Select>
+        <span className="font-semibold text-[#00122E]">Cumulé</span>
       </div>
 
       <div className="flex items-center gap-2 border border-[#D0E3F5] rounded-lg px-4 h-10">
@@ -236,45 +220,26 @@ export default function ClientTresorerieTab({
 
       <div className="flex items-center gap-2 border border-[#D0E3F5] rounded-lg px-4 h-10">
         <span className="text-xs text-[#335890]">Granularité :</span>
-        {cumule ? (
-          <Select
-            value={cumulGranularity}
-            onValueChange={(v: string) => {
-              const g = v as "mois" | "annee";
-              setCumulGranularity(g);
-              if (g === "annee") {
-                setPeriodType("ytd");
-                setSelectedMonth("12");
-              } else {
-                setPeriodType("ytd-day");
-              }
-            }}
-          >
-            <SelectTrigger className="border-0 p-0 h-auto shadow-none min-w-[80px] font-semibold text-[#00122E]">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="mois">Mois</SelectItem>
-              <SelectItem value="annee">Année</SelectItem>
-            </SelectContent>
-          </Select>
-        ) : (
-          <Select
-            value={periodType === "month" ? "month" : "year"}
-            onValueChange={(v: string) => setPeriodType(v as PeriodType)}
-          >
-            <SelectTrigger className="border-0 p-0 h-auto shadow-none min-w-[80px] font-semibold text-[#00122E]">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="year">Année</SelectItem>
-              <SelectItem value="month">Mois</SelectItem>
-            </SelectContent>
-          </Select>
-        )}
+        <Select
+          value={cumulGranularity}
+          onValueChange={(v: string) => {
+            const g = v as "mois" | "annee";
+            setCumulGranularity(g);
+            setPeriodType(g === "annee" ? "ytd" : "ytd-day");
+            if (g === "annee") setSelectedMonth("12");
+          }}
+        >
+          <SelectTrigger className="border-0 p-0 h-auto shadow-none min-w-[80px] font-semibold text-[#00122E]">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="mois">Mois</SelectItem>
+            <SelectItem value="annee">Année</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
 
-      {(periodType === "ytd-day" || periodType === "month") && (
+      {cumulGranularity === "mois" && (
         <div className="flex items-center gap-2 border border-[#D0E3F5] rounded-lg px-4 h-10">
           <span className="text-xs text-[#335890]">Mois :</span>
           <Select value={selectedMonth} onValueChange={setSelectedMonth}>

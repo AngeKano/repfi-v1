@@ -32,6 +32,7 @@ import {
   PiMoneyWavyDuotone,
   PiWalletDuotone,
   PiPercentDuotone,
+  PiBankDuotone,
   PiBookOpenDuotone,
   PiFileTextDuotone,
   PiUsersThreeDuotone,
@@ -48,6 +49,7 @@ import ClientDettesTab from "@/components/reporting/client-dettes-tab";
 import ClientDettesCourtTermeTab from "@/components/reporting/client-dettes-court-terme-tab";
 import ClientTresorerieTab from "@/components/reporting/client-tresorerie-tab";
 import ClientRatiosTab from "@/components/reporting/client-ratios-tab";
+import ClientDettesFinancieresTab from "@/components/reporting/client-dettes-financieres-tab";
 import ClientBilanTab from "@/components/reporting/client-bilan-tab";
 import ClientEtatsFinanciersTab from "@/components/reporting/client-etats-financiers-tab";
 import { UploadFileDialog } from "./upload-file-dialog";
@@ -76,6 +78,7 @@ const CLIENT_TABS = [
   { id: "dettes", label: "Règlement Fournisseurs", icon: PiScalesDuotone },
   { id: "dettes-ct", label: "Dettes court terme", icon: PiMoneyWavyDuotone },
   { id: "tresorerie", label: "Trésorerie", icon: PiWalletDuotone },
+  { id: "dettes-fi", label: "Dettes Financières", icon: PiBankDuotone },
   { id: "ratios", label: "Ratios bilantiels", icon: PiPercentDuotone },
   { id: "etats", label: "États Financiers", icon: PiFileTextDuotone },
   { id: "bilan", label: "Bilan d'activité", icon: PiBookOpenDuotone },
@@ -98,6 +101,7 @@ const REPORTING_TAB_IDS = new Set([
   "dettes",
   "dettes-ct",
   "tresorerie",
+  "dettes-fi",
   "ratios",
   "etats",
   "bilan",
@@ -208,6 +212,8 @@ export default function ClientDetailsClient({
       activeTab === "dettes" ||
       activeTab === "recouvrement" ||
       activeTab === "dettes-ct" ||
+      activeTab === "tresorerie" ||
+      activeTab === "dettes-fi" ||
       activeTab === "ratios"
     ) {
       const target = cumulGranularity === "annee" ? "ytd" : "ytd-day";
@@ -558,7 +564,6 @@ export default function ClientDetailsClient({
                     clientId={client.id}
                     year={year}
                     setYear={setYear}
-                    periodType={periodType}
                     setPeriodType={setPeriodType}
                     selectedMonth={selectedMonth}
                     setSelectedMonth={setSelectedMonth}
@@ -576,13 +581,35 @@ export default function ClientDetailsClient({
                   </Card>
                 ))}
 
+              {activeTab === "dettes-fi" &&
+                (hasReporting ? (
+                  <ClientDettesFinancieresTab
+                    clientId={client.id}
+                    year={year}
+                    setYear={setYear}
+                    setPeriodType={setPeriodType}
+                    selectedMonth={selectedMonth}
+                    setSelectedMonth={setSelectedMonth}
+                    cumulGranularity={cumulGranularity}
+                    setCumulGranularity={setCumulGranularity}
+                  />
+                ) : (
+                  <Card className="p-12 border-[#D0E3F5] text-center">
+                    <h3 className="text-lg font-semibold text-[#00122E] mb-1">
+                      Aucun reporting financier
+                    </h3>
+                    <p className="text-sm text-[#335890]">
+                      Importez un grand livre pour analyser les dettes financières.
+                    </p>
+                  </Card>
+                ))}
+
               {activeTab === "ratios" &&
                 (hasReporting ? (
                   <ClientRatiosTab
                     clientId={client.id}
                     year={year}
                     setYear={setYear}
-                    periodType={periodType}
                     setPeriodType={setPeriodType}
                     selectedMonth={selectedMonth}
                     setSelectedMonth={setSelectedMonth}

@@ -1,9 +1,11 @@
 "use client";
 
 // ============================================================================
-// Onglet « Ratios bilantiels » — FRNG, BFR, dettes financières et DSO.
+// Onglet « Ratios bilantiels » — FRNG et BFR.
 // Ces ratios portent sur des encours : le mode de calcul est verrouillé sur
 // « Cumulé », comme l'onglet Dettes court terme.
+// Les dettes financières ont leur propre onglet, le DSO est rattaché au
+// Recouvrement Clients.
 // ============================================================================
 import { useCallback, useEffect, useState } from "react";
 import {
@@ -25,7 +27,7 @@ import {
   ChartTooltip,
   ChartTooltipContent,
 } from "@/components/ui/chart";
-import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid } from "recharts";
+import { LineChart, Line, XAxis, YAxis, CartesianGrid } from "recharts";
 import type { ChartConfig } from "@/components/ui/chart";
 import {
   Loader2,
@@ -39,19 +41,9 @@ import {
   PiArrowsClockwiseDuotone,
   PiFactoryDuotone,
   PiPackageDuotone,
-  PiBankDuotone,
-  PiHandCoinsDuotone,
-  PiKeyDuotone,
-  PiClockCountdownDuotone,
 } from "react-icons/pi";
 import { toast } from "sonner";
-import {
-  KpiGrid,
-  formatCompactOnly,
-  formatJours,
-  type KpiDef,
-  type KpiValue,
-} from "./kpi-grid";
+import { KpiGrid, formatCompactOnly, type KpiDef, type KpiValue } from "./kpi-grid";
 import { RATIOS_FORMULES } from "@/lib/reporting/ratios-bilantiels";
 
 type PeriodType = "year" | "month" | "ytd" | "ytd-day";
@@ -60,7 +52,6 @@ interface ClientRatiosTabProps {
   clientId: string;
   year: string;
   setYear: (y: string) => void;
-  periodType: PeriodType;
   setPeriodType: (p: PeriodType) => void;
   selectedMonth: string;
   setSelectedMonth: (m: string) => void;
@@ -80,20 +71,14 @@ interface ChartPoint {
   bfrGlobal: number;
   bfrGlobalN1: number;
   bfrExploitation: number;
+  bfrExploitationN1: number;
   bfrHao: number;
-  dettesFinancieres: number;
-  dettesFinancieresN1: number;
-  emprunts: number;
-  creditBail: number;
-  dso: number;
-  dsoN1: number;
+  bfrHaoN1: number;
 }
 interface RatiosData {
   yearN: number;
   yearN1: number;
-  jours: number;
   kpis: Record<string, KpiValeur>;
-  dsoDetail: { creancesTTC: number; caTTC: number };
   chartData: ChartPoint[];
 }
 
@@ -112,17 +97,11 @@ const MONTHS = [
   { value: "12", label: "Décembre" },
 ];
 
-// Indicateurs affichés, dans l'ordre des quatre blocs de la spécification.
-// Le DSO s'exprime en jours, les autres en montants.
-const KPI_HABILLAGE: { id: string; icon: React.ElementType; color: string; jours?: boolean }[] = [
+const KPI_HABILLAGE = [
   { id: "frng", icon: PiScalesDuotone, color: "text-[#0077C3]" },
   { id: "bfrGlobal", icon: PiArrowsClockwiseDuotone, color: "text-indigo-600" },
   { id: "bfrExploitation", icon: PiFactoryDuotone, color: "text-blue-600" },
   { id: "bfrHao", icon: PiPackageDuotone, color: "text-cyan-600" },
-  { id: "dettesFinancieres", icon: PiBankDuotone, color: "text-orange-600" },
-  { id: "emprunts", icon: PiHandCoinsDuotone, color: "text-fuchsia-500" },
-  { id: "creditBail", icon: PiKeyDuotone, color: "text-rose-600" },
-  { id: "dso", icon: PiClockCountdownDuotone, color: "text-emerald-600", jours: true },
 ];
 
 const KPI_DEFS: KpiDef[] = KPI_HABILLAGE.map((h) => ({
@@ -133,16 +112,20 @@ const KPI_DEFS: KpiDef[] = KPI_HABILLAGE.map((h) => ({
   color: h.color,
 }));
 
+// Le graphique du BFR n'affiche qu'une composante à la fois, en N et N-1 :
+// superposer les trois rendrait la lecture illisible.
+const SERIES_BFR = [
+  { id: "bfrGlobal", label: "BFR global", cleN: "bfrGlobal", cleN1: "bfrGlobalN1", couleur: "#2463eb", couleurN1: "#81a5f3" },
+  { id: "bfrExploitation", label: "BFR d'exploitation", cleN: "bfrExploitation", cleN1: "bfrExploitationN1", couleur: "#0d9488", couleurN1: "#5eead4" },
+  { id: "bfrHao", label: "BFR HAO", cleN: "bfrHao", cleN1: "bfrHaoN1", couleur: "#d97706", couleurN1: "#fcd34d" },
+] as const;
+
 const chartConfigRatios: ChartConfig = {
   frng: { label: "FRNG N", color: "hsl(221, 83%, 53%)" },
   frngN1: { label: "FRNG N-1", color: "hsl(221, 83%, 73%)" },
   bfrGlobal: { label: "BFR global", color: "hsl(221, 83%, 53%)" },
   bfrExploitation: { label: "BFR exploitation", color: "hsl(174, 62%, 47%)" },
   bfrHao: { label: "BFR HAO", color: "hsl(32, 95%, 54%)" },
-  emprunts: { label: "Emprunts", color: "hsl(221, 83%, 53%)" },
-  creditBail: { label: "Crédit-bail", color: "hsl(221, 83%, 73%)" },
-  dso: { label: "DSO", color: "hsl(160, 84%, 39%)" },
-  dsoN1: { label: "DSO N-1", color: "hsl(160, 60%, 70%)" },
 };
 
 function LegendLine({ color, dashed }: { color: string; dashed?: boolean }) {
@@ -187,6 +170,7 @@ export default function ClientRatiosTab({
 }: ClientRatiosTabProps) {
   const [data, setData] = useState<RatiosData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [serieBfr, setSerieBfr] = useState<string>("bfrGlobal");
 
   // Les ratios bilantiels sont des encours : toujours cumulés depuis janvier.
   const moisFin = cumulGranularity === "annee" ? "12" : selectedMonth;
@@ -314,14 +298,6 @@ export default function ClientRatiosTab({
     );
   }
 
-  const montantAxe = (value: number) => {
-    const abs = Math.abs(value);
-    if (abs >= 1000000) return `${(value / 1000000).toFixed(0)}M`;
-    if (abs >= 1000) return `${(value / 1000).toFixed(0)}K`;
-    return value.toString();
-  };
-
-  // Le DSO sort en jours, les autres indicateurs en montants.
   const kpiValues: Record<string, KpiValue> = Object.fromEntries(
     KPI_HABILLAGE.map((h) => {
       const v = data.kpis[h.id] ?? { valeurN: 0, valeurN1: 0, variation: 0 };
@@ -332,11 +308,19 @@ export default function ClientRatiosTab({
           valeurN1: v.valeurN1,
           labelN1: data.yearN1,
           variation: v.variation,
-          format: h.jours ? formatJours : formatCompactOnly,
         },
       ];
     }),
   );
+
+  const montantAxe = (value: number) => {
+    const abs = Math.abs(value);
+    if (abs >= 1000000) return `${(value / 1000000).toFixed(0)}M`;
+    if (abs >= 1000) return `${(value / 1000).toFixed(0)}K`;
+    return value.toString();
+  };
+
+  const serie = SERIES_BFR.find((s) => s.id === serieBfr) ?? SERIES_BFR[0];
 
   return (
     <div className="space-y-6">
@@ -354,6 +338,7 @@ export default function ClientRatiosTab({
         storageKey={`ratios-${clientId}`}
         defs={KPI_DEFS}
         values={kpiValues}
+        columns={2}
       />
 
       {/* FRNG — courbes N vs N-1 */}
@@ -408,7 +393,7 @@ export default function ClientRatiosTab({
         </CardContent>
       </Card>
 
-      {/* BFR — courbes : global, exploitation, HAO (+ global N-1) */}
+      {/* BFR — une composante à la fois, en N et N-1 */}
       <Card>
         <CardHeader className="flex flex-row items-start justify-between gap-4">
           <div>
@@ -417,13 +402,26 @@ export default function ClientRatiosTab({
               BFR global = BFR d&apos;exploitation + BFR HAO, cumulé — {data.yearN} vs{" "}
               {data.yearN1}
             </CardDescription>
+            <div className="flex items-center gap-2 border border-[#D0E3F5] rounded-lg px-4 h-10 mt-3 w-fit">
+              <span className="text-xs text-[#335890]">Donnée :</span>
+              <Select value={serieBfr} onValueChange={setSerieBfr}>
+                <SelectTrigger className="border-0 p-0 h-auto shadow-none min-w-[160px] font-semibold text-[#00122E]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {SERIES_BFR.map((s) => (
+                    <SelectItem key={s.id} value={s.id}>
+                      {s.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
           <Legende
             items={[
-              { label: `BFR global ${data.yearN}`, color: "#2463eb" },
-              { label: "BFR exploitation", color: "#2dd4bf" },
-              { label: "BFR HAO", color: "#f59e0b" },
-              { label: `BFR global ${data.yearN1}`, color: "#81a5f3", dashed: true },
+              { label: `${serie.label} ${data.yearN}`, color: serie.couleur },
+              { label: `${serie.label} ${data.yearN1}`, color: serie.couleurN1, dashed: true },
             ]}
           />
         </CardHeader>
@@ -442,178 +440,23 @@ export default function ClientRatiosTab({
               />
               <Line
                 type="monotone"
-                dataKey="bfrGlobal"
-                name={`BFR global ${data.yearN}`}
-                stroke="#2463eb"
+                dataKey={serie.cleN}
+                name={`${serie.label} ${data.yearN}`}
+                stroke={serie.couleur}
                 strokeWidth={2}
                 dot={{ r: 3 }}
               />
               <Line
                 type="monotone"
-                dataKey="bfrExploitation"
-                name="BFR exploitation"
-                stroke="#2dd4bf"
-                strokeWidth={2}
-                dot={{ r: 3 }}
-              />
-              <Line
-                type="monotone"
-                dataKey="bfrHao"
-                name="BFR HAO"
-                stroke="#f59e0b"
-                strokeWidth={2}
-                dot={{ r: 3 }}
-              />
-              <Line
-                type="monotone"
-                dataKey="bfrGlobalN1"
-                name={`BFR global ${data.yearN1}`}
-                stroke="#81a5f3"
+                dataKey={serie.cleN1}
+                name={`${serie.label} ${data.yearN1}`}
+                stroke={serie.couleurN1}
                 strokeWidth={2}
                 strokeDasharray="6 6"
                 dot={{ r: 3 }}
               />
             </LineChart>
           </ChartContainer>
-        </CardContent>
-      </Card>
-
-      {/* Dettes financières — histogramme empilé DA + DB */}
-      <Card>
-        <CardHeader className="flex flex-row items-start justify-between gap-4">
-          <div>
-            <CardTitle>Dettes financières</CardTitle>
-            <CardDescription>
-              Emprunts (DA) et crédit-bail (DB), cumulés — exercice {data.yearN}
-            </CardDescription>
-          </div>
-          <Legende
-            items={[
-              { label: "Emprunts", color: "#2463eb" },
-              { label: "Crédit-bail", color: "#81a5f3" },
-            ]}
-          />
-        </CardHeader>
-        <CardContent>
-          <ChartContainer config={chartConfigRatios} className="h-[380px] w-full">
-            <BarChart
-              data={data.chartData}
-              margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
-              barCategoryGap="20%"
-            >
-              <CartesianGrid strokeDasharray="3 3" vertical={false} />
-              <XAxis dataKey="label" tickLine={false} axisLine={false} fontSize={12} />
-              <YAxis tickLine={false} axisLine={false} tickFormatter={montantAxe} fontSize={12} />
-              <ChartTooltip
-                content={
-                  <ChartTooltipContent
-                    formatter={(value, name) => [formatCompactOnly(value as number), name as string]}
-                  />
-                }
-              />
-              <Bar dataKey="emprunts" name="Emprunts" stackId="df" fill="hsl(221, 83%, 53%)" barSize={28} />
-              <Bar
-                dataKey="creditBail"
-                name="Crédit-bail"
-                stackId="df"
-                fill="hsl(221, 83%, 73%)"
-                barSize={28}
-                radius={[4, 4, 0, 0]}
-              />
-            </BarChart>
-          </ChartContainer>
-        </CardContent>
-      </Card>
-
-      {/* DSO — courbes N vs N-1, en jours */}
-      <Card>
-        <CardHeader className="flex flex-row items-start justify-between gap-4">
-          <div>
-            <CardTitle>Délai Moyen de paiement Clients (DSO)</CardTitle>
-            <CardDescription>
-              (Créances clients moyennes TTC / CA TTC) × nombre de jours écoulés depuis le
-              1er janvier ({data.jours} j au {periodLabel.toLowerCase()}) — {data.yearN} vs{" "}
-              {data.yearN1}
-            </CardDescription>
-          </div>
-          <Legende
-            items={[
-              { label: data.yearN, color: "#059669" },
-              { label: data.yearN1, color: "#6ee7b7", dashed: true },
-            ]}
-          />
-        </CardHeader>
-        <CardContent>
-          <ChartContainer config={chartConfigRatios} className="h-[380px] w-full">
-            <LineChart data={data.chartData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" vertical={false} />
-              <XAxis dataKey="label" tickLine={false} axisLine={false} fontSize={12} />
-              <YAxis
-                tickLine={false}
-                axisLine={false}
-                tickFormatter={(v) => `${Math.round(v as number)} j`}
-                fontSize={12}
-              />
-              <ChartTooltip
-                content={
-                  <ChartTooltipContent
-                    formatter={(value, name) => [formatJours(value as number), name as string]}
-                  />
-                }
-              />
-              <Line
-                type="monotone"
-                dataKey="dso"
-                name={`DSO ${data.yearN}`}
-                stroke="#059669"
-                strokeWidth={2}
-                dot={{ r: 3 }}
-              />
-              <Line
-                type="monotone"
-                dataKey="dsoN1"
-                name={`DSO ${data.yearN1}`}
-                stroke="#6ee7b7"
-                strokeWidth={2}
-                strokeDasharray="6 6"
-                dot={{ r: 3 }}
-              />
-            </LineChart>
-          </ChartContainer>
-
-          {/* Détail du calcul à la date de fin de période. */}
-          <div className="mt-6 overflow-x-auto">
-            <table className="w-full text-sm">
-              <tbody>
-                <tr className="border-b">
-                  <td className="py-2.5 text-muted-foreground">
-                    Créances clients TTC (BI − comptes 414)
-                  </td>
-                  <td className="text-right py-2.5 font-semibold">
-                    {formatCompactOnly(data.dsoDetail.creancesTTC)}
-                  </td>
-                </tr>
-                <tr className="border-b">
-                  <td className="py-2.5 text-muted-foreground">
-                    Chiffre d&apos;affaires TTC (TA + TB + TC + TD + TVA collectée 4431 à 4435)
-                  </td>
-                  <td className="text-right py-2.5 font-semibold">
-                    {formatCompactOnly(data.dsoDetail.caTTC)}
-                  </td>
-                </tr>
-                <tr className="border-b">
-                  <td className="py-2.5 text-muted-foreground">Nombre de jours</td>
-                  <td className="text-right py-2.5 font-semibold">{data.jours} j</td>
-                </tr>
-                <tr className="border-t-2 font-bold">
-                  <td className="py-2.5">DSO</td>
-                  <td className="text-right py-2.5 text-blue-600">
-                    {formatJours(data.kpis.dso?.valeurN ?? 0)}
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
         </CardContent>
       </Card>
     </div>
