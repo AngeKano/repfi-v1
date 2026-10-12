@@ -68,6 +68,7 @@ import {
   PiChartDonutDuotone,
   PiShoppingCartSimpleDuotone,
   PiGearDuotone,
+  PiClockCountdownDuotone,
   PiPercentDuotone,
   PiReceiptDuotone,
   PiCalculatorDuotone,
@@ -431,7 +432,9 @@ function saveKpiConfig(clientId: string, items: KpiItem[]) {
 type RecouvrementTotalsKey =
   | "tauxRecouvrement"
   | "caTTCTotal"
-  | "caEncaisseTTC";
+  | "caEncaisseTTC"
+  // Délai moyen de paiement clients, calculé par l'endpoint « ratios ».
+  | "dso";
 
 interface RecouvrementKpiItem {
   id: string;
@@ -441,6 +444,8 @@ interface RecouvrementKpiItem {
   color: string;
   icon: React.ElementType;
   percent?: boolean;
+  /** Valeur exprimée en jours (DSO) et non en montant. */
+  jours?: boolean;
   visible: boolean;
   order: number;
 }
@@ -476,6 +481,17 @@ const DEFAULT_RECOUVREMENT_KPIS: RecouvrementKpiItem[] = [
     icon: PiWalletDuotone,
     visible: true,
     order: 2,
+  },
+  {
+    id: "dso",
+    label: "Délai Moyen de paiement Clients (DSO)",
+    key: "dso",
+    sub: "(Créances clients moyennes TTC / CA TTC) × nombre de jours",
+    color: "text-emerald-600",
+    icon: PiClockCountdownDuotone,
+    jours: true,
+    visible: true,
+    order: 3,
   },
 ];
 
@@ -865,6 +881,16 @@ export default function ClientReportingChart({
     }
   }, [initialTab]);
 
+  // Délai moyen de paiement clients, servi par l'endpoint « ratios ».
+  const [dsoData, setDsoData] = useState<{
+    yearN: number;
+    yearN1: number;
+    jours: number;
+    valeur: number;
+    detail: { creancesTTC: number; caTTC: number };
+    chartData: Array<{ label: string; dso: number; dsoN1: number }>;
+  } | null>(null);
+
   // États spécifiques au recouvrement
   const [recouvrementData, setRecouvrementData] = useState<{
     chartData: Array<{
@@ -883,6 +909,8 @@ export default function ClientReportingChart({
       caEncaisseTTC: number;
       tauxRecouvrement: number;
       soldeCreances: number;
+      // Jamais servi par l'API recouvrement : le DSO est lu dans dsoData.
+      dso?: number;
     };
     periodRange: {
       start: { year: number; month: number; label: string };
@@ -980,6 +1008,39 @@ export default function ClientReportingChart({
     }
   };
 
+  const fetchDsoData = async (endMonth: string) => {
+    try {
+      // Le DSO vient du calcul des ratios bilantiels, sur la même fenêtre.
+      const res = await fetch(
+        `/api/clients/${clientId}/reporting/ratios?year=${recouvrementYear}&month=${endMonth}`,
+      );
+      if (!res.ok) throw new Error("Erreur API DSO");
+      const json = (await res.json()) as {
+        yearN: number;
+        yearN1: number;
+        jours: number;
+        kpis: Record<string, { valeurN: number; valeurN1: number; variation: number }>;
+        dsoDetail: { creancesTTC: number; caTTC: number };
+        chartData: Array<{ label: string; dso: number; dsoN1: number }>;
+      };
+      setDsoData({
+        yearN: json.yearN,
+        yearN1: json.yearN1,
+        jours: json.jours,
+        valeur: json.kpis.dso?.valeurN ?? 0,
+        detail: json.dsoDetail,
+        chartData: json.chartData.map((d) => ({
+          label: d.label,
+          dso: d.dso,
+          dsoN1: d.dsoN1,
+        })),
+      });
+    } catch (error) {
+      console.error("Fetch DSO error:", error);
+      setDsoData(null);
+    }
+  };
+
   const fetchRecouvrementData = async () => {
     setRecouvrementLoading(true);
     try {
@@ -992,7 +1053,7 @@ export default function ClientReportingChart({
       const startPeriod = `${recouvrementYear}-${startMonth}`;
       const endPeriod = `${recouvrementYear}-${endMonth}`;
       const url = `/api/clients/${clientId}/reporting/recouvrement?endPeriod=${endPeriod}&startPeriod=${startPeriod}`;
-      const res = await fetch(url);
+      const [res] = await Promise.all([fetch(url), fetchDsoData(endMonth)]);
       if (!res.ok) throw new Error("Erreur API Recouvrement");
       const json = await res.json();
       setRecouvrementData(json);
@@ -2439,7 +2500,11 @@ export default function ClientReportingChart({
                   .filter((k) => recouvrementKpiEditMode || k.visible)
                   .map((kpi) => {
                     const Icon = kpi.icon;
-                    const value = recouvrementData.totals[kpi.key];
+                    // Le DSO ne vient pas des totaux du recouvrement.
+                    const value =
+                      kpi.key === "dso"
+                        ? (dsoData?.valeur ?? 0)
+                        : recouvrementData.totals[kpi.key];
                     const isDragging = recouvrementKpiDragId === kpi.id;
                     return (
                       <div
@@ -2498,7 +2563,9 @@ export default function ClientReportingChart({
                                 >
                                   {kpi.percent
                                     ? `${value.toFixed(1)}%`
-                                    : formatCompactOnly(value)}
+                                    : kpi.jours
+                                      ? `${Math.round(value).toLocaleString("fr-FR")} j`
+                                      : formatCompactOnly(value)}
                                 </div>
                                 <p className="text-xs text-muted-foreground mt-1">
                                   {kpi.sub}
@@ -2687,6 +2754,124 @@ export default function ClientReportingChart({
                 </ChartContainer>
               </CardContent>
             </Card>
+
+            {/* Évolution du DSO — déplacée depuis les ratios bilantiels */}
+            {dsoData && (
+              <Card>
+                <CardHeader className="flex flex-row items-start justify-between gap-4">
+                  <div>
+                    <CardTitle>
+                      Évolution du Délai Moyen de paiement Clients (DSO)
+                    </CardTitle>
+                    <CardDescription>
+                      (Créances clients moyennes TTC / CA TTC) × nombre de jours
+                      écoulés depuis le 1er janvier ({dsoData.jours} j à la fin de
+                      la période) — {dsoData.yearN} vs {dsoData.yearN1}
+                    </CardDescription>
+                  </div>
+                  <ChartLegend
+                    labelN={dsoData.yearN}
+                    labelN1={dsoData.yearN1}
+                    colorN="#059669"
+                    colorN1="#6ee7b7"
+                  />
+                </CardHeader>
+                <CardContent>
+                  <ChartContainer
+                    config={{
+                      dso: { label: "DSO", color: "#059669" },
+                      dsoN1: { label: "DSO N-1", color: "#6ee7b7" },
+                    }}
+                    className="h-[380px] w-full"
+                  >
+                    <LineChart
+                      data={dsoData.chartData}
+                      margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
+                    >
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                      <XAxis
+                        dataKey="label"
+                        tickLine={false}
+                        axisLine={false}
+                        fontSize={12}
+                      />
+                      <YAxis
+                        tickLine={false}
+                        axisLine={false}
+                        tickFormatter={(v) => `${Math.round(v as number)} j`}
+                        fontSize={12}
+                      />
+                      <ChartTooltip
+                        content={
+                          <ChartTooltipContent
+                            formatter={(value, name) => [
+                              `${Math.round(value as number).toLocaleString("fr-FR")} j`,
+                              name as string,
+                            ]}
+                          />
+                        }
+                      />
+                      <Line
+                        type="monotone"
+                        dataKey="dso"
+                        name={`DSO ${dsoData.yearN}`}
+                        stroke="#059669"
+                        strokeWidth={2}
+                        dot={{ r: 3 }}
+                      />
+                      <Line
+                        type="monotone"
+                        dataKey="dsoN1"
+                        name={`DSO ${dsoData.yearN1}`}
+                        stroke="#6ee7b7"
+                        strokeWidth={2}
+                        strokeDasharray="6 6"
+                        dot={{ r: 3 }}
+                      />
+                    </LineChart>
+                  </ChartContainer>
+
+                  {/* Détail du calcul à la date de fin de période. */}
+                  <div className="mt-6 overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <tbody>
+                        <tr className="border-b">
+                          <td className="py-2.5 text-muted-foreground">
+                            Créances clients TTC (BI − comptes 414)
+                          </td>
+                          <td className="text-right py-2.5 font-semibold">
+                            {formatCompactOnly(dsoData.detail.creancesTTC)}
+                          </td>
+                        </tr>
+                        <tr className="border-b">
+                          <td className="py-2.5 text-muted-foreground">
+                            Chiffre d&apos;affaires TTC (TA + TB + TC + TD + TVA
+                            collectée 4431 à 4435)
+                          </td>
+                          <td className="text-right py-2.5 font-semibold">
+                            {formatCompactOnly(dsoData.detail.caTTC)}
+                          </td>
+                        </tr>
+                        <tr className="border-b">
+                          <td className="py-2.5 text-muted-foreground">
+                            Nombre de jours
+                          </td>
+                          <td className="text-right py-2.5 font-semibold">
+                            {dsoData.jours} j
+                          </td>
+                        </tr>
+                        <tr className="border-t-2 font-bold">
+                          <td className="py-2.5">DSO</td>
+                          <td className="text-right py-2.5 text-blue-600">
+                            {Math.round(dsoData.valeur).toLocaleString("fr-FR")} j
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
 
             {/* Top 10 Créances - Analyse des créances clients */}
             <Card>

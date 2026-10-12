@@ -127,11 +127,14 @@ export function KpiGrid({
   storageKey,
   defs,
   values,
+  columns = 3,
 }: {
   /** Identifiant de persistance, unique par onglet et par client. */
   storageKey: string;
   defs: KpiDef[];
   values: Record<string, KpiValue | undefined>;
+  /** Cartes par ligne. 3 par défaut ; 2 quand l'onglet n'a que 4 indicateurs. */
+  columns?: 2 | 3 | 4;
 }) {
   const [config, setConfig] = useState<KpiConfigItem[]>(() => loadConfig(storageKey, defs));
   const [editMode, setEditMode] = useState(false);
@@ -185,7 +188,12 @@ export function KpiGrid({
         </Button>
       </div>
 
-      <div className="grid grid-cols-3 gap-4">
+      <div
+        className={cn(
+          "grid gap-4",
+          columns === 2 ? "grid-cols-2" : columns === 4 ? "grid-cols-4" : "grid-cols-3",
+        )}
+      >
         {cartes.map(({ def, visible }) => {
           const v = values[def.id] ?? { valeur: 0 };
           const fmt = v.format ?? formatCompactOnly;
