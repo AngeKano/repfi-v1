@@ -14,6 +14,7 @@ import {
   PRODUITS_PERIMETRE_SQL,
 } from "@/lib/reporting/chiffre-affaires";
 import { CREANCES_CLIENTS_SQL } from "@/lib/reporting/creances";
+import { planComptesMap, intituleCompte } from "@/lib/clickhouse/plan-comptable";
 
 const clickhouseClient = createClickhouseClient({
   url: process.env.CLICKHOUSE_HOST || "http://localhost:8123",
@@ -571,6 +572,10 @@ async function recupererCAParNature(
     baseParams.monthFilter = selectedMonth;
   }
 
+  // Le plan comptable fait autorité pour l'intitulé : le grand livre porte
+  // parfois une valeur générique (« Détail ») héritée du fichier source.
+  const plan = await planComptesMap(clickhouseClient, dbName);
+
   // Requête pour N
   const fetchComptes = async (batchIds: string[]): Promise<Map<string, { intitule: string; montant: number }>> => {
     const result = new Map<string, { intitule: string; montant: number }>();
@@ -580,7 +585,7 @@ async function recupererCAParNature(
       query: `
         SELECT
           compte,
-          any(intitule_compte) as intitule_compte,
+          anyIf(intitule_compte, intitule_compte != '') as intitule_compte,
           sum(${CA_MONTANT_SQL}) as montant
         FROM ${dbName}.grand_livre
         WHERE batch_id IN ({batchIds:Array(String)})
@@ -601,7 +606,7 @@ async function recupererCAParNature(
 
     for (const row of rows) {
       result.set(row.compte, {
-        intitule: row.intitule_compte || row.compte,
+        intitule: intituleCompte(plan, row.compte, row.intitule_compte || row.compte),
         montant: parseFloat(row.montant) || 0,
       });
     }
