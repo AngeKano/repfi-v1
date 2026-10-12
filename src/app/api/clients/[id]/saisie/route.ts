@@ -17,8 +17,10 @@ import {
   planComptesMap,
   planTiersList,
   intituleCompte,
+  codeJournauxMap,
 } from "@/lib/clickhouse/plan-comptable";
 import {
+  CODES_JOURNAUX,
   CODE_JOURNAUX_SET,
   FLAG_IMPORT,
   FLAG_SAISIE,
@@ -312,7 +314,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     let comptes: Array<{ compte: string; intitule: string; rubrique: string; bilan: string }> = [];
     let tiers: Array<{ nTiers: string; intitule: string; comptes: string[] }> = [];
     // Options des filtres (valeurs distinctes présentes dans la vue).
-    let journaux: string[] = [];
+    let codesJournaux: string[] = [];
     let pieces: string[] = [];
     let factures: string[] = [];
     let rubriques: string[] = [];
@@ -327,7 +329,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
         });
         return ((await r.json()) as Array<{ v: string }>).map((x) => x.v);
       };
-      [journaux, pieces, factures, rubriques] = await Promise.all([
+      [codesJournaux, pieces, factures, rubriques] = await Promise.all([
         distinct("code_journal", 300),
         distinct("numero_piece", 5000),
         distinct("numero_facture", 5000),
@@ -336,6 +338,17 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     } catch (e) {
       console.error("[saisie GET] options de filtres indisponibles:", e);
     }
+    // Libellé des journaux : la table `code_journal` du client fait foi, à
+    // défaut la liste standard de l'application.
+    const libellesJournaux = await codeJournauxMap(clickhouse, dbName);
+    const journaux = codesJournaux.map((code) => ({
+      code,
+      libelle:
+        libellesJournaux.get(code) ||
+        CODES_JOURNAUX.find((j) => j.code === code)?.label ||
+        "",
+    }));
+
     // ---- Référentiel des COMPTES ----------------------------------------
     // Le plan comptable fait foi : il contient tous les comptes utilisables,
     // y compris ceux jamais mouvementés. Le grand livre n'apporte que les

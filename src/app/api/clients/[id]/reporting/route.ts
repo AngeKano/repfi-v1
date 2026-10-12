@@ -8,6 +8,8 @@ import {
   CA_RUBRIQUES,
   CA_PERIMETRE_SQL,
   CA_MONTANT_SQL,
+  CA_EST_SUBVENTION_SQL,
+  CA_VENTES_SQL,
   PRODUITS_RUBRIQUES,
   PRODUITS_PERIMETRE_SQL,
 } from "@/lib/reporting/chiffre-affaires";
@@ -700,7 +702,21 @@ async function recupererTop10Clients(
             ${CA_MONTANT_SQL} AS montant_ht
           FROM ${dbName}.grand_livre
           WHERE batch_id IN ({batchIds:Array(String)})
-            AND ${CA_PERIMETRE_SQL}
+            AND ${CA_VENTES_SQL}
+            ${periodFilter}
+        ),
+        -- Subventions à recevoir (4495*) : contrairement à une vente, le tiers
+        -- (l'organisme financeur) est porté par la ligne elle-même. Aucun
+        -- rapprochement par pièce n'est donc nécessaire — et il échouerait,
+        -- ces écritures n'ayant pas de ligne client 41*.
+        subventions AS (
+          SELECT
+            if(n_tiers != '', n_tiers, compte) AS n_tiers,
+            if(intitule_tiers != '', intitule_tiers, 'Subventions à recevoir') AS intitule_tiers,
+            ${CA_MONTANT_SQL} AS montant_ht
+          FROM ${dbName}.grand_livre
+          WHERE batch_id IN ({batchIds:Array(String)})
+            AND ${CA_EST_SUBVENTION_SQL}
             ${periodFilter}
         ),
         -- Un seul tiers client par (pièce, date) pour éviter le fan-out de
@@ -733,6 +749,8 @@ async function recupererTop10Clients(
           INNER JOIN tiers_piece t
             ON t.numero_piece = v.numero_piece
             AND t.date_transaction = v.date_transaction
+          UNION ALL
+          SELECT n_tiers, intitule_tiers, montant_ht FROM subventions
         )
         SELECT
           n_tiers AS numero_client,
@@ -780,11 +798,15 @@ async function recupererTop10Clients(
           sum(debit) AS ca_client
         FROM ${dbName}.grand_livre
         WHERE batch_id IN ({batchIds:Array(String)})
-          AND startsWith(compte, '41')
-          AND NOT startsWith(compte, '418')
-          AND NOT startsWith(compte, '419')
-          AND NOT startsWith(n_tiers, '418')
-          AND NOT startsWith(n_tiers, '419')
+          AND (
+            (startsWith(compte, '41')
+              AND NOT startsWith(compte, '418')
+              AND NOT startsWith(compte, '419')
+              AND NOT startsWith(n_tiers, '418')
+              AND NOT startsWith(n_tiers, '419'))
+            -- Subventions à recevoir : même traitement que les créances clients.
+            OR ${CA_EST_SUBVENTION_SQL}
+          )
           AND n_tiers != ''
           ${periodFilter}
         GROUP BY n_tiers, intitule_tiers
@@ -802,11 +824,14 @@ async function recupererTop10Clients(
         SELECT sum(debit) as ca_total
         FROM ${dbName}.grand_livre
         WHERE batch_id IN ({batchIds:Array(String)})
-          AND startsWith(compte, '41')
-          AND NOT startsWith(compte, '418')
-          AND NOT startsWith(compte, '419')
-          AND NOT startsWith(n_tiers, '418')
-          AND NOT startsWith(n_tiers, '419')
+          AND (
+            (startsWith(compte, '41')
+              AND NOT startsWith(compte, '418')
+              AND NOT startsWith(compte, '419')
+              AND NOT startsWith(n_tiers, '418')
+              AND NOT startsWith(n_tiers, '419'))
+            OR ${CA_EST_SUBVENTION_SQL}
+          )
           AND n_tiers != ''
           ${periodFilter}
       `,

@@ -222,6 +222,30 @@ interface ClientDettesTabProps {
   setCumulGranularity: (g: "mois" | "annee") => void;
 }
 
+function LegendLine({ color }: { color: string }) {
+  return (
+    <svg width="120" height="4" viewBox="0 0 199 3" fill="none" aria-hidden preserveAspectRatio="none">
+      <path d="M1.5 1.5H197.5" stroke={color} strokeWidth="3" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function Legende({ items }: { items: { label: string; color: string }[] }) {
+  return (
+    <div className="flex flex-col gap-1 shrink-0">
+      <span className="text-base font-semibold text-[#335890]">Légende</span>
+      {items.map((it) => (
+        <div key={it.label} className="flex items-center gap-3">
+          <LegendLine color={it.color} />
+          <span className="text-base font-medium" style={{ color: it.color }}>
+            {it.label}
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export default function ClientDettesTab({
   clientId,
   year,
@@ -564,11 +588,19 @@ export default function ClientDettesTab({
 
       {/* Chart 1 — Évolution du taux de remboursement */}
       <Card>
-        <CardHeader>
-          <CardTitle>Évolution du Taux de Décaissement Fournisseurs</CardTitle>
-          <CardDescription>
-            (Remboursements / Dettes ) × 100 — taux cumulé et périodique
-          </CardDescription>
+        <CardHeader className="flex flex-row items-start justify-between gap-4">
+          <div>
+            <CardTitle>Évolution du Taux de Décaissement Fournisseurs</CardTitle>
+            <CardDescription>
+              (Remboursements / Dettes ) × 100 — taux cumulé et périodique
+            </CardDescription>
+          </div>
+          <Legende
+            items={[
+              { label: "Taux cumulé", color: "hsl(262, 83%, 58%)" },
+              { label: "Taux périodique", color: "hsl(262, 83%, 78%)" },
+            ]}
+          />
         </CardHeader>
         <CardContent>
           <ChartContainer
@@ -639,13 +671,21 @@ export default function ClientDettesTab({
 
       {/* Chart 2 — Dette fournisseurs vs dettes fournisseurs remboursées */}
       <Card>
-        <CardHeader>
-          <CardTitle>
-            Dettes Fournisseurs TTC vs Décaissement Fournisseurs TTC
-          </CardTitle>
-          <CardDescription>
-            Crédit DJ vs débit DJ, hors comptes 408* (factures non parvenues)
-          </CardDescription>
+        <CardHeader className="flex flex-row items-start justify-between gap-4">
+          <div>
+            <CardTitle>
+              Dettes Fournisseurs TTC vs Décaissement Fournisseurs TTC
+            </CardTitle>
+            <CardDescription>
+              Crédit DJ vs débit DJ, hors comptes 408* (factures non parvenues)
+            </CardDescription>
+          </div>
+          <Legende
+            items={[
+              { label: "Dettes Fournisseurs TTC", color: "hsl(221, 83%, 53%)" },
+              { label: "Décaissement Fournisseurs TTC", color: "hsl(221, 83%, 73%)" },
+            ]}
+          />
         </CardHeader>
         <CardContent>
           <ChartContainer
