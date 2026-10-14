@@ -9,15 +9,32 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   Loader2,
   AlertTriangle,
   ChevronLeft,
   ChevronRight,
   CalendarRange,
+  Download,
+  FileSpreadsheet,
+  FileText,
 } from "lucide-react";
 import { PiScalesDuotone, PiChartDonutDuotone } from "react-icons/pi";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
+import {
+  exporterEtatsExcel,
+  exporterEtatsPdf,
+  type EtatsExportData,
+} from "./etats-financiers-export";
 
 type PeriodType = "year" | "month" | "ytd" | "ytd-day";
 
@@ -130,6 +147,8 @@ export default function ClientEtatsFinanciersTab({
   const [subTab, setSubTab] = useState<"bilan" | "resultat">("bilan");
   // Index de départ de la fenêtre de comparaison (2 exercices maximum).
   const [exOffset, setExOffset] = useState(0);
+  const [showExport, setShowExport] = useState(false);
+  const [exporting, setExporting] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -305,6 +324,31 @@ export default function ClientEtatsFinanciersTab({
     </td>
   );
 
+  // L exportation reprend exactement ce qui est à l écran : mêmes filtres,
+  // mêmes exercices comparés.
+  const lancerExport = async (format: "xlsx" | "pdf") => {
+    setExporting(true);
+    try {
+      const charge: EtatsExportData = {
+        clientName: data.client.name,
+        periodeLabel: periodLabel,
+        exercices: visibles,
+        offset: exOffset,
+        actif: data.actif,
+        passif: data.passif,
+        resultat: data.resultat,
+      };
+      if (format === "xlsx") await exporterEtatsExcel(charge);
+      else await exporterEtatsPdf(charge);
+      setShowExport(false);
+    } catch (e) {
+      console.error(e);
+      toast.error("Échec du téléchargement des états financiers");
+    } finally {
+      setExporting(false);
+    }
+  };
+
   const navExercices = allEx.length > MAX_EXERCICES && (
     <div className="flex items-center gap-2">
       <span className="text-xs text-[#335890]">Exercices comparés :</span>
@@ -365,10 +409,56 @@ export default function ClientEtatsFinanciersTab({
 
       <div className="flex flex-wrap items-center justify-between gap-3">
         {navExercices || <span />}
-        <Badge variant="outline" className="text-xs">
-          {data.manualIncluded ? "Saisies incluses" : "Saisies masquées"}
-        </Badge>
+        <div className="flex items-center gap-3">
+          <Badge variant="outline" className="text-xs">
+            {data.manualIncluded ? "Saisies incluses" : "Saisies masquées"}
+          </Badge>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setShowExport(true)}
+            className="gap-2 h-9 rounded-lg border-[#D0E3F5] text-[#335890] hover:bg-[#EBF5FF]"
+            title="Télécharger les états financiers"
+          >
+            <Download className="w-4 h-4" />
+            Télécharger
+          </Button>
+        </div>
       </div>
+
+      {/* Choix du format d'export — l'export reprend les filtres et les
+          exercices actuellement comparés. */}
+      <Dialog open={showExport} onOpenChange={setShowExport}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Télécharger les états financiers</DialogTitle>
+            <DialogDescription>
+              Bilan (actif et passif) et compte de résultat, pour{" "}
+              {visibles.map((e) => e.label).join(" et ")} — période : {periodLabel}.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid grid-cols-2 gap-3 pt-2">
+            <button
+              disabled={exporting}
+              onClick={() => lancerExport("xlsx")}
+              className="flex flex-col items-center gap-2 rounded-lg border border-[#D0E3F5] p-5 hover:bg-[#EBF5FF] transition-colors disabled:opacity-50"
+            >
+              <FileSpreadsheet className="w-8 h-8 text-green-600" />
+              <span className="text-sm font-medium text-[#00122E]">Excel</span>
+              <span className="text-xs text-muted-foreground">3 onglets (.xlsx)</span>
+            </button>
+            <button
+              disabled={exporting}
+              onClick={() => lancerExport("pdf")}
+              className="flex flex-col items-center gap-2 rounded-lg border border-[#D0E3F5] p-5 hover:bg-[#EBF5FF] transition-colors disabled:opacity-50"
+            >
+              <FileText className="w-8 h-8 text-red-600" />
+              <span className="text-sm font-medium text-[#00122E]">PDF</span>
+              <span className="text-xs text-muted-foreground">Format paysage</span>
+            </button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {loading && (
         <div className="flex items-center gap-2 text-xs text-muted-foreground">

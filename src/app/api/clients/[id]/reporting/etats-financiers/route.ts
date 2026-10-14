@@ -70,17 +70,25 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     const month = (searchParams.get("month") || "12").padStart(2, "0");
     const selectedYear = parseInt(searchParams.get("year") || "", 10);
 
-    // Fenêtre de périodes (YYYYMM) appliquée à CHAQUE exercice, pour que la
-    // comparaison N / N-1 / N-2 porte sur le même intervalle de l'année.
-    const fenetre = (y: number) => {
-      if (cumule) return { start: `${y}01`, end: `${y}${month}` };
-      if (surAnnee) return { start: `${y}01`, end: `${y}12` };
-      return { start: `${y}${month}`, end: `${y}${month}` };
-    };
-    const periodeLabel = cumule
-      ? `Janvier - ${MOIS[parseInt(month, 10) - 1]}`
-      : surAnnee
-        ? "Janvier - Décembre"
+// Mois de clôture de la fenêtre, commun aux deux états.
+    const moisFin = surAnnee ? "12" : month;
+
+    // Le BILAN est une photo à une date : il part toujours du 1er janvier.
+    // Le tronquer au seul mois sélectionné exclurait l'à-nouveau et le bilan
+    // ne s'équilibrerait plus — le mode « périodique » n'a donc de sens que
+    // pour les flux.
+    const fenetreBilan = (y: number) => ({ start: `${y}01`, end: `${y}${moisFin}` });
+
+    // Le COMPTE DE RÉSULTAT porte des flux : il suit le mode choisi.
+    const periodique = !cumule && !surAnnee;
+    const fenetreResultat = (y: number) =>
+      periodique
+        ? { start: `${y}${month}`, end: `${y}${month}` }
+        : { start: `${y}01`, end: `${y}${moisFin}` };
+    const periodeLabel = surAnnee
+      ? "Janvier - Décembre"
+      : cumule
+        ? `Janvier - ${MOIS[parseInt(month, 10) - 1]}`
         : MOIS[parseInt(month, 10) - 1];
 
     const dbName = getClickhouseDbName(id);
@@ -116,35 +124,52 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       .filter((y) => (Number.isFinite(selectedYear) ? y <= selectedYear : true))
       .sort((a, b) => b - a);
 
-    const exercices = years.map((y) => {
-      const d = byYear.get(y)!.periodEnd;
-      return {
-        year: y,
-        // Date de clôture réelle de l'exercice (ex. 31/12/2025).
-        label: `${String(d.getUTCDate()).padStart(2, "0")}/${String(d.getUTCMonth() + 1).padStart(2, "0")}/${d.getUTCFullYear()}`,
-      };
-    });
+    // Intitulé d'un exercice : la date de fin de la fenêtre filtrée, bornée à
+    // la clôture réelle (inutile d'annoncer 31/12 si l'exercice s'arrête en
+    // avril). Filtrer sur avril affiche donc « 30/04/2026 » et « 30/04/2025 ».
+    const libelleExercice = (y: number) => {
+      const clotureReelle = byYear.get(y)!.periodEnd;
+      const finFenetre = new Date(Date.UTC(y, parseInt(moisFin, 10), 0));
+      const d = finFenetre < clotureReelle ? finFenetre : clotureReelle;
+      return `${String(d.getUTCDate()).padStart(2, "0")}/${String(d.getUTCMonth() + 1).padStart(2, "0")}/${d.getUTCFullYear()}`;
+    };
 
-    const actifBrut: Record<string, number>[] = [];
-    const actifAmort: Record<string, number>[] = [];
-    const actifNet: Record<string, number>[] = [];
-    const passifNet: Record<string, number>[] = [];
-    const resultatVals: Record<string, number>[] = [];
+    const exercicesCalcules: Array<{
+      year: number;
+      label: string;
+      avecDonnees: boolean;
+      brut: Record<string, number>;
+      amort: Record<string, number>;
+      net: Record<string, number>;
+      passif: Record<string, number>;
+      resultat: Record<string, number>;
+    }> = [];
 
     for (const y of years) {
       const batchIds = [...byYear.get(y)!.batchIds];
       if (!client.excludeManualEntries) batchIds.push(manualBatchId(id, y));
-      const { start, end } = fenetre(y);
+      const bilanWin = fenetreBilan(y);
+      const resWin = fenetreResultat(y);
 
       const brut: Record<string, number> = {};
       const amort: Record<string, number> = {};
       const passif: Record<string, number> = {};
+      // `res` alimente le compte de résultat affiché ; `resCumul` sert au
+      // report du résultat net au bilan (CJ), qui est toujours cumulé.
       const res: Record<string, number> = {};
+      const resCumul: Record<string, number> = {};
+      let lignesLues = 0;
 
       if (batchIds.length > 0) {
         try {
-          const qp = { batchIds, startYM: start, endYM: end };
-          const [bRes, rRes] = await Promise.all([
+          const qp = {
+            batchIds,
+            startYM: bilanWin.start,
+            endYM: bilanWin.end,
+            startRes: resWin.start,
+            endRes: resWin.end,
+          };
+          const [bRes, rRes, rCumul] = await Promise.all([
             clickhouse.query({
               query: `
                 SELECT ${BILAN_REF} AS ref,
@@ -166,6 +191,19 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
                 FROM ${dbName}.grand_livre
                 WHERE batch_id IN ({batchIds:Array(String)})
                   AND rubrique != ''
+                  AND ${YM} >= {startRes:String} AND ${YM} <= {endRes:String}
+                GROUP BY rubrique
+              `,
+              query_params: qp,
+              format: "JSONEachRow",
+            }),
+            // Résultat cumulé depuis janvier : seul report valable au bilan.
+            clickhouse.query({
+              query: `
+                SELECT rubrique AS ref, sum(credit - debit) AS solde
+                FROM ${dbName}.grand_livre
+                WHERE batch_id IN ({batchIds:Array(String)})
+                  AND rubrique != ''
                   AND ${YM} >= {startYM:String} AND ${YM} <= {endYM:String}
                 GROUP BY rubrique
               `,
@@ -174,7 +212,9 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
             }),
           ]);
 
-          for (const row of (await bRes.json()) as BilanRow[]) {
+          const bilanRows = (await bRes.json()) as BilanRow[];
+          lignesLues += bilanRows.length;
+          for (const row of bilanRows) {
             const inActif = normalizeRef(row.ref, ACTIF_REFS);
             if (inActif) {
               brut[inActif] = (brut[inActif] || 0) + (parseFloat(row.brut) || 0);
@@ -187,9 +227,15 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
             }
           }
 
-          for (const row of (await rRes.json()) as ResultatRow[]) {
+          const resRows = (await rRes.json()) as ResultatRow[];
+          lignesLues += resRows.length;
+          for (const row of resRows) {
             const ref = normalizeRef(row.ref, RESULTAT_REFS);
             if (ref) res[ref] = (res[ref] || 0) + (parseFloat(row.solde) || 0);
+          }
+          for (const row of (await rCumul.json()) as ResultatRow[]) {
+            const ref = normalizeRef(row.ref, RESULTAT_REFS);
+            if (ref) resCumul[ref] = (resCumul[ref] || 0) + (parseFloat(row.solde) || 0);
           }
         } catch (e) {
           console.error(`[etats-financiers] ClickHouse indisponible (exercice ${y}):`, e);
@@ -208,14 +254,29 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       // depuis le compte de résultat (XI). Si les comptes ont été clôturés, XI
       // vaut 0 et le solde déjà classé en CJ subsiste : pas de double compte.
       const sig = computeResultatTotals(res);
-      passif.CJ = (passif.CJ || 0) + sig.XI;
+      passif.CJ = (passif.CJ || 0) + computeResultatTotals(resCumul).XI;
 
-      actifBrut.push(applyTotals(BILAN_ACTIF, brut));
-      actifAmort.push(applyTotals(BILAN_ACTIF, amort));
-      actifNet.push(applyTotals(BILAN_ACTIF, net));
-      passifNet.push(applyTotals(BILAN_PASSIF, passif));
-      resultatVals.push(sig);
+      exercicesCalcules.push({
+        year: y,
+        label: libelleExercice(y),
+        avecDonnees: lignesLues > 0,
+        brut: applyTotals(BILAN_ACTIF, brut),
+        amort: applyTotals(BILAN_ACTIF, amort),
+        net: applyTotals(BILAN_ACTIF, net),
+        passif: applyTotals(BILAN_PASSIF, passif),
+        resultat: sig,
+      });
     }
+
+    // Un exercice sans aucune écriture sur la fenêtre filtrée n'apporte rien à
+    // la comparaison : on ne l'affiche pas.
+    const retenus = exercicesCalcules.filter((e) => e.avecDonnees);
+    const exercices = retenus.map((e) => ({ year: e.year, label: e.label }));
+    const actifBrut = retenus.map((e) => e.brut);
+    const actifAmort = retenus.map((e) => e.amort);
+    const actifNet = retenus.map((e) => e.net);
+    const passifNet = retenus.map((e) => e.passif);
+    const resultatVals = retenus.map((e) => e.resultat);
 
     const at = (arr: Record<string, number>[], ref: string) => arr.map((v) => v[ref] || 0);
 
