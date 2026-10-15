@@ -14,9 +14,11 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Loader2,
   AlertTriangle,
@@ -149,6 +151,8 @@ export default function ClientEtatsFinanciersTab({
   const [exOffset, setExOffset] = useState(0);
   const [showExport, setShowExport] = useState(false);
   const [exporting, setExporting] = useState(false);
+  // Formats cochés : un seul ou les deux à la fois.
+  const [formats, setFormats] = useState<Array<"xlsx" | "pdf">>(["xlsx"]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -326,7 +330,11 @@ export default function ClientEtatsFinanciersTab({
 
   // L exportation reprend exactement ce qui est à l écran : mêmes filtres,
   // mêmes exercices comparés.
-  const lancerExport = async (format: "xlsx" | "pdf") => {
+  const toggleFormat = (f: "xlsx" | "pdf") =>
+    setFormats((l) => (l.includes(f) ? l.filter((x) => x !== f) : [...l, f]));
+
+  const lancerExport = async () => {
+    if (formats.length === 0) return;
     setExporting(true);
     try {
       const charge: EtatsExportData = {
@@ -338,8 +346,9 @@ export default function ClientEtatsFinanciersTab({
         passif: data.passif,
         resultat: data.resultat,
       };
-      if (format === "xlsx") await exporterEtatsExcel(charge);
-      else await exporterEtatsPdf(charge);
+      // Les deux formats cochés produisent deux fichiers, l'un après l'autre.
+      if (formats.includes("xlsx")) await exporterEtatsExcel(charge);
+      if (formats.includes("pdf")) await exporterEtatsPdf(charge);
       setShowExport(false);
     } catch (e) {
       console.error(e);
@@ -438,25 +447,68 @@ export default function ClientEtatsFinanciersTab({
             </DialogDescription>
           </DialogHeader>
           <div className="grid grid-cols-2 gap-3 pt-2">
-            <button
-              disabled={exporting}
-              onClick={() => lancerExport("xlsx")}
-              className="flex flex-col items-center gap-2 rounded-lg border border-[#D0E3F5] p-5 hover:bg-[#EBF5FF] transition-colors disabled:opacity-50"
-            >
-              <FileSpreadsheet className="w-8 h-8 text-green-600" />
-              <span className="text-sm font-medium text-[#00122E]">Excel</span>
-              <span className="text-xs text-muted-foreground">3 onglets (.xlsx)</span>
-            </button>
-            <button
-              disabled={exporting}
-              onClick={() => lancerExport("pdf")}
-              className="flex flex-col items-center gap-2 rounded-lg border border-[#D0E3F5] p-5 hover:bg-[#EBF5FF] transition-colors disabled:opacity-50"
-            >
-              <FileText className="w-8 h-8 text-red-600" />
-              <span className="text-sm font-medium text-[#00122E]">PDF</span>
-              <span className="text-xs text-muted-foreground">Format paysage</span>
-            </button>
+            {[
+              {
+                id: "xlsx" as const,
+                label: "Excel",
+                detail: "3 onglets (.xlsx)",
+                icon: FileSpreadsheet,
+                color: "text-green-600",
+              },
+              {
+                id: "pdf" as const,
+                label: "PDF",
+                detail: "A4 paysage",
+                icon: FileText,
+                color: "text-red-600",
+              },
+            ].map((f) => {
+              const Icon = f.icon;
+              const coche = formats.includes(f.id);
+              return (
+                <button
+                  key={f.id}
+                  type="button"
+                  disabled={exporting}
+                  onClick={() => toggleFormat(f.id)}
+                  aria-pressed={coche}
+                  className={cn(
+                    "relative flex flex-col items-center gap-2 rounded-lg border p-5 transition-colors disabled:opacity-50",
+                    coche
+                      ? "border-[#0077C3] bg-[#EBF5FF] ring-1 ring-[#0077C3]/20"
+                      : "border-[#D0E3F5] hover:bg-[#F5F9FF]",
+                  )}
+                >
+                  <Checkbox
+                    checked={coche}
+                    tabIndex={-1}
+                    aria-hidden
+                    className="absolute top-2 right-2 pointer-events-none"
+                  />
+                  <Icon className={`w-8 h-8 ${f.color}`} />
+                  <span className="text-sm font-medium text-[#00122E]">{f.label}</span>
+                  <span className="text-xs text-muted-foreground">{f.detail}</span>
+                </button>
+              );
+            })}
           </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setShowExport(false)}>
+              Annuler
+            </Button>
+            <Button
+              onClick={lancerExport}
+              disabled={exporting || formats.length === 0}
+              className="gap-2"
+            >
+              {exporting ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <Download className="w-4 h-4" />
+              )}
+              {formats.length === 2 ? "Télécharger les 2 fichiers" : "Télécharger"}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 
