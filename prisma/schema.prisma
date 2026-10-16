@@ -375,6 +375,9 @@ enum FileType {
   PLAN_COMPTES
   PLAN_TIERS
   CODE_JOURNAL
+  // Mapping racine de compte → rubrique (table ClickHouse ple) : référentiel à
+  // part entière, mis à jour par fichier ou ligne à ligne, jamais reconstruit.
+  PLE
 }
 
 enum ProcessingStatus {

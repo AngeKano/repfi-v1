@@ -169,3 +169,14 @@ export function planTiersList(
   tiersCache.set(dbName, { at: Date.now(), list });
   return list;
 }
+
+/**
+ * Vide les caches des référentiels d'une base client : à appeler après une
+ * modification d'intitulé, pour que le reporting reflète la nouvelle valeur
+ * sans attendre l'expiration du cache.
+ */
+export function invaliderReferentiels(dbName: string): void {
+  cache.delete(dbName);
+  tiersCache.delete(dbName);
+  journauxCache.delete(dbName);
+}

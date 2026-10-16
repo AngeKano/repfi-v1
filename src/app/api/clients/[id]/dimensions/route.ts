@@ -2,16 +2,19 @@
 // Mise à jour UNITAIRE des tables de dimension d'un client
 // (plan comptable, plan tiers, codes journaux).
 //
-//   GET  → état des trois référentiels (nombre de lignes, dernière mise à
-//          jour) + historique des mises à jour.
-//   POST → dépôt d'UN fichier (multipart : fileType + file). Le fichier est
-//          rangé sur S3 puis confié au DAG Airflow « etl_dimensions_clickhouse »,
-//          qui ajoute les clés nouvelles et met à jour les clés existantes,
-//          sans jamais supprimer de ligne. Aucune période, aucun grand livre.
+// Même enchaînement que l'import complet (upload → trigger-etl → statut) :
+//   POST                       → dépôt d'UN fichier sur S3 + suivi en PENDING
+//                                (équivalent de /api/files/comptable/upload) ;
+//   POST /dimensions/trigger   → lancement du DAG Airflow
+//                                « etl_dimensions_clickhouse » (équivalent de
+//                                /api/files/comptable/trigger-etl) ;
+//   GET                        → lecture du suivi, que le DAG met à jour
+//                                lui-même dans `dimension_updates` (statut,
+//                                progression, lignes ajoutées / modifiées,
+//                                erreur), comme il le fait pour les périodes.
 //
-// Le DAG ne connaît pas la table de suivi `dimension_updates` : l'état d'un
-// traitement et ses compteurs sont relus dans l'API Airflow (état du run et
-// valeur renvoyée par la tâche) à chaque consultation, tant qu'il est en cours.
+// Le DAG ajoute les clés nouvelles et met à jour les clés existantes, sans
+// jamais supprimer de ligne. Aucune période, aucun grand livre.
 // ============================================================================
 import { NextRequest, NextResponse } from "next/server";
 import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
@@ -31,13 +34,12 @@ import {
   validateComptableFormat,
   MAX_COMPTABLE_FILE_SIZE,
 } from "@/lib/comptable-formats";
-import {
-  triggerAirflowDagRun,
-  getAirflowDagRunState,
-  getAirflowTaskReturnValue,
-} from "@/lib/airflow";
 import { getClickhouseDbName } from "@/lib/clickhouse/manual-sync";
-import { DIMENSIONS, dimensionParType } from "@/lib/comptable/dimensions";
+import {
+  DIMENSIONS,
+  DIMENSION_EN_COURS,
+  dimensionParType,
+} from "@/lib/comptable/dimensions";
 
 const s3Client = new S3Client({
   region: process.env.AWS_REGION!,
@@ -53,15 +55,6 @@ const clickhouse = createClickhouseClient({
   password: process.env.CLICKHOUSE_PASSWORD || "",
 });
 
-const DAG_ID = "etl_dimensions_clickhouse";
-const TASK_ID = "update_dimension";
-
-const EN_COURS: ProcessingStatus[] = [
-  ProcessingStatus.PENDING,
-  ProcessingStatus.VALIDATING,
-  ProcessingStatus.PROCESSING,
-];
-
 /** Nom de fichier sûr pour une clé S3 (on garde l'extension d'origine). */
 function nomSur(nom: string): string {
   return nom.replace(/[^\w.\-]+/g, "_").slice(-120);
@@ -75,83 +68,6 @@ function horodatage(d: Date): string {
   );
 }
 
-/**
- * Compteurs renvoyés par la tâche : { ajoutees, modifiees, inchangees, … }.
- * Selon la version d'Airflow, la valeur arrive en objet ou en texte (repr
- * Python d'un dict) : on lit les deux formes.
- */
-function lireCompteurs(valeur: unknown): { ajoutees: number; modifiees: number } | null {
-  if (valeur && typeof valeur === "object") {
-    const v = valeur as Record<string, unknown>;
-    return { ajoutees: Number(v.ajoutees) || 0, modifiees: Number(v.modifiees) || 0 };
-  }
-  if (typeof valeur === "string") {
-    const lire = (cle: string) => {
-      const m = new RegExp(`["']${cle}["']\\s*:\\s*(\\d+)`).exec(valeur);
-      return m ? parseInt(m[1], 10) : 0;
-    };
-    return { ajoutees: lire("ajoutees"), modifiees: lire("modifiees") };
-  }
-  return null;
-}
-
-/**
- * Met à jour les traitements en cours d'après l'état de leur run Airflow.
- * Best-effort : si Airflow ne répond pas, la ligne reste en cours et sera
- * resynchronisée à la consultation suivante.
- */
-async function synchroniserDepuisAirflow(
-  enCours: Array<{ id: string; dagRunId: string | null }>,
-) {
-  await Promise.all(
-    enCours.map(async (u) => {
-      if (!u.dagRunId) return;
-      try {
-        const etat = await getAirflowDagRunState(DAG_ID, u.dagRunId);
-        if (etat === "success") {
-          let compteurs: { ajoutees: number; modifiees: number } | null = null;
-          try {
-            compteurs = lireCompteurs(
-              await getAirflowTaskReturnValue(DAG_ID, u.dagRunId, TASK_ID),
-            );
-          } catch (e) {
-            console.error("[dimensions] compteurs Airflow indisponibles:", e);
-          }
-          await prisma.dimensionUpdate.update({
-            where: { id: u.id },
-            data: {
-              status: ProcessingStatus.COMPLETED,
-              progress: 100,
-              rowsInserted: compteurs?.ajoutees ?? null,
-              rowsUpdated: compteurs?.modifiees ?? null,
-              processedAt: new Date(),
-            },
-          });
-        } else if (etat === "failed") {
-          await prisma.dimensionUpdate.update({
-            where: { id: u.id },
-            data: {
-              status: ProcessingStatus.FAILED,
-              progress: 100,
-              errorMessage:
-                "Le traitement a échoué (format ou contenu du fichier). " +
-                `Détail dans Airflow, run ${u.dagRunId}.`,
-              processedAt: new Date(),
-            },
-          });
-        } else if (etat === "running") {
-          await prisma.dimensionUpdate.update({
-            where: { id: u.id },
-            data: { status: ProcessingStatus.PROCESSING, progress: 50 },
-          });
-        }
-      } catch (e) {
-        console.error(`[dimensions] état Airflow indisponible (${u.dagRunId}):`, e);
-      }
-    }),
-  );
-}
-
 async function chargerClient(id: string, companyId: string) {
   return prisma.client.findFirst({
     where: { id, companyId },
@@ -160,7 +76,7 @@ async function chargerClient(id: string, companyId: string) {
 }
 
 // ============================================================================
-// GET — état des référentiels + historique
+// GET — état des référentiels + historique (lu en base, écrit par Airflow)
 // ============================================================================
 export async function GET(
   _req: NextRequest,
@@ -174,13 +90,6 @@ export async function GET(
     const { id } = await params;
     const client = await chargerClient(id, user.companyId);
     if (!client) return NextResponse.json({ error: "Client non trouvé" }, { status: 404 });
-
-    // Les traitements en cours sont d'abord resynchronisés avec Airflow.
-    const aSynchroniser = await prisma.dimensionUpdate.findMany({
-      where: { clientId: id, status: { in: EN_COURS } },
-      select: { id: true, dagRunId: true },
-    });
-    if (aSynchroniser.length > 0) await synchroniserDepuisAirflow(aSynchroniser);
 
     const updates = await prisma.dimensionUpdate.findMany({
       where: { clientId: id },
@@ -219,7 +128,9 @@ export async function GET(
           label: d.label,
           lignes: comptes[i],
           derniereMiseAJour: derniere?.processedAt ?? null,
-          enCours: updates.some((u) => u.fileType === d.fileType && EN_COURS.includes(u.status)),
+          enCours: updates.some(
+            (u) => u.fileType === d.fileType && DIMENSION_EN_COURS.includes(u.status),
+          ),
         };
       }),
       updates: updates.map((u) => ({
@@ -227,8 +138,11 @@ export async function GET(
         fileType: u.fileType,
         fileName: u.fileName,
         fileSize: u.fileSize,
+        // Pas de fichier déposé : reclassement du grand livre (mapping PLE).
+        reclassement: !u.s3Key,
         status: u.status,
         progress: u.progress,
+        dagRunId: u.dagRunId,
         rowsInserted: u.rowsInserted,
         rowsUpdated: u.rowsUpdated,
         errorMessage: u.errorMessage,
@@ -247,7 +161,7 @@ export async function GET(
 }
 
 // ============================================================================
-// POST — dépôt d'un fichier de dimension unique
+// POST — dépôt d'un fichier de dimension unique (sans lancer le traitement)
 // ============================================================================
 export async function POST(
   req: NextRequest,
@@ -294,7 +208,7 @@ export async function POST(
 
     // Deux mises à jour simultanées d'une même table se marcheraient dessus.
     const enCours = await prisma.dimensionUpdate.findFirst({
-      where: { clientId: id, fileType, status: { in: EN_COURS } },
+      where: { clientId: id, fileType, status: { in: DIMENSION_EN_COURS } },
       select: { id: true },
     });
     if (enCours) {
@@ -337,36 +251,7 @@ export async function POST(
       },
     });
 
-    // ---- Déclenchement du DAG dédié ----
-    try {
-      const dagRunId = await triggerAirflowDagRun(DAG_ID, {
-        client_id: id,
-        dimension: dimension.etlType,
-        s3_key: s3Key,
-      });
-      const lancee = await prisma.dimensionUpdate.update({
-        where: { id: update.id },
-        data: { status: ProcessingStatus.PROCESSING, progress: 5, dagRunId },
-      });
-      return NextResponse.json({ update: lancee }, { status: 201 });
-    } catch (e) {
-      // Le fichier est déposé mais le traitement n'a pas pu démarrer :
-      // l'échec est tracé pour rester visible dans l'historique.
-      const message = e instanceof Error ? e.message : String(e);
-      await prisma.dimensionUpdate.update({
-        where: { id: update.id },
-        data: {
-          status: ProcessingStatus.FAILED,
-          progress: 100,
-          errorMessage: message,
-          processedAt: new Date(),
-        },
-      });
-      return NextResponse.json(
-        { error: `Le traitement n'a pas pu démarrer : ${message}` },
-        { status: 502 },
-      );
-    }
+    return NextResponse.json({ update }, { status: 201 });
   } catch (error) {
     console.error("Dimensions POST error:", error);
     return NextResponse.json({ error: "Erreur lors du dépôt du référentiel" }, { status: 500 });

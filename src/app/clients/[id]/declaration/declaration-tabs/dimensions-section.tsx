@@ -29,7 +29,12 @@ import {
   RefreshCw,
   Info,
 } from "lucide-react";
-import { PiListChecksDuotone, PiUsersThreeDuotone, PiBooksDuotone } from "react-icons/pi";
+import {
+  PiListChecksDuotone,
+  PiUsersThreeDuotone,
+  PiBooksDuotone,
+  PiTreeStructureDuotone,
+} from "react-icons/pi";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { FileType } from "../../../../../../prisma/generated/prisma/enums";
@@ -66,6 +71,8 @@ interface MiseAJour {
   createdAt: string;
   processedAt: string | null;
   uploadedBy: string;
+  /** Reclassement du grand livre (mapping PLE), sans fichier déposé. */
+  reclassement: boolean;
 }
 
 interface Reponse {
@@ -78,9 +85,31 @@ const ICONES: Record<string, React.ElementType> = {
   [FileType.PLAN_COMPTES]: PiBooksDuotone,
   [FileType.PLAN_TIERS]: PiUsersThreeDuotone,
   [FileType.CODE_JOURNAL]: PiListChecksDuotone,
+  [FileType.PLE]: PiTreeStructureDuotone,
 };
 
 const EN_COURS: Statut[] = ["PENDING", "VALIDATING", "PROCESSING"];
+// Seuls ces statuts évoluent sans action de l'utilisateur : Airflow les fait
+// progresser. Un dépôt PENDING attend son lancement.
+const EN_TRAITEMENT: Statut[] = ["VALIDATING", "PROCESSING"];
+
+/**
+ * Lance le traitement Airflow d'un dépôt — pendant de l'appel à
+ * /api/files/comptable/trigger-etl de l'import complet.
+ */
+async function lancerTraitement(clientId: string, updateId: string): Promise<string | null> {
+  try {
+    const res = await fetch(`/api/clients/${clientId}/dimensions/trigger`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ updateId }),
+    });
+    const json = await res.json().catch(() => ({}));
+    return res.ok ? null : json?.error || "Le traitement n'a pas pu démarrer.";
+  } catch {
+    return "Erreur réseau.";
+  }
+}
 
 const fmtDate = (iso: string | null) =>
   iso
@@ -111,7 +140,7 @@ function BadgeStatut({ statut }: { statut: Statut }) {
       }
       className="text-xs gap-1"
     >
-      {EN_COURS.includes(statut) && <Loader2 className="w-3 h-3 animate-spin" />}
+      {EN_TRAITEMENT.includes(statut) && <Loader2 className="w-3 h-3 animate-spin" />}
       {libelles[statut]}
     </Badge>
   );
@@ -136,7 +165,17 @@ export default function DimensionsSection({ clientId }: { clientId: string }) {
   }, [charger]);
 
   // Suivi en direct tant qu'une mise à jour est en cours.
-  const enCours = data?.updates.some((u) => EN_COURS.includes(u.status)) ?? false;
+  const enCours = data?.updates.some((u) => EN_TRAITEMENT.includes(u.status)) ?? false;
+  const [lancement, setLancement] = useState<string | null>(null);
+
+  const relancer = async (u: MiseAJour) => {
+    setLancement(u.id);
+    const erreur = await lancerTraitement(clientId, u.id);
+    setLancement(null);
+    if (erreur) toast.error(erreur);
+    else toast.success("Traitement lancé");
+    charger();
+  };
   useEffect(() => {
     if (!enCours) return;
     const t = setInterval(charger, 4000);
@@ -172,7 +211,8 @@ export default function DimensionsSection({ clientId }: { clientId: string }) {
             </h2>
             <p className="text-sm text-[#335890] mt-0.5">
               Mettez à jour un référentiel seul, sans réimporter de période. Les lignes du
-              fichier sont ajoutées ou modifiées — aucune n&apos;est supprimée.
+              fichier sont ajoutées ou modifiées — aucune n&apos;est supprimée. Le contenu
+              des tables se consulte et se corrige depuis l&apos;onglet Comptabilité.
             </p>
           </div>
           {data?.canUpload && (
@@ -187,7 +227,7 @@ export default function DimensionsSection({ clientId }: { clientId: string }) {
         </div>
 
         {/* État des trois référentiels */}
-        <div className="grid grid-cols-3 gap-4 mb-6">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
           {DIMENSIONS.map((d) => {
             const etat = data?.tables.find((t) => t.fileType === d.fileType);
             const Icon = ICONES[d.fileType] ?? PiBooksDuotone;
@@ -244,7 +284,7 @@ export default function DimensionsSection({ clientId }: { clientId: string }) {
             <table className="w-full">
               <thead>
                 <tr className="border-b border-[#D0E3F5] bg-[#F5F9FF]">
-                  {["Date", "Référentiel", "Fichier", "Résultat", "Statut", "Par"].map((h, i) => (
+                  {["Date", "Référentiel", "Fichier", "Résultat", "Statut", "Par", ""].map((h, i) => (
                     <th
                       key={h}
                       className={cn(
@@ -276,7 +316,14 @@ export default function DimensionsSection({ clientId }: { clientId: string }) {
                       {u.fileName}
                     </td>
                     <td className="px-4 py-3 text-sm">
-                      {u.status === "COMPLETED" ? (
+                      {u.status === "COMPLETED" && u.reclassement ? (
+                        <span className="text-[#00122E]">
+                          <span className="text-[#0077C3] font-medium">
+                            {(u.rowsUpdated ?? 0).toLocaleString("fr-FR")}
+                          </span>{" "}
+                          écriture(s) reclassée(s)
+                        </span>
+                      ) : u.status === "COMPLETED" ? (
                         <span className="text-[#00122E]">
                           <span className="text-green-700 font-medium">
                             +{(u.rowsInserted ?? 0).toLocaleString("fr-FR")}
@@ -305,6 +352,24 @@ export default function DimensionsSection({ clientId }: { clientId: string }) {
                     </td>
                     <td className="px-4 py-3 text-sm text-[#335890] whitespace-nowrap">
                       {u.uploadedBy}
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      {data.canUpload && (u.status === "PENDING" || u.status === "FAILED") && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          disabled={lancement === u.id}
+                          onClick={() => relancer(u)}
+                          className="h-8 gap-1.5 border-[#D0E3F5] text-[#335890] hover:bg-[#EBF5FF] whitespace-nowrap"
+                        >
+                          {lancement === u.id ? (
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          ) : (
+                            <RefreshCw className="w-3.5 h-3.5" />
+                          )}
+                          {u.status === "FAILED" ? "Relancer" : "Lancer le traitement"}
+                        </Button>
+                      )}
                     </td>
                   </tr>
                 ))}
@@ -406,13 +471,22 @@ function DimensionUploadDialog({
       const fd = new FormData();
       fd.append("fileType", fileType);
       fd.append("file", file);
+      // 1. Dépôt du fichier (équivalent de /api/files/comptable/upload).
       const res = await fetch(`/api/clients/${clientId}/dimensions`, { method: "POST", body: fd });
       const json = await res.json().catch(() => ({}));
       if (!res.ok) {
         setErreur(json?.error || "Le dépôt a échoué.");
         return;
       }
-      toast.success(`${def.label} : fichier déposé, mise à jour en cours.`);
+
+      // 2. Lancement du DAG Airflow (équivalent de trigger-etl). En cas
+      //    d'échec, le dépôt reste visible et relançable dans l'historique.
+      const erreurLancement = await lancerTraitement(clientId, json.update.id);
+      if (erreurLancement) {
+        toast.error(`Fichier déposé, mais ${erreurLancement.charAt(0).toLowerCase()}${erreurLancement.slice(1)}`);
+      } else {
+        toast.success(`${def.label} : traitement Airflow lancé.`);
+      }
       onClose(true);
     } catch {
       setErreur("Erreur réseau.");
@@ -449,7 +523,7 @@ function DimensionUploadDialog({
           </div>
 
           {/* Choix du référentiel */}
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             {DIMENSIONS.map((d) => {
               const Icon = ICONES[d.fileType] ?? PiBooksDuotone;
               const actif = d.fileType === fileType;
@@ -485,6 +559,20 @@ function DimensionUploadDialog({
                 Les lignes absentes du fichier sont <strong>conservées</strong> : aucune
                 suppression. Format accepté : {formatsAutorises}.
               </p>
+              {def.colonnesFichier && (
+                <p>
+                  Colonnes attendues (première ligne) :{" "}
+                  <code className="text-[11px]">{def.colonnesFichier.join(", ")}</code>. Le
+                  bouton « Télécharger » du référentiel, dans l&apos;onglet Comptabilité, fournit
+                  un fichier déjà au bon format.
+                </p>
+              )}
+              {def.reclassement && (
+                <p>
+                  Les écritures déjà chargées sont ensuite <strong>reclassées</strong> selon le
+                  mapping mis à jour.
+                </p>
+              )}
             </div>
           </div>
 

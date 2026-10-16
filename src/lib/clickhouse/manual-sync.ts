@@ -71,6 +71,28 @@ interface GrandLivreRowFull extends GrandLivreRow {
 
 // Reconstruit intégralement le batch manuel d'un client/année dans ClickHouse
 // à partir de la source de vérité Postgres (idempotent).
+/**
+ * Rubrique que porte actuellement ClickHouse pour chaque compte du lot de
+ * saisies. Airflow peut avoir reclassé ces lignes après une modification du
+ * mapping PLE : c'est alors la valeur à jour. On la relit avant de réécrire
+ * le lot, faute de quoi la resynchronisation y remettrait l'ancienne rubrique.
+ */
+async function rubriquesDuLot(dbName: string, batch: string): Promise<Map<string, string>> {
+  const out = new Map<string, string>();
+  const res = await clickhouseClient.query({
+    query: `SELECT compte, anyIf(rubrique, rubrique != '') AS r
+            FROM ${dbName}.grand_livre
+            WHERE batch_id = {batch:String}
+            GROUP BY compte`,
+    query_params: { batch },
+    format: "JSONEachRow",
+  });
+  for (const row of (await res.json()) as Array<{ compte: string; r: string }>) {
+    if (row.r) out.set(row.compte, row.r);
+  }
+  return out;
+}
+
 export async function syncManualBatch(
   clientId: string,
   year: number,
@@ -83,13 +105,41 @@ export async function syncManualBatch(
   });
 
   try {
+    const colonneBilan = await hasBilanRubrique(clickhouseClient, dbName);
+
+    // 0. Schéma fusionné : une saisie reprend la rubrique que ClickHouse porte
+    //    déjà pour son compte dans ce lot (éventuellement reclassée par
+    //    Airflow). La copie Postgres est alignée pour que l'onglet
+    //    Comptabilité affiche la même valeur.
+    if (!colonneBilan && entries.length > 0) {
+      try {
+        const actuelles = await rubriquesDuLot(dbName, batch);
+        const changees = new Map<string, string>();
+        for (const e of entries) {
+          const r = actuelles.get(e.compte);
+          if (r && r !== e.rubrique) {
+            e.rubrique = r;
+            changees.set(e.compte, r);
+          }
+        }
+        for (const [compte, rubrique] of changees) {
+          await prisma.manualLedgerEntry.updateMany({
+            where: { clientId, year, compte },
+            data: { rubrique },
+          });
+        }
+      } catch (e) {
+        // Best-effort : à défaut, la rubrique enregistrée est conservée.
+        console.warn(`[manual-sync] rubriques importées indisponibles (${batch}):`, e);
+      }
+    }
+
     // 1. Vider l'ancien contenu du batch manuel (mutation asynchrone ClickHouse).
     await clickhouseClient.command({
       query: `ALTER TABLE ${dbName}.grand_livre DELETE WHERE batch_id = '${batch}'`,
     });
 
     // 2. Réinsérer l'état courant.
-    const colonneBilan = await hasBilanRubrique(clickhouseClient, dbName);
     if (entries.length > 0) {
       const rowsFull: GrandLivreRowFull[] = entries.map((e) => ({
         batch_id: batch,
