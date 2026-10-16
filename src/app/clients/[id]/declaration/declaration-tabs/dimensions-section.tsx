@@ -29,7 +29,12 @@ import {
   RefreshCw,
   Info,
 } from "lucide-react";
-import { PiListChecksDuotone, PiUsersThreeDuotone, PiBooksDuotone } from "react-icons/pi";
+import {
+  PiListChecksDuotone,
+  PiUsersThreeDuotone,
+  PiBooksDuotone,
+  PiTreeStructureDuotone,
+} from "react-icons/pi";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { FileType } from "../../../../../../prisma/generated/prisma/enums";
@@ -66,6 +71,8 @@ interface MiseAJour {
   createdAt: string;
   processedAt: string | null;
   uploadedBy: string;
+  /** Reclassement du grand livre (mapping PLE), sans fichier déposé. */
+  reclassement: boolean;
 }
 
 interface Reponse {
@@ -78,6 +85,7 @@ const ICONES: Record<string, React.ElementType> = {
   [FileType.PLAN_COMPTES]: PiBooksDuotone,
   [FileType.PLAN_TIERS]: PiUsersThreeDuotone,
   [FileType.CODE_JOURNAL]: PiListChecksDuotone,
+  [FileType.PLE]: PiTreeStructureDuotone,
 };
 
 const EN_COURS: Statut[] = ["PENDING", "VALIDATING", "PROCESSING"];
@@ -219,7 +227,7 @@ export default function DimensionsSection({ clientId }: { clientId: string }) {
         </div>
 
         {/* État des trois référentiels */}
-        <div className="grid grid-cols-3 gap-4 mb-6">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
           {DIMENSIONS.map((d) => {
             const etat = data?.tables.find((t) => t.fileType === d.fileType);
             const Icon = ICONES[d.fileType] ?? PiBooksDuotone;
@@ -308,7 +316,14 @@ export default function DimensionsSection({ clientId }: { clientId: string }) {
                       {u.fileName}
                     </td>
                     <td className="px-4 py-3 text-sm">
-                      {u.status === "COMPLETED" ? (
+                      {u.status === "COMPLETED" && u.reclassement ? (
+                        <span className="text-[#00122E]">
+                          <span className="text-[#0077C3] font-medium">
+                            {(u.rowsUpdated ?? 0).toLocaleString("fr-FR")}
+                          </span>{" "}
+                          écriture(s) reclassée(s)
+                        </span>
+                      ) : u.status === "COMPLETED" ? (
                         <span className="text-[#00122E]">
                           <span className="text-green-700 font-medium">
                             +{(u.rowsInserted ?? 0).toLocaleString("fr-FR")}
@@ -508,7 +523,7 @@ function DimensionUploadDialog({
           </div>
 
           {/* Choix du référentiel */}
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             {DIMENSIONS.map((d) => {
               const Icon = ICONES[d.fileType] ?? PiBooksDuotone;
               const actif = d.fileType === fileType;
@@ -544,6 +559,20 @@ function DimensionUploadDialog({
                 Les lignes absentes du fichier sont <strong>conservées</strong> : aucune
                 suppression. Format accepté : {formatsAutorises}.
               </p>
+              {def.colonnesFichier && (
+                <p>
+                  Colonnes attendues (première ligne) :{" "}
+                  <code className="text-[11px]">{def.colonnesFichier.join(", ")}</code>. Le
+                  bouton « Télécharger » du référentiel, dans l&apos;onglet Comptabilité, fournit
+                  un fichier déjà au bon format.
+                </p>
+              )}
+              {def.reclassement && (
+                <p>
+                  Les écritures déjà chargées sont ensuite <strong>reclassées</strong> selon le
+                  mapping mis à jour.
+                </p>
+              )}
             </div>
           </div>
 

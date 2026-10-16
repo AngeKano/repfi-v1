@@ -18,12 +18,14 @@ export type ComptableFileFormat =
 /**
  * Formats acceptés par type de fichier comptable.
  * - plan_comptes / code_journal : Excel uniquement
+ * - ple (mapping des rubriques)  : Excel uniquement
  * - plan_tiers                  : Excel ou .pnc Sage (Plan Tiers Sage)
  * - grand_livre                 : Excel ou .pnm Sage (Grand Livre Sage)
  */
 export const ALLOWED_FORMATS: Record<FileType, ComptableFileFormat[]> = {
   [FileType.PLAN_COMPTES]: ["excel"],
   [FileType.CODE_JOURNAL]: ["excel"],
+  [FileType.PLE]: ["excel"],
   [FileType.PLAN_TIERS]: ["excel", "sage_pnc"],
   [FileType.GRAND_LIVRE]: ["excel", "sage_pnm"],
   // Types legacy (v2) — gardés Excel only pour rétrocompatibilité
@@ -37,6 +39,7 @@ export const FILE_TYPE_LABELS: Record<FileType, string> = {
   [FileType.PLAN_COMPTES]: "Plan Comptable",
   [FileType.PLAN_TIERS]: "Plan Tiers",
   [FileType.CODE_JOURNAL]: "Codes Journaux",
+  [FileType.PLE]: "Mapping (PLE)",
   [FileType.GRAND_LIVRE_COMPTES]: "Grand Livre Comptes (legacy)",
   [FileType.GRAND_LIVRE_TIERS]: "Grand Livre Tiers (legacy)",
 };

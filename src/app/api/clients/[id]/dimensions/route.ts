@@ -138,6 +138,8 @@ export async function GET(
         fileType: u.fileType,
         fileName: u.fileName,
         fileSize: u.fileSize,
+        // Pas de fichier déposé : reclassement du grand livre (mapping PLE).
+        reclassement: !u.s3Key,
         status: u.status,
         progress: u.progress,
         dagRunId: u.dagRunId,

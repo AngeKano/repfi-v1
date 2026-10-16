@@ -14,8 +14,8 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { ProcessingStatus } from "../../../../../../../prisma/generated/prisma/enums";
 import { requirePermission, FICHIERS_ACTIONS } from "@/lib/permissions";
-import { triggerAirflowDagRun } from "@/lib/airflow";
-import { DIMENSION_DAG_ID, DIMENSION_EN_COURS, dimensionParType } from "@/lib/comptable/dimensions";
+import { DIMENSION_EN_COURS, dimensionParType } from "@/lib/comptable/dimensions";
+import { lancerMiseAJourDimension } from "@/lib/comptable/dimension-trigger";
 
 const triggerSchema = z.object({ updateId: z.string().min(1) });
 
@@ -64,14 +64,10 @@ export async function POST(
         { status: 409 },
       );
 
-    let dagRunId: string;
+    // Fichier déposé → fusion ; sans fichier → reclassement (mapping PLE).
     try {
-      dagRunId = await triggerAirflowDagRun(DIMENSION_DAG_ID, {
-        client_id: id,
-        dimension: dimension.etlType,
-        s3_key: update.s3Key,
-        update_id: update.id,
-      });
+      const lancee = await lancerMiseAJourDimension(update);
+      return NextResponse.json({ message: "Traitement lancé", update: lancee, dagRunId: lancee.dagRunId });
     } catch (e) {
       // Le dépôt reste en PENDING : il pourra être relancé.
       const message = e instanceof Error ? e.message : String(e);
@@ -80,22 +76,6 @@ export async function POST(
         { status: 502 },
       );
     }
-
-    // Le DAG prend le relais pour la suite du suivi.
-    const lancee = await prisma.dimensionUpdate.update({
-      where: { id: update.id },
-      data: {
-        status: ProcessingStatus.PROCESSING,
-        progress: 5,
-        dagRunId,
-        rowsInserted: null,
-        rowsUpdated: null,
-        errorMessage: null,
-        processedAt: null,
-      },
-    });
-
-    return NextResponse.json({ message: "Traitement lancé", update: lancee, dagRunId });
   } catch (error) {
     console.error("Dimensions trigger error:", error);
     return NextResponse.json({ error: "Erreur lors du lancement du traitement" }, { status: 500 });

@@ -1,6 +1,6 @@
 // ============================================================================
-// Lecture des référentiels ClickHouse (plan_compte, plan_tiers, code_journal,
-// ple) et modification ligne à ligne des tables de dimension.
+// Lecture des référentiels ClickHouse (plan_compte, ple, plan_tiers,
+// code_journal) et modification ligne à ligne.
 //
 // La modification suit exactement les règles du DAG Airflow
 // (plugins/clickhouse/dimensions.py) :
@@ -10,13 +10,14 @@
 //   - une ligne identique à l'existante n'est pas réécrite ;
 //   - les intitulés recopiés dans grand_livre sont mis à jour pour la même clé,
 //     sans jamais écraser une valeur par du vide (_GL_PROPAGATION).
-// La clé (numéro de compte, de tiers, code journal) n'est jamais modifiable, et
-// le mapping (ple), reconstruit par Airflow à chaque import, est en lecture seule.
+// La clé n'est jamais modifiable. Elle est composite pour le mapping (racine,
+// type, longueur de racine, sens du solde) : une ligne y est identifiée par
+// l'ensemble de ces colonnes.
 // ============================================================================
 import type { ClickHouseClient } from "@clickhouse/client";
 import { tableColumns } from "./schema";
 import type { TableReferentiel } from "@/lib/comptable/dimensions";
-import { colonneCle } from "@/lib/comptable/dimensions";
+import { colonneCle, colonnesCles } from "@/lib/comptable/dimensions";
 
 export type LigneDimension = Record<string, string>;
 
@@ -35,6 +36,8 @@ export interface PageDimension {
 }
 
 export const TAILLE_PAGE = 50;
+/** Borne de l'export complet d'un référentiel. */
+export const MAX_EXPORT = 100_000;
 /** Borne du nombre de valeurs proposées par filtre. */
 const MAX_OPTIONS = 5000;
 
@@ -88,6 +91,8 @@ export async function listerDimension(
     sortBy?: string;
     sortDir?: "asc" | "desc";
     page?: number;
+    /** Toutes les lignes filtrées, sans pagination (export). */
+    tout?: boolean;
   },
 ): Promise<PageDimension> {
   const noms = def.colonnes.map((c) => c.nom);
@@ -104,8 +109,12 @@ export async function listerDimension(
       format: "JSONEachRow",
     });
     const total = parseInt(((await cRes.json()) as Array<{ n: string }>)[0]?.n ?? "0", 10) || 0;
-    const totalPages = Math.max(1, Math.ceil(total / TAILLE_PAGE));
+    const totalPages = opts.tout ? 1 : Math.max(1, Math.ceil(total / TAILLE_PAGE));
     const page = Math.min(Math.max(1, opts.page || 1), totalPages);
+    // LIMIT / OFFSET : entiers calculés ici, jamais issus de la requête.
+    const limite = opts.tout
+      ? `LIMIT ${MAX_EXPORT}`
+      : `LIMIT ${TAILLE_PAGE} OFFSET ${(page - 1) * TAILLE_PAGE}`;
 
     // Valeurs rendues en texte : l'interface les traite toutes de la même façon.
     const res = await client.query({
@@ -113,13 +122,18 @@ export async function listerDimension(
               FROM ${dbName}.${def.table} FINAL
               ${whereSql}
               ORDER BY ${tri} ${sens}, ${cles.map((c) => `${c} ASC`).join(", ")}
-              LIMIT ${TAILLE_PAGE} OFFSET ${(page - 1) * TAILLE_PAGE}`,
-      // LIMIT / OFFSET : entiers calculés ici, jamais issus de la requête.
+              ${limite}`,
       query_params: params,
       format: "JSONEachRow",
     });
     const lignes = (await res.json()) as LigneDimension[];
-    return { lignes, total, page, pageSize: TAILLE_PAGE, totalPages };
+    return {
+      lignes,
+      total,
+      page,
+      pageSize: opts.tout ? lignes.length : TAILLE_PAGE,
+      totalPages,
+    };
   } catch (e) {
     // Base ou table absente : client jamais importé.
     console.error(`[referentiels] lecture ${dbName}.${def.table} impossible:`, e);
@@ -170,26 +184,32 @@ export interface ResultatModification {
 }
 
 /**
- * Modifie les colonnes éditables d'une ligne existante.
- * @throws Error « introuvable » si la clé n'existe pas dans la table,
- *         Error « lecture seule » pour une table reconstruite par Airflow.
+ * Modifie les colonnes éditables d'une ligne existante, identifiée par
+ * l'ensemble de ses colonnes clés.
+ * @throws Error « introuvable » si la ligne n'existe pas dans la table.
  */
 export async function modifierDimension(
   client: ClickHouseClient,
   dbName: string,
   def: TableReferentiel,
-  cle: string,
+  cles: Record<string, string>,
   valeurs: Record<string, string>,
 ): Promise<ResultatModification> {
-  if (def.lectureSeule) throw new Error("lecture seule");
-
   const noms = def.colonnes.map((c) => c.nom);
-  const colCle = colonneCle(def).nom;
+  const colonnesCle = colonnesCles(def);
+  // Valeur de la clé principale : sert au report dans le grand livre.
+  const cle = cles[colonneCle(def).nom] ?? "";
 
+  // toString : la longueur de racine du mapping est numérique.
+  const where = colonnesCle.map((c, i) => `toString(${c.nom}) = {k${i}:String}`).join(" AND ");
+  const params = Object.fromEntries(colonnesCle.map((c, i) => [`k${i}`, cles[c.nom] ?? ""]));
+
+  // Lecture dans les types natifs : la nouvelle version est réinsérée telle
+  // quelle, seules les colonnes texte éditables changent.
   const res = await client.query({
     query: `SELECT ${noms.join(", ")} FROM ${dbName}.${def.table} FINAL
-            WHERE ${colCle} = {cle:String} LIMIT 1`,
-    query_params: { cle },
+            WHERE ${where} LIMIT 1`,
+    query_params: params,
     format: "JSONEachRow",
   });
   const actuelle = ((await res.json()) as LigneDimension[])[0];

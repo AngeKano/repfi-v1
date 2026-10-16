@@ -7,8 +7,10 @@
 // Même présentation que le grand livre : recherche, panneau « Filtres » avec
 // une sélection multiple par champ, tri par colonne, pagination numérotée. Le
 // bouton « Modifier » d'une ligne rend ses champs éditables ; la clé reste
-// verrouillée et aucune ligne ne peut être supprimée. Le mapping, reconstruit
-// par Airflow à chaque import, est en lecture seule.
+// verrouillée et aucune ligne ne peut être supprimée. Une modification du
+// mapping (PLE) s'applique aux écritures déjà chargées après leur
+// reclassement, lancé depuis ce même écran. « Télécharger » exporte le
+// référentiel filtré au format attendu pour une mise à jour par fichier.
 // ============================================================================
 import { useCallback, useEffect, useState } from "react";
 import {
@@ -34,6 +36,9 @@ import {
   Search,
   SlidersHorizontal,
   X,
+  Download,
+  RefreshCw,
+  AlertTriangle,
 } from "lucide-react";
 import {
   PiBooksDuotone,
@@ -46,6 +51,7 @@ import { cn } from "@/lib/utils";
 import {
   REFERENTIELS,
   colonneCle,
+  colonnesCles,
   identifiantLigne,
   referentielParId,
 } from "@/lib/comptable/dimensions";
@@ -66,7 +72,7 @@ interface PageReferentiel {
 
 const ICONES: Record<string, React.ElementType> = {
   PLAN_COMPTES: PiBooksDuotone,
-  MAPPING: PiTreeStructureDuotone,
+  PLE: PiTreeStructureDuotone,
   PLAN_TIERS: PiUsersThreeDuotone,
   CODE_JOURNAL: PiListChecksDuotone,
 };
@@ -117,6 +123,10 @@ export default function DimensionsViewer({
   // Édition : une seule ligne à la fois.
   const [edition, setEdition] = useState<{ id: string; cle: string; valeurs: Ligne } | null>(null);
   const [enregistrement, setEnregistrement] = useState(false);
+  const [exportEnCours, setExportEnCours] = useState(false);
+  // Mapping modifié ligne à ligne depuis cet écran : reclassement à lancer.
+  const [mappingModifie, setMappingModifie] = useState(false);
+  const [reclassementEnCours, setReclassementEnCours] = useState(false);
 
   const def = referentielParId(refId)!;
   const cle = colonneCle(def).nom;
@@ -191,6 +201,71 @@ export default function DimensionsViewer({
     setPage(1);
   };
 
+  /** Export Excel de toutes les lignes filtrées, colonnes au format du fichier. */
+  const telecharger = async () => {
+    setExportEnCours(true);
+    try {
+      const qs = new URLSearchParams({ export: "1", sortDir });
+      if (search) qs.set("search", search);
+      if (sortBy) qs.set("sortBy", sortBy);
+      for (const [col, valeurs] of Object.entries(filtres))
+        valeurs.forEach((v) => qs.append(`f.${col}`, v));
+      const res = await fetch(`/api/clients/${clientId}/dimensions/tables/${refId}?${qs}`);
+      if (!res.ok) throw new Error();
+      const json = (await res.json()) as PageReferentiel;
+
+      // En-têtes = noms techniques : le fichier peut être modifié puis
+      // redéposé tel quel dans Import pour une mise à jour par fichier.
+      const colonnes = def.colonnesFichier ?? def.colonnes.map((c) => c.nom);
+      const XLSX = await import("xlsx");
+      const ws = XLSX.utils.aoa_to_sheet([
+        colonnes,
+        ...json.lignes.map((l) => colonnes.map((c) => l[c] ?? "")),
+      ]);
+      ws["!cols"] = colonnes.map((c) => ({ wch: c.startsWith("intitule") ? 45 : 18 }));
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, def.label.slice(0, 31));
+      const buf = XLSX.write(wb, { type: "array", bookType: "xlsx" }) as ArrayBuffer;
+      const url = URL.createObjectURL(
+        new Blob([buf], {
+          type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        }),
+      );
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${def.table}_${new Date().toISOString().slice(0, 10)}.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch {
+      toast.error("Échec du téléchargement");
+    } finally {
+      setExportEnCours(false);
+    }
+  };
+
+  /** Réapplique le mapping actuel aux écritures déjà chargées (Airflow). */
+  const reclasser = async () => {
+    setReclassementEnCours(true);
+    try {
+      const res = await fetch(`/api/clients/${clientId}/dimensions/reclassement`, {
+        method: "POST",
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        toast.error(json?.error || "Le reclassement n'a pas pu démarrer");
+        return;
+      }
+      setMappingModifie(false);
+      toast.success("Reclassement lancé — suivi dans l'onglet Import, historique des mises à jour.");
+    } catch {
+      toast.error("Erreur réseau");
+    } finally {
+      setReclassementEnCours(false);
+    }
+  };
+
   const enregistrer = async () => {
     if (!edition) return;
     // N'envoie que les champs éditables effectivement changés.
@@ -215,7 +290,13 @@ export default function DimensionsViewer({
       const res = await fetch(`/api/clients/${clientId}/dimensions/tables/${refId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ cle: edition.cle, valeurs }),
+        // La ligne est désignée par toutes ses colonnes clés (composite pour le mapping).
+        body: JSON.stringify({
+          cles: Object.fromEntries(
+            colonnesCles(def).map((c) => [c.nom, origine?.[c.nom] ?? ""]),
+          ),
+          valeurs,
+        }),
       });
       const json = await res.json().catch(() => ({}));
       if (!res.ok) {
@@ -235,6 +316,7 @@ export default function DimensionsViewer({
       );
       // Un intitulé ou un type nouveau doit apparaître dans les filtres.
       setOptionsAJour(false);
+      if (json.reclassementRequis) setMappingModifie(true);
       const reports: string[] = [];
       if (json.grandLivre?.length) reports.push("grand livre");
       if (json.saisies > 0) reports.push(`${json.saisies} écriture(s) saisie(s)`);
@@ -283,10 +365,10 @@ export default function DimensionsViewer({
       <CardHeader>
         <CardTitle>Référentiels</CardTitle>
         <CardDescription>
-          Plan comptable, mapping des rubriques, plan tiers et codes journaux. Les intitulés et
-          types des tables de dimension se corrigent directement : la clé n&apos;est pas
-          modifiable, aucune ligne n&apos;est supprimée, et les intitulés recopiés dans le grand
-          livre et les écritures saisies suivent la modification.
+          Plan comptable, mapping des rubriques (PLE), plan tiers et codes journaux. Les champs
+          se corrigent directement : la clé n&apos;est pas modifiable, aucune ligne n&apos;est
+          supprimée, et les intitulés recopiés dans le grand livre et les écritures saisies
+          suivent la modification.
         </CardDescription>
 
         {/* Sous-onglets — même présentation que les États Financiers */}
@@ -305,7 +387,6 @@ export default function DimensionsViewer({
               >
                 <Icon className="w-4 h-4" />
                 {r.label}
-                {r.lectureSeule && <Lock className="w-3 h-3 opacity-60" />}
                 {actif && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#0077C3]" />}
               </button>
             );
@@ -337,6 +418,38 @@ export default function DimensionsViewer({
               </Badge>
             )}
           </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={telecharger}
+            disabled={exportEnCours}
+            className="gap-2 h-9"
+            title="Télécharger le référentiel filtré (Excel, format de mise à jour)"
+          >
+            {exportEnCours ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <Download className="w-4 h-4" />
+            )}
+            Télécharger
+          </Button>
+          {def.reclassement && canEdit && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={reclasser}
+              disabled={reclassementEnCours}
+              className="gap-2 h-9"
+              title="Reclasser les écritures déjà chargées selon le mapping actuel"
+            >
+              {reclassementEnCours ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <RefreshCw className="w-4 h-4" />
+              )}
+              Réappliquer le mapping
+            </Button>
+          )}
           <span className="text-xs text-muted-foreground ml-1">
             {loading ? (
               <span className="inline-flex items-center gap-1">
@@ -347,6 +460,25 @@ export default function DimensionsViewer({
             )}
           </span>
         </div>
+
+        {def.reclassement && mappingModifie && (
+          <div className="flex flex-wrap items-center gap-3 rounded-lg border border-amber-200 bg-amber-50 p-3 mt-3 text-xs text-amber-800">
+            <AlertTriangle className="w-4 h-4 shrink-0" />
+            <span className="flex-1 min-w-[240px]">
+              Mapping modifié : les écritures déjà chargées restent classées selon l&apos;ancienne
+              version tant qu&apos;elles ne sont pas reclassées.
+            </span>
+            <Button
+              size="sm"
+              onClick={reclasser}
+              disabled={reclassementEnCours}
+              className="h-8 gap-1.5 bg-[#0077C3] hover:bg-[#005992]"
+            >
+              <RefreshCw className="w-3.5 h-3.5" />
+              Réappliquer maintenant
+            </Button>
+          </div>
+        )}
 
         {/* Panneau de filtres : une sélection multiple par champ de la table */}
         {showFiltres && (
@@ -556,10 +688,7 @@ export default function DimensionsViewer({
         )}
 
         {def.note && (
-          <p className="text-xs text-muted-foreground flex items-center gap-1.5 mt-4">
-            <Lock className="w-3 h-3 shrink-0" />
-            {def.note}
-          </p>
+          <p className="text-xs text-muted-foreground mt-4">{def.note}</p>
         )}
       </CardContent>
     </Card>

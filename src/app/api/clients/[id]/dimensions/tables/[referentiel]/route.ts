@@ -1,17 +1,20 @@
 // ============================================================================
-// Contenu d'un référentiel (plan comptable, mapping, plan tiers, codes
-// journaux) : lecture paginée et filtrée, modification d'une ligne.
+// Contenu d'un référentiel (plan comptable, mapping PLE, plan tiers, codes
+// journaux) : lecture paginée et filtrée, export, modification d'une ligne.
 //
-//   GET   ?search=&sortBy=&sortDir=&page=&f.<colonne>=v…&options=1
+//   GET   ?search=&sortBy=&sortDir=&page=&f.<colonne>=v…&options=1&export=1
 //           → page de lignes ; filtres répétables par colonne (1..n valeurs),
 //             comme ceux du grand livre ; options=1 ajoute les valeurs
-//             proposées par chaque filtre.
-//   PATCH { cle, valeurs: { colonne: valeur } } → modification d'une ligne.
+//             proposées par chaque filtre ; export=1 renvoie toutes les
+//             lignes filtrées (téléchargement Excel).
+//   PATCH { cles: { colonne clé: valeur }, valeurs: { colonne: valeur } }
+//           → modification d'une ligne, identifiée par TOUTES ses colonnes
+//             clés (une seule, sauf pour le mapping).
 //
 // La clé n'est jamais modifiable et aucune ligne n'est supprimée. Les
 // intitulés recopiés dans le grand livre — et dans les écritures saisies —
-// suivent la modification. Le mapping, reconstruit par Airflow à chaque
-// import, est en lecture seule.
+// suivent la modification. Une modification du mapping n'agit sur les
+// écritures déjà chargées qu'après leur reclassement (voir /reclassement).
 // ============================================================================
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
@@ -31,7 +34,7 @@ import {
   optionsFiltresDimension,
   type FiltresReferentiel,
 } from "@/lib/clickhouse/dimensions-table";
-import { colonneCle, estDimension, referentielParId } from "@/lib/comptable/dimensions";
+import { colonneCle, colonnesCles, referentielParId } from "@/lib/comptable/dimensions";
 
 const clickhouse = createClickhouseClient({
   url: process.env.CLICKHOUSE_HOST || "http://localhost:8123",
@@ -85,6 +88,7 @@ export async function GET(
         sortBy: sp.get("sortBy") || "",
         sortDir: sp.get("sortDir") === "desc" ? "desc" : "asc",
         page: parseInt(sp.get("page") || "1", 10) || 1,
+        tout: sp.get("export") === "1",
       }),
       // Calculées une fois par référentiel affiché, pas à chaque page.
       sp.get("options") === "1" ? optionsFiltresDimension(clickhouse, dbName, def) : null,
@@ -93,7 +97,7 @@ export async function GET(
     return NextResponse.json({
       ...page,
       ...(options ? { options } : {}),
-      canEdit: !def.lectureSeule && checkPermissionSync(user.role, FICHIERS_ACTIONS.CHARGER),
+      canEdit: checkPermissionSync(user.role, FICHIERS_ACTIONS.CHARGER),
     });
   } catch (error) {
     console.error("Referentiel GET error:", error);
@@ -105,7 +109,7 @@ export async function GET(
 // PATCH — modification d'une ligne
 // ============================================================================
 const patchSchema = z.object({
-  cle: z.string().trim().min(1),
+  cles: z.record(z.string(), z.string()),
   valeurs: z.record(z.string(), z.string()),
 });
 
@@ -123,16 +127,17 @@ export async function PATCH(
     if (ctx.erreur) return ctx.erreur;
     const def = ctx.def;
 
-    if (def.lectureSeule || !estDimension(def)) {
-      return NextResponse.json(
-        { error: `${def.label} : table reconstruite à chaque import, en lecture seule.` },
-        { status: 403 },
-      );
-    }
-
     const parsed = patchSchema.safeParse(await req.json().catch(() => null));
     if (!parsed.success) return NextResponse.json({ error: "Données invalides" }, { status: 400 });
-    const { cle, valeurs } = parsed.data;
+    const { cles, valeurs } = parsed.data;
+
+    // La ligne est désignée par toutes ses colonnes clés.
+    for (const c of colonnesCles(def)) {
+      if (cles[c.nom] === undefined)
+        return NextResponse.json({ error: `Clé incomplète : ${c.libelle} manquant.` }, { status: 400 });
+    }
+    const cle = cles[colonneCle(def).nom];
+    if (!cle?.trim()) return NextResponse.json({ error: "Clé manquante" }, { status: 400 });
 
     // Seules les colonnes éditables sont acceptées : la clé reste intouchable.
     const editables = new Map(def.colonnes.filter((c) => c.editable).map((c) => [c.nom, c]));
@@ -167,7 +172,7 @@ export async function PATCH(
     const dbName = getClickhouseDbName(id);
     let resultat;
     try {
-      resultat = await modifierDimension(clickhouse, dbName, def, cle, valeurs);
+      resultat = await modifierDimension(clickhouse, dbName, def, cles, valeurs);
     } catch (e) {
       if (e instanceof Error && e.message === "introuvable")
         return NextResponse.json(
@@ -199,10 +204,16 @@ export async function PATCH(
     }
 
     return NextResponse.json({
-      ligne: resultat.ligne,
+      // En texte, comme les lignes de la liste.
+      ligne: Object.fromEntries(
+        Object.entries(resultat.ligne).map(([k, v]) => [k, v == null ? "" : String(v)]),
+      ),
       modifiee: resultat.modifiee,
       grandLivre: resultat.grandLivre,
       saisies: saisiesMaj,
+      // Mapping modifié : les écritures déjà chargées restent classées selon
+      // l'ancienne version tant qu'elles ne sont pas reclassées.
+      reclassementRequis: !!def.reclassement && resultat.modifiee,
     });
   } catch (error) {
     console.error("Referentiel PATCH error:", error);
