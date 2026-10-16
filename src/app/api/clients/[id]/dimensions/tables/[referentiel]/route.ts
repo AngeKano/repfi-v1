@@ -1,13 +1,17 @@
 // ============================================================================
-// Contenu d'une table de dimension (plan comptable, plan tiers, codes
-// journaux) : lecture paginée et modification d'une ligne depuis l'interface.
+// Contenu d'un référentiel (plan comptable, mapping, plan tiers, codes
+// journaux) : lecture paginée et filtrée, modification d'une ligne.
 //
-//   GET   ?search=&categorie=&sortBy=&sortDir=&page=  → page de lignes
-//   PATCH { cle, valeurs: { colonne: valeur } }       → modification
+//   GET   ?search=&sortBy=&sortDir=&page=&f.<colonne>=v…&options=1
+//           → page de lignes ; filtres répétables par colonne (1..n valeurs),
+//             comme ceux du grand livre ; options=1 ajoute les valeurs
+//             proposées par chaque filtre.
+//   PATCH { cle, valeurs: { colonne: valeur } } → modification d'une ligne.
 //
 // La clé n'est jamais modifiable et aucune ligne n'est supprimée. Les
 // intitulés recopiés dans le grand livre — et dans les écritures saisies —
-// suivent la modification, comme lors d'une mise à jour par fichier.
+// suivent la modification. Le mapping, reconstruit par Airflow à chaque
+// import, est en lecture seule.
 // ============================================================================
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
@@ -21,8 +25,13 @@ import {
 } from "@/lib/permissions";
 import { getClickhouseDbName } from "@/lib/clickhouse/manual-sync";
 import { invaliderReferentiels } from "@/lib/clickhouse/plan-comptable";
-import { listerDimension, modifierDimension } from "@/lib/clickhouse/dimensions-table";
-import { colonneCle, dimensionParType } from "@/lib/comptable/dimensions";
+import {
+  listerDimension,
+  modifierDimension,
+  optionsFiltresDimension,
+  type FiltresReferentiel,
+} from "@/lib/clickhouse/dimensions-table";
+import { colonneCle, estDimension, referentielParId } from "@/lib/comptable/dimensions";
 
 const clickhouse = createClickhouseClient({
   url: process.env.CLICKHOUSE_HOST || "http://localhost:8123",
@@ -32,13 +41,13 @@ const clickhouse = createClickhouseClient({
 
 const LONGUEUR_MAX = 255;
 
-async function contexte(id: string, fileType: string, companyId: string) {
+async function contexte(id: string, referentiel: string, companyId: string) {
   const client = await prisma.client.findFirst({
     where: { id, companyId },
     select: { id: true },
   });
   if (!client) return { erreur: NextResponse.json({ error: "Client non trouvé" }, { status: 404 }) };
-  const def = dimensionParType(fileType);
+  const def = referentielParId(referentiel);
   if (!def) return { erreur: NextResponse.json({ error: "Référentiel inconnu" }, { status: 400 }) };
   return { def };
 }
@@ -48,32 +57,46 @@ async function contexte(id: string, fileType: string, companyId: string) {
 // ============================================================================
 export async function GET(
   req: NextRequest,
-  { params }: { params: Promise<{ id: string; fileType: string }> },
+  { params }: { params: Promise<{ id: string; referentiel: string }> },
 ) {
   try {
     const perm = await requirePermission(FICHIERS_ACTIONS.VOIR);
     if (perm instanceof NextResponse) return perm;
     const { user } = perm;
 
-    const { id, fileType } = await params;
-    const ctx = await contexte(id, fileType, user.companyId);
+    const { id, referentiel } = await params;
+    const ctx = await contexte(id, referentiel, user.companyId);
     if (ctx.erreur) return ctx.erreur;
+    const def = ctx.def;
 
     const sp = new URL(req.url).searchParams;
-    const page = await listerDimension(clickhouse, getClickhouseDbName(id), ctx.def, {
-      search: sp.get("search") || "",
-      categorie: sp.get("categorie") || "",
-      sortBy: sp.get("sortBy") || "",
-      sortDir: sp.get("sortDir") === "desc" ? "desc" : "asc",
-      page: parseInt(sp.get("page") || "1", 10) || 1,
-    });
+    // Filtres : un paramètre « f.<colonne> » répétable par valeur retenue.
+    const filtres: FiltresReferentiel = {};
+    for (const c of def.colonnes) {
+      const valeurs = sp.getAll(`f.${c.nom}`).filter((v) => v !== "");
+      if (valeurs.length) filtres[c.nom] = valeurs;
+    }
+
+    const dbName = getClickhouseDbName(id);
+    const [page, options] = await Promise.all([
+      listerDimension(clickhouse, dbName, def, {
+        search: sp.get("search") || "",
+        filtres,
+        sortBy: sp.get("sortBy") || "",
+        sortDir: sp.get("sortDir") === "desc" ? "desc" : "asc",
+        page: parseInt(sp.get("page") || "1", 10) || 1,
+      }),
+      // Calculées une fois par référentiel affiché, pas à chaque page.
+      sp.get("options") === "1" ? optionsFiltresDimension(clickhouse, dbName, def) : null,
+    ]);
 
     return NextResponse.json({
       ...page,
-      canEdit: checkPermissionSync(user.role, FICHIERS_ACTIONS.CHARGER),
+      ...(options ? { options } : {}),
+      canEdit: !def.lectureSeule && checkPermissionSync(user.role, FICHIERS_ACTIONS.CHARGER),
     });
   } catch (error) {
-    console.error("Dimension table GET error:", error);
+    console.error("Referentiel GET error:", error);
     return NextResponse.json({ error: "Erreur lors de la lecture du référentiel" }, { status: 500 });
   }
 }
@@ -88,17 +111,24 @@ const patchSchema = z.object({
 
 export async function PATCH(
   req: NextRequest,
-  { params }: { params: Promise<{ id: string; fileType: string }> },
+  { params }: { params: Promise<{ id: string; referentiel: string }> },
 ) {
   try {
     const perm = await requirePermission(FICHIERS_ACTIONS.CHARGER);
     if (perm instanceof NextResponse) return perm;
     const { user } = perm;
 
-    const { id, fileType } = await params;
-    const ctx = await contexte(id, fileType, user.companyId);
+    const { id, referentiel } = await params;
+    const ctx = await contexte(id, referentiel, user.companyId);
     if (ctx.erreur) return ctx.erreur;
     const def = ctx.def;
+
+    if (def.lectureSeule || !estDimension(def)) {
+      return NextResponse.json(
+        { error: `${def.label} : table reconstruite à chaque import, en lecture seule.` },
+        { status: 403 },
+      );
+    }
 
     const parsed = patchSchema.safeParse(await req.json().catch(() => null));
     if (!parsed.success) return NextResponse.json({ error: "Données invalides" }, { status: 400 });
@@ -157,9 +187,8 @@ export async function PATCH(
         const valeur = resultat.ligne[c.nom];
         if (c.saisie && valeur) champs[c.saisie] = valeur;
       }
-      if (Object.keys(champs).length > 0) {
-        const filtre =
-          def.cleGrandLivre === "compte" ? { compte: cle } : { nTiers: cle };
+      if (Object.keys(champs).length > 0 && def.cleGrandLivre) {
+        const filtre = def.cleGrandLivre === "compte" ? { compte: cle } : { nTiers: cle };
         const r = await prisma.manualLedgerEntry.updateMany({
           where: { clientId: id, ...filtre },
           data: champs,
@@ -176,7 +205,7 @@ export async function PATCH(
       saisies: saisiesMaj,
     });
   } catch (error) {
-    console.error("Dimension table PATCH error:", error);
+    console.error("Referentiel PATCH error:", error);
     return NextResponse.json({ error: "Erreur lors de la modification" }, { status: 500 });
   }
 }

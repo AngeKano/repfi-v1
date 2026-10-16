@@ -1,6 +1,6 @@
 // ============================================================================
-// Lecture et modification ligne à ligne des tables de dimension ClickHouse
-// (plan_compte, plan_tiers, code_journal).
+// Lecture des référentiels ClickHouse (plan_compte, plan_tiers, code_journal,
+// ple) et modification ligne à ligne des tables de dimension.
 //
 // La modification suit exactement les règles du DAG Airflow
 // (plugins/clickhouse/dimensions.py) :
@@ -10,14 +10,21 @@
 //   - une ligne identique à l'existante n'est pas réécrite ;
 //   - les intitulés recopiés dans grand_livre sont mis à jour pour la même clé,
 //     sans jamais écraser une valeur par du vide (_GL_PROPAGATION).
-// La clé (numéro de compte, de tiers, code journal) n'est jamais modifiable.
+// La clé (numéro de compte, de tiers, code journal) n'est jamais modifiable, et
+// le mapping (ple), reconstruit par Airflow à chaque import, est en lecture seule.
 // ============================================================================
 import type { ClickHouseClient } from "@clickhouse/client";
 import { tableColumns } from "./schema";
-import type { DimensionDef } from "@/lib/comptable/dimensions";
+import type { TableReferentiel } from "@/lib/comptable/dimensions";
 import { colonneCle } from "@/lib/comptable/dimensions";
 
 export type LigneDimension = Record<string, string>;
+
+/** Option d'un filtre : la valeur filtrée et, le cas échéant, son libellé. */
+export interface OptionFiltre {
+  code: string;
+  libelle?: string;
+}
 
 export interface PageDimension {
   lignes: LigneDimension[];
@@ -25,97 +32,134 @@ export interface PageDimension {
   page: number;
   pageSize: number;
   totalPages: number;
-  /** Valeurs distinctes de la colonne « catégorie » (type, nature). */
-  categories: string[];
 }
 
 export const TAILLE_PAGE = 50;
+/** Borne du nombre de valeurs proposées par filtre. */
+const MAX_OPTIONS = 5000;
 
-/** Liste paginée, recherche plein texte sur toutes les colonnes, tri, filtre. */
+/** Filtres par colonne : valeurs retenues (OU dans une colonne, ET entre colonnes). */
+export type FiltresReferentiel = Record<string, string[]>;
+
+/**
+ * Clause WHERE commune à la liste et au comptage.
+ * Les noms de colonnes viennent de la définition (jamais de la requête) ; les
+ * valeurs passent toujours par des paramètres nommés. `toString` rend les
+ * colonnes numériques (nb_racine) interrogeables comme les autres.
+ */
+function construireWhere(
+  def: TableReferentiel,
+  search: string,
+  filtres: FiltresReferentiel,
+): { sql: string; params: Record<string, unknown> } {
+  const where: string[] = [];
+  const params: Record<string, unknown> = {};
+
+  const recherche = search.trim();
+  if (recherche) {
+    where.push(
+      "(" +
+        def.colonnes
+          .map((c) => `positionCaseInsensitive(toString(${c.nom}), {s:String}) > 0`)
+          .join(" OR ") +
+        ")",
+    );
+    params.s = recherche;
+  }
+
+  def.colonnes.forEach((c, i) => {
+    const valeurs = (filtres[c.nom] ?? []).filter((v) => v !== undefined);
+    if (valeurs.length === 0) return;
+    where.push(`toString(${c.nom}) IN ({f${i}:Array(String)})`);
+    params[`f${i}`] = valeurs;
+  });
+
+  return { sql: where.length ? `WHERE ${where.join(" AND ")}` : "", params };
+}
+
+/** Page de lignes : recherche plein texte, filtres par champ, tri. */
 export async function listerDimension(
   client: ClickHouseClient,
   dbName: string,
-  def: DimensionDef,
+  def: TableReferentiel,
   opts: {
     search?: string;
-    categorie?: string;
+    filtres?: FiltresReferentiel;
     sortBy?: string;
     sortDir?: "asc" | "desc";
     page?: number;
   },
 ): Promise<PageDimension> {
   const noms = def.colonnes.map((c) => c.nom);
-  const cle = colonneCle(def).nom;
-  const colCategorie = def.colonnes.find((c) => c.categorie)?.nom;
+  const cles = def.colonnes.filter((c) => c.cle).map((c) => c.nom);
+  const { sql: whereSql, params } = construireWhere(def, opts.search || "", opts.filtres || {});
 
-  // Noms de colonnes issus de la définition (jamais de l'utilisateur).
-  const where: string[] = [];
-  const params: Record<string, unknown> = {};
-  const recherche = (opts.search || "").trim();
-  if (recherche) {
-    where.push(
-      "(" + noms.map((n) => `positionCaseInsensitive(${n}, {s:String}) > 0`).join(" OR ") + ")",
-    );
-    params.s = recherche;
-  }
-  if (colCategorie && opts.categorie) {
-    where.push(`${colCategorie} = {cat:String}`);
-    params.cat = opts.categorie;
-  }
-  const whereSql = where.length ? `WHERE ${where.join(" AND ")}` : "";
-
-  const tri = noms.includes(opts.sortBy || "") ? opts.sortBy! : cle;
+  const tri = noms.includes(opts.sortBy || "") ? opts.sortBy! : colonneCle(def).nom;
   const sens = opts.sortDir === "desc" ? "DESC" : "ASC";
 
-  const vide: PageDimension = {
-    lignes: [],
-    total: 0,
-    page: 1,
-    pageSize: TAILLE_PAGE,
-    totalPages: 1,
-    categories: [],
-  };
-
   try {
-    const [cRes, categoriesRes] = await Promise.all([
-      client.query({
-        query: `SELECT count() AS n FROM ${dbName}.${def.table} FINAL ${whereSql}`,
-        query_params: params,
-        format: "JSONEachRow",
-      }),
-      colCategorie
-        ? client.query({
-            query: `SELECT DISTINCT ${colCategorie} AS v FROM ${dbName}.${def.table} FINAL
-                    WHERE ${colCategorie} != '' ORDER BY v LIMIT 200`,
-            format: "JSONEachRow",
-          })
-        : null,
-    ]);
+    const cRes = await client.query({
+      query: `SELECT count() AS n FROM ${dbName}.${def.table} FINAL ${whereSql}`,
+      query_params: params,
+      format: "JSONEachRow",
+    });
     const total = parseInt(((await cRes.json()) as Array<{ n: string }>)[0]?.n ?? "0", 10) || 0;
-    const categories = categoriesRes
-      ? ((await categoriesRes.json()) as Array<{ v: string }>).map((r) => r.v)
-      : [];
-
     const totalPages = Math.max(1, Math.ceil(total / TAILLE_PAGE));
     const page = Math.min(Math.max(1, opts.page || 1), totalPages);
 
+    // Valeurs rendues en texte : l'interface les traite toutes de la même façon.
     const res = await client.query({
-      query: `SELECT ${noms.join(", ")}
+      query: `SELECT ${noms.map((n) => `toString(${n}) AS ${n}`).join(", ")}
               FROM ${dbName}.${def.table} FINAL
               ${whereSql}
-              ORDER BY ${tri} ${sens}, ${cle} ASC
+              ORDER BY ${tri} ${sens}, ${cles.map((c) => `${c} ASC`).join(", ")}
               LIMIT ${TAILLE_PAGE} OFFSET ${(page - 1) * TAILLE_PAGE}`,
       // LIMIT / OFFSET : entiers calculés ici, jamais issus de la requête.
       query_params: params,
       format: "JSONEachRow",
     });
     const lignes = (await res.json()) as LigneDimension[];
-    return { lignes, total, page, pageSize: TAILLE_PAGE, totalPages, categories };
+    return { lignes, total, page, pageSize: TAILLE_PAGE, totalPages };
   } catch (e) {
     // Base ou table absente : client jamais importé.
-    console.error(`[dimensions] lecture ${dbName}.${def.table} impossible:`, e);
-    return vide;
+    console.error(`[referentiels] lecture ${dbName}.${def.table} impossible:`, e);
+    return { lignes: [], total: 0, page: 1, pageSize: TAILLE_PAGE, totalPages: 1 };
   }
+}
+
+/**
+ * Valeurs proposées par chaque filtre : les valeurs distinctes de chaque
+ * colonne, accompagnées du libellé quand la colonne en a un (compte →
+ * intitulé), comme les filtres du grand livre.
+ */
+export async function optionsFiltresDimension(
+  client: ClickHouseClient,
+  dbName: string,
+  def: TableReferentiel,
+): Promise<Record<string, OptionFiltre[]>> {
+  const entrees = await Promise.all(
+    def.colonnes.map(async (c): Promise<[string, OptionFiltre[]]> => {
+      try {
+        const res = await client.query({
+          query: c.libelleDe
+            ? `SELECT toString(${c.nom}) AS v, anyIf(${c.libelleDe}, ${c.libelleDe} != '') AS l
+               FROM ${dbName}.${def.table} FINAL
+               WHERE toString(${c.nom}) != ''
+               GROUP BY v ORDER BY v LIMIT ${MAX_OPTIONS}`
+            : `SELECT DISTINCT toString(${c.nom}) AS v
+               FROM ${dbName}.${def.table} FINAL
+               WHERE toString(${c.nom}) != ''
+               ORDER BY v LIMIT ${MAX_OPTIONS}`,
+          format: "JSONEachRow",
+        });
+        const rows = (await res.json()) as Array<{ v: string; l?: string }>;
+        return [c.nom, rows.map((r) => (r.l ? { code: r.v, libelle: r.l } : { code: r.v }))];
+      } catch {
+        return [c.nom, []];
+      }
+    }),
+  );
+  return Object.fromEntries(entrees);
 }
 
 export interface ResultatModification {
@@ -127,15 +171,18 @@ export interface ResultatModification {
 
 /**
  * Modifie les colonnes éditables d'une ligne existante.
- * @throws Error « introuvable » si la clé n'existe pas dans la table.
+ * @throws Error « introuvable » si la clé n'existe pas dans la table,
+ *         Error « lecture seule » pour une table reconstruite par Airflow.
  */
 export async function modifierDimension(
   client: ClickHouseClient,
   dbName: string,
-  def: DimensionDef,
+  def: TableReferentiel,
   cle: string,
   valeurs: Record<string, string>,
 ): Promise<ResultatModification> {
+  if (def.lectureSeule) throw new Error("lecture seule");
+
   const noms = def.colonnes.map((c) => c.nom);
   const colCle = colonneCle(def).nom;
 

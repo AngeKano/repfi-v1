@@ -80,7 +80,8 @@ export function countActiveFilters(f: GlFilterValues): number {
 }
 
 // ==================== Multi-sélection (1..n) ====================
-function MultiSelect({
+// Exporté : réutilisé par les filtres des référentiels (onglet Comptabilité).
+export function MultiSelect({
   label,
   options,
   selected,

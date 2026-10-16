@@ -1,13 +1,14 @@
 "use client";
 
 // ============================================================================
-// Contenu des référentiels — consultation et modification ligne à ligne,
+// Référentiels — consultation, filtres et modification ligne à ligne,
 // depuis l'onglet Comptabilité (le dépôt de fichiers reste dans Import).
 //
-// Même présentation que le grand livre de l'onglet Comptabilité : recherche,
-// tri par colonne, pagination numérotée. Le bouton « Modifier » d'une ligne
-// rend ses champs éditables ; la clé (n° de compte, de tiers, code journal)
-// reste verrouillée et aucune ligne ne peut être supprimée.
+// Même présentation que le grand livre : recherche, panneau « Filtres » avec
+// une sélection multiple par champ, tri par colonne, pagination numérotée. Le
+// bouton « Modifier » d'une ligne rend ses champs éditables ; la clé reste
+// verrouillée et aucune ligne ne peut être supprimée. Le mapping, reconstruit
+// par Airflow à chaque import, est en lecture seule.
 // ============================================================================
 import { useCallback, useEffect, useState } from "react";
 import {
@@ -17,15 +18,9 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import {
   ArrowDown,
   ArrowUp,
@@ -37,33 +32,44 @@ import {
   Pencil,
   Save,
   Search,
+  SlidersHorizontal,
   X,
 } from "lucide-react";
-import { PiBooksDuotone, PiListChecksDuotone, PiUsersThreeDuotone } from "react-icons/pi";
+import {
+  PiBooksDuotone,
+  PiListChecksDuotone,
+  PiTreeStructureDuotone,
+  PiUsersThreeDuotone,
+} from "react-icons/pi";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import { FileType } from "../../../../../prisma/generated/prisma/enums";
-import { DIMENSIONS, colonneCle, dimensionParType } from "@/lib/comptable/dimensions";
+import {
+  REFERENTIELS,
+  colonneCle,
+  identifiantLigne,
+  referentielParId,
+} from "@/lib/comptable/dimensions";
+import { MultiSelect, type OptionFiltre } from "./gl-filters-panel";
 
 type Ligne = Record<string, string>;
+type Filtres = Record<string, string[]>;
 
-interface PageDimension {
+interface PageReferentiel {
   lignes: Ligne[];
   total: number;
   page: number;
   pageSize: number;
   totalPages: number;
-  categories: string[];
   canEdit: boolean;
+  options?: Record<string, OptionFiltre[]>;
 }
 
 const ICONES: Record<string, React.ElementType> = {
-  [FileType.PLAN_COMPTES]: PiBooksDuotone,
-  [FileType.PLAN_TIERS]: PiUsersThreeDuotone,
-  [FileType.CODE_JOURNAL]: PiListChecksDuotone,
+  PLAN_COMPTES: PiBooksDuotone,
+  MAPPING: PiTreeStructureDuotone,
+  PLAN_TIERS: PiUsersThreeDuotone,
+  CODE_JOURNAL: PiListChecksDuotone,
 };
-
-const TOUTES = "__toutes__";
 
 function pageWindow(current: number, total: number, size = 5): (number | "…")[] {
   if (total <= size) return Array.from({ length: total }, (_, i) => i + 1);
@@ -83,6 +89,8 @@ function pageWindow(current: number, total: number, size = 5): (number | "…")[
   return out;
 }
 
+const nbFiltresActifs = (f: Filtres) => Object.values(f).reduce((n, v) => n + v.length, 0);
+
 export default function DimensionsViewer({
   clientId,
   version = 0,
@@ -91,23 +99,27 @@ export default function DimensionsViewer({
   /** Incrémenter pour forcer un rechargement (ex. fin d'une mise à jour). */
   version?: number;
 }) {
-  const [fileType, setFileType] = useState<FileType>(FileType.PLAN_COMPTES);
-  const [data, setData] = useState<PageDimension | null>(null);
+  const [refId, setRefId] = useState<string>(REFERENTIELS[0].id);
+  const [data, setData] = useState<PageReferentiel | null>(null);
+  const [options, setOptions] = useState<Record<string, OptionFiltre[]>>({});
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
-  const [categorie, setCategorie] = useState(TOUTES);
+  const [filtres, setFiltres] = useState<Filtres>({});
+  const [showFiltres, setShowFiltres] = useState(false);
   const [sortBy, setSortBy] = useState("");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
+  // Les valeurs proposées par les filtres ne sont recalculées qu'au changement
+  // de référentiel (ou après une modification), pas à chaque page.
+  const [optionsAJour, setOptionsAJour] = useState(false);
 
   // Édition : une seule ligne à la fois.
-  const [edition, setEdition] = useState<{ cle: string; valeurs: Ligne } | null>(null);
+  const [edition, setEdition] = useState<{ id: string; cle: string; valeurs: Ligne } | null>(null);
   const [enregistrement, setEnregistrement] = useState(false);
 
-  const def = dimensionParType(fileType)!;
+  const def = referentielParId(refId)!;
   const cle = colonneCle(def).nom;
-  const colCategorie = def.colonnes.find((c) => c.categorie);
 
   const charger = useCallback(async () => {
     setLoading(true);
@@ -115,22 +127,32 @@ export default function DimensionsViewer({
       const qs = new URLSearchParams({ page: String(page), sortDir });
       if (search) qs.set("search", search);
       if (sortBy) qs.set("sortBy", sortBy);
-      if (categorie !== TOUTES) qs.set("categorie", categorie);
-      const res = await fetch(`/api/clients/${clientId}/dimensions/tables/${fileType}?${qs}`);
+      for (const [col, valeurs] of Object.entries(filtres))
+        valeurs.forEach((v) => qs.append(`f.${col}`, v));
+      if (!optionsAJour) qs.set("options", "1");
+
+      const res = await fetch(`/api/clients/${clientId}/dimensions/tables/${refId}?${qs}`);
       if (!res.ok) throw new Error();
-      setData((await res.json()) as PageDimension);
+      const json = (await res.json()) as PageReferentiel;
+      setData(json);
+      if (json.options) {
+        setOptions(json.options);
+        setOptionsAJour(true);
+      }
     } catch {
       toast.error("Erreur lors du chargement du référentiel");
     } finally {
       setLoading(false);
     }
-  }, [clientId, fileType, page, search, sortBy, sortDir, categorie]);
+    // optionsAJour est volontairement exclu : le basculer ne doit pas recharger.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [clientId, refId, page, search, sortBy, sortDir, filtres]);
 
   useEffect(() => {
     charger();
   }, [charger, version]);
 
-  // Recherche différée, comme dans la Comptabilité.
+  // Recherche différée, comme dans le grand livre.
   useEffect(() => {
     const t = setTimeout(() => {
       if (searchInput !== search) {
@@ -141,16 +163,23 @@ export default function DimensionsViewer({
     return () => clearTimeout(t);
   }, [searchInput, search]);
 
-  const changerReferentiel = (t: FileType) => {
-    if (t === fileType) return;
-    setFileType(t);
+  const changerReferentiel = (id: string) => {
+    if (id === refId) return;
+    setRefId(id);
     setPage(1);
     setSearchInput("");
     setSearch("");
-    setCategorie(TOUTES);
+    setFiltres({});
+    setOptions({});
+    setOptionsAJour(false);
     setSortBy("");
     setSortDir("asc");
     setEdition(null);
+  };
+
+  const appliquerFiltres = (f: Filtres) => {
+    setFiltres(f);
+    setPage(1);
   };
 
   const toggleSort = (col: string) => {
@@ -165,7 +194,7 @@ export default function DimensionsViewer({
   const enregistrer = async () => {
     if (!edition) return;
     // N'envoie que les champs éditables effectivement changés.
-    const origine = data?.lignes.find((l) => l[cle] === edition.cle);
+    const origine = data?.lignes.find((l) => identifiantLigne(def, l) === edition.id);
     const valeurs: Record<string, string> = {};
     for (const c of def.colonnes) {
       if (!c.editable) continue;
@@ -183,7 +212,7 @@ export default function DimensionsViewer({
 
     setEnregistrement(true);
     try {
-      const res = await fetch(`/api/clients/${clientId}/dimensions/tables/${fileType}`, {
+      const res = await fetch(`/api/clients/${clientId}/dimensions/tables/${refId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ cle: edition.cle, valeurs }),
@@ -198,10 +227,14 @@ export default function DimensionsViewer({
         d
           ? {
               ...d,
-              lignes: d.lignes.map((l) => (l[cle] === edition.cle ? (json.ligne as Ligne) : l)),
+              lignes: d.lignes.map((l) =>
+                identifiantLigne(def, l) === edition.id ? (json.ligne as Ligne) : l,
+              ),
             }
           : d,
       );
+      // Un intitulé ou un type nouveau doit apparaître dans les filtres.
+      setOptionsAJour(false);
       const reports: string[] = [];
       if (json.grandLivre?.length) reports.push("grand livre");
       if (json.saisies > 0) reports.push(`${json.saisies} écriture(s) saisie(s)`);
@@ -243,42 +276,44 @@ export default function DimensionsViewer({
 
   const canEdit = !!data?.canEdit;
   const nbColonnes = def.colonnes.length + (canEdit ? 1 : 0);
-  const datalistId = `dimension-categories-${fileType}`;
+  const actifs = nbFiltresActifs(filtres);
 
   return (
     <Card className="border-[#D0E3F5]">
       <CardHeader>
-        <CardTitle>Contenu des référentiels</CardTitle>
+        <CardTitle>Référentiels</CardTitle>
         <CardDescription>
-          Consultez les tables de dimension et corrigez un intitulé ou un type directement. Les
-          clés ne sont pas modifiables et aucune ligne n&apos;est supprimée ; les intitulés
-          recopiés dans le grand livre et les écritures saisies suivent la modification.
+          Plan comptable, mapping des rubriques, plan tiers et codes journaux. Les intitulés et
+          types des tables de dimension se corrigent directement : la clé n&apos;est pas
+          modifiable, aucune ligne n&apos;est supprimée, et les intitulés recopiés dans le grand
+          livre et les écritures saisies suivent la modification.
         </CardDescription>
 
         {/* Sous-onglets — même présentation que les États Financiers */}
-        <div className="flex items-center gap-6 border-b border-[#D0E3F5] pt-2">
-          {DIMENSIONS.map((d) => {
-            const Icon = ICONES[d.fileType] ?? PiBooksDuotone;
-            const actif = d.fileType === fileType;
+        <div className="flex flex-wrap items-center gap-6 border-b border-[#D0E3F5] pt-2">
+          {REFERENTIELS.map((r) => {
+            const Icon = ICONES[r.id] ?? PiBooksDuotone;
+            const actif = r.id === refId;
             return (
               <button
-                key={d.fileType}
-                onClick={() => changerReferentiel(d.fileType)}
+                key={r.id}
+                onClick={() => changerReferentiel(r.id)}
                 className={cn(
                   "flex items-center gap-2 pb-3 text-sm font-medium transition-colors relative",
                   actif ? "text-[#0077C3]" : "text-[#335890] hover:text-[#0077C3]",
                 )}
               >
                 <Icon className="w-4 h-4" />
-                {d.label}
+                {r.label}
+                {r.lectureSeule && <Lock className="w-3 h-3 opacity-60" />}
                 {actif && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#0077C3]" />}
               </button>
             );
           })}
         </div>
 
-        {/* Barre d'outils : recherche + filtre de catégorie */}
-        <div className="flex flex-wrap items-center gap-3 pt-3">
+        {/* Barre d'outils : recherche + filtres, comme le grand livre */}
+        <div className="flex flex-wrap items-center gap-2 pt-3">
           <div className="relative">
             <Search className="w-4 h-4 text-muted-foreground absolute left-3 top-1/2 -translate-y-1/2" />
             <Input
@@ -288,31 +323,21 @@ export default function DimensionsViewer({
               className="pl-9 w-80 h-9"
             />
           </div>
-          {colCategorie && (data?.categories.length ?? 0) > 0 && (
-            <div className="flex items-center gap-2 border border-[#D0E3F5] rounded-lg px-3 h-9">
-              <span className="text-xs text-[#335890]">{colCategorie.libelle} :</span>
-              <Select
-                value={categorie}
-                onValueChange={(v) => {
-                  setCategorie(v);
-                  setPage(1);
-                }}
-              >
-                <SelectTrigger className="border-0 p-0 h-auto shadow-none min-w-[80px] font-semibold text-[#00122E] text-sm">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={TOUTES}>Tous</SelectItem>
-                  {data!.categories.map((v) => (
-                    <SelectItem key={v} value={v}>
-                      {v}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          )}
-          <span className="text-xs text-muted-foreground">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setShowFiltres((f) => !f)}
+            className="gap-2 h-9"
+          >
+            <SlidersHorizontal className="w-4 h-4" />
+            Filtres
+            {actifs > 0 && (
+              <Badge variant="secondary" className="text-[10px]">
+                {actifs}
+              </Badge>
+            )}
+          </Button>
+          <span className="text-xs text-muted-foreground ml-1">
             {loading ? (
               <span className="inline-flex items-center gap-1">
                 <Loader2 className="w-3 h-3 animate-spin" /> Chargement…
@@ -322,15 +347,51 @@ export default function DimensionsViewer({
             )}
           </span>
         </div>
+
+        {/* Panneau de filtres : une sélection multiple par champ de la table */}
+        {showFiltres && (
+          <div className="space-y-3 pt-3">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              {def.colonnes.map((c) => (
+                <MultiSelect
+                  key={c.nom}
+                  label={c.libelle}
+                  options={options[c.nom] ?? []}
+                  selected={filtres[c.nom] ?? []}
+                  onChange={(v) => appliquerFiltres({ ...filtres, [c.nom]: v })}
+                />
+              ))}
+            </div>
+            {actifs > 0 && (
+              <div className="flex items-center gap-2">
+                <Badge variant="outline" className="text-xs">
+                  {actifs} filtre{actifs > 1 ? "s" : ""} actif{actifs > 1 ? "s" : ""}
+                </Badge>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 text-xs"
+                  onClick={() => appliquerFiltres({})}
+                >
+                  <X className="w-3 h-3 mr-1" /> Réinitialiser
+                </Button>
+              </div>
+            )}
+          </div>
+        )}
       </CardHeader>
 
       <CardContent>
         {/* Suggestions pour les champs « catégorie » (type, nature) */}
-        <datalist id={datalistId}>
-          {(data?.categories ?? []).map((v) => (
-            <option key={v} value={v} />
+        {def.colonnes
+          .filter((c) => c.categorie)
+          .map((c) => (
+            <datalist key={c.nom} id={`referentiel-${refId}-${c.nom}`}>
+              {(options[c.nom] ?? []).map((o) => (
+                <option key={o.code} value={o.code} />
+              ))}
+            </datalist>
           ))}
-        </datalist>
 
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
@@ -349,15 +410,13 @@ export default function DimensionsViewer({
                 </tr>
               ) : (
                 data.lignes.map((l) => {
-                  const enEdition = edition?.cle === l[cle];
+                  const idLigne = identifiantLigne(def, l);
+                  const enEdition = edition?.id === idLigne;
                   return (
-                    <tr
-                      key={l[cle]}
-                      className={cn("border-b", enEdition && "bg-[#F5F9FF]")}
-                    >
+                    <tr key={idLigne} className={cn("border-b", enEdition && "bg-[#F5F9FF]")}>
                       {def.colonnes.map((c) => (
                         <td key={c.nom} className="p-2 align-middle">
-                          {c.cle ? (
+                          {c.nom === cle ? (
                             <span className="inline-flex items-center gap-1.5 font-medium">
                               {enEdition && <Lock className="w-3 h-3 text-muted-foreground" />}
                               {l[c.nom]}
@@ -365,19 +424,24 @@ export default function DimensionsViewer({
                           ) : enEdition && c.editable ? (
                             <Input
                               value={edition.valeurs[c.nom] ?? ""}
-                              list={c.categorie ? datalistId : undefined}
+                              list={c.categorie ? `referentiel-${refId}-${c.nom}` : undefined}
                               maxLength={255}
                               autoFocus={c.requis}
                               onChange={(e) =>
                                 setEdition((ed) =>
-                                  ed ? { ...ed, valeurs: { ...ed.valeurs, [c.nom]: e.target.value } } : ed,
+                                  ed
+                                    ? { ...ed, valeurs: { ...ed.valeurs, [c.nom]: e.target.value } }
+                                    : ed,
                                 )
                               }
                               onKeyDown={(e) => {
                                 if (e.key === "Enter") enregistrer();
                                 if (e.key === "Escape") setEdition(null);
                               }}
-                              className={cn("h-8 text-xs", c.categorie ? "w-40" : "w-full min-w-[240px]")}
+                              className={cn(
+                                "h-8 text-xs",
+                                c.categorie ? "w-40" : "w-full min-w-[240px]",
+                              )}
                             />
                           ) : (
                             <span className={cn(!l[c.nom] && "text-muted-foreground")}>
@@ -419,7 +483,9 @@ export default function DimensionsViewer({
                               variant="outline"
                               size="sm"
                               disabled={!!edition}
-                              onClick={() => setEdition({ cle: l[cle], valeurs: { ...l } })}
+                              onClick={() =>
+                                setEdition({ id: idLigne, cle: l[cle], valeurs: { ...l } })
+                              }
                               className="h-8 gap-1.5 border-[#D0E3F5] text-[#335890] hover:bg-[#EBF5FF]"
                             >
                               <Pencil className="w-3.5 h-3.5" />
@@ -487,6 +553,13 @@ export default function DimensionsViewer({
               </Button>
             </div>
           </div>
+        )}
+
+        {def.note && (
+          <p className="text-xs text-muted-foreground flex items-center gap-1.5 mt-4">
+            <Lock className="w-3 h-3 shrink-0" />
+            {def.note}
+          </p>
         )}
       </CardContent>
     </Card>
