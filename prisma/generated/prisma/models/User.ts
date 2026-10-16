@@ -234,6 +234,7 @@ export type UserWhereInput = {
   createdClients?: Prisma.ClientListRelationFilter
   modifiedClients?: Prisma.ClientListRelationFilter
   comptableFiles?: Prisma.ComptableFileListRelationFilter
+  dimensionUpdates?: Prisma.DimensionUpdateListRelationFilter
   folders?: Prisma.FolderListRelationFilter
   normalFiles?: Prisma.NormalFileListRelationFilter
   company?: Prisma.XOR<Prisma.CompanyScalarRelationFilter, Prisma.CompanyWhereInput>
@@ -255,6 +256,7 @@ export type UserOrderByWithRelationInput = {
   createdClients?: Prisma.ClientOrderByRelationAggregateInput
   modifiedClients?: Prisma.ClientOrderByRelationAggregateInput
   comptableFiles?: Prisma.ComptableFileOrderByRelationAggregateInput
+  dimensionUpdates?: Prisma.DimensionUpdateOrderByRelationAggregateInput
   folders?: Prisma.FolderOrderByRelationAggregateInput
   normalFiles?: Prisma.NormalFileOrderByRelationAggregateInput
   company?: Prisma.CompanyOrderByWithRelationInput
@@ -279,6 +281,7 @@ export type UserWhereUniqueInput = Prisma.AtLeast<{
   createdClients?: Prisma.ClientListRelationFilter
   modifiedClients?: Prisma.ClientListRelationFilter
   comptableFiles?: Prisma.ComptableFileListRelationFilter
+  dimensionUpdates?: Prisma.DimensionUpdateListRelationFilter
   folders?: Prisma.FolderListRelationFilter
   normalFiles?: Prisma.NormalFileListRelationFilter
   company?: Prisma.XOR<Prisma.CompanyScalarRelationFilter, Prisma.CompanyWhereInput>
@@ -333,6 +336,7 @@ export type UserCreateInput = {
   createdClients?: Prisma.ClientCreateNestedManyWithoutCreatedByInput
   modifiedClients?: Prisma.ClientCreateNestedManyWithoutModifiedByInput
   comptableFiles?: Prisma.ComptableFileCreateNestedManyWithoutUploadedByInput
+  dimensionUpdates?: Prisma.DimensionUpdateCreateNestedManyWithoutUploadedByInput
   folders?: Prisma.FolderCreateNestedManyWithoutCreatedByInput
   normalFiles?: Prisma.NormalFileCreateNestedManyWithoutUploadedByInput
   company: Prisma.CompanyCreateNestedOneWithoutMembersInput
@@ -354,6 +358,7 @@ export type UserUncheckedCreateInput = {
   createdClients?: Prisma.ClientUncheckedCreateNestedManyWithoutCreatedByInput
   modifiedClients?: Prisma.ClientUncheckedCreateNestedManyWithoutModifiedByInput
   comptableFiles?: Prisma.ComptableFileUncheckedCreateNestedManyWithoutUploadedByInput
+  dimensionUpdates?: Prisma.DimensionUpdateUncheckedCreateNestedManyWithoutUploadedByInput
   folders?: Prisma.FolderUncheckedCreateNestedManyWithoutCreatedByInput
   normalFiles?: Prisma.NormalFileUncheckedCreateNestedManyWithoutUploadedByInput
 }
@@ -373,6 +378,7 @@ export type UserUpdateInput = {
   createdClients?: Prisma.ClientUpdateManyWithoutCreatedByNestedInput
   modifiedClients?: Prisma.ClientUpdateManyWithoutModifiedByNestedInput
   comptableFiles?: Prisma.ComptableFileUpdateManyWithoutUploadedByNestedInput
+  dimensionUpdates?: Prisma.DimensionUpdateUpdateManyWithoutUploadedByNestedInput
   folders?: Prisma.FolderUpdateManyWithoutCreatedByNestedInput
   normalFiles?: Prisma.NormalFileUpdateManyWithoutUploadedByNestedInput
   company?: Prisma.CompanyUpdateOneRequiredWithoutMembersNestedInput
@@ -394,6 +400,7 @@ export type UserUncheckedUpdateInput = {
   createdClients?: Prisma.ClientUncheckedUpdateManyWithoutCreatedByNestedInput
   modifiedClients?: Prisma.ClientUncheckedUpdateManyWithoutModifiedByNestedInput
   comptableFiles?: Prisma.ComptableFileUncheckedUpdateManyWithoutUploadedByNestedInput
+  dimensionUpdates?: Prisma.DimensionUpdateUncheckedUpdateManyWithoutUploadedByNestedInput
   folders?: Prisma.FolderUncheckedUpdateManyWithoutCreatedByNestedInput
   normalFiles?: Prisma.NormalFileUncheckedUpdateManyWithoutUploadedByNestedInput
 }
@@ -641,6 +648,20 @@ export type UserUpdateOneRequiredWithoutComptableFilesNestedInput = {
   update?: Prisma.XOR<Prisma.XOR<Prisma.UserUpdateToOneWithWhereWithoutComptableFilesInput, Prisma.UserUpdateWithoutComptableFilesInput>, Prisma.UserUncheckedUpdateWithoutComptableFilesInput>
 }
 
+export type UserCreateNestedOneWithoutDimensionUpdatesInput = {
+  create?: Prisma.XOR<Prisma.UserCreateWithoutDimensionUpdatesInput, Prisma.UserUncheckedCreateWithoutDimensionUpdatesInput>
+  connectOrCreate?: Prisma.UserCreateOrConnectWithoutDimensionUpdatesInput
+  connect?: Prisma.UserWhereUniqueInput
+}
+
+export type UserUpdateOneRequiredWithoutDimensionUpdatesNestedInput = {
+  create?: Prisma.XOR<Prisma.UserCreateWithoutDimensionUpdatesInput, Prisma.UserUncheckedCreateWithoutDimensionUpdatesInput>
+  connectOrCreate?: Prisma.UserCreateOrConnectWithoutDimensionUpdatesInput
+  upsert?: Prisma.UserUpsertWithoutDimensionUpdatesInput
+  connect?: Prisma.UserWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.UserUpdateToOneWithWhereWithoutDimensionUpdatesInput, Prisma.UserUpdateWithoutDimensionUpdatesInput>, Prisma.UserUncheckedUpdateWithoutDimensionUpdatesInput>
+}
+
 export type UserCreateWithoutCompanyInput = {
   id?: string
   email: string
@@ -656,6 +677,7 @@ export type UserCreateWithoutCompanyInput = {
   createdClients?: Prisma.ClientCreateNestedManyWithoutCreatedByInput
   modifiedClients?: Prisma.ClientCreateNestedManyWithoutModifiedByInput
   comptableFiles?: Prisma.ComptableFileCreateNestedManyWithoutUploadedByInput
+  dimensionUpdates?: Prisma.DimensionUpdateCreateNestedManyWithoutUploadedByInput
   folders?: Prisma.FolderCreateNestedManyWithoutCreatedByInput
   normalFiles?: Prisma.NormalFileCreateNestedManyWithoutUploadedByInput
 }
@@ -675,6 +697,7 @@ export type UserUncheckedCreateWithoutCompanyInput = {
   createdClients?: Prisma.ClientUncheckedCreateNestedManyWithoutCreatedByInput
   modifiedClients?: Prisma.ClientUncheckedCreateNestedManyWithoutModifiedByInput
   comptableFiles?: Prisma.ComptableFileUncheckedCreateNestedManyWithoutUploadedByInput
+  dimensionUpdates?: Prisma.DimensionUpdateUncheckedCreateNestedManyWithoutUploadedByInput
   folders?: Prisma.FolderUncheckedCreateNestedManyWithoutCreatedByInput
   normalFiles?: Prisma.NormalFileUncheckedCreateNestedManyWithoutUploadedByInput
 }
@@ -736,6 +759,7 @@ export type UserCreateWithoutCreatedClientsInput = {
   clientAssignments?: Prisma.ClientAssignmentCreateNestedManyWithoutUserInput
   modifiedClients?: Prisma.ClientCreateNestedManyWithoutModifiedByInput
   comptableFiles?: Prisma.ComptableFileCreateNestedManyWithoutUploadedByInput
+  dimensionUpdates?: Prisma.DimensionUpdateCreateNestedManyWithoutUploadedByInput
   folders?: Prisma.FolderCreateNestedManyWithoutCreatedByInput
   normalFiles?: Prisma.NormalFileCreateNestedManyWithoutUploadedByInput
   company: Prisma.CompanyCreateNestedOneWithoutMembersInput
@@ -756,6 +780,7 @@ export type UserUncheckedCreateWithoutCreatedClientsInput = {
   clientAssignments?: Prisma.ClientAssignmentUncheckedCreateNestedManyWithoutUserInput
   modifiedClients?: Prisma.ClientUncheckedCreateNestedManyWithoutModifiedByInput
   comptableFiles?: Prisma.ComptableFileUncheckedCreateNestedManyWithoutUploadedByInput
+  dimensionUpdates?: Prisma.DimensionUpdateUncheckedCreateNestedManyWithoutUploadedByInput
   folders?: Prisma.FolderUncheckedCreateNestedManyWithoutCreatedByInput
   normalFiles?: Prisma.NormalFileUncheckedCreateNestedManyWithoutUploadedByInput
 }
@@ -779,6 +804,7 @@ export type UserCreateWithoutModifiedClientsInput = {
   clientAssignments?: Prisma.ClientAssignmentCreateNestedManyWithoutUserInput
   createdClients?: Prisma.ClientCreateNestedManyWithoutCreatedByInput
   comptableFiles?: Prisma.ComptableFileCreateNestedManyWithoutUploadedByInput
+  dimensionUpdates?: Prisma.DimensionUpdateCreateNestedManyWithoutUploadedByInput
   folders?: Prisma.FolderCreateNestedManyWithoutCreatedByInput
   normalFiles?: Prisma.NormalFileCreateNestedManyWithoutUploadedByInput
   company: Prisma.CompanyCreateNestedOneWithoutMembersInput
@@ -799,6 +825,7 @@ export type UserUncheckedCreateWithoutModifiedClientsInput = {
   clientAssignments?: Prisma.ClientAssignmentUncheckedCreateNestedManyWithoutUserInput
   createdClients?: Prisma.ClientUncheckedCreateNestedManyWithoutCreatedByInput
   comptableFiles?: Prisma.ComptableFileUncheckedCreateNestedManyWithoutUploadedByInput
+  dimensionUpdates?: Prisma.DimensionUpdateUncheckedCreateNestedManyWithoutUploadedByInput
   folders?: Prisma.FolderUncheckedCreateNestedManyWithoutCreatedByInput
   normalFiles?: Prisma.NormalFileUncheckedCreateNestedManyWithoutUploadedByInput
 }
@@ -833,6 +860,7 @@ export type UserUpdateWithoutCreatedClientsInput = {
   clientAssignments?: Prisma.ClientAssignmentUpdateManyWithoutUserNestedInput
   modifiedClients?: Prisma.ClientUpdateManyWithoutModifiedByNestedInput
   comptableFiles?: Prisma.ComptableFileUpdateManyWithoutUploadedByNestedInput
+  dimensionUpdates?: Prisma.DimensionUpdateUpdateManyWithoutUploadedByNestedInput
   folders?: Prisma.FolderUpdateManyWithoutCreatedByNestedInput
   normalFiles?: Prisma.NormalFileUpdateManyWithoutUploadedByNestedInput
   company?: Prisma.CompanyUpdateOneRequiredWithoutMembersNestedInput
@@ -853,6 +881,7 @@ export type UserUncheckedUpdateWithoutCreatedClientsInput = {
   clientAssignments?: Prisma.ClientAssignmentUncheckedUpdateManyWithoutUserNestedInput
   modifiedClients?: Prisma.ClientUncheckedUpdateManyWithoutModifiedByNestedInput
   comptableFiles?: Prisma.ComptableFileUncheckedUpdateManyWithoutUploadedByNestedInput
+  dimensionUpdates?: Prisma.DimensionUpdateUncheckedUpdateManyWithoutUploadedByNestedInput
   folders?: Prisma.FolderUncheckedUpdateManyWithoutCreatedByNestedInput
   normalFiles?: Prisma.NormalFileUncheckedUpdateManyWithoutUploadedByNestedInput
 }
@@ -882,6 +911,7 @@ export type UserUpdateWithoutModifiedClientsInput = {
   clientAssignments?: Prisma.ClientAssignmentUpdateManyWithoutUserNestedInput
   createdClients?: Prisma.ClientUpdateManyWithoutCreatedByNestedInput
   comptableFiles?: Prisma.ComptableFileUpdateManyWithoutUploadedByNestedInput
+  dimensionUpdates?: Prisma.DimensionUpdateUpdateManyWithoutUploadedByNestedInput
   folders?: Prisma.FolderUpdateManyWithoutCreatedByNestedInput
   normalFiles?: Prisma.NormalFileUpdateManyWithoutUploadedByNestedInput
   company?: Prisma.CompanyUpdateOneRequiredWithoutMembersNestedInput
@@ -902,6 +932,7 @@ export type UserUncheckedUpdateWithoutModifiedClientsInput = {
   clientAssignments?: Prisma.ClientAssignmentUncheckedUpdateManyWithoutUserNestedInput
   createdClients?: Prisma.ClientUncheckedUpdateManyWithoutCreatedByNestedInput
   comptableFiles?: Prisma.ComptableFileUncheckedUpdateManyWithoutUploadedByNestedInput
+  dimensionUpdates?: Prisma.DimensionUpdateUncheckedUpdateManyWithoutUploadedByNestedInput
   folders?: Prisma.FolderUncheckedUpdateManyWithoutCreatedByNestedInput
   normalFiles?: Prisma.NormalFileUncheckedUpdateManyWithoutUploadedByNestedInput
 }
@@ -920,6 +951,7 @@ export type UserCreateWithoutClientAssignmentsInput = {
   createdClients?: Prisma.ClientCreateNestedManyWithoutCreatedByInput
   modifiedClients?: Prisma.ClientCreateNestedManyWithoutModifiedByInput
   comptableFiles?: Prisma.ComptableFileCreateNestedManyWithoutUploadedByInput
+  dimensionUpdates?: Prisma.DimensionUpdateCreateNestedManyWithoutUploadedByInput
   folders?: Prisma.FolderCreateNestedManyWithoutCreatedByInput
   normalFiles?: Prisma.NormalFileCreateNestedManyWithoutUploadedByInput
   company: Prisma.CompanyCreateNestedOneWithoutMembersInput
@@ -940,6 +972,7 @@ export type UserUncheckedCreateWithoutClientAssignmentsInput = {
   createdClients?: Prisma.ClientUncheckedCreateNestedManyWithoutCreatedByInput
   modifiedClients?: Prisma.ClientUncheckedCreateNestedManyWithoutModifiedByInput
   comptableFiles?: Prisma.ComptableFileUncheckedCreateNestedManyWithoutUploadedByInput
+  dimensionUpdates?: Prisma.DimensionUpdateUncheckedCreateNestedManyWithoutUploadedByInput
   folders?: Prisma.FolderUncheckedCreateNestedManyWithoutCreatedByInput
   normalFiles?: Prisma.NormalFileUncheckedCreateNestedManyWithoutUploadedByInput
 }
@@ -974,6 +1007,7 @@ export type UserUpdateWithoutClientAssignmentsInput = {
   createdClients?: Prisma.ClientUpdateManyWithoutCreatedByNestedInput
   modifiedClients?: Prisma.ClientUpdateManyWithoutModifiedByNestedInput
   comptableFiles?: Prisma.ComptableFileUpdateManyWithoutUploadedByNestedInput
+  dimensionUpdates?: Prisma.DimensionUpdateUpdateManyWithoutUploadedByNestedInput
   folders?: Prisma.FolderUpdateManyWithoutCreatedByNestedInput
   normalFiles?: Prisma.NormalFileUpdateManyWithoutUploadedByNestedInput
   company?: Prisma.CompanyUpdateOneRequiredWithoutMembersNestedInput
@@ -994,6 +1028,7 @@ export type UserUncheckedUpdateWithoutClientAssignmentsInput = {
   createdClients?: Prisma.ClientUncheckedUpdateManyWithoutCreatedByNestedInput
   modifiedClients?: Prisma.ClientUncheckedUpdateManyWithoutModifiedByNestedInput
   comptableFiles?: Prisma.ComptableFileUncheckedUpdateManyWithoutUploadedByNestedInput
+  dimensionUpdates?: Prisma.DimensionUpdateUncheckedUpdateManyWithoutUploadedByNestedInput
   folders?: Prisma.FolderUncheckedUpdateManyWithoutCreatedByNestedInput
   normalFiles?: Prisma.NormalFileUncheckedUpdateManyWithoutUploadedByNestedInput
 }
@@ -1013,6 +1048,7 @@ export type UserCreateWithoutFoldersInput = {
   createdClients?: Prisma.ClientCreateNestedManyWithoutCreatedByInput
   modifiedClients?: Prisma.ClientCreateNestedManyWithoutModifiedByInput
   comptableFiles?: Prisma.ComptableFileCreateNestedManyWithoutUploadedByInput
+  dimensionUpdates?: Prisma.DimensionUpdateCreateNestedManyWithoutUploadedByInput
   normalFiles?: Prisma.NormalFileCreateNestedManyWithoutUploadedByInput
   company: Prisma.CompanyCreateNestedOneWithoutMembersInput
 }
@@ -1033,6 +1069,7 @@ export type UserUncheckedCreateWithoutFoldersInput = {
   createdClients?: Prisma.ClientUncheckedCreateNestedManyWithoutCreatedByInput
   modifiedClients?: Prisma.ClientUncheckedCreateNestedManyWithoutModifiedByInput
   comptableFiles?: Prisma.ComptableFileUncheckedCreateNestedManyWithoutUploadedByInput
+  dimensionUpdates?: Prisma.DimensionUpdateUncheckedCreateNestedManyWithoutUploadedByInput
   normalFiles?: Prisma.NormalFileUncheckedCreateNestedManyWithoutUploadedByInput
 }
 
@@ -1067,6 +1104,7 @@ export type UserUpdateWithoutFoldersInput = {
   createdClients?: Prisma.ClientUpdateManyWithoutCreatedByNestedInput
   modifiedClients?: Prisma.ClientUpdateManyWithoutModifiedByNestedInput
   comptableFiles?: Prisma.ComptableFileUpdateManyWithoutUploadedByNestedInput
+  dimensionUpdates?: Prisma.DimensionUpdateUpdateManyWithoutUploadedByNestedInput
   normalFiles?: Prisma.NormalFileUpdateManyWithoutUploadedByNestedInput
   company?: Prisma.CompanyUpdateOneRequiredWithoutMembersNestedInput
 }
@@ -1087,6 +1125,7 @@ export type UserUncheckedUpdateWithoutFoldersInput = {
   createdClients?: Prisma.ClientUncheckedUpdateManyWithoutCreatedByNestedInput
   modifiedClients?: Prisma.ClientUncheckedUpdateManyWithoutModifiedByNestedInput
   comptableFiles?: Prisma.ComptableFileUncheckedUpdateManyWithoutUploadedByNestedInput
+  dimensionUpdates?: Prisma.DimensionUpdateUncheckedUpdateManyWithoutUploadedByNestedInput
   normalFiles?: Prisma.NormalFileUncheckedUpdateManyWithoutUploadedByNestedInput
 }
 
@@ -1105,6 +1144,7 @@ export type UserCreateWithoutNormalFilesInput = {
   createdClients?: Prisma.ClientCreateNestedManyWithoutCreatedByInput
   modifiedClients?: Prisma.ClientCreateNestedManyWithoutModifiedByInput
   comptableFiles?: Prisma.ComptableFileCreateNestedManyWithoutUploadedByInput
+  dimensionUpdates?: Prisma.DimensionUpdateCreateNestedManyWithoutUploadedByInput
   folders?: Prisma.FolderCreateNestedManyWithoutCreatedByInput
   company: Prisma.CompanyCreateNestedOneWithoutMembersInput
 }
@@ -1125,6 +1165,7 @@ export type UserUncheckedCreateWithoutNormalFilesInput = {
   createdClients?: Prisma.ClientUncheckedCreateNestedManyWithoutCreatedByInput
   modifiedClients?: Prisma.ClientUncheckedCreateNestedManyWithoutModifiedByInput
   comptableFiles?: Prisma.ComptableFileUncheckedCreateNestedManyWithoutUploadedByInput
+  dimensionUpdates?: Prisma.DimensionUpdateUncheckedCreateNestedManyWithoutUploadedByInput
   folders?: Prisma.FolderUncheckedCreateNestedManyWithoutCreatedByInput
 }
 
@@ -1159,6 +1200,7 @@ export type UserUpdateWithoutNormalFilesInput = {
   createdClients?: Prisma.ClientUpdateManyWithoutCreatedByNestedInput
   modifiedClients?: Prisma.ClientUpdateManyWithoutModifiedByNestedInput
   comptableFiles?: Prisma.ComptableFileUpdateManyWithoutUploadedByNestedInput
+  dimensionUpdates?: Prisma.DimensionUpdateUpdateManyWithoutUploadedByNestedInput
   folders?: Prisma.FolderUpdateManyWithoutCreatedByNestedInput
   company?: Prisma.CompanyUpdateOneRequiredWithoutMembersNestedInput
 }
@@ -1179,6 +1221,7 @@ export type UserUncheckedUpdateWithoutNormalFilesInput = {
   createdClients?: Prisma.ClientUncheckedUpdateManyWithoutCreatedByNestedInput
   modifiedClients?: Prisma.ClientUncheckedUpdateManyWithoutModifiedByNestedInput
   comptableFiles?: Prisma.ComptableFileUncheckedUpdateManyWithoutUploadedByNestedInput
+  dimensionUpdates?: Prisma.DimensionUpdateUncheckedUpdateManyWithoutUploadedByNestedInput
   folders?: Prisma.FolderUncheckedUpdateManyWithoutCreatedByNestedInput
 }
 
@@ -1196,6 +1239,7 @@ export type UserCreateWithoutComptableFilesInput = {
   clientAssignments?: Prisma.ClientAssignmentCreateNestedManyWithoutUserInput
   createdClients?: Prisma.ClientCreateNestedManyWithoutCreatedByInput
   modifiedClients?: Prisma.ClientCreateNestedManyWithoutModifiedByInput
+  dimensionUpdates?: Prisma.DimensionUpdateCreateNestedManyWithoutUploadedByInput
   folders?: Prisma.FolderCreateNestedManyWithoutCreatedByInput
   normalFiles?: Prisma.NormalFileCreateNestedManyWithoutUploadedByInput
   company: Prisma.CompanyCreateNestedOneWithoutMembersInput
@@ -1216,6 +1260,7 @@ export type UserUncheckedCreateWithoutComptableFilesInput = {
   clientAssignments?: Prisma.ClientAssignmentUncheckedCreateNestedManyWithoutUserInput
   createdClients?: Prisma.ClientUncheckedCreateNestedManyWithoutCreatedByInput
   modifiedClients?: Prisma.ClientUncheckedCreateNestedManyWithoutModifiedByInput
+  dimensionUpdates?: Prisma.DimensionUpdateUncheckedCreateNestedManyWithoutUploadedByInput
   folders?: Prisma.FolderUncheckedCreateNestedManyWithoutCreatedByInput
   normalFiles?: Prisma.NormalFileUncheckedCreateNestedManyWithoutUploadedByInput
 }
@@ -1250,6 +1295,7 @@ export type UserUpdateWithoutComptableFilesInput = {
   clientAssignments?: Prisma.ClientAssignmentUpdateManyWithoutUserNestedInput
   createdClients?: Prisma.ClientUpdateManyWithoutCreatedByNestedInput
   modifiedClients?: Prisma.ClientUpdateManyWithoutModifiedByNestedInput
+  dimensionUpdates?: Prisma.DimensionUpdateUpdateManyWithoutUploadedByNestedInput
   folders?: Prisma.FolderUpdateManyWithoutCreatedByNestedInput
   normalFiles?: Prisma.NormalFileUpdateManyWithoutUploadedByNestedInput
   company?: Prisma.CompanyUpdateOneRequiredWithoutMembersNestedInput
@@ -1270,6 +1316,103 @@ export type UserUncheckedUpdateWithoutComptableFilesInput = {
   clientAssignments?: Prisma.ClientAssignmentUncheckedUpdateManyWithoutUserNestedInput
   createdClients?: Prisma.ClientUncheckedUpdateManyWithoutCreatedByNestedInput
   modifiedClients?: Prisma.ClientUncheckedUpdateManyWithoutModifiedByNestedInput
+  dimensionUpdates?: Prisma.DimensionUpdateUncheckedUpdateManyWithoutUploadedByNestedInput
+  folders?: Prisma.FolderUncheckedUpdateManyWithoutCreatedByNestedInput
+  normalFiles?: Prisma.NormalFileUncheckedUpdateManyWithoutUploadedByNestedInput
+}
+
+export type UserCreateWithoutDimensionUpdatesInput = {
+  id?: string
+  email: string
+  password: string
+  firstName?: string | null
+  lastName?: string | null
+  isActive?: boolean
+  role?: $Enums.UserRole
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  lastLoginAt?: Date | string | null
+  clientAssignments?: Prisma.ClientAssignmentCreateNestedManyWithoutUserInput
+  createdClients?: Prisma.ClientCreateNestedManyWithoutCreatedByInput
+  modifiedClients?: Prisma.ClientCreateNestedManyWithoutModifiedByInput
+  comptableFiles?: Prisma.ComptableFileCreateNestedManyWithoutUploadedByInput
+  folders?: Prisma.FolderCreateNestedManyWithoutCreatedByInput
+  normalFiles?: Prisma.NormalFileCreateNestedManyWithoutUploadedByInput
+  company: Prisma.CompanyCreateNestedOneWithoutMembersInput
+}
+
+export type UserUncheckedCreateWithoutDimensionUpdatesInput = {
+  id?: string
+  email: string
+  password: string
+  firstName?: string | null
+  lastName?: string | null
+  isActive?: boolean
+  companyId: string
+  role?: $Enums.UserRole
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  lastLoginAt?: Date | string | null
+  clientAssignments?: Prisma.ClientAssignmentUncheckedCreateNestedManyWithoutUserInput
+  createdClients?: Prisma.ClientUncheckedCreateNestedManyWithoutCreatedByInput
+  modifiedClients?: Prisma.ClientUncheckedCreateNestedManyWithoutModifiedByInput
+  comptableFiles?: Prisma.ComptableFileUncheckedCreateNestedManyWithoutUploadedByInput
+  folders?: Prisma.FolderUncheckedCreateNestedManyWithoutCreatedByInput
+  normalFiles?: Prisma.NormalFileUncheckedCreateNestedManyWithoutUploadedByInput
+}
+
+export type UserCreateOrConnectWithoutDimensionUpdatesInput = {
+  where: Prisma.UserWhereUniqueInput
+  create: Prisma.XOR<Prisma.UserCreateWithoutDimensionUpdatesInput, Prisma.UserUncheckedCreateWithoutDimensionUpdatesInput>
+}
+
+export type UserUpsertWithoutDimensionUpdatesInput = {
+  update: Prisma.XOR<Prisma.UserUpdateWithoutDimensionUpdatesInput, Prisma.UserUncheckedUpdateWithoutDimensionUpdatesInput>
+  create: Prisma.XOR<Prisma.UserCreateWithoutDimensionUpdatesInput, Prisma.UserUncheckedCreateWithoutDimensionUpdatesInput>
+  where?: Prisma.UserWhereInput
+}
+
+export type UserUpdateToOneWithWhereWithoutDimensionUpdatesInput = {
+  where?: Prisma.UserWhereInput
+  data: Prisma.XOR<Prisma.UserUpdateWithoutDimensionUpdatesInput, Prisma.UserUncheckedUpdateWithoutDimensionUpdatesInput>
+}
+
+export type UserUpdateWithoutDimensionUpdatesInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  email?: Prisma.StringFieldUpdateOperationsInput | string
+  password?: Prisma.StringFieldUpdateOperationsInput | string
+  firstName?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  lastName?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  isActive?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  role?: Prisma.EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  lastLoginAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  clientAssignments?: Prisma.ClientAssignmentUpdateManyWithoutUserNestedInput
+  createdClients?: Prisma.ClientUpdateManyWithoutCreatedByNestedInput
+  modifiedClients?: Prisma.ClientUpdateManyWithoutModifiedByNestedInput
+  comptableFiles?: Prisma.ComptableFileUpdateManyWithoutUploadedByNestedInput
+  folders?: Prisma.FolderUpdateManyWithoutCreatedByNestedInput
+  normalFiles?: Prisma.NormalFileUpdateManyWithoutUploadedByNestedInput
+  company?: Prisma.CompanyUpdateOneRequiredWithoutMembersNestedInput
+}
+
+export type UserUncheckedUpdateWithoutDimensionUpdatesInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  email?: Prisma.StringFieldUpdateOperationsInput | string
+  password?: Prisma.StringFieldUpdateOperationsInput | string
+  firstName?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  lastName?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  isActive?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  companyId?: Prisma.StringFieldUpdateOperationsInput | string
+  role?: Prisma.EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  lastLoginAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  clientAssignments?: Prisma.ClientAssignmentUncheckedUpdateManyWithoutUserNestedInput
+  createdClients?: Prisma.ClientUncheckedUpdateManyWithoutCreatedByNestedInput
+  modifiedClients?: Prisma.ClientUncheckedUpdateManyWithoutModifiedByNestedInput
+  comptableFiles?: Prisma.ComptableFileUncheckedUpdateManyWithoutUploadedByNestedInput
   folders?: Prisma.FolderUncheckedUpdateManyWithoutCreatedByNestedInput
   normalFiles?: Prisma.NormalFileUncheckedUpdateManyWithoutUploadedByNestedInput
 }
@@ -1302,6 +1445,7 @@ export type UserUpdateWithoutCompanyInput = {
   createdClients?: Prisma.ClientUpdateManyWithoutCreatedByNestedInput
   modifiedClients?: Prisma.ClientUpdateManyWithoutModifiedByNestedInput
   comptableFiles?: Prisma.ComptableFileUpdateManyWithoutUploadedByNestedInput
+  dimensionUpdates?: Prisma.DimensionUpdateUpdateManyWithoutUploadedByNestedInput
   folders?: Prisma.FolderUpdateManyWithoutCreatedByNestedInput
   normalFiles?: Prisma.NormalFileUpdateManyWithoutUploadedByNestedInput
 }
@@ -1321,6 +1465,7 @@ export type UserUncheckedUpdateWithoutCompanyInput = {
   createdClients?: Prisma.ClientUncheckedUpdateManyWithoutCreatedByNestedInput
   modifiedClients?: Prisma.ClientUncheckedUpdateManyWithoutModifiedByNestedInput
   comptableFiles?: Prisma.ComptableFileUncheckedUpdateManyWithoutUploadedByNestedInput
+  dimensionUpdates?: Prisma.DimensionUpdateUncheckedUpdateManyWithoutUploadedByNestedInput
   folders?: Prisma.FolderUncheckedUpdateManyWithoutCreatedByNestedInput
   normalFiles?: Prisma.NormalFileUncheckedUpdateManyWithoutUploadedByNestedInput
 }
@@ -1348,6 +1493,7 @@ export type UserCountOutputType = {
   createdClients: number
   modifiedClients: number
   comptableFiles: number
+  dimensionUpdates: number
   folders: number
   normalFiles: number
 }
@@ -1357,6 +1503,7 @@ export type UserCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensions.I
   createdClients?: boolean | UserCountOutputTypeCountCreatedClientsArgs
   modifiedClients?: boolean | UserCountOutputTypeCountModifiedClientsArgs
   comptableFiles?: boolean | UserCountOutputTypeCountComptableFilesArgs
+  dimensionUpdates?: boolean | UserCountOutputTypeCountDimensionUpdatesArgs
   folders?: boolean | UserCountOutputTypeCountFoldersArgs
   normalFiles?: boolean | UserCountOutputTypeCountNormalFilesArgs
 }
@@ -1402,6 +1549,13 @@ export type UserCountOutputTypeCountComptableFilesArgs<ExtArgs extends runtime.T
 /**
  * UserCountOutputType without action
  */
+export type UserCountOutputTypeCountDimensionUpdatesArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.DimensionUpdateWhereInput
+}
+
+/**
+ * UserCountOutputType without action
+ */
 export type UserCountOutputTypeCountFoldersArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   where?: Prisma.FolderWhereInput
 }
@@ -1430,6 +1584,7 @@ export type UserSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = r
   createdClients?: boolean | Prisma.User$createdClientsArgs<ExtArgs>
   modifiedClients?: boolean | Prisma.User$modifiedClientsArgs<ExtArgs>
   comptableFiles?: boolean | Prisma.User$comptableFilesArgs<ExtArgs>
+  dimensionUpdates?: boolean | Prisma.User$dimensionUpdatesArgs<ExtArgs>
   folders?: boolean | Prisma.User$foldersArgs<ExtArgs>
   normalFiles?: boolean | Prisma.User$normalFilesArgs<ExtArgs>
   company?: boolean | Prisma.CompanyDefaultArgs<ExtArgs>
@@ -1486,6 +1641,7 @@ export type UserInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = 
   createdClients?: boolean | Prisma.User$createdClientsArgs<ExtArgs>
   modifiedClients?: boolean | Prisma.User$modifiedClientsArgs<ExtArgs>
   comptableFiles?: boolean | Prisma.User$comptableFilesArgs<ExtArgs>
+  dimensionUpdates?: boolean | Prisma.User$dimensionUpdatesArgs<ExtArgs>
   folders?: boolean | Prisma.User$foldersArgs<ExtArgs>
   normalFiles?: boolean | Prisma.User$normalFilesArgs<ExtArgs>
   company?: boolean | Prisma.CompanyDefaultArgs<ExtArgs>
@@ -1505,6 +1661,7 @@ export type $UserPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs =
     createdClients: Prisma.$ClientPayload<ExtArgs>[]
     modifiedClients: Prisma.$ClientPayload<ExtArgs>[]
     comptableFiles: Prisma.$ComptableFilePayload<ExtArgs>[]
+    dimensionUpdates: Prisma.$DimensionUpdatePayload<ExtArgs>[]
     folders: Prisma.$FolderPayload<ExtArgs>[]
     normalFiles: Prisma.$NormalFilePayload<ExtArgs>[]
     company: Prisma.$CompanyPayload<ExtArgs>
@@ -1919,6 +2076,7 @@ export interface Prisma__UserClient<T, Null = never, ExtArgs extends runtime.Typ
   createdClients<T extends Prisma.User$createdClientsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$createdClientsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$ClientPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   modifiedClients<T extends Prisma.User$modifiedClientsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$modifiedClientsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$ClientPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   comptableFiles<T extends Prisma.User$comptableFilesArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$comptableFilesArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$ComptableFilePayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  dimensionUpdates<T extends Prisma.User$dimensionUpdatesArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$dimensionUpdatesArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$DimensionUpdatePayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   folders<T extends Prisma.User$foldersArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$foldersArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$FolderPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   normalFiles<T extends Prisma.User$normalFilesArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$normalFilesArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$NormalFilePayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   company<T extends Prisma.CompanyDefaultArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.CompanyDefaultArgs<ExtArgs>>): Prisma.Prisma__CompanyClient<runtime.Types.Result.GetResult<Prisma.$CompanyPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
@@ -2451,6 +2609,30 @@ export type User$comptableFilesArgs<ExtArgs extends runtime.Types.Extensions.Int
   take?: number
   skip?: number
   distinct?: Prisma.ComptableFileScalarFieldEnum | Prisma.ComptableFileScalarFieldEnum[]
+}
+
+/**
+ * User.dimensionUpdates
+ */
+export type User$dimensionUpdatesArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the DimensionUpdate
+   */
+  select?: Prisma.DimensionUpdateSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the DimensionUpdate
+   */
+  omit?: Prisma.DimensionUpdateOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.DimensionUpdateInclude<ExtArgs> | null
+  where?: Prisma.DimensionUpdateWhereInput
+  orderBy?: Prisma.DimensionUpdateOrderByWithRelationInput | Prisma.DimensionUpdateOrderByWithRelationInput[]
+  cursor?: Prisma.DimensionUpdateWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.DimensionUpdateScalarFieldEnum | Prisma.DimensionUpdateScalarFieldEnum[]
 }
 
 /**

@@ -5,54 +5,24 @@ import { requirePermission } from "@/lib/permissions/middleware";
 import { FICHIERS_ACTIONS } from "@/lib/permissions/actions";
 
 import { prisma } from "@/lib/prisma";
+import { triggerAirflowDagRun } from "@/lib/airflow";
 import { ProcessingStatus } from "../../../../../../prisma/generated/prisma/enums";
 
 const triggerETLSchema = z.object({
   batchId: z.string().uuid(),
 });
 
-async function triggerAirflowDAG(
+// Le DAG principal charge les 4 fichiers d'une période (dimensions + grand livre).
+function triggerAirflowDAG(
   batchId: string,
   clientId: string,
   s3Prefix: string,
 ): Promise<string> {
-  const airflowUrl = process.env.AIRFLOW_API_URL;
-  const airflowUsername = process.env.AIRFLOW_USERNAME;
-  const airflowPassword = process.env.AIRFLOW_PASSWORD;
-
-  if (!airflowUrl || !airflowUsername || !airflowPassword) {
-    throw new Error("Configuration Airflow manquante");
-  }
-
-  const basicAuth = Buffer.from(
-    `${airflowUsername}:${airflowPassword}`,
-  ).toString("base64");
-
-  const response = await fetch(
-    `${airflowUrl}/api/v1/dags/etl_comptable_clickhouse/dagRuns`,
-    {
-      method: "POST",
-      headers: {
-        Authorization: `Basic ${basicAuth}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        conf: {
-          client_id: clientId,
-          batch_id: batchId,
-          s3_prefix: s3Prefix,
-        },
-      }),
-    },
-  );
-
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(`Airflow: ${error.detail || response.statusText}`);
-  }
-
-  const data = await response.json();
-  return data.dag_run_id;
+  return triggerAirflowDagRun("etl_comptable_clickhouse", {
+    client_id: clientId,
+    batch_id: batchId,
+    s3_prefix: s3Prefix,
+  });
 }
 
 export async function POST(req: NextRequest) {

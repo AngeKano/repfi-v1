@@ -90,6 +90,11 @@ export type NormalFileHistory = Prisma.NormalFileHistoryModel
  */
 export type ComptableFileHistory = Prisma.ComptableFileHistoryModel
 /**
+ * Model DimensionUpdate
+ * 
+ */
+export type DimensionUpdate = Prisma.DimensionUpdateModel
+/**
  * Model FileTypePattern
  * 
  */

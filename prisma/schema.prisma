@@ -44,6 +44,7 @@ model User {
   createdClients    Client[]           @relation("ClientCreator")
   modifiedClients   Client[]           @relation("ClientModifier")
   comptableFiles    ComptableFile[]    @relation("ComptableFileUploader")
+  dimensionUpdates  DimensionUpdate[]  @relation("DimensionUpdateUploader")
   folders           Folder[]           @relation("FolderCreator")
   normalFiles       NormalFile[]       @relation("NormalFileUploader")
   company           Company            @relation(fields: [companyId], references: [id], onDelete: Cascade)
@@ -84,6 +85,7 @@ model Client {
   normalFiles      NormalFile[]
   socialNetworks   SocialNetwork[]
   manualEntries    ManualLedgerEntry[]
+  dimensionUpdates DimensionUpdate[]
 
   @@index([companyId])
   @@index([isSelfEntity])
@@ -230,6 +232,36 @@ model ComptableFileHistory {
   @@index([action])
   @@index([occurredAt])
   @@map("comptable_file_history")
+}
+
+// Mise à jour UNITAIRE d'une table de dimension ClickHouse (plan comptable,
+// plan tiers ou codes journaux), indépendante de toute période : le DAG
+// Airflow « etl_dimension_update » ajoute les clés nouvelles et met à jour
+// les clés existantes, sans jamais supprimer de ligne.
+model DimensionUpdate {
+  id           String           @id @default(cuid())
+  clientId     String
+  fileType     FileType
+  fileName     String
+  s3Key        String
+  fileSize     Int
+  status       ProcessingStatus @default(PENDING)
+  progress     Int              @default(0)
+  dagRunId     String?
+  // Renseignés par le DAG à la fin du traitement.
+  rowsInserted Int?
+  rowsUpdated  Int?
+  errorMessage String?
+  uploadedById String
+  createdAt    DateTime         @default(now())
+  processedAt  DateTime?
+  client       Client           @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  uploadedBy   User             @relation("DimensionUpdateUploader", fields: [uploadedById], references: [id])
+
+  @@index([clientId])
+  @@index([status])
+  @@index([createdAt])
+  @@map("dimension_updates")
 }
 
 model FileTypePattern {
