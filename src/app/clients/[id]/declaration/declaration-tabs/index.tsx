@@ -28,6 +28,7 @@ import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import { UploadFileDialog } from "../../upload-file-dialog";
 import StatusComponents from "../status/[batchId]/status";
+import DimensionsSection from "./dimensions-section";
 
 type PeriodFilter = "all" | "year" | "month";
 
@@ -392,6 +393,9 @@ const DeclarationTabs: React.FC<DeclarationTabsProps> = ({ clientId }) => {
             </div>
           )}
         </Card>
+
+        {/* Référentiels : mise à jour unitaire des tables de dimension */}
+        <DimensionsSection clientId={clientId} />
       </TabsContent>
 
       {/* Upload Dialog */}

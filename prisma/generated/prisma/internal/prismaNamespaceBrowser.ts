@@ -61,6 +61,7 @@ export const ModelName = {
   ComptableFile: 'ComptableFile',
   NormalFileHistory: 'NormalFileHistory',
   ComptableFileHistory: 'ComptableFileHistory',
+  DimensionUpdate: 'DimensionUpdate',
   FileTypePattern: 'FileTypePattern',
   ComptablePeriod: 'ComptablePeriod',
   ManualLedgerEntry: 'ManualLedgerEntry'
@@ -242,6 +243,27 @@ export const ComptableFileHistoryScalarFieldEnum = {
 } as const
 
 export type ComptableFileHistoryScalarFieldEnum = (typeof ComptableFileHistoryScalarFieldEnum)[keyof typeof ComptableFileHistoryScalarFieldEnum]
+
+
+export const DimensionUpdateScalarFieldEnum = {
+  id: 'id',
+  clientId: 'clientId',
+  fileType: 'fileType',
+  fileName: 'fileName',
+  s3Key: 's3Key',
+  fileSize: 'fileSize',
+  status: 'status',
+  progress: 'progress',
+  dagRunId: 'dagRunId',
+  rowsInserted: 'rowsInserted',
+  rowsUpdated: 'rowsUpdated',
+  errorMessage: 'errorMessage',
+  uploadedById: 'uploadedById',
+  createdAt: 'createdAt',
+  processedAt: 'processedAt'
+} as const
+
+export type DimensionUpdateScalarFieldEnum = (typeof DimensionUpdateScalarFieldEnum)[keyof typeof DimensionUpdateScalarFieldEnum]
 
 
 export const FileTypePatternScalarFieldEnum = {

@@ -394,6 +394,7 @@ export const ModelName = {
   ComptableFile: 'ComptableFile',
   NormalFileHistory: 'NormalFileHistory',
   ComptableFileHistory: 'ComptableFileHistory',
+  DimensionUpdate: 'DimensionUpdate',
   FileTypePattern: 'FileTypePattern',
   ComptablePeriod: 'ComptablePeriod',
   ManualLedgerEntry: 'ManualLedgerEntry'
@@ -412,7 +413,7 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
     omit: GlobalOmitOptions
   }
   meta: {
-    modelProps: "company" | "user" | "client" | "clientAssignment" | "folder" | "socialNetwork" | "normalFile" | "comptableFile" | "normalFileHistory" | "comptableFileHistory" | "fileTypePattern" | "comptablePeriod" | "manualLedgerEntry"
+    modelProps: "company" | "user" | "client" | "clientAssignment" | "folder" | "socialNetwork" | "normalFile" | "comptableFile" | "normalFileHistory" | "comptableFileHistory" | "dimensionUpdate" | "fileTypePattern" | "comptablePeriod" | "manualLedgerEntry"
     txIsolationLevel: TransactionIsolationLevel
   }
   model: {
@@ -1156,6 +1157,80 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
         }
       }
     }
+    DimensionUpdate: {
+      payload: Prisma.$DimensionUpdatePayload<ExtArgs>
+      fields: Prisma.DimensionUpdateFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.DimensionUpdateFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DimensionUpdatePayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.DimensionUpdateFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DimensionUpdatePayload>
+        }
+        findFirst: {
+          args: Prisma.DimensionUpdateFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DimensionUpdatePayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.DimensionUpdateFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DimensionUpdatePayload>
+        }
+        findMany: {
+          args: Prisma.DimensionUpdateFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DimensionUpdatePayload>[]
+        }
+        create: {
+          args: Prisma.DimensionUpdateCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DimensionUpdatePayload>
+        }
+        createMany: {
+          args: Prisma.DimensionUpdateCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.DimensionUpdateCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DimensionUpdatePayload>[]
+        }
+        delete: {
+          args: Prisma.DimensionUpdateDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DimensionUpdatePayload>
+        }
+        update: {
+          args: Prisma.DimensionUpdateUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DimensionUpdatePayload>
+        }
+        deleteMany: {
+          args: Prisma.DimensionUpdateDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.DimensionUpdateUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.DimensionUpdateUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DimensionUpdatePayload>[]
+        }
+        upsert: {
+          args: Prisma.DimensionUpdateUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DimensionUpdatePayload>
+        }
+        aggregate: {
+          args: Prisma.DimensionUpdateAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateDimensionUpdate>
+        }
+        groupBy: {
+          args: Prisma.DimensionUpdateGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.DimensionUpdateGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.DimensionUpdateCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.DimensionUpdateCountAggregateOutputType> | number
+        }
+      }
+    }
     FileTypePattern: {
       payload: Prisma.$FileTypePatternPayload<ExtArgs>
       fields: Prisma.FileTypePatternFieldRefs
@@ -1579,6 +1654,27 @@ export const ComptableFileHistoryScalarFieldEnum = {
 export type ComptableFileHistoryScalarFieldEnum = (typeof ComptableFileHistoryScalarFieldEnum)[keyof typeof ComptableFileHistoryScalarFieldEnum]
 
 
+export const DimensionUpdateScalarFieldEnum = {
+  id: 'id',
+  clientId: 'clientId',
+  fileType: 'fileType',
+  fileName: 'fileName',
+  s3Key: 's3Key',
+  fileSize: 'fileSize',
+  status: 'status',
+  progress: 'progress',
+  dagRunId: 'dagRunId',
+  rowsInserted: 'rowsInserted',
+  rowsUpdated: 'rowsUpdated',
+  errorMessage: 'errorMessage',
+  uploadedById: 'uploadedById',
+  createdAt: 'createdAt',
+  processedAt: 'processedAt'
+} as const
+
+export type DimensionUpdateScalarFieldEnum = (typeof DimensionUpdateScalarFieldEnum)[keyof typeof DimensionUpdateScalarFieldEnum]
+
+
 export const FileTypePatternScalarFieldEnum = {
   id: 'id',
   fileType: 'fileType',
@@ -1930,6 +2026,7 @@ export type GlobalOmitConfig = {
   comptableFile?: Prisma.ComptableFileOmit
   normalFileHistory?: Prisma.NormalFileHistoryOmit
   comptableFileHistory?: Prisma.ComptableFileHistoryOmit
+  dimensionUpdate?: Prisma.DimensionUpdateOmit
   fileTypePattern?: Prisma.FileTypePatternOmit
   comptablePeriod?: Prisma.ComptablePeriodOmit
   manualLedgerEntry?: Prisma.ManualLedgerEntryOmit
