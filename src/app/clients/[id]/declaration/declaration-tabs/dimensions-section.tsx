@@ -42,7 +42,6 @@ import {
   FORMAT_LABELS,
 } from "@/lib/comptable-formats";
 import { DIMENSIONS, dimensionParType } from "@/lib/comptable/dimensions";
-import DimensionsViewer from "./dimensions-viewer";
 
 type Statut = "PENDING" | "VALIDATING" | "PROCESSING" | "COMPLETED" | "FAILED";
 
@@ -142,9 +141,6 @@ function BadgeStatut({ statut }: { statut: Statut }) {
 export default function DimensionsSection({ clientId }: { clientId: string }) {
   const [data, setData] = useState<Reponse | null>(null);
   const [dialogType, setDialogType] = useState<FileType | null>(null);
-  // Incrémenté à la fin d'une mise à jour par fichier : le contenu affiché
-  // des référentiels est alors rechargé.
-  const [versionDonnees, setVersionDonnees] = useState(0);
 
   const charger = useCallback(async () => {
     try {
@@ -186,7 +182,6 @@ export default function DimensionsSection({ clientId }: { clientId: string }) {
       const avant = statutsPrecedents.current.get(u.id);
       if (avant && EN_COURS.includes(avant) && !EN_COURS.includes(u.status)) {
         const label = dimensionParType(u.fileType)?.label ?? u.fileType;
-        if (u.status === "COMPLETED") setVersionDonnees((v) => v + 1);
         if (u.status === "COMPLETED")
           toast.success(
             `${label} mis à jour : ${u.rowsInserted ?? 0} ligne(s) ajoutée(s), ` +
@@ -208,7 +203,8 @@ export default function DimensionsSection({ clientId }: { clientId: string }) {
             </h2>
             <p className="text-sm text-[#335890] mt-0.5">
               Mettez à jour un référentiel seul, sans réimporter de période. Les lignes du
-              fichier sont ajoutées ou modifiées — aucune n&apos;est supprimée.
+              fichier sont ajoutées ou modifiées — aucune n&apos;est supprimée. Le contenu
+              des tables se consulte et se corrige depuis l&apos;onglet Comptabilité.
             </p>
           </div>
           {data?.canUpload && (
@@ -371,9 +367,6 @@ export default function DimensionsSection({ clientId }: { clientId: string }) {
           </div>
         )}
       </Card>
-
-      {/* Consultation et modification ligne à ligne */}
-      <DimensionsViewer clientId={clientId} version={versionDonnees} />
 
       {dialogType && (
         <DimensionUploadDialog

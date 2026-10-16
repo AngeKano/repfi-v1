@@ -1,7 +1,8 @@
 "use client";
 
 // ============================================================================
-// Contenu des référentiels — consultation et modification ligne à ligne.
+// Contenu des référentiels — consultation et modification ligne à ligne,
+// depuis l'onglet Comptabilité (le dépôt de fichiers reste dans Import).
 //
 // Même présentation que le grand livre de l'onglet Comptabilité : recherche,
 // tri par colonne, pagination numérotée. Le bouton « Modifier » d'une ligne
@@ -41,7 +42,7 @@ import {
 import { PiBooksDuotone, PiListChecksDuotone, PiUsersThreeDuotone } from "react-icons/pi";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import { FileType } from "../../../../../../prisma/generated/prisma/enums";
+import { FileType } from "../../../../../prisma/generated/prisma/enums";
 import { DIMENSIONS, colonneCle, dimensionParType } from "@/lib/comptable/dimensions";
 
 type Ligne = Record<string, string>;
@@ -84,11 +85,11 @@ function pageWindow(current: number, total: number, size = 5): (number | "…")[
 
 export default function DimensionsViewer({
   clientId,
-  version,
+  version = 0,
 }: {
   clientId: string;
-  /** Incrémenté quand une mise à jour par fichier se termine : on recharge. */
-  version: number;
+  /** Incrémenter pour forcer un rechargement (ex. fin d'une mise à jour). */
+  version?: number;
 }) {
   const [fileType, setFileType] = useState<FileType>(FileType.PLAN_COMPTES);
   const [data, setData] = useState<PageDimension | null>(null);
@@ -245,7 +246,7 @@ export default function DimensionsViewer({
   const datalistId = `dimension-categories-${fileType}`;
 
   return (
-    <Card className="mt-6 border-[#D0E3F5]">
+    <Card className="border-[#D0E3F5]">
       <CardHeader>
         <CardTitle>Contenu des référentiels</CardTitle>
         <CardDescription>

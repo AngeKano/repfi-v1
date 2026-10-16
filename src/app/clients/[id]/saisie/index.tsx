@@ -27,6 +27,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
+import DimensionsViewer from "./dimensions-viewer";
 import {
   GlFiltersPanel,
   EMPTY_GL_FILTERS,
@@ -1157,6 +1158,9 @@ export default function SaisieTab({ clientId }: { clientId: string }) {
         <Badge variant="outline" className="text-xs">Info</Badge>
         Les écritures saisies sont intégrées aux calculs du reporting. Seul le Loader Plus peut saisir.
       </p>
+
+      {/* ============ Référentiels : plan comptable, plan tiers, journaux ============ */}
+      <DimensionsViewer clientId={clientId} />
 
       {/* ============ Téléchargement du grand livre (filtres 1..n) ============ */}
       <Dialog open={showExportDialog} onOpenChange={setShowExportDialog}>
