@@ -2,6 +2,12 @@
 // Lecture des référentiels ClickHouse (plan_compte, ple, plan_tiers,
 // code_journal) et modification ligne à ligne.
 //
+// Le schéma de ces tables varie selon les installations (ex. `compte_tiers`
+// ou `n_tiers`) : les noms réels des colonnes sont détectés à l'exécution
+// (system.columns), comme le fait déjà planTiersList. Les lignes sont lues
+// sous leurs noms réels puis renvoyées sous les noms de référence de
+// dimensions.ts, en texte.
+//
 // La modification suit exactement les règles du DAG Airflow
 // (plugins/clickhouse/dimensions.py) :
 //   - les tables sont des ReplacingMergeTree(updated_at) : modifier une ligne,
@@ -16,7 +22,7 @@
 // ============================================================================
 import type { ClickHouseClient } from "@clickhouse/client";
 import { tableColumns } from "./schema";
-import type { TableReferentiel } from "@/lib/comptable/dimensions";
+import type { ColonneDimension, TableReferentiel } from "@/lib/comptable/dimensions";
 import { colonneCle, colonnesCles } from "@/lib/comptable/dimensions";
 
 export type LigneDimension = Record<string, string>;
@@ -44,41 +50,99 @@ const MAX_OPTIONS = 5000;
 /** Filtres par colonne : valeurs retenues (OU dans une colonne, ET entre colonnes). */
 export type FiltresReferentiel = Record<string, string[]>;
 
+// ---------------------------------------------------------------------------
+// Résolution des noms de colonnes
+// ---------------------------------------------------------------------------
+
+/** Nom de référence → nom réel dans la table (absent si la colonne n'existe pas). */
+type Colonnes = Map<string, string>;
+
+async function resoudreColonnes(
+  client: ClickHouseClient,
+  dbName: string,
+  def: TableReferentiel,
+): Promise<Colonnes> {
+  const reelles = await tableColumns(client, dbName, def.table);
+  const prises = new Set<string>();
+  const out: Colonnes = new Map();
+  for (const c of def.colonnes) {
+    // Un même nom réel ne sert qu'une fois (ex. « intitule » candidat de deux colonnes).
+    const trouve = [c.nom, ...(c.alias ?? [])].find((n) => reelles.has(n) && !prises.has(n));
+    if (trouve) {
+      out.set(c.nom, trouve);
+      prises.add(trouve);
+    }
+  }
+  const absentes = def.colonnes.filter((c) => !out.has(c.nom)).map((c) => c.nom);
+  if (absentes.length)
+    console.warn(
+      `[referentiels] ${dbName}.${def.table} : colonne(s) introuvable(s) ${absentes.join(", ")} ` +
+        `(colonnes réelles : ${[...reelles].join(", ")})`,
+    );
+  return out;
+}
+
+/** Ligne lue sous les noms réels → ligne sous les noms de référence, en texte. */
+function versReference(
+  def: TableReferentiel,
+  cols: Colonnes,
+  brute: Record<string, unknown>,
+): LigneDimension {
+  return Object.fromEntries(
+    def.colonnes.map((c) => {
+      const reel = cols.get(c.nom);
+      const v = reel ? brute[reel] : undefined;
+      return [c.nom, v === null || v === undefined ? "" : String(v)];
+    }),
+  );
+}
+
 /**
  * Clause WHERE commune à la liste et au comptage.
- * Les noms de colonnes viennent de la définition (jamais de la requête) ; les
- * valeurs passent toujours par des paramètres nommés. `toString` rend les
- * colonnes numériques (nb_racine) interrogeables comme les autres.
+ * Les noms de colonnes viennent de la définition et du schéma réel (jamais de
+ * la requête) ; les valeurs passent toujours par des paramètres nommés.
+ * `toString` rend les colonnes numériques (nb_racine) interrogeables.
  */
 function construireWhere(
   def: TableReferentiel,
+  cols: Colonnes,
   search: string,
   filtres: FiltresReferentiel,
 ): { sql: string; params: Record<string, unknown> } {
   const where: string[] = [];
   const params: Record<string, unknown> = {};
+  const presentes = def.colonnes.filter((c) => cols.has(c.nom));
 
   const recherche = search.trim();
-  if (recherche) {
+  if (recherche && presentes.length) {
     where.push(
       "(" +
-        def.colonnes
-          .map((c) => `positionCaseInsensitive(toString(${c.nom}), {s:String}) > 0`)
+        presentes
+          .map((c) => `positionCaseInsensitive(toString(${cols.get(c.nom)}), {s:String}) > 0`)
           .join(" OR ") +
         ")",
     );
     params.s = recherche;
   }
 
-  def.colonnes.forEach((c, i) => {
-    const valeurs = (filtres[c.nom] ?? []).filter((v) => v !== undefined);
+  presentes.forEach((c, i) => {
+    const valeurs = filtres[c.nom] ?? [];
     if (valeurs.length === 0) return;
-    where.push(`toString(${c.nom}) IN ({f${i}:Array(String)})`);
+    where.push(`toString(${cols.get(c.nom)}) IN ({f${i}:Array(String)})`);
     params[`f${i}`] = valeurs;
   });
 
   return { sql: where.length ? `WHERE ${where.join(" AND ")}` : "", params };
 }
+
+/** Liste des noms réels sélectionnés, sans doublon et sans alias. */
+function selection(cols: Colonnes): string {
+  return [...new Set(cols.values())].join(", ");
+}
+
+// ---------------------------------------------------------------------------
+// Lecture
+// ---------------------------------------------------------------------------
 
 /** Page de lignes : recherche plein texte, filtres par champ, tri. */
 export async function listerDimension(
@@ -95,14 +159,27 @@ export async function listerDimension(
     tout?: boolean;
   },
 ): Promise<PageDimension> {
-  const noms = def.colonnes.map((c) => c.nom);
-  const cles = def.colonnes.filter((c) => c.cle).map((c) => c.nom);
-  const { sql: whereSql, params } = construireWhere(def, opts.search || "", opts.filtres || {});
-
-  const tri = noms.includes(opts.sortBy || "") ? opts.sortBy! : colonneCle(def).nom;
-  const sens = opts.sortDir === "desc" ? "DESC" : "ASC";
+  const vide: PageDimension = { lignes: [], total: 0, page: 1, pageSize: TAILLE_PAGE, totalPages: 1 };
 
   try {
+    const cols = await resoudreColonnes(client, dbName, def);
+    const cleReelle = cols.get(colonneCle(def).nom);
+    if (!cleReelle) return vide;
+
+    const { sql: whereSql, params } = construireWhere(
+      def,
+      cols,
+      opts.search || "",
+      opts.filtres || {},
+    );
+    const tri = cols.get(opts.sortBy || "") ?? cleReelle;
+    const sens = opts.sortDir === "desc" ? "DESC" : "ASC";
+    const departage = colonnesCles(def)
+      .map((c) => cols.get(c.nom))
+      .filter((n): n is string => !!n)
+      .map((n) => `${n} ASC`)
+      .join(", ");
+
     const cRes = await client.query({
       query: `SELECT count() AS n FROM ${dbName}.${def.table} FINAL ${whereSql}`,
       query_params: params,
@@ -116,17 +193,19 @@ export async function listerDimension(
       ? `LIMIT ${MAX_EXPORT}`
       : `LIMIT ${TAILLE_PAGE} OFFSET ${(page - 1) * TAILLE_PAGE}`;
 
-    // Valeurs rendues en texte : l'interface les traite toutes de la même façon.
+    // Colonnes lues sous leur nom réel, sans alias ; la conversion en texte et
+    // le renommage se font ensuite côté serveur.
     const res = await client.query({
-      query: `SELECT ${noms.map((n) => `toString(${n}) AS ${n}`).join(", ")}
+      query: `SELECT ${selection(cols)}
               FROM ${dbName}.${def.table} FINAL
               ${whereSql}
-              ORDER BY ${tri} ${sens}, ${cles.map((c) => `${c} ASC`).join(", ")}
+              ORDER BY ${tri} ${sens}, ${departage}
               ${limite}`,
       query_params: params,
       format: "JSONEachRow",
     });
-    const lignes = (await res.json()) as LigneDimension[];
+    const brutes = (await res.json()) as Array<Record<string, unknown>>;
+    const lignes = brutes.map((b) => versReference(def, cols, b));
     return {
       lignes,
       total,
@@ -137,7 +216,7 @@ export async function listerDimension(
   } catch (e) {
     // Base ou table absente : client jamais importé.
     console.error(`[referentiels] lecture ${dbName}.${def.table} impossible:`, e);
-    return { lignes: [], total: 0, page: 1, pageSize: TAILLE_PAGE, totalPages: 1 };
+    return vide;
   }
 }
 
@@ -151,18 +230,28 @@ export async function optionsFiltresDimension(
   dbName: string,
   def: TableReferentiel,
 ): Promise<Record<string, OptionFiltre[]>> {
+  let cols: Colonnes;
+  try {
+    cols = await resoudreColonnes(client, dbName, def);
+  } catch {
+    return {};
+  }
+
   const entrees = await Promise.all(
-    def.colonnes.map(async (c): Promise<[string, OptionFiltre[]]> => {
+    def.colonnes.map(async (c: ColonneDimension): Promise<[string, OptionFiltre[]]> => {
+      const reel = cols.get(c.nom);
+      if (!reel) return [c.nom, []];
+      const libelleReel = c.libelleDe ? cols.get(c.libelleDe) : undefined;
       try {
         const res = await client.query({
-          query: c.libelleDe
-            ? `SELECT toString(${c.nom}) AS v, anyIf(${c.libelleDe}, ${c.libelleDe} != '') AS l
+          query: libelleReel
+            ? `SELECT toString(${reel}) AS v, anyIf(toString(${libelleReel}), toString(${libelleReel}) != '') AS l
                FROM ${dbName}.${def.table} FINAL
-               WHERE toString(${c.nom}) != ''
+               WHERE toString(${reel}) != ''
                GROUP BY v ORDER BY v LIMIT ${MAX_OPTIONS}`
-            : `SELECT DISTINCT toString(${c.nom}) AS v
+            : `SELECT DISTINCT toString(${reel}) AS v
                FROM ${dbName}.${def.table} FINAL
-               WHERE toString(${c.nom}) != ''
+               WHERE toString(${reel}) != ''
                ORDER BY v LIMIT ${MAX_OPTIONS}`,
           format: "JSONEachRow",
         });
@@ -176,7 +265,12 @@ export async function optionsFiltresDimension(
   return Object.fromEntries(entrees);
 }
 
+// ---------------------------------------------------------------------------
+// Modification
+// ---------------------------------------------------------------------------
+
 export interface ResultatModification {
+  /** Ligne après modification, sous les noms de référence, en texte. */
   ligne: LigneDimension;
   modifiee: boolean;
   /** Colonnes du grand livre mises à jour, par nom. */
@@ -185,7 +279,7 @@ export interface ResultatModification {
 
 /**
  * Modifie les colonnes éditables d'une ligne existante, identifiée par
- * l'ensemble de ses colonnes clés.
+ * l'ensemble de ses colonnes clés (noms de référence).
  * @throws Error « introuvable » si la ligne n'existe pas dans la table.
  */
 export async function modifierDimension(
@@ -195,40 +289,43 @@ export async function modifierDimension(
   cles: Record<string, string>,
   valeurs: Record<string, string>,
 ): Promise<ResultatModification> {
-  const noms = def.colonnes.map((c) => c.nom);
-  const colonnesCle = colonnesCles(def);
+  const cols = await resoudreColonnes(client, dbName, def);
+  const colonnesCle = colonnesCles(def).filter((c) => cols.has(c.nom));
+  if (colonnesCle.length === 0) throw new Error("introuvable");
   // Valeur de la clé principale : sert au report dans le grand livre.
   const cle = cles[colonneCle(def).nom] ?? "";
 
-  // toString : la longueur de racine du mapping est numérique.
-  const where = colonnesCle.map((c, i) => `toString(${c.nom}) = {k${i}:String}`).join(" AND ");
+  const where = colonnesCle
+    .map((c, i) => `toString(${cols.get(c.nom)}) = {k${i}:String}`)
+    .join(" AND ");
   const params = Object.fromEntries(colonnesCle.map((c, i) => [`k${i}`, cles[c.nom] ?? ""]));
 
-  // Lecture dans les types natifs : la nouvelle version est réinsérée telle
-  // quelle, seules les colonnes texte éditables changent.
+  // Lecture dans les types natifs et sous les noms réels : la nouvelle version
+  // est réinsérée telle quelle, seules les colonnes texte éditables changent.
   const res = await client.query({
-    query: `SELECT ${noms.join(", ")} FROM ${dbName}.${def.table} FINAL
+    query: `SELECT ${selection(cols)} FROM ${dbName}.${def.table} FINAL
             WHERE ${where} LIMIT 1`,
     query_params: params,
     format: "JSONEachRow",
   });
-  const actuelle = ((await res.json()) as LigneDimension[])[0];
+  const actuelle = ((await res.json()) as Array<Record<string, unknown>>)[0];
   if (!actuelle) throw new Error("introuvable");
 
-  // Nouvelle version : seules les colonnes éditables changent.
-  const nouvelle: LigneDimension = { ...actuelle };
+  const nouvelle: Record<string, unknown> = { ...actuelle };
   for (const c of def.colonnes) {
-    if (c.editable && valeurs[c.nom] !== undefined) nouvelle[c.nom] = valeurs[c.nom].trim();
+    const reel = cols.get(c.nom);
+    if (reel && c.editable && valeurs[c.nom] !== undefined) nouvelle[reel] = valeurs[c.nom].trim();
   }
 
-  const modifiee = def.colonnes.some((c) => (actuelle[c.nom] ?? "") !== (nouvelle[c.nom] ?? ""));
-  if (!modifiee) return { ligne: actuelle, modifiee: false, grandLivre: [] };
+  const texte = (v: unknown) => (v === null || v === undefined ? "" : String(v));
+  const modifiee = [...cols.values()].some((reel) => texte(actuelle[reel]) !== texte(nouvelle[reel]));
+  if (!modifiee) return { ligne: versReference(def, cols, actuelle), modifiee: false, grandLivre: [] };
 
   // updated_at prend sa valeur par défaut (now()) : la version la plus récente
   // l'emporte à la fusion, puis OPTIMIZE FINAL la rend seule visible.
   await client.insert({
     table: `${dbName}.${def.table}`,
-    values: [Object.fromEntries(noms.map((n) => [n, nouvelle[n] ?? ""]))],
+    values: [nouvelle],
     format: "JSONEachRow",
   });
   await client.command({ query: `OPTIMIZE TABLE ${dbName}.${def.table} FINAL` });
@@ -240,9 +337,10 @@ export async function modifierDimension(
     const gl = await tableColumns(client, dbName, "grand_livre");
     if (gl.has(def.cleGrandLivre)) {
       for (const c of def.colonnes) {
-        if (!c.grandLivre || !gl.has(c.grandLivre)) continue;
-        const valeur = nouvelle[c.nom] ?? "";
-        if (!valeur || valeur === (actuelle[c.nom] ?? "")) continue;
+        const reel = cols.get(c.nom);
+        if (!reel || !c.grandLivre || !gl.has(c.grandLivre)) continue;
+        const valeur = texte(nouvelle[reel]);
+        if (!valeur || valeur === texte(actuelle[reel])) continue;
         await client.command({
           query: `ALTER TABLE ${dbName}.grand_livre
                   UPDATE ${c.grandLivre} = {v:String}
@@ -255,5 +353,5 @@ export async function modifierDimension(
     }
   }
 
-  return { ligne: nouvelle, modifiee: true, grandLivre: reportees };
+  return { ligne: versReference(def, cols, nouvelle), modifiee: true, grandLivre: reportees };
 }

@@ -20,8 +20,14 @@ export const DIMENSION_EN_COURS: ProcessingStatus[] = [
 
 /** Colonne d'une table de référentiel. */
 export interface ColonneDimension {
-  /** Nom de la colonne ClickHouse. */
+  /** Nom de la colonne (nom de référence, celui du schéma Airflow). */
   nom: string;
+  /**
+   * Autres noms possibles de la colonne : le schéma des référentiels varie
+   * selon les installations (même logique que planTiersList). Le nom réel est
+   * détecté à l'exécution.
+   */
+  alias?: string[];
   libelle: string;
   /**
    * Fait partie de la clé de la table : affichée mais jamais modifiable. La
@@ -86,16 +92,29 @@ export const DIMENSIONS: DimensionDef[] = [
     cle: "numéro de compte",
     cleGrandLivre: "compte",
     colonnes: [
-      { nom: "compte", libelle: "Compte", cle: true, libelleDe: "intitule_compte" },
+      {
+        nom: "compte",
+        alias: ["numero_compte", "n_compte"],
+        libelle: "Compte",
+        cle: true,
+        libelleDe: "intitule_compte",
+      },
       {
         nom: "intitule_compte",
+        alias: ["intitule", "libelle", "libelle_compte"],
         libelle: "Intitulé",
         editable: true,
         requis: true,
         grandLivre: "intitule_compte",
         saisie: "intituleCompte",
       },
-      { nom: "nature_compte", libelle: "Nature", editable: true, categorie: true },
+      {
+        nom: "nature_compte",
+        alias: ["nature", "type_compte"],
+        libelle: "Nature",
+        editable: true,
+        categorie: true,
+      },
     ],
   },
   {
@@ -139,9 +158,16 @@ export const DIMENSIONS: DimensionDef[] = [
     cle: "numéro de tiers",
     cleGrandLivre: "n_tiers",
     colonnes: [
-      { nom: "compte_tiers", libelle: "N° tiers", cle: true, libelleDe: "intitule_tiers" },
+      {
+        nom: "compte_tiers",
+        alias: ["n_tiers", "numero_tiers", "compte"],
+        libelle: "N° tiers",
+        cle: true,
+        libelleDe: "intitule_tiers",
+      },
       {
         nom: "intitule_tiers",
+        alias: ["intitule", "libelle", "nom"],
         libelle: "Intitulé",
         editable: true,
         requis: true,
@@ -150,6 +176,7 @@ export const DIMENSIONS: DimensionDef[] = [
       },
       {
         nom: "type",
+        alias: ["type_tiers"],
         libelle: "Type",
         editable: true,
         categorie: true,
@@ -167,9 +194,15 @@ export const DIMENSIONS: DimensionDef[] = [
     cle: "code journal",
     // Le grand livre ne recopie pas l'intitulé du journal : rien à reporter.
     colonnes: [
-      { nom: "code_journal", libelle: "Code", cle: true, libelleDe: "intitule" },
-      { nom: "intitule", libelle: "Intitulé", editable: true, requis: true },
-      { nom: "type", libelle: "Type", editable: true, categorie: true },
+      { nom: "code_journal", alias: ["code"], libelle: "Code", cle: true, libelleDe: "intitule" },
+      {
+        nom: "intitule",
+        alias: ["libelle", "intitule_journal", "libelle_journal"],
+        libelle: "Intitulé",
+        editable: true,
+        requis: true,
+      },
+      { nom: "type", alias: ["type_journal"], libelle: "Type", editable: true, categorie: true },
     ],
   },
 ];
