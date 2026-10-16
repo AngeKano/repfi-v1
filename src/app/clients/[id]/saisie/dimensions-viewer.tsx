@@ -68,6 +68,8 @@ interface PageReferentiel {
   totalPages: number;
   canEdit: boolean;
   options?: Record<string, OptionFiltre[]>;
+  /** Anomalie de lecture expliquée par le serveur (schéma inattendu). */
+  diagnostic?: string;
 }
 
 const ICONES: Record<string, React.ElementType> = {
@@ -524,6 +526,14 @@ export default function DimensionsViewer({
               ))}
             </datalist>
           ))}
+
+        {/* Lecture anormale : le serveur explique pourquoi, plutôt qu'un tableau vide. */}
+        {data?.diagnostic && (
+          <div className="flex gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 mb-3 text-xs text-amber-800">
+            <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+            <span className="break-words">{data.diagnostic}</span>
+          </div>
+        )}
 
         <div className="overflow-x-auto">
           <table className="w-full text-sm">

@@ -2,23 +2,30 @@
 // Lecture des référentiels ClickHouse (plan_compte, ple, plan_tiers,
 // code_journal) et modification ligne à ligne.
 //
-// Le schéma de ces tables varie selon les installations (ex. `compte_tiers`
-// ou `n_tiers`) : les noms réels des colonnes sont détectés à l'exécution
-// (system.columns), comme le fait déjà planTiersList. Les lignes sont lues
-// sous leurs noms réels puis renvoyées sous les noms de référence de
-// dimensions.ts, en texte.
+// Le schéma de ces tables varie selon les installations : nom des colonnes
+// (ex. `compte_tiers` ou `n_tiers`), casse, colonnes ajoutées après coup et
+// restées vides. On ne suppose donc rien :
+//   - les colonnes réelles sont lues dans system.columns, sans tenir compte de
+//     la casse ;
+//   - chaque champ de dimensions.ts a un nom de référence et des variantes ;
+//     sa valeur est la PREMIÈRE NON VIDE parmi les colonnes présentes
+//     (expression `valeur effective`), utilisée partout : lecture, recherche,
+//     filtres, tri, options et identification d'une ligne à modifier ;
+//   - les valeurs sont lues sous des alias neutres (__c0, __c1…), jamais sous
+//     le nom d'une colonne existante.
+// Si une table renvoie des lignes sans aucune valeur exploitable, un
+// diagnostic (colonnes réelles, correspondances) est joint à la réponse.
 //
 // La modification suit exactement les règles du DAG Airflow
 // (plugins/clickhouse/dimensions.py) :
 //   - les tables sont des ReplacingMergeTree(updated_at) : modifier une ligne,
-//     c'est INSÉRER sa nouvelle version, qui remplace l'ancienne à la fusion
-//     (forcée par OPTIMIZE … FINAL) ; aucune ligne n'est supprimée ;
+//     c'est INSÉRER sa nouvelle version (updated_at = now()), qui remplace
+//     l'ancienne à la fusion forcée par OPTIMIZE … FINAL ; rien n'est supprimé ;
 //   - une ligne identique à l'existante n'est pas réécrite ;
 //   - les intitulés recopiés dans grand_livre sont mis à jour pour la même clé,
 //     sans jamais écraser une valeur par du vide (_GL_PROPAGATION).
 // La clé n'est jamais modifiable. Elle est composite pour le mapping (racine,
-// type, longueur de racine, sens du solde) : une ligne y est identifiée par
-// l'ensemble de ces colonnes.
+// type, longueur de racine, sens du solde).
 // ============================================================================
 import type { ClickHouseClient } from "@clickhouse/client";
 import { tableColumns } from "./schema";
@@ -39,6 +46,8 @@ export interface PageDimension {
   page: number;
   pageSize: number;
   totalPages: number;
+  /** Anomalie de lecture expliquée à l'utilisateur (schéma inattendu). */
+  diagnostic?: string;
 }
 
 export const TAILLE_PAGE = 50;
@@ -51,93 +60,91 @@ const MAX_OPTIONS = 5000;
 export type FiltresReferentiel = Record<string, string[]>;
 
 // ---------------------------------------------------------------------------
-// Résolution des noms de colonnes
+// Schéma réel
 // ---------------------------------------------------------------------------
 
-/** Nom de référence → nom réel dans la table (absent si la colonne n'existe pas). */
-type Colonnes = Map<string, string>;
+interface Schema {
+  /** Toutes les colonnes réelles, avec leur casse d'origine. */
+  reelles: string[];
+  /** Champ de référence → colonnes réelles candidates présentes, dans l'ordre de préférence. */
+  candidats: Map<string, string[]>;
+}
 
-async function resoudreColonnes(
+/** Identifiant ClickHouse protégé (casse ou caractères inhabituels). */
+const ident = (nom: string) => `\`${nom.replace(/`/g, "")}\``;
+
+async function lireSchema(
   client: ClickHouseClient,
   dbName: string,
   def: TableReferentiel,
-): Promise<Colonnes> {
-  const reelles = await tableColumns(client, dbName, def.table);
-  const prises = new Set<string>();
-  const out: Colonnes = new Map();
+): Promise<Schema> {
+  const reelles = [...(await tableColumns(client, dbName, def.table))];
+  const parMinuscule = new Map(reelles.map((n) => [n.toLowerCase(), n]));
+  const candidats = new Map<string, string[]>();
   for (const c of def.colonnes) {
-    // Un même nom réel ne sert qu'une fois (ex. « intitule » candidat de deux colonnes).
-    const trouve = [c.nom, ...(c.alias ?? [])].find((n) => reelles.has(n) && !prises.has(n));
-    if (trouve) {
-      out.set(c.nom, trouve);
-      prises.add(trouve);
-    }
+    const presents = [c.nom, ...(c.alias ?? [])]
+      .map((n) => parMinuscule.get(n.toLowerCase()))
+      .filter((n): n is string => !!n);
+    candidats.set(c.nom, [...new Set(presents)]);
   }
-  const absentes = def.colonnes.filter((c) => !out.has(c.nom)).map((c) => c.nom);
-  if (absentes.length)
-    console.warn(
-      `[referentiels] ${dbName}.${def.table} : colonne(s) introuvable(s) ${absentes.join(", ")} ` +
-        `(colonnes réelles : ${[...reelles].join(", ")})`,
-    );
-  return out;
+  return { reelles, candidats };
 }
 
-/** Ligne lue sous les noms réels → ligne sous les noms de référence, en texte. */
-function versReference(
-  def: TableReferentiel,
-  cols: Colonnes,
-  brute: Record<string, unknown>,
-): LigneDimension {
-  return Object.fromEntries(
-    def.colonnes.map((c) => {
-      const reel = cols.get(c.nom);
-      const v = reel ? brute[reel] : undefined;
-      return [c.nom, v === null || v === undefined ? "" : String(v)];
-    }),
+/**
+ * Valeur effective d'un champ, en texte : la première non vide parmi ses
+ * colonnes candidates. `null` si aucune colonne candidate n'existe.
+ */
+function expression(schema: Schema, nom: string): string | null {
+  const cols = schema.candidats.get(nom) ?? [];
+  if (cols.length === 0) return null;
+  if (cols.length === 1) return `toString(${ident(cols[0])})`;
+  const branches = cols.flatMap((c) => [`toString(${ident(c)}) != ''`, `toString(${ident(c)})`]);
+  return `multiIf(${branches.join(", ")}, '')`;
+}
+
+function diagnosticSchema(def: TableReferentiel, schema: Schema, motif: string): string {
+  const correspondances = def.colonnes
+    .map((c) => `${c.libelle} → ${(schema.candidats.get(c.nom) ?? []).join(" | ") || "aucune"}`)
+    .join(" ; ");
+  return (
+    `${motif} Table ${def.table} — colonnes réelles : ${schema.reelles.join(", ") || "aucune"}. ` +
+    `Correspondances : ${correspondances}.`
   );
 }
 
 /**
- * Clause WHERE commune à la liste et au comptage.
- * Les noms de colonnes viennent de la définition et du schéma réel (jamais de
- * la requête) ; les valeurs passent toujours par des paramètres nommés.
- * `toString` rend les colonnes numériques (nb_racine) interrogeables.
+ * Clause WHERE commune à la liste et au comptage. Les expressions viennent du
+ * schéma réel (jamais de la requête) ; les valeurs passent toujours par des
+ * paramètres nommés.
  */
 function construireWhere(
   def: TableReferentiel,
-  cols: Colonnes,
+  schema: Schema,
   search: string,
   filtres: FiltresReferentiel,
 ): { sql: string; params: Record<string, unknown> } {
   const where: string[] = [];
   const params: Record<string, unknown> = {};
-  const presentes = def.colonnes.filter((c) => cols.has(c.nom));
+  const exprs = def.colonnes
+    .map((c) => ({ c, e: expression(schema, c.nom) }))
+    .filter((x): x is { c: ColonneDimension; e: string } => x.e !== null);
 
   const recherche = search.trim();
-  if (recherche && presentes.length) {
+  if (recherche && exprs.length) {
     where.push(
-      "(" +
-        presentes
-          .map((c) => `positionCaseInsensitive(toString(${cols.get(c.nom)}), {s:String}) > 0`)
-          .join(" OR ") +
-        ")",
+      "(" + exprs.map(({ e }) => `positionCaseInsensitive(${e}, {s:String}) > 0`).join(" OR ") + ")",
     );
     params.s = recherche;
   }
 
-  presentes.forEach((c, i) => {
+  exprs.forEach(({ c, e }, i) => {
     const valeurs = filtres[c.nom] ?? [];
     if (valeurs.length === 0) return;
-    where.push(`toString(${cols.get(c.nom)}) IN ({f${i}:Array(String)})`);
+    where.push(`${e} IN ({f${i}:Array(String)})`);
     params[`f${i}`] = valeurs;
   });
 
   return { sql: where.length ? `WHERE ${where.join(" AND ")}` : "", params };
-}
-
-/** Liste des noms réels sélectionnés, sans doublon et sans alias. */
-function selection(cols: Colonnes): string {
-  return [...new Set(cols.values())].join(", ");
 }
 
 // ---------------------------------------------------------------------------
@@ -161,23 +168,28 @@ export async function listerDimension(
 ): Promise<PageDimension> {
   const vide: PageDimension = { lignes: [], total: 0, page: 1, pageSize: TAILLE_PAGE, totalPages: 1 };
 
+  let schema: Schema;
   try {
-    const cols = await resoudreColonnes(client, dbName, def);
-    const cleReelle = cols.get(colonneCle(def).nom);
-    if (!cleReelle) return vide;
+    schema = await lireSchema(client, dbName, def);
+  } catch (e) {
+    console.error(`[referentiels] schéma ${dbName}.${def.table} illisible:`, e);
+    return vide;
+  }
+  if (schema.reelles.length === 0) return vide; // table absente : client jamais importé
 
-    const { sql: whereSql, params } = construireWhere(
-      def,
-      cols,
-      opts.search || "",
-      opts.filtres || {},
-    );
-    const tri = cols.get(opts.sortBy || "") ?? cleReelle;
+  const exprCle = expression(schema, colonneCle(def).nom);
+  if (!exprCle) {
+    return { ...vide, diagnostic: diagnosticSchema(def, schema, "Colonne clé introuvable.") };
+  }
+
+  try {
+    const { sql: whereSql, params } = construireWhere(def, schema, opts.search || "", opts.filtres || {});
+    const tri = expression(schema, opts.sortBy || "") ?? exprCle;
     const sens = opts.sortDir === "desc" ? "DESC" : "ASC";
     const departage = colonnesCles(def)
-      .map((c) => cols.get(c.nom))
-      .filter((n): n is string => !!n)
-      .map((n) => `${n} ASC`)
+      .map((c) => expression(schema, c.nom))
+      .filter((e): e is string => !!e)
+      .map((e) => `${e} ASC`)
       .join(", ");
 
     const cRes = await client.query({
@@ -193,10 +205,10 @@ export async function listerDimension(
       ? `LIMIT ${MAX_EXPORT}`
       : `LIMIT ${TAILLE_PAGE} OFFSET ${(page - 1) * TAILLE_PAGE}`;
 
-    // Colonnes lues sous leur nom réel, sans alias ; la conversion en texte et
-    // le renommage se font ensuite côté serveur.
+    // Alias neutres : aucune ambiguïté avec le nom d'une colonne réelle.
+    const champs = def.colonnes.map((c, i) => ({ nom: c.nom, alias: `__c${i}`, e: expression(schema, c.nom) }));
     const res = await client.query({
-      query: `SELECT ${selection(cols)}
+      query: `SELECT ${champs.map((f) => `${f.e ?? "''"} AS ${f.alias}`).join(", ")}
               FROM ${dbName}.${def.table} FINAL
               ${whereSql}
               ORDER BY ${tri} ${sens}, ${departage}
@@ -205,53 +217,79 @@ export async function listerDimension(
       format: "JSONEachRow",
     });
     const brutes = (await res.json()) as Array<Record<string, unknown>>;
-    const lignes = brutes.map((b) => versReference(def, cols, b));
+    const lignes: LigneDimension[] = brutes.map((b) =>
+      Object.fromEntries(
+        champs.map((f) => {
+          const v = b[f.alias];
+          return [f.nom, v === null || v === undefined ? "" : String(v)];
+        }),
+      ),
+    );
+
+    // Des lignes existent mais aucune valeur n'est exploitable : on l'explique
+    // au lieu d'afficher un tableau vide sans raison.
+    const toutesVides =
+      lignes.length > 0 && lignes.every((l) => Object.values(l).every((v) => v === ""));
+    if (toutesVides) {
+      const premiere = brutes[0] ? Object.keys(brutes[0]).join(", ") : "";
+      console.warn(`[referentiels] ${dbName}.${def.table} : lignes sans valeur (clés : ${premiere})`);
+    }
+
     return {
       lignes,
       total,
       page,
       pageSize: opts.tout ? lignes.length : TAILLE_PAGE,
       totalPages,
+      ...(toutesVides
+        ? { diagnostic: diagnosticSchema(def, schema, "Les lignes existent mais leurs champs sont vides.") }
+        : {}),
     };
   } catch (e) {
-    // Base ou table absente : client jamais importé.
     console.error(`[referentiels] lecture ${dbName}.${def.table} impossible:`, e);
-    return vide;
+    return {
+      ...vide,
+      diagnostic: diagnosticSchema(
+        def,
+        schema,
+        `Lecture impossible (${e instanceof Error ? e.message.slice(0, 300) : String(e)}).`,
+      ),
+    };
   }
 }
 
 /**
  * Valeurs proposées par chaque filtre : les valeurs distinctes de chaque
- * colonne, accompagnées du libellé quand la colonne en a un (compte →
- * intitulé), comme les filtres du grand livre.
+ * champ, accompagnées du libellé quand le champ en a un (compte → intitulé),
+ * comme les filtres du grand livre.
  */
 export async function optionsFiltresDimension(
   client: ClickHouseClient,
   dbName: string,
   def: TableReferentiel,
 ): Promise<Record<string, OptionFiltre[]>> {
-  let cols: Colonnes;
+  let schema: Schema;
   try {
-    cols = await resoudreColonnes(client, dbName, def);
+    schema = await lireSchema(client, dbName, def);
   } catch {
     return {};
   }
 
   const entrees = await Promise.all(
-    def.colonnes.map(async (c: ColonneDimension): Promise<[string, OptionFiltre[]]> => {
-      const reel = cols.get(c.nom);
-      if (!reel) return [c.nom, []];
-      const libelleReel = c.libelleDe ? cols.get(c.libelleDe) : undefined;
+    def.colonnes.map(async (c): Promise<[string, OptionFiltre[]]> => {
+      const e = expression(schema, c.nom);
+      if (!e) return [c.nom, []];
+      const lib = c.libelleDe ? expression(schema, c.libelleDe) : null;
       try {
         const res = await client.query({
-          query: libelleReel
-            ? `SELECT toString(${reel}) AS v, anyIf(toString(${libelleReel}), toString(${libelleReel}) != '') AS l
+          query: lib
+            ? `SELECT ${e} AS v, anyIf(${lib}, ${lib} != '') AS l
                FROM ${dbName}.${def.table} FINAL
-               WHERE toString(${reel}) != ''
+               WHERE ${e} != ''
                GROUP BY v ORDER BY v LIMIT ${MAX_OPTIONS}`
-            : `SELECT DISTINCT toString(${reel}) AS v
+            : `SELECT DISTINCT ${e} AS v
                FROM ${dbName}.${def.table} FINAL
-               WHERE toString(${reel}) != ''
+               WHERE ${e} != ''
                ORDER BY v LIMIT ${MAX_OPTIONS}`,
           format: "JSONEachRow",
         });
@@ -277,9 +315,20 @@ export interface ResultatModification {
   grandLivre: string[];
 }
 
+const texte = (v: unknown) => (v === null || v === undefined ? "" : String(v));
+
+/** Valeur effective d'un champ dans une ligne lue avec SELECT * (noms réels). */
+function valeurEffective(schema: Schema, nom: string, ligne: Record<string, unknown>): string {
+  for (const col of schema.candidats.get(nom) ?? []) {
+    const v = texte(ligne[col]);
+    if (v !== "") return v;
+  }
+  return "";
+}
+
 /**
- * Modifie les colonnes éditables d'une ligne existante, identifiée par
- * l'ensemble de ses colonnes clés (noms de référence).
+ * Modifie les champs éditables d'une ligne existante, identifiée par
+ * l'ensemble de ses champs clés (noms de référence).
  * @throws Error « introuvable » si la ligne n'existe pas dans la table.
  */
 export async function modifierDimension(
@@ -289,22 +338,21 @@ export async function modifierDimension(
   cles: Record<string, string>,
   valeurs: Record<string, string>,
 ): Promise<ResultatModification> {
-  const cols = await resoudreColonnes(client, dbName, def);
-  const colonnesCle = colonnesCles(def).filter((c) => cols.has(c.nom));
-  if (colonnesCle.length === 0) throw new Error("introuvable");
+  const schema = await lireSchema(client, dbName, def);
+  const clesPresentes = colonnesCles(def)
+    .map((c) => ({ c, e: expression(schema, c.nom) }))
+    .filter((x): x is { c: ColonneDimension; e: string } => x.e !== null);
+  if (clesPresentes.length === 0) throw new Error("introuvable");
   // Valeur de la clé principale : sert au report dans le grand livre.
   const cle = cles[colonneCle(def).nom] ?? "";
 
-  const where = colonnesCle
-    .map((c, i) => `toString(${cols.get(c.nom)}) = {k${i}:String}`)
-    .join(" AND ");
-  const params = Object.fromEntries(colonnesCle.map((c, i) => [`k${i}`, cles[c.nom] ?? ""]));
+  const where = clesPresentes.map(({ e }, i) => `${e} = {k${i}:String}`).join(" AND ");
+  const params = Object.fromEntries(clesPresentes.map(({ c }, i) => [`k${i}`, cles[c.nom] ?? ""]));
 
-  // Lecture dans les types natifs et sous les noms réels : la nouvelle version
-  // est réinsérée telle quelle, seules les colonnes texte éditables changent.
+  // Ligne complète, types natifs et noms réels : la nouvelle version est
+  // réinsérée telle quelle, seuls les champs éditables changent.
   const res = await client.query({
-    query: `SELECT ${selection(cols)} FROM ${dbName}.${def.table} FINAL
-            WHERE ${where} LIMIT 1`,
+    query: `SELECT * FROM ${dbName}.${def.table} FINAL WHERE ${where} LIMIT 1`,
     query_params: params,
     format: "JSONEachRow",
   });
@@ -312,17 +360,25 @@ export async function modifierDimension(
   if (!actuelle) throw new Error("introuvable");
 
   const nouvelle: Record<string, unknown> = { ...actuelle };
+  // updated_at prend sa valeur par défaut (now()) : la nouvelle version
+  // l'emporte à la fusion sur l'ancienne.
+  for (const k of Object.keys(nouvelle)) if (k.toLowerCase() === "updated_at") delete nouvelle[k];
+
   for (const c of def.colonnes) {
-    const reel = cols.get(c.nom);
-    if (reel && c.editable && valeurs[c.nom] !== undefined) nouvelle[reel] = valeurs[c.nom].trim();
+    if (!c.editable || valeurs[c.nom] === undefined) continue;
+    const cols = schema.candidats.get(c.nom) ?? [];
+    if (cols.length === 0) continue;
+    // On écrit dans la colonne qui porte la valeur affichée (la première non
+    // vide), sinon dans la colonne de référence.
+    const cible = cols.find((col) => texte(actuelle[col]) !== "") ?? cols[0];
+    nouvelle[cible] = valeurs[c.nom].trim();
   }
 
-  const texte = (v: unknown) => (v === null || v === undefined ? "" : String(v));
-  const modifiee = [...cols.values()].some((reel) => texte(actuelle[reel]) !== texte(nouvelle[reel]));
-  if (!modifiee) return { ligne: versReference(def, cols, actuelle), modifiee: false, grandLivre: [] };
+  const avant = Object.fromEntries(def.colonnes.map((c) => [c.nom, valeurEffective(schema, c.nom, actuelle)]));
+  const apres = Object.fromEntries(def.colonnes.map((c) => [c.nom, valeurEffective(schema, c.nom, nouvelle)]));
+  const modifiee = def.colonnes.some((c) => avant[c.nom] !== apres[c.nom]);
+  if (!modifiee) return { ligne: avant, modifiee: false, grandLivre: [] };
 
-  // updated_at prend sa valeur par défaut (now()) : la version la plus récente
-  // l'emporte à la fusion, puis OPTIMIZE FINAL la rend seule visible.
   await client.insert({
     table: `${dbName}.${def.table}`,
     values: [nouvelle],
@@ -330,17 +386,16 @@ export async function modifierDimension(
   });
   await client.command({ query: `OPTIMIZE TABLE ${dbName}.${def.table} FINAL` });
 
-  // Report dans le grand livre des seules colonnes recopiées et changées,
-  // jamais par une valeur vide (même règle que le DAG).
+  // Report dans le grand livre des seuls champs recopiés et changés, jamais
+  // par une valeur vide (même règle que le DAG).
   const reportees: string[] = [];
   if (def.cleGrandLivre) {
     const gl = await tableColumns(client, dbName, "grand_livre");
     if (gl.has(def.cleGrandLivre)) {
       for (const c of def.colonnes) {
-        const reel = cols.get(c.nom);
-        if (!reel || !c.grandLivre || !gl.has(c.grandLivre)) continue;
-        const valeur = texte(nouvelle[reel]);
-        if (!valeur || valeur === texte(actuelle[reel])) continue;
+        if (!c.grandLivre || !gl.has(c.grandLivre)) continue;
+        const valeur = apres[c.nom];
+        if (!valeur || valeur === avant[c.nom]) continue;
         await client.command({
           query: `ALTER TABLE ${dbName}.grand_livre
                   UPDATE ${c.grandLivre} = {v:String}
@@ -353,5 +408,5 @@ export async function modifierDimension(
     }
   }
 
-  return { ligne: versReference(def, cols, nouvelle), modifiee: true, grandLivre: reportees };
+  return { ligne: apres, modifiee: true, grandLivre: reportees };
 }
