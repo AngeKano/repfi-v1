@@ -42,6 +42,7 @@ import {
   FORMAT_LABELS,
 } from "@/lib/comptable-formats";
 import { DIMENSIONS, dimensionParType } from "@/lib/comptable/dimensions";
+import DimensionsViewer from "./dimensions-viewer";
 
 type Statut = "PENDING" | "VALIDATING" | "PROCESSING" | "COMPLETED" | "FAILED";
 
@@ -81,6 +82,27 @@ const ICONES: Record<string, React.ElementType> = {
 };
 
 const EN_COURS: Statut[] = ["PENDING", "VALIDATING", "PROCESSING"];
+// Seuls ces statuts évoluent sans action de l'utilisateur : Airflow les fait
+// progresser. Un dépôt PENDING attend son lancement.
+const EN_TRAITEMENT: Statut[] = ["VALIDATING", "PROCESSING"];
+
+/**
+ * Lance le traitement Airflow d'un dépôt — pendant de l'appel à
+ * /api/files/comptable/trigger-etl de l'import complet.
+ */
+async function lancerTraitement(clientId: string, updateId: string): Promise<string | null> {
+  try {
+    const res = await fetch(`/api/clients/${clientId}/dimensions/trigger`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ updateId }),
+    });
+    const json = await res.json().catch(() => ({}));
+    return res.ok ? null : json?.error || "Le traitement n'a pas pu démarrer.";
+  } catch {
+    return "Erreur réseau.";
+  }
+}
 
 const fmtDate = (iso: string | null) =>
   iso
@@ -111,7 +133,7 @@ function BadgeStatut({ statut }: { statut: Statut }) {
       }
       className="text-xs gap-1"
     >
-      {EN_COURS.includes(statut) && <Loader2 className="w-3 h-3 animate-spin" />}
+      {EN_TRAITEMENT.includes(statut) && <Loader2 className="w-3 h-3 animate-spin" />}
       {libelles[statut]}
     </Badge>
   );
@@ -120,6 +142,9 @@ function BadgeStatut({ statut }: { statut: Statut }) {
 export default function DimensionsSection({ clientId }: { clientId: string }) {
   const [data, setData] = useState<Reponse | null>(null);
   const [dialogType, setDialogType] = useState<FileType | null>(null);
+  // Incrémenté à la fin d'une mise à jour par fichier : le contenu affiché
+  // des référentiels est alors rechargé.
+  const [versionDonnees, setVersionDonnees] = useState(0);
 
   const charger = useCallback(async () => {
     try {
@@ -136,7 +161,17 @@ export default function DimensionsSection({ clientId }: { clientId: string }) {
   }, [charger]);
 
   // Suivi en direct tant qu'une mise à jour est en cours.
-  const enCours = data?.updates.some((u) => EN_COURS.includes(u.status)) ?? false;
+  const enCours = data?.updates.some((u) => EN_TRAITEMENT.includes(u.status)) ?? false;
+  const [lancement, setLancement] = useState<string | null>(null);
+
+  const relancer = async (u: MiseAJour) => {
+    setLancement(u.id);
+    const erreur = await lancerTraitement(clientId, u.id);
+    setLancement(null);
+    if (erreur) toast.error(erreur);
+    else toast.success("Traitement lancé");
+    charger();
+  };
   useEffect(() => {
     if (!enCours) return;
     const t = setInterval(charger, 4000);
@@ -151,6 +186,7 @@ export default function DimensionsSection({ clientId }: { clientId: string }) {
       const avant = statutsPrecedents.current.get(u.id);
       if (avant && EN_COURS.includes(avant) && !EN_COURS.includes(u.status)) {
         const label = dimensionParType(u.fileType)?.label ?? u.fileType;
+        if (u.status === "COMPLETED") setVersionDonnees((v) => v + 1);
         if (u.status === "COMPLETED")
           toast.success(
             `${label} mis à jour : ${u.rowsInserted ?? 0} ligne(s) ajoutée(s), ` +
@@ -244,7 +280,7 @@ export default function DimensionsSection({ clientId }: { clientId: string }) {
             <table className="w-full">
               <thead>
                 <tr className="border-b border-[#D0E3F5] bg-[#F5F9FF]">
-                  {["Date", "Référentiel", "Fichier", "Résultat", "Statut", "Par"].map((h, i) => (
+                  {["Date", "Référentiel", "Fichier", "Résultat", "Statut", "Par", ""].map((h, i) => (
                     <th
                       key={h}
                       className={cn(
@@ -306,6 +342,24 @@ export default function DimensionsSection({ clientId }: { clientId: string }) {
                     <td className="px-4 py-3 text-sm text-[#335890] whitespace-nowrap">
                       {u.uploadedBy}
                     </td>
+                    <td className="px-4 py-3 text-right">
+                      {data.canUpload && (u.status === "PENDING" || u.status === "FAILED") && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          disabled={lancement === u.id}
+                          onClick={() => relancer(u)}
+                          className="h-8 gap-1.5 border-[#D0E3F5] text-[#335890] hover:bg-[#EBF5FF] whitespace-nowrap"
+                        >
+                          {lancement === u.id ? (
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          ) : (
+                            <RefreshCw className="w-3.5 h-3.5" />
+                          )}
+                          {u.status === "FAILED" ? "Relancer" : "Lancer le traitement"}
+                        </Button>
+                      )}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -317,6 +371,9 @@ export default function DimensionsSection({ clientId }: { clientId: string }) {
           </div>
         )}
       </Card>
+
+      {/* Consultation et modification ligne à ligne */}
+      <DimensionsViewer clientId={clientId} version={versionDonnees} />
 
       {dialogType && (
         <DimensionUploadDialog
@@ -406,13 +463,22 @@ function DimensionUploadDialog({
       const fd = new FormData();
       fd.append("fileType", fileType);
       fd.append("file", file);
+      // 1. Dépôt du fichier (équivalent de /api/files/comptable/upload).
       const res = await fetch(`/api/clients/${clientId}/dimensions`, { method: "POST", body: fd });
       const json = await res.json().catch(() => ({}));
       if (!res.ok) {
         setErreur(json?.error || "Le dépôt a échoué.");
         return;
       }
-      toast.success(`${def.label} : fichier déposé, mise à jour en cours.`);
+
+      // 2. Lancement du DAG Airflow (équivalent de trigger-etl). En cas
+      //    d'échec, le dépôt reste visible et relançable dans l'historique.
+      const erreurLancement = await lancerTraitement(clientId, json.update.id);
+      if (erreurLancement) {
+        toast.error(`Fichier déposé, mais ${erreurLancement.charAt(0).toLowerCase()}${erreurLancement.slice(1)}`);
+      } else {
+        toast.success(`${def.label} : traitement Airflow lancé.`);
+      }
       onClose(true);
     } catch {
       setErreur("Erreur réseau.");
