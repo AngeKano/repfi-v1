@@ -12,7 +12,7 @@
 // reclassement, lancé depuis ce même écran. « Télécharger » exporte le
 // référentiel filtré au format attendu pour une mise à jour par fichier.
 // ============================================================================
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Card,
   CardContent,
@@ -108,7 +108,12 @@ export default function DimensionsViewer({
   version?: number;
 }) {
   const [refId, setRefId] = useState<string>(REFERENTIELS[0].id);
-  const [data, setData] = useState<PageReferentiel | null>(null);
+  // Données étiquetées par le référentiel demandé : des lignes d'un onglet ne
+  // sont jamais rendues avec les colonnes d'un autre.
+  const [donnees, setDonnees] = useState<{ ref: string; page: PageReferentiel } | null>(null);
+  // Numéro de la dernière requête : une réponse plus ancienne, arrivée en
+  // retard, est ignorée.
+  const derniereRequete = useRef(0);
   const [options, setOptions] = useState<Record<string, OptionFiltre[]>>({});
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
@@ -132,8 +137,18 @@ export default function DimensionsViewer({
 
   const def = referentielParId(refId)!;
   const cle = colonneCle(def).nom;
+  // Seules les données du référentiel affiché sont utilisées.
+  const data = donnees?.ref === refId ? donnees.page : null;
+  const setData = (maj: (d: PageReferentiel | null) => PageReferentiel | null) =>
+    setDonnees((prev) => {
+      if (!prev || prev.ref !== refId) return prev;
+      const page = maj(prev.page);
+      return page ? { ref: refId, page } : null;
+    });
 
   const charger = useCallback(async () => {
+    const requete = ++derniereRequete.current;
+    const ref = refId;
     setLoading(true);
     try {
       const qs = new URLSearchParams({ page: String(page), sortDir });
@@ -146,15 +161,17 @@ export default function DimensionsViewer({
       const res = await fetch(`/api/clients/${clientId}/dimensions/tables/${refId}?${qs}`);
       if (!res.ok) throw new Error();
       const json = (await res.json()) as PageReferentiel;
-      setData(json);
+      // Une requête plus récente a été lancée entre-temps : on l'attend.
+      if (requete !== derniereRequete.current) return;
+      setDonnees({ ref, page: { ...json, lignes: Array.isArray(json.lignes) ? json.lignes : [] } });
       if (json.options) {
         setOptions(json.options);
         setOptionsAJour(true);
       }
     } catch {
-      toast.error("Erreur lors du chargement du référentiel");
+      if (requete === derniereRequete.current) toast.error("Erreur lors du chargement du référentiel");
     } finally {
-      setLoading(false);
+      if (requete === derniereRequete.current) setLoading(false);
     }
     // optionsAJour est volontairement exclu : le basculer ne doit pas recharger.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -551,11 +568,14 @@ export default function DimensionsViewer({
                   </td>
                 </tr>
               ) : (
-                data.lignes.map((l) => {
+                data.lignes.map((l, index) => {
                   const idLigne = identifiantLigne(def, l);
                   const enEdition = edition?.id === idLigne;
                   return (
-                    <tr key={idLigne} className={cn("border-b", enEdition && "bg-[#F5F9FF]")}>
+                    <tr
+                      key={`${refId}:${index}:${idLigne}`}
+                      className={cn("border-b", enEdition && "bg-[#F5F9FF]")}
+                    >
                       {def.colonnes.map((c) => (
                         <td key={c.nom} className="p-2 align-middle">
                           {c.nom === cle ? (
