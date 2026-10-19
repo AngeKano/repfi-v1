@@ -382,7 +382,7 @@ export default function DimensionsViewer({
   return (
     <Card className="border-[#D0E3F5]">
       <CardHeader>
-        <CardTitle>Référentiels</CardTitle>
+        <CardTitle>Tables de dimension</CardTitle>
         <CardDescription>
           Plan comptable, mapping des rubriques (PLE), plan tiers et codes journaux. Les champs
           se corrigent directement : la clé n&apos;est pas modifiable, aucune ligne n&apos;est

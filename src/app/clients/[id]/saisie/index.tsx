@@ -53,6 +53,8 @@ import {
   ArrowUpDown,
   Download,
   SlidersHorizontal,
+  BookOpen,
+  Database,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -200,7 +202,59 @@ function pageWindow(current: number, total: number, size = 5): (number | "…")[
   return out;
 }
 
+// Sous-onglets de la Comptabilité — même présentation que la page Paramètres.
+const SOUS_ONGLETS = [
+  { id: "grand-livre" as const, label: "Grand livre", icon: BookOpen },
+  { id: "dimensions" as const, label: "Tables de dimension", icon: Database },
+];
+type SousOnglet = (typeof SOUS_ONGLETS)[number]["id"];
+
 export default function SaisieTab({ clientId }: { clientId: string }) {
+  const [sousOnglet, setSousOnglet] = useState<SousOnglet>("grand-livre");
+  // Les tables de dimension ne sont chargées qu'à la première ouverture.
+  const [dimensionsOuvertes, setDimensionsOuvertes] = useState(false);
+
+  const ouvrir = (id: SousOnglet) => {
+    setSousOnglet(id);
+    if (id === "dimensions") setDimensionsOuvertes(true);
+  };
+
+  return (
+    <div>
+      <div className="flex items-center gap-6 mb-6 border-b border-[#D0E3F5]">
+        {SOUS_ONGLETS.map((tab) => {
+          const active = sousOnglet === tab.id;
+          return (
+            <button
+              key={tab.id}
+              onClick={() => ouvrir(tab.id)}
+              className={`flex items-center gap-2 pb-3 text-sm font-medium transition-colors relative ${
+                active ? "text-[#0077C3]" : "text-[#335890] hover:text-[#0077C3]"
+              }`}
+            >
+              <tab.icon className="w-4 h-4" />
+              {tab.label}
+              {active && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#0077C3]" />}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Les deux vues restent montées : passer d'un onglet à l'autre ne fait
+          perdre ni une écriture en cours de saisie, ni les filtres posés. */}
+      <div className={cn(sousOnglet !== "grand-livre" && "hidden")}>
+        <GrandLivreSaisie clientId={clientId} />
+      </div>
+      {dimensionsOuvertes && (
+        <div className={cn(sousOnglet !== "dimensions" && "hidden")}>
+          <DimensionsViewer clientId={clientId} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+function GrandLivreSaisie({ clientId }: { clientId: string }) {
   const [data, setData] = useState<SaisieData | null>(null);
   const [loading, setLoading] = useState(true);
   const [annee, setAnnee] = useState<number | null>(null);
@@ -1158,9 +1212,6 @@ export default function SaisieTab({ clientId }: { clientId: string }) {
         <Badge variant="outline" className="text-xs">Info</Badge>
         Les écritures saisies sont intégrées aux calculs du reporting. Seul le Loader Plus peut saisir.
       </p>
-
-      {/* ============ Référentiels : plan comptable, plan tiers, journaux ============ */}
-      <DimensionsViewer clientId={clientId} />
 
       {/* ============ Téléchargement du grand livre (filtres 1..n) ============ */}
       <Dialog open={showExportDialog} onOpenChange={setShowExportDialog}>
