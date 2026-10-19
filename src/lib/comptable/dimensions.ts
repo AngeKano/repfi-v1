@@ -50,6 +50,18 @@ export interface ColonneDimension {
   grandLivre?: string;
   /** Champ équivalent des écritures saisies (ManualLedgerEntry). */
   saisie?: "intituleCompte" | "intituleTiers" | "typeTiers";
+
+  // ---- Règles de saisie d'une nouvelle ligne ----
+  /** Seules ces valeurs sont acceptées (liste déroulante). */
+  choix?: string[];
+  /** Nombre entier (ex. longueur de racine). */
+  entier?: boolean;
+  /** Colonne clé qui peut rester vide (ex. sens du solde du mapping). */
+  vide?: boolean;
+  /** Valeur par défaut : longueur de la valeur de cette autre colonne. */
+  defautLongueurDe?: string;
+  /** Valeur mise en majuscules (codes de rubrique : « TC », jamais « tc »). */
+  majuscules?: boolean;
 }
 
 /** Référentiel : consultable, filtrable, modifiable et mis à jour par fichier. */
@@ -125,7 +137,7 @@ export const DIMENSIONS: DimensionDef[] = [
     fileType: FileType.PLE,
     etlType: "ple",
     table: "ple",
-    label: "Mapping (PLE)",
+    label: "Mapping",
     cle: "racine, type, longueur de racine et sens du solde",
     reclassement: true,
     colonnesFichier: [
@@ -142,10 +154,29 @@ export const DIMENSIONS: DimensionDef[] = [
       "écritures déjà chargées.",
     colonnes: [
       { nom: "racine", libelle: "Racine", cle: true },
-      { nom: "rubrique", libelle: "Rubrique", editable: true, requis: true, categorie: true },
-      { nom: "type_rubrique", libelle: "Type", cle: true },
-      { nom: "nb_racine", libelle: "Longueur racine", cle: true },
-      { nom: "solde_filter", libelle: "Sens du solde", cle: true },
+      {
+        nom: "rubrique",
+        libelle: "Rubrique",
+        editable: true,
+        requis: true,
+        categorie: true,
+        majuscules: true,
+      },
+      { nom: "type_rubrique", libelle: "Type", cle: true, choix: ["PL", "BILAN"] },
+      {
+        nom: "nb_racine",
+        libelle: "Longueur racine",
+        cle: true,
+        entier: true,
+        defautLongueurDe: "racine",
+      },
+      {
+        nom: "solde_filter",
+        libelle: "Sens du solde",
+        cle: true,
+        vide: true,
+        choix: ["", "debit", "credit"],
+      },
       { nom: "exclusions", libelle: "Exclusions", editable: true },
     ],
   },
@@ -233,4 +264,46 @@ export function identifiantLigne(d: DimensionDef, ligne: Record<string, unknown>
   return colonnesCles(d)
     .map((c) => String(ligne[c.nom] ?? ""))
     .join("|");
+}
+
+/**
+ * Normalise et contrôle une ligne à ajouter. Partagé par le formulaire
+ * (contrôle immédiat) et par l'API (contrôle qui fait foi).
+ *   - champs clés obligatoires, sauf ceux qui peuvent rester vides ;
+ *   - valeurs limitées à une liste quand le champ en a une (casse ignorée) ;
+ *   - longueur de racine du mapping : par défaut, et obligatoirement, égale à
+ *     la longueur de la racine — sinon la ligne ne serait jamais retenue au
+ *     classement des comptes.
+ */
+export function preparerNouvelleLigne(
+  def: DimensionDef,
+  saisie: Record<string, string>,
+): { ligne: Record<string, string> } | { erreur: string } {
+  const ligne: Record<string, string> = {};
+  for (const c of def.colonnes) {
+    let v = (saisie[c.nom] ?? "").trim();
+    if (c.majuscules) v = v.toUpperCase();
+
+    if (c.defautLongueurDe) {
+      const longueur = (saisie[c.defautLongueurDe] ?? "").trim().length;
+      if (!v && longueur) v = String(longueur);
+      if (v && longueur && Number(v) !== longueur)
+        return { erreur: `${c.libelle} : doit être égale à la longueur de la racine (${longueur}).` };
+    }
+    if (c.choix) {
+      const retenue = c.choix.find((x) => x.toLowerCase() === v.toLowerCase());
+      if (retenue === undefined)
+        return {
+          erreur: `${c.libelle} : valeur attendue parmi ${c.choix.map((x) => x || "(vide)").join(", ")}.`,
+        };
+      v = retenue;
+    }
+    if (c.entier && v && !/^\d{1,2}$/.test(v))
+      return { erreur: `${c.libelle} : nombre entier attendu.` };
+    if (((c.cle && !c.vide) || c.requis) && !v) return { erreur: `${c.libelle} obligatoire.` };
+    if (v.length > 255) return { erreur: `${c.libelle} : 255 caractères maximum.` };
+
+    ligne[c.nom] = v;
+  }
+  return { ligne };
 }

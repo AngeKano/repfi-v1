@@ -39,7 +39,7 @@ export const FILE_TYPE_LABELS: Record<FileType, string> = {
   [FileType.PLAN_COMPTES]: "Plan Comptable",
   [FileType.PLAN_TIERS]: "Plan Tiers",
   [FileType.CODE_JOURNAL]: "Codes Journaux",
-  [FileType.PLE]: "Mapping (PLE)",
+  [FileType.PLE]: "Mapping",
   [FileType.GRAND_LIVRE_COMPTES]: "Grand Livre Comptes (legacy)",
   [FileType.GRAND_LIVRE_TIERS]: "Grand Livre Tiers (legacy)",
 };

@@ -386,27 +386,94 @@ export async function modifierDimension(
   });
   await client.command({ query: `OPTIMIZE TABLE ${dbName}.${def.table} FINAL` });
 
-  // Report dans le grand livre des seuls champs recopiés et changés, jamais
-  // par une valeur vide (même règle que le DAG).
-  const reportees: string[] = [];
-  if (def.cleGrandLivre) {
-    const gl = await tableColumns(client, dbName, "grand_livre");
-    if (gl.has(def.cleGrandLivre)) {
-      for (const c of def.colonnes) {
-        if (!c.grandLivre || !gl.has(c.grandLivre)) continue;
-        const valeur = apres[c.nom];
-        if (!valeur || valeur === avant[c.nom]) continue;
-        await client.command({
-          query: `ALTER TABLE ${dbName}.grand_livre
-                  UPDATE ${c.grandLivre} = {v:String}
-                  WHERE ${def.cleGrandLivre} = {cle:String}`,
-          query_params: { v: valeur, cle },
-          clickhouse_settings: { mutations_sync: "1" },
-        });
-        reportees.push(c.grandLivre);
-      }
-    }
-  }
-
+  const reportees = await reporterGrandLivre(client, dbName, def, cle, avant, apres);
   return { ligne: apres, modifiee: true, grandLivre: reportees };
+}
+
+/**
+ * Report dans le grand livre des seuls champs recopiés et changés, jamais par
+ * une valeur vide (même règle que le DAG, qui reporte aussi les lignes
+ * ajoutées). Renvoie les colonnes du grand livre mises à jour.
+ */
+async function reporterGrandLivre(
+  client: ClickHouseClient,
+  dbName: string,
+  def: TableReferentiel,
+  cle: string,
+  avant: Record<string, string>,
+  apres: Record<string, string>,
+): Promise<string[]> {
+  const reportees: string[] = [];
+  if (!def.cleGrandLivre || !cle) return reportees;
+  const gl = await tableColumns(client, dbName, "grand_livre");
+  if (!gl.has(def.cleGrandLivre)) return reportees;
+
+  for (const c of def.colonnes) {
+    if (!c.grandLivre || !gl.has(c.grandLivre)) continue;
+    const valeur = apres[c.nom];
+    if (!valeur || valeur === avant[c.nom]) continue;
+    await client.command({
+      query: `ALTER TABLE ${dbName}.grand_livre
+              UPDATE ${c.grandLivre} = {v:String}
+              WHERE ${def.cleGrandLivre} = {cle:String}`,
+      query_params: { v: valeur, cle },
+      clickhouse_settings: { mutations_sync: "1" },
+    });
+    reportees.push(c.grandLivre);
+  }
+  return reportees;
+}
+
+/**
+ * Ajoute une ligne nouvelle (déjà contrôlée par preparerNouvelleLigne).
+ * @throws Error « existe » si une ligne de même clé existe déjà : elle se
+ *         corrige alors avec « Modifier », jamais par un ajout.
+ * @throws Error « schema » si une colonne clé est absente de la table.
+ */
+export async function ajouterDimension(
+  client: ClickHouseClient,
+  dbName: string,
+  def: TableReferentiel,
+  ligne: Record<string, string>,
+): Promise<{ ligne: LigneDimension; grandLivre: string[] }> {
+  const schema = await lireSchema(client, dbName, def);
+  const cles = colonnesCles(def);
+  if (cles.some((c) => !expression(schema, c.nom))) throw new Error("schema");
+
+  // Une clé déjà présente n'est jamais dupliquée.
+  const where = cles.map((c, i) => `${expression(schema, c.nom)} = {k${i}:String}`).join(" AND ");
+  const params = Object.fromEntries(cles.map((c, i) => [`k${i}`, ligne[c.nom] ?? ""]));
+  const res = await client.query({
+    query: `SELECT count() AS n FROM ${dbName}.${def.table} FINAL WHERE ${where}`,
+    query_params: params,
+    format: "JSONEachRow",
+  });
+  const n = parseInt(((await res.json()) as Array<{ n: string }>)[0]?.n ?? "0", 10) || 0;
+  if (n > 0) throw new Error("existe");
+
+  // Chaque champ est écrit dans sa colonne de référence présente ; les
+  // colonnes numériques reçoivent un nombre. updated_at prend now().
+  const valeurs: Record<string, unknown> = {};
+  for (const c of def.colonnes) {
+    const col = schema.candidats.get(c.nom)?.[0];
+    if (!col) continue;
+    const v = ligne[c.nom] ?? "";
+    valeurs[col] = c.entier ? Number(v) || 0 : v;
+  }
+  await client.insert({
+    table: `${dbName}.${def.table}`,
+    values: [valeurs],
+    format: "JSONEachRow",
+  });
+
+  const apres = Object.fromEntries(def.colonnes.map((c) => [c.nom, ligne[c.nom] ?? ""]));
+  const grandLivre = await reporterGrandLivre(
+    client,
+    dbName,
+    def,
+    ligne[colonneCle(def).nom] ?? "",
+    {},
+    apres,
+  );
+  return { ligne: apres, grandLivre };
 }
