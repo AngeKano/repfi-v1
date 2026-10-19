@@ -10,6 +10,7 @@
 // total en gras sur fond gris, montants alignés à droite et montant nul laissé
 // vide hors lignes de total.
 // ============================================================================
+import { DEVISE } from "@/lib/devise";
 
 export interface ExerciceExport {
   year: number;
@@ -85,18 +86,26 @@ interface Tableau {
 const arrondi = (n: number) => Math.round(n || 0);
 
 /**
- * Montant tel qu'affiché à l'écran : séparateur de milliers français, et rien
- * du tout quand la valeur est nulle sur une ligne de détail.
+ * Groupe les milliers d'un entier avec une espace simple : « 2 218 101 ».
  *
- * `toLocaleString` produit une espace fine insécable (U+202F) que les polices
- * standard de jsPDF ne savent pas rendre — elle y apparaît comme un « / ». On
- * la remplace donc par une espace ordinaire.
+ * Volontairement sans toLocaleString : selon le navigateur, le séparateur
+ * français est une espace fine insécable (U+202F) ou insécable (U+00A0), que
+ * les polices standard de jsPDF ne savent pas dessiner — elle sortait en « / »
+ * (« 541/176/746 »). Ici, uniquement des caractères ASCII.
+ */
+function grouperMilliers(n: number): string {
+  const entier = Math.round(n);
+  const chiffres = Math.abs(entier).toString().replace(/\B(?=(\d{3})+(?!\d))/g, " ");
+  return entier < 0 ? `-${chiffres}` : chiffres;
+}
+
+/**
+ * Montant tel qu'affiché à l'écran : milliers séparés, et rien du tout quand
+ * la valeur est nulle sur une ligne de détail (« 0 » sur une ligne de total).
  */
 function montantTexte(n: number, total: boolean): string {
-  if (!n) return total ? "0" : "";
-  return Math.round(n)
-    .toLocaleString("fr-FR")
-    .replace(/[  ]/g, " ");
+  if (!Math.round(n || 0)) return total ? "0" : "";
+  return grouperMilliers(n);
 }
 
 /** Nom de fichier sans caractère gênant pour le système. */
@@ -236,7 +245,7 @@ export async function exporterEtatsExcel(d: EtatsExportData) {
     // Lignes 1-3 : titre, contexte, séparateur. Lignes 4-5 : en-tête.
     const aoa: (string | number | null)[][] = [
       [t.titre],
-      [`${d.clientName} — Période : ${d.periodeLabel}`],
+      [`${d.clientName} — Période : ${d.periodeLabel} — Montants en ${DEVISE}`],
       [],
     ];
 
@@ -354,6 +363,10 @@ export async function exporterEtatsPdf(d: EtatsExportData) {
     pdf.setFontSize(8);
     pdf.setTextColor(120);
     pdf.text(`${d.clientName} — Période : ${d.periodeLabel}`, MARGE, y);
+    // Devise de l'application, rappelée en haut à droite de chaque état.
+    pdf.setFont("helvetica", "bold");
+    pdf.text(`Montants en ${DEVISE}`, LARGEUR_PAGE - MARGE, y, { align: "right" });
+    pdf.setFont("helvetica", "normal");
     pdf.setTextColor(0);
     y += 5;
 
@@ -409,7 +422,7 @@ export async function exporterEtatsPdf(d: EtatsExportData) {
     // ---- Corps ----
     pdf.setFontSize(7);
     for (const l of t.lignes) {
-      if (y + H_LIGNE > HAUTEUR_PAGE - MARGE) {
+      if (y + H_LIGNE > HAUTEUR_PAGE - MARGE - 4) {
         pdf.addPage();
         y = MARGE + 4;
         dessinerEntete();
@@ -457,6 +470,18 @@ export async function exporterEtatsPdf(d: EtatsExportData) {
   };
 
   tousLesTableaux(d).forEach((t, i) => dessiner(t, i === 0));
+
+  // Pied de page : client, devise et numéro de page sur toutes les pages.
+  const nbPages = pdf.getNumberOfPages();
+  for (let i = 1; i <= nbPages; i++) {
+    pdf.setPage(i);
+    pdf.setFont("helvetica", "normal");
+    pdf.setFontSize(7);
+    pdf.setTextColor(120);
+    pdf.text(`${d.clientName} — États financiers en ${DEVISE}`, MARGE, HAUTEUR_PAGE - 5);
+    pdf.text(`Page ${i} / ${nbPages}`, LARGEUR_PAGE - MARGE, HAUTEUR_PAGE - 5, { align: "right" });
+  }
+  pdf.setTextColor(0);
 
   telecharger(pdf.output("blob"), nomFichier(d, "pdf"));
 }

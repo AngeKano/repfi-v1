@@ -60,6 +60,7 @@ import {
   getRoleBadgeVariant,
 } from "@/lib/permissions/role-utils";
 import { DashboardLayout } from "@/components/dashboard-layout";
+import { DEVISE, UNITE_ABREGEE } from "@/lib/devise";
 
 interface ClientDetailsClientProps {
   session: any;
@@ -323,9 +324,9 @@ export default function ClientDetailsClient({
               Devise
             </p>
             <p className="text-sm font-semibold text-[#00122E]">
-              FCFA{" "}
+              {DEVISE}{" "}
               <span className="text-xs font-normal text-[#335890]">
-                (unité : K FCFA)
+                (unité : {UNITE_ABREGEE})
               </span>
             </p>
           </div>

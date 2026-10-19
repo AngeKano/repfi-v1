@@ -212,7 +212,7 @@ export default function DimensionsSection({ clientId }: { clientId: string }) {
             <p className="text-sm text-[#335890] mt-0.5">
               Mettez à jour un référentiel seul, sans réimporter de période. Les lignes du
               fichier sont ajoutées ou modifiées — aucune n&apos;est supprimée. Le contenu
-              des tables se consulte et se corrige depuis l&apos;onglet Comptabilité.
+              des tables se consulte et se corrige dans Comptabilité › Tables de dimension.
             </p>
           </div>
           {data?.canUpload && (
@@ -563,7 +563,7 @@ function DimensionUploadDialog({
                 <p>
                   Colonnes attendues (première ligne) :{" "}
                   <code className="text-[11px]">{def.colonnesFichier.join(", ")}</code>. Le
-                  bouton « Télécharger » du référentiel, dans l&apos;onglet Comptabilité, fournit
+                  bouton « Télécharger » de Comptabilité › Tables de dimension fournit
                   un fichier déjà au bon format.
                 </p>
               )}
