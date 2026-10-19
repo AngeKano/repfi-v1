@@ -252,7 +252,7 @@ export const FILE_TYPE_LABELS: Record<FileType, string> = {
   PLAN_COMPTES: "Plan Comptable",
   PLAN_TIERS: "Plan des Tiers",
   CODE_JOURNAL: "Codes Journaux",
-  PLE: "Mapping (PLE)",
+  PLE: "Mapping",
   GRAND_LIVRE_COMPTES: "Grand Livre des Comptes (legacy)",
   GRAND_LIVRE_TIERS: "Grand Livre des Tiers (legacy)",
 };

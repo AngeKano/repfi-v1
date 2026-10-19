@@ -24,6 +24,13 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   ArrowDown,
   ArrowUp,
   ArrowUpDown,
@@ -39,6 +46,7 @@ import {
   Download,
   RefreshCw,
   AlertTriangle,
+  Plus,
 } from "lucide-react";
 import {
   PiBooksDuotone,
@@ -53,7 +61,9 @@ import {
   colonneCle,
   colonnesCles,
   identifiantLigne,
+  preparerNouvelleLigne,
   referentielParId,
+  type ColonneDimension,
 } from "@/lib/comptable/dimensions";
 import { MultiSelect, type OptionFiltre } from "./gl-filters-panel";
 
@@ -130,6 +140,9 @@ export default function DimensionsViewer({
   // Édition : une seule ligne à la fois.
   const [edition, setEdition] = useState<{ id: string; cle: string; valeurs: Ligne } | null>(null);
   const [enregistrement, setEnregistrement] = useState(false);
+  // Ligne en cours d'ajout (null = formulaire fermé).
+  const [ajout, setAjout] = useState<Ligne | null>(null);
+  const [ajoutEnCours, setAjoutEnCours] = useState(false);
   const [exportEnCours, setExportEnCours] = useState(false);
   // Mapping modifié ligne à ligne depuis cet écran : reclassement à lancer.
   const [mappingModifie, setMappingModifie] = useState(false);
@@ -204,6 +217,7 @@ export default function DimensionsViewer({
     setSortBy("");
     setSortDir("asc");
     setEdition(null);
+    setAjout(null);
   };
 
   const appliquerFiltres = (f: Filtres) => {
@@ -283,6 +297,96 @@ export default function DimensionsViewer({
     } finally {
       setReclassementEnCours(false);
     }
+  };
+
+  /** Ajoute la ligne saisie : contrôle immédiat, puis contrôle serveur qui fait foi. */
+  const ajouter = async () => {
+    if (!ajout) return;
+    const prep = preparerNouvelleLigne(def, ajout);
+    if ("erreur" in prep) {
+      toast.error(prep.erreur);
+      return;
+    }
+    setAjoutEnCours(true);
+    try {
+      const res = await fetch(`/api/clients/${clientId}/dimensions/tables/${refId}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ valeurs: prep.ligne }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        toast.error(json?.error || "Ajout refusé");
+        return;
+      }
+      const reports: string[] = [];
+      if (json.grandLivre?.length) reports.push("grand livre");
+      if (json.saisies > 0) reports.push(`${json.saisies} écriture(s) saisie(s)`);
+      toast.success(
+        `${def.label} : ligne ${prep.ligne[cle]} ajoutée` +
+          (reports.length ? ` — reportée sur : ${reports.join(", ")}.` : "."),
+      );
+      if (json.reclassementRequis) setMappingModifie(true);
+      setAjout(null);
+      // La nouvelle valeur doit apparaître dans la table et dans les filtres.
+      setOptionsAJour(false);
+      charger();
+    } catch {
+      toast.error("Erreur réseau");
+    } finally {
+      setAjoutEnCours(false);
+    }
+  };
+
+  /** Champ de saisie d'une nouvelle ligne, selon le type de la colonne. */
+  const champAjout = (c: ColonneDimension) => {
+    const valeur = ajout?.[c.nom] ?? "";
+    const maj = (v: string) => setAjout((a) => (a ? { ...a, [c.nom]: v } : a));
+    if (c.choix) {
+      // Radix n'accepte pas de valeur vide : « (vide) » passe par une sentinelle.
+      const VIDE = "__vide__";
+      return (
+        <Select value={valeur === "" ? VIDE : valeur} onValueChange={(v) => maj(v === VIDE ? "" : v)}>
+          <SelectTrigger className="h-8 text-xs w-32">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {c.choix.map((x) => (
+              <SelectItem key={x || VIDE} value={x || VIDE}>
+                {x || "(vide)"}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      );
+    }
+    return (
+      <Input
+        value={valeur}
+        inputMode={c.entier ? "numeric" : undefined}
+        list={c.categorie ? `referentiel-${refId}-${c.nom}` : undefined}
+        maxLength={255}
+        placeholder={c.defautLongueurDe ? "auto" : c.libelle}
+        autoFocus={c.nom === cle}
+        onChange={(e) => maj(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") ajouter();
+          if (e.key === "Escape") setAjout(null);
+        }}
+        className={cn(
+          "h-8 text-xs",
+          c.entier ? "w-20" : c.categorie || c.cle ? "w-36" : "w-full min-w-[240px]",
+        )}
+      />
+    );
+  };
+
+  const ouvrirAjout = () => {
+    setEdition(null);
+    // Valeurs initiales : la première valeur proposée pour les listes.
+    setAjout(
+      Object.fromEntries(def.colonnes.map((c) => [c.nom, c.choix ? c.choix[0] : ""])),
+    );
   };
 
   const enregistrer = async () => {
@@ -384,7 +488,7 @@ export default function DimensionsViewer({
       <CardHeader>
         <CardTitle>Tables de dimension</CardTitle>
         <CardDescription>
-          Plan comptable, mapping des rubriques (PLE), plan tiers et codes journaux. Les champs
+          Plan comptable, mapping des rubriques, plan tiers et codes journaux. Les champs
           se corrigent directement : la clé n&apos;est pas modifiable, aucune ligne n&apos;est
           supprimée, et les intitulés recopiés dans le grand livre et les écritures saisies
           suivent la modification.
@@ -452,6 +556,18 @@ export default function DimensionsViewer({
             )}
             Télécharger
           </Button>
+          {canEdit && (
+            <Button
+              size="sm"
+              onClick={ouvrirAjout}
+              disabled={!!ajout || !!edition}
+              className="gap-2 h-9 bg-[#0077C3] hover:bg-[#005992]"
+              title={`Ajouter une ligne au référentiel « ${def.label} »`}
+            >
+              <Plus className="w-4 h-4" />
+              Ajouter une ligne
+            </Button>
+          )}
           {def.reclassement && canEdit && (
             <Button
               variant="outline"
@@ -561,6 +677,42 @@ export default function DimensionsViewer({
               </tr>
             </thead>
             <tbody>
+              {ajout && (
+                <tr className="border-b bg-[#F5F9FF]">
+                  {def.colonnes.map((c) => (
+                    <td key={c.nom} className="p-2 align-middle">
+                      {champAjout(c)}
+                    </td>
+                  ))}
+                  <td className="p-2 text-right whitespace-nowrap">
+                    <div className="inline-flex items-center gap-1">
+                      <Button
+                        size="sm"
+                        onClick={ajouter}
+                        disabled={ajoutEnCours}
+                        className="h-8 gap-1.5 bg-[#0077C3] hover:bg-[#005992]"
+                      >
+                        {ajoutEnCours ? (
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        ) : (
+                          <Save className="w-3.5 h-3.5" />
+                        )}
+                        Ajouter
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setAjout(null)}
+                        disabled={ajoutEnCours}
+                        className="h-8 w-8 p-0"
+                        title="Annuler"
+                      >
+                        <X className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  </td>
+                </tr>
+              )}
               {!data || data.lignes.length === 0 ? (
                 <tr>
                   <td colSpan={nbColonnes} className="p-6 text-center text-muted-foreground">
@@ -644,7 +796,7 @@ export default function DimensionsViewer({
                             <Button
                               variant="outline"
                               size="sm"
-                              disabled={!!edition}
+                              disabled={!!edition || !!ajout}
                               onClick={() =>
                                 setEdition({ id: idLigne, cle: l[cle], valeurs: { ...l } })
                               }
