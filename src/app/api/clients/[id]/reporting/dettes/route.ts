@@ -596,7 +596,7 @@ export async function GET(
     }
 
     const kpis = {
-      // Règlement fournisseurs (DJ hors 408*).
+      // Règlement fournisseurs : solde DJ hors 408/409, hors / sur journaux de trésorerie.
       dettesFournisseursTTC: cumulDetteNee,
       decaissementFournisseursTTC: cumulRembourse,
       dettesFournisseurs: netDJ,
