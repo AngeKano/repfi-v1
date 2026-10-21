@@ -16,6 +16,9 @@ export const CODES_JOURNAUX: { code: string; label: string }[] = [
 
 export const CODE_JOURNAUX_SET = new Set(CODES_JOURNAUX.map((j) => j.code));
 
+/** Journaux de trésorerie de la saisie (Caisse, Banque). */
+export const CODES_JOURNAUX_TRESORERIE = ["CAIS", "BQ"];
+
 // Types de tiers (pour les comptes centralisateurs uniquement).
 export const TYPES_TIERS = ["Client", "Fournisseur", "Salarié", "État", "Autre"];
 

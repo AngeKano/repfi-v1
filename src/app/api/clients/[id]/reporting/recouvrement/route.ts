@@ -4,7 +4,13 @@ import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import { createClient as createClickhouseClient } from "@clickhouse/client";
 import { prisma } from "@/lib/prisma";
 import { manualBatchIdsForYears } from "@/lib/clickhouse/manual-sync";
-import { CREANCES_CLIENTS_SQL } from "@/lib/reporting/creances";
+import {
+  creancesTTCSql,
+  encaissementsTTCSql,
+  perimetreCreancesSql,
+} from "@/lib/reporting/creances";
+import { bilanRefExpr } from "@/lib/clickhouse/schema";
+import { journauxTresorerie } from "@/lib/clickhouse/plan-comptable";
 
 const clickhouseClient = createClickhouseClient({
   url: process.env.CLICKHOUSE_HOST || "http://localhost:8123",
@@ -65,9 +71,13 @@ function getYearToDateMonths(
   return months;
 }
 
+// Créances Clients TTC  = solde des comptes BI hors 418/419, hors journaux de trésorerie
+// Encaissements Clients TTC = solde des mêmes comptes, journaux de trésorerie uniquement
 async function recupererRecouvrementParYearMonth(
   dbName: string,
   batchIds: string[],
+  refExpr: string,
+  journaux: string[],
 ): Promise<Map<string, { caTTCTotal: number; caEncaisseTTC: number }>> {
   const result = new Map<
     string,
@@ -80,14 +90,14 @@ async function recupererRecouvrementParYearMonth(
       SELECT
         substring(date_transaction, 7, 4) as year,
         substring(date_transaction, 4, 2) as month,
-        sum(CASE WHEN ${CREANCES_CLIENTS_SQL} THEN debit ELSE 0 END) as ca_ttc_total,
-        sum(CASE WHEN ${CREANCES_CLIENTS_SQL} THEN credit ELSE 0 END) as ca_encaisse_ttc
+        ${creancesTTCSql(refExpr)} as ca_ttc_total,
+        ${encaissementsTTCSql(refExpr)} as ca_encaisse_ttc
       FROM ${dbName}.grand_livre
       WHERE batch_id IN ({batchIds:Array(String)})
       GROUP BY year, month
       ORDER BY year, month
     `,
-    query_params: { batchIds },
+    query_params: { batchIds, journauxTresorerie: journaux },
     format: "JSONEachRow",
   });
 
@@ -111,8 +121,8 @@ async function recupererRecouvrementParYearMonth(
 
 // ============================================================================
 // TOP 10 CRÉANCES - Clients avec les créances les plus élevées
-// Créance = Créances Clients TTC (débits) - Encaissements Clients TTC
-// (crédits), sur le périmètre CREANCES_CLIENTS_SQL (41* hors 418/419).
+// Créance = Créances Clients TTC − Encaissements Clients TTC, sur le
+// périmètre des créances (BI hors 418/419), définitions de creances.ts.
 // Le filtre période est défini par (startYear, startMonth) → (endYear, endMonth).
 // ============================================================================
 
@@ -128,6 +138,8 @@ interface TopCreance {
 async function recupererTop10Creances(
   dbName: string,
   batchIds: string[],
+  refExpr: string,
+  journaux: string[],
   endYear?: number,
   endMonth?: number,
   startYear?: number,
@@ -140,7 +152,7 @@ async function recupererTop10Creances(
   // date_transaction format: DD/MM/YYYY → year=substr(7,4), month=substr(4,2),
   // donc on compare sur la concat YYYYMM (= substr(7,4) || substr(4,2)).
   let periodFilter = "";
-  const queryParams: Record<string, unknown> = { batchIds };
+  const queryParams: Record<string, unknown> = { batchIds, journauxTresorerie: journaux };
 
   if (endYear && endMonth) {
     const effectiveStartYear = startYear ?? endYear;
@@ -170,12 +182,12 @@ async function recupererTop10Creances(
             anyIf(intitule_compte, intitule_compte != '') != '', anyIf(intitule_compte, intitule_compte != ''),
             any(compte)
           ) AS nom_client,
-          sum(debit) AS ca_ttc_total,
-          sum(credit) AS ca_encaisse_ttc,
-          sum(debit) - sum(credit) AS solde_creance
+          ${creancesTTCSql(refExpr)} AS ca_ttc_total,
+          ${encaissementsTTCSql(refExpr)} AS ca_encaisse_ttc,
+          ca_ttc_total - ca_encaisse_ttc AS solde_creance
         FROM ${dbName}.grand_livre
         WHERE batch_id IN ({batchIds:Array(String)})
-          AND ${CREANCES_CLIENTS_SQL}
+          AND ${perimetreCreancesSql(refExpr)}
           ${periodFilter}
         GROUP BY numero_client
         HAVING solde_creance > 0
@@ -299,10 +311,18 @@ export async function GET(
       ...(client.excludeManualEntries ? [] : manualBatchIdsForYears(id, manualYears)),
     ];
 
+    // Rubrique bilan (schéma fusionné ou d'origine) et journaux de trésorerie.
+    const [refExpr, journaux] = await Promise.all([
+      bilanRefExpr(clickhouseClient, dbName),
+      journauxTresorerie(clickhouseClient, dbName),
+    ]);
+
     // Récupérer les données de recouvrement
     const recouvrementData = await recupererRecouvrementParYearMonth(
       dbName,
       allBatchIds,
+      refExpr,
+      journaux,
     );
 
     // Construire les données du graphique
@@ -358,6 +378,8 @@ export async function GET(
     const topCreances = await recupererTop10Creances(
       dbName,
       allBatchIds,
+      refExpr,
+      journaux,
       endYear,
       endMonth,
       startYear,

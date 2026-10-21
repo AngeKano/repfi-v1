@@ -464,9 +464,9 @@ const DEFAULT_RECOUVREMENT_KPIS: RecouvrementKpiItem[] = [
   },
   {
     id: "creances",
-    label: "Créances Clients TTC (Débit 41*)",
+    label: "Créances Clients TTC",
     key: "caTTCTotal",
-    sub: "Somme des débits comptes clients",
+    sub: "Solde BI hors 418/419, hors journaux de trésorerie",
     color: "text-blue-600",
     icon: PiCoinsDuotone,
     visible: true,
@@ -474,9 +474,9 @@ const DEFAULT_RECOUVREMENT_KPIS: RecouvrementKpiItem[] = [
   },
   {
     id: "encaisse",
-    label: "Encaissements Clients TTC (Crédit 41*)",
+    label: "Encaissements Clients TTC",
     key: "caEncaisseTTC",
-    sub: "Somme des crédits comptes clients",
+    sub: "Solde BI hors 418/419, journaux de trésorerie uniquement",
     color: "text-green-600",
     icon: PiWalletDuotone,
     visible: true,

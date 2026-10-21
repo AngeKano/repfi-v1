@@ -5,6 +5,11 @@ import { createClient as createClickhouseClient } from "@clickhouse/client";
 import { prisma } from "@/lib/prisma";
 import { manualBatchIdsForYears } from "@/lib/clickhouse/manual-sync";
 import { bilanRefExpr } from "@/lib/clickhouse/schema";
+import { journauxTresorerie } from "@/lib/clickhouse/plan-comptable";
+import {
+  dettesFournisseursTTCSql,
+  decaissementsFournisseursTTCSql,
+} from "@/lib/reporting/creances";
 
 const clickhouseClient = createClickhouseClient({
   url: process.env.CLICKHOUSE_HOST || "http://localhost:8123",
@@ -105,10 +110,11 @@ function getYearToDateMonths(
 type RubriqueTotals = {
   credit: number;
   debit: number;
-  // Mêmes flux en excluant les comptes 408* (fournisseurs, factures non
-  // parvenues) : ils ne correspondent pas à un règlement fournisseur réel.
-  creditH408: number;
-  debitH408: number;
+  // Règlement fournisseurs (définitions de creances.ts) : DJ hors 408/409,
+  // solde des comptes hors journaux de trésorerie (dette née) et sur les
+  // journaux de trésorerie (décaissement).
+  detteFournisseurs: number;
+  decaissementFournisseurs: number;
 };
 
 // ----------------------------------------------------------------------------
@@ -119,6 +125,7 @@ async function recupererDettesParYearMonth(
   dbName: string,
   batchIds: string[],
   refExpr: string,
+  journaux: string[],
 ): Promise<Map<string, Map<string, RubriqueTotals>>> {
   const result = new Map<string, Map<string, RubriqueTotals>>();
   if (batchIds.length === 0) return result;
@@ -131,15 +138,15 @@ async function recupererDettesParYearMonth(
         ${refExpr} as rubrique,
         sum(credit) as dette_nee,
         sum(debit) as rembourse,
-        sumIf(credit, NOT startsWith(compte, '408')) as dette_nee_h408,
-        sumIf(debit, NOT startsWith(compte, '408')) as rembourse_h408
+        ${dettesFournisseursTTCSql(refExpr)} as dette_fournisseurs,
+        ${decaissementsFournisseursTTCSql(refExpr)} as decaissement_fournisseurs
       FROM ${dbName}.grand_livre
       WHERE batch_id IN ({batchIds:Array(String)})
         AND ${refExpr} IN ({rubriques:Array(String)})
       GROUP BY year, month, rubrique
       ORDER BY year, month
     `,
-    query_params: { batchIds, rubriques: ALL_DEBT_RUBRIQUE_CODES },
+    query_params: { batchIds, rubriques: ALL_DEBT_RUBRIQUE_CODES, journauxTresorerie: journaux },
     format: "JSONEachRow",
   });
 
@@ -149,8 +156,8 @@ async function recupererDettesParYearMonth(
     rubrique: string;
     dette_nee: string;
     rembourse: string;
-    dette_nee_h408: string;
-    rembourse_h408: string;
+    dette_fournisseurs: string;
+    decaissement_fournisseurs: string;
   }>;
 
   for (const row of rows) {
@@ -160,8 +167,8 @@ async function recupererDettesParYearMonth(
     byRubrique.set(row.rubrique, {
       credit: parseFloat(row.dette_nee) || 0,
       debit: parseFloat(row.rembourse) || 0,
-      creditH408: parseFloat(row.dette_nee_h408) || 0,
-      debitH408: parseFloat(row.rembourse_h408) || 0,
+      detteFournisseurs: parseFloat(row.dette_fournisseurs) || 0,
+      decaissementFournisseurs: parseFloat(row.decaissement_fournisseurs) || 0,
     });
   }
 
@@ -179,6 +186,7 @@ async function recupererDettesParJour(
   year: number,
   month: number,
   refExpr: string,
+  journaux: string[],
 ): Promise<Map<string, Map<string, RubriqueTotals>>> {
   const result = new Map<string, Map<string, RubriqueTotals>>();
   if (batchIds.length === 0) return result;
@@ -193,8 +201,8 @@ async function recupererDettesParJour(
         ${refExpr} as rubrique,
         sum(credit) as dette_nee,
         sum(debit) as rembourse,
-        sumIf(credit, NOT startsWith(compte, '408')) as dette_nee_h408,
-        sumIf(debit, NOT startsWith(compte, '408')) as rembourse_h408
+        ${dettesFournisseursTTCSql(refExpr)} as dette_fournisseurs,
+        ${decaissementsFournisseursTTCSql(refExpr)} as decaissement_fournisseurs
       FROM ${dbName}.grand_livre
       WHERE batch_id IN ({batchIds:Array(String)})
         AND ${refExpr} IN ({rubriques:Array(String)})
@@ -206,6 +214,7 @@ async function recupererDettesParJour(
     query_params: {
       batchIds,
       rubriques: ALL_DEBT_RUBRIQUE_CODES,
+      journauxTresorerie: journaux,
       year: yyyy,
       month: mm,
     },
@@ -217,8 +226,8 @@ async function recupererDettesParJour(
     rubrique: string;
     dette_nee: string;
     rembourse: string;
-    dette_nee_h408: string;
-    rembourse_h408: string;
+    dette_fournisseurs: string;
+    decaissement_fournisseurs: string;
   }>;
 
   for (const row of rows) {
@@ -227,8 +236,8 @@ async function recupererDettesParJour(
     result.get(day)!.set(row.rubrique, {
       credit: parseFloat(row.dette_nee) || 0,
       debit: parseFloat(row.rembourse) || 0,
-      creditH408: parseFloat(row.dette_nee_h408) || 0,
-      debitH408: parseFloat(row.rembourse_h408) || 0,
+      detteFournisseurs: parseFloat(row.dette_fournisseurs) || 0,
+      decaissementFournisseurs: parseFloat(row.decaissement_fournisseurs) || 0,
     });
   }
 
@@ -384,12 +393,15 @@ function netForRubrique(
 }
 
 /**
- * Flux du RÈGLEMENT FOURNISSEURS : rubrique DJ uniquement, hors comptes 408*.
+ * Flux du RÈGLEMENT FOURNISSEURS : rubrique DJ hors comptes 408* et 409*.
  *
  * L'onglet suit le cycle d'achat fournisseur — ni les dettes sociales, ni
  * fiscales, ni HAO (elles ont leur propre onglet « Dettes court terme »). Les
- * comptes 408* (factures non parvenues) sont écartés : ce sont des charges
- * estimées, pas des dettes à décaisser.
+ * 408* (factures non parvenues) sont des charges estimées et les 409*
+ * (fournisseurs débiteurs) des avances : ni l'un ni l'autre n'est une
+ * dette à décaisser.
+ *   - dette née    : solde (crédit − débit) hors journaux de trésorerie ;
+ *   - décaissement : solde (débit − crédit) sur les journaux de trésorerie.
  */
 function flowsFournisseurs(byRubrique: Map<string, RubriqueTotals> | undefined): {
   detteNee: number;
@@ -397,8 +409,8 @@ function flowsFournisseurs(byRubrique: Map<string, RubriqueTotals> | undefined):
 } {
   const t = byRubrique?.get(DEBT_RUBRIQUES.fournisseurs);
   return {
-    detteNee: t?.creditH408 ?? 0,
-    rembourse: t?.debitH408 ?? 0,
+    detteNee: t?.detteFournisseurs ?? 0,
+    rembourse: t?.decaissementFournisseurs ?? 0,
   };
 }
 
@@ -459,7 +471,11 @@ export async function GET(
 
     const dbName = getClickhouseDbName(id);
     // Schéma fusionné (une seule colonne `rubrique`) ou schéma d'origine.
-    const refExpr = await bilanRefExpr(clickhouseClient, dbName);
+    // Rubrique bilan (schéma fusionné ou d'origine) et journaux de trésorerie.
+    const [refExpr, journaux] = await Promise.all([
+      bilanRefExpr(clickhouseClient, dbName),
+      journauxTresorerie(clickhouseClient, dbName),
+    ]);
 
     const allPeriods = await prisma.comptablePeriod.findMany({
       where: { clientId: id },
@@ -482,7 +498,7 @@ export async function GET(
       startYear === endYear &&
       startMonth === endMonth;
 
-    const monthlyData = await recupererDettesParYearMonth(dbName, allBatchIds, refExpr);
+    const monthlyData = await recupererDettesParYearMonth(dbName, allBatchIds, refExpr, journaux);
 
     const chartData: DetteDataPoint[] = [];
     let cumulDetteNee = 0;
@@ -507,6 +523,7 @@ export async function GET(
         endYear,
         endMonth,
         refExpr,
+        journaux,
       );
       const daysInMonth = new Date(endYear, endMonth, 0).getDate();
 
