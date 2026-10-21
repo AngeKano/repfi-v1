@@ -77,6 +77,7 @@ export function intituleCompte(
 // plutôt que de les supposer.
 // ---------------------------------------------------------------------------
 import { tableColumns } from "./schema";
+import { CODES_JOURNAUX_TRESORERIE } from "@/lib/comptable/saisie-refs";
 
 // ---------------------------------------------------------------------------
 // Référentiel des journaux (table `code_journal`).
@@ -122,6 +123,79 @@ export function codeJournauxMap(
 
   journauxCache.set(dbName, { at: Date.now(), map });
   return map;
+}
+
+// ---------------------------------------------------------------------------
+// Journaux de trésorerie
+//
+// Les indicateurs de recouvrement et de règlement fournisseurs séparent les
+// mouvements selon le TYPE du journal : un encaissement ou un décaissement
+// passe par un journal de trésorerie, une créance ou une dette par les autres
+// (ventes, achats, OD, à-nouveaux…).
+//
+// Source : la table code_journal du client, colonne type = « Trésorerie »
+// (valeur Sage, cf. TYPES_JOURNAUX du parseur Airflow), complétée des
+// journaux de trésorerie de la saisie (CAIS, BQ). Si le référentiel n'en
+// déclare aucun, on retient les journaux qui mouvementent des comptes de
+// banque ou de caisse (52*, 57*), ce qui est la définition comptable d'un
+// journal de trésorerie.
+// ---------------------------------------------------------------------------
+const tresorerieCache = new Map<string, { at: number; liste: Promise<string[]> }>();
+
+export function journauxTresorerie(
+  client: ClickHouseClient,
+  dbName: string,
+): Promise<string[]> {
+  const hit = tresorerieCache.get(dbName);
+  if (hit && Date.now() - hit.at < TTL_MS) return hit.liste;
+
+  const liste = (async () => {
+    const codes = new Set<string>(CODES_JOURNAUX_TRESORERIE);
+    let duReferentiel = 0;
+    try {
+      const cols = await tableColumns(client, dbName, "code_journal");
+      const parMinuscule = new Map([...cols].map((n) => [n.toLowerCase(), n]));
+      const colCode = ["code_journal", "code"].map((n) => parMinuscule.get(n)).find(Boolean);
+      const colType = ["type", "type_journal"].map((n) => parMinuscule.get(n)).find(Boolean);
+      if (colCode && colType) {
+        // « Trésorerie » comme « Tresorerie », quelle que soit la casse.
+        const res = await client.query({
+          query: `SELECT DISTINCT trim(toString(\`${colCode}\`)) AS c
+                  FROM ${dbName}.code_journal FINAL
+                  WHERE positionCaseInsensitiveUTF8(toString(\`${colType}\`), 'sorerie') > 0`,
+          format: "JSONEachRow",
+        });
+        for (const r of (await res.json()) as Array<{ c: string }>) {
+          if (r.c) {
+            codes.add(r.c);
+            duReferentiel++;
+          }
+        }
+      }
+    } catch (e) {
+      console.error(`[journaux] référentiel des journaux illisible (${dbName}):`, e);
+    }
+
+    if (duReferentiel === 0) {
+      try {
+        const res = await client.query({
+          query: `SELECT DISTINCT trim(code_journal) AS c
+                  FROM ${dbName}.grand_livre
+                  WHERE code_journal != ''
+                    AND (startsWith(compte, '52') OR startsWith(compte, '57'))`,
+          format: "JSONEachRow",
+        });
+        for (const r of (await res.json()) as Array<{ c: string }>) if (r.c) codes.add(r.c);
+        console.warn(`[journaux] ${dbName} : aucun journal « Trésorerie » au référentiel, repli sur les journaux de banque/caisse`);
+      } catch (e) {
+        console.error(`[journaux] repli impossible (${dbName}):`, e);
+      }
+    }
+    return [...codes];
+  })();
+
+  tresorerieCache.set(dbName, { at: Date.now(), liste });
+  return liste;
 }
 
 export interface TiersRef {
@@ -179,4 +253,5 @@ export function invaliderReferentiels(dbName: string): void {
   cache.delete(dbName);
   tiersCache.delete(dbName);
   journauxCache.delete(dbName);
+  tresorerieCache.delete(dbName);
 }

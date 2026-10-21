@@ -677,7 +677,8 @@ export default function ClientDettesTab({
               Dettes Fournisseurs TTC vs Décaissement Fournisseurs TTC
             </CardTitle>
             <CardDescription>
-              Crédit DJ vs débit DJ, hors comptes 408* (factures non parvenues)
+              Solde DJ hors 408/409 : dettes hors journaux de trésorerie, décaissements sur
+              journaux de trésorerie
             </CardDescription>
           </div>
           <Legende

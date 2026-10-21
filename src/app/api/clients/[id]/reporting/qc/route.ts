@@ -4,7 +4,13 @@ import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import { createClient as createClickhouseClient } from "@clickhouse/client";
 import { prisma } from "@/lib/prisma";
 import { manualBatchId } from "@/lib/clickhouse/manual-sync";
-import { CREANCES_CLIENTS_SQL } from "@/lib/reporting/creances";
+import {
+  creancesTTCSql,
+  encaissementsTTCSql,
+  perimetreCreancesSql,
+} from "@/lib/reporting/creances";
+import { bilanRefExpr } from "@/lib/clickhouse/schema";
+import { journauxTresorerie } from "@/lib/clickhouse/plan-comptable";
 import {
   CA_RUBRIQUES,
   CA_PERIMETRE_SQL,
@@ -84,7 +90,19 @@ export async function GET(
 
     const startYM = `${year}01`;
     const endYM = `${year}${endMonth}`;
-    const baseParams = { batchIds, startYM, endYM, caRubriques: CA_RUBRIQUES };
+    // Mêmes définitions que la production (creances.ts) : rubrique bilan et
+    // journaux de trésorerie du client.
+    const [refExpr, journaux] = await Promise.all([
+      bilanRefExpr(clickhouseClient, dbName),
+      journauxTresorerie(clickhouseClient, dbName),
+    ]);
+    const baseParams = {
+      batchIds,
+      startYM,
+      endYM,
+      caRubriques: CA_RUBRIQUES,
+      journauxTresorerie: journaux,
+    };
 
     const checks: QcCheck[] = [];
 
@@ -98,15 +116,15 @@ export async function GET(
       });
     }
 
-    // --- Q1 : créances / encaissements clients (41* hors 418/419) -----------
+    // --- Q1 : créances / encaissements clients (BI hors 418/419) -----------
     const q1 = await clickhouseClient.query({
       query: `
         SELECT
-          sum(debit) AS ca_ttc,
-          sum(credit) AS ca_encaisse
+          ${creancesTTCSql(refExpr)} AS ca_ttc,
+          ${encaissementsTTCSql(refExpr)} AS ca_encaisse
         FROM ${dbName}.grand_livre
         WHERE batch_id IN ({batchIds:Array(String)})
-          AND ${CREANCES_CLIENTS_SQL}
+          AND ${perimetreCreancesSql(refExpr)}
           ${PERIOD_FILTER}
       `,
       query_params: baseParams,
@@ -132,10 +150,10 @@ export async function GET(
       query: `
         WITH creances AS (
           SELECT if(n_tiers != '', n_tiers, compte) AS n_tiers,
-                 sum(debit) - sum(credit) AS solde
+                 ${creancesTTCSql(refExpr)} - ${encaissementsTTCSql(refExpr)} AS solde
           FROM ${dbName}.grand_livre
           WHERE batch_id IN ({batchIds:Array(String)})
-            AND ${CREANCES_CLIENTS_SQL}
+            AND ${perimetreCreancesSql(refExpr)}
             ${PERIOD_FILTER}
           GROUP BY n_tiers
           HAVING solde > 0

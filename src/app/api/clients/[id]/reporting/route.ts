@@ -13,7 +13,9 @@ import {
   PRODUITS_RUBRIQUES,
   PRODUITS_PERIMETRE_SQL,
 } from "@/lib/reporting/chiffre-affaires";
-import { CREANCES_CLIENTS_SQL } from "@/lib/reporting/creances";
+import { creancesTTCSql, encaissementsTTCSql } from "@/lib/reporting/creances";
+import { bilanRefExpr } from "@/lib/clickhouse/schema";
+import { journauxTresorerie } from "@/lib/clickhouse/plan-comptable";
 import { planComptesMap, intituleCompte } from "@/lib/clickhouse/plan-comptable";
 
 const clickhouseClient = createClickhouseClient({
@@ -445,10 +447,11 @@ async function recupererTresorerieParJour(
 }
 
 // ============================================================================
-// RECOUVREMENT - Comptes clients (41*, hors 418 et 419)
-// Créances Clients TTC = Somme des montants au débit des comptes 41* (hors 418/419)
-// Encaissements Clients TTC = Somme des montants au crédit des comptes 41* (hors 418/419)
+// RECOUVREMENT - Comptes clients (rubrique BI, hors 418 et 419)
+// Créances Clients TTC = solde des comptes, hors journaux de trésorerie
+// Encaissements Clients TTC = solde des comptes, journaux de trésorerie uniquement
 // Taux de recouvrement = (Encaissements Clients TTC / Créances Clients TTC) * 100
+// Définitions partagées : src/lib/reporting/creances.ts.
 // ============================================================================
 
 async function recupererRecouvrementParMois(
@@ -460,19 +463,23 @@ async function recupererRecouvrementParMois(
     { caTTCTotal: number; caEncaisseTTC: number }
   >();
   if (batchIds.length === 0) return result;
+  const [refExpr, journaux] = await Promise.all([
+    bilanRefExpr(clickhouseClient, dbName),
+    journauxTresorerie(clickhouseClient, dbName),
+  ]);
 
   const data = await clickhouseClient.query({
     query: `
       SELECT
         substring(date_transaction, 4, 2) as period,
-        sum(CASE WHEN ${CREANCES_CLIENTS_SQL} THEN debit ELSE 0 END) as ca_ttc_total,
-        sum(CASE WHEN ${CREANCES_CLIENTS_SQL} THEN credit ELSE 0 END) as ca_encaisse_ttc
+        ${creancesTTCSql(refExpr)} as ca_ttc_total,
+        ${encaissementsTTCSql(refExpr)} as ca_encaisse_ttc
       FROM ${dbName}.grand_livre
       WHERE batch_id IN ({batchIds:Array(String)})
       GROUP BY period
       ORDER BY period
     `,
-    query_params: { batchIds },
+    query_params: { batchIds, journauxTresorerie: journaux },
     format: "JSONEachRow",
   });
 
@@ -502,20 +509,24 @@ async function recupererRecouvrementParJour(
     { caTTCTotal: number; caEncaisseTTC: number }
   >();
   if (batchIds.length === 0) return result;
+  const [refExpr, journaux] = await Promise.all([
+    bilanRefExpr(clickhouseClient, dbName),
+    journauxTresorerie(clickhouseClient, dbName),
+  ]);
 
   const data = await clickhouseClient.query({
     query: `
       SELECT
         substring(date_transaction, 1, 2) as period,
-        sum(CASE WHEN ${CREANCES_CLIENTS_SQL} THEN debit ELSE 0 END) as ca_ttc_total,
-        sum(CASE WHEN ${CREANCES_CLIENTS_SQL} THEN credit ELSE 0 END) as ca_encaisse_ttc
+        ${creancesTTCSql(refExpr)} as ca_ttc_total,
+        ${encaissementsTTCSql(refExpr)} as ca_encaisse_ttc
       FROM ${dbName}.grand_livre
       WHERE batch_id IN ({batchIds:Array(String)})
         AND substring(date_transaction, 4, 2) = {monthFilter:String}
       GROUP BY period
       ORDER BY period
     `,
-    query_params: { batchIds, monthFilter },
+    query_params: { batchIds, monthFilter, journauxTresorerie: journaux },
     format: "JSONEachRow",
   });
 
