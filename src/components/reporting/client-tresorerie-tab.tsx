@@ -43,6 +43,7 @@ import {
   PiChartDonutDuotone,
   PiDeviceMobileDuotone,
   PiCertificateDuotone,
+  PiCreditCardDuotone,
 } from "react-icons/pi";
 import { toast } from "sonner";
 import {
@@ -52,7 +53,11 @@ import {
   type KpiDef,
   type KpiValue,
 } from "./kpi-grid";
-import { TRESORERIE_KPIS, formuleTresorerie } from "@/lib/reporting/tresorerie";
+import {
+  TRESORERIE_KPIS,
+  RUBRIQUES_TOTAL_TRESORERIE,
+  formuleTresorerie,
+} from "@/lib/reporting/tresorerie";
 
 type PeriodType = "year" | "month" | "ytd" | "ytd-day";
 
@@ -112,6 +117,7 @@ const HABILLAGE: Record<string, { icon: React.ElementType; color: string }> = {
   instrumentsTresorerie: { icon: PiChartDonutDuotone, color: "text-orange-600" },
   monnaieElectronique: { icon: PiDeviceMobileDuotone, color: "text-emerald-600" },
   accreditifs: { icon: PiCertificateDuotone, color: "text-rose-600" },
+  autresTresoreriePassif: { icon: PiCreditCardDuotone, color: "text-red-600" },
 };
 
 // Les rubriques résiduelles (monnaie électronique, accréditifs) sont masquées
@@ -331,8 +337,9 @@ export default function ClientTresorerieTab({
             <div>
               <CardTitle>Trésorerie par comptes</CardTitle>
               <CardDescription>
-                Soldes des comptes (rubriques BSA, BSB, BSC, BSD, BSE, BSF, BSG) —{" "}
-                {data.yearN} vs {data.yearN1}
+                Soldes des comptes des rubriques du Total Trésorerie (
+                {RUBRIQUES_TOTAL_TRESORERIE.join(", ")}) — concours bancaires et dépréciations
+                en négatif — {data.yearN} vs {data.yearN1}
               </CardDescription>
             </div>
             <div className="flex flex-col gap-1 shrink-0">

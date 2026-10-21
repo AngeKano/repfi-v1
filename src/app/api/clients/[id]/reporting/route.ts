@@ -16,6 +16,7 @@ import {
 import { creancesTTCSql, encaissementsTTCSql } from "@/lib/reporting/creances";
 import { bilanRefExpr } from "@/lib/clickhouse/schema";
 import { journauxTresorerie } from "@/lib/clickhouse/plan-comptable";
+import { RUBRIQUES_TOTAL_TRESORERIE } from "@/lib/reporting/tresorerie";
 import { planComptesMap, intituleCompte } from "@/lib/clickhouse/plan-comptable";
 
 const clickhouseClient = createClickhouseClient({
@@ -376,25 +377,28 @@ async function recupererCA70ParJour(
   return result;
 }
 
+// Trésorerie de la Synthèse = Total Trésorerie de l'onglet Trésorerie : somme
+// des (débit − crédit) sur ses rubriques (actif BS…, dépréciations, concours
+// bancaires DRA/DRB/DRC/DQ). Raisonnement par rubrique, plus par compte 52/57.
 async function recupererTresorerieParMois(
   dbName: string,
   batchIds: string[],
 ): Promise<Map<string, number>> {
   const result = new Map<string, number>();
   if (batchIds.length === 0) return result;
+  const refExpr = await bilanRefExpr(clickhouseClient, dbName);
 
   const data = await clickhouseClient.query({
     query: `
       SELECT
         substring(date_transaction, 4, 2) as period,
-        sum(CASE WHEN startsWith(compte, '52') THEN debit - credit ELSE 0 END) +
-        sum(CASE WHEN startsWith(compte, '57') THEN debit - credit ELSE 0 END) as solde_tresorerie
+        sumIf(debit - credit, ${refExpr} IN ({rubriquesTresorerie:Array(String)})) as solde_tresorerie
       FROM ${dbName}.grand_livre
       WHERE batch_id IN ({batchIds:Array(String)})
       GROUP BY period
       ORDER BY period
     `,
-    query_params: { batchIds },
+    query_params: { batchIds, rubriquesTresorerie: RUBRIQUES_TOTAL_TRESORERIE },
     format: "JSONEachRow",
   });
 
@@ -417,20 +421,20 @@ async function recupererTresorerieParJour(
 ): Promise<Map<string, number>> {
   const result = new Map<string, number>();
   if (batchIds.length === 0) return result;
+  const refExpr = await bilanRefExpr(clickhouseClient, dbName);
 
   const data = await clickhouseClient.query({
     query: `
       SELECT
         substring(date_transaction, 1, 2) as period,
-        sum(CASE WHEN startsWith(compte, '52') THEN debit - credit ELSE 0 END) +
-        sum(CASE WHEN startsWith(compte, '57') THEN debit - credit ELSE 0 END) as solde_tresorerie
+        sumIf(debit - credit, ${refExpr} IN ({rubriquesTresorerie:Array(String)})) as solde_tresorerie
       FROM ${dbName}.grand_livre
       WHERE batch_id IN ({batchIds:Array(String)})
         AND substring(date_transaction, 4, 2) = {monthFilter:String}
       GROUP BY period
       ORDER BY period
     `,
-    query_params: { batchIds, monthFilter },
+    query_params: { batchIds, monthFilter, rubriquesTresorerie: RUBRIQUES_TOTAL_TRESORERIE },
     format: "JSONEachRow",
   });
 

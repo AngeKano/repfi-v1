@@ -27,7 +27,7 @@
 | XH Résultat HAO | `TN+TO + RO+RP` | TN, TO, RO, RP |
 | XI Résultat net | `XG + XH + RQ + RS` (XG = XE+XF) | RQ, RS |
 
-**KPIs dérivés** `calculerIndicateursPeriode` (`R:955-1035`) : Chiffre d'affaires (`assujetti ? XB : Σdébit 41*`), masse salariale (`|RK|`), trésorerie (`Σ(débit-crédit)` comptes 52+57), taux de recouvrement, créances/encaissements 41* (hors 418/419 sur `compte` **et** `n_tiers`), `produitsAdditionnels` (TE..TI), `totalAchats` (`|RA..RJ|`), `impotResultat` (`|RS|`).
+**KPIs dérivés** `calculerIndicateursPeriode` (`R:955-1035`) : Chiffre d'affaires (`assujetti ? XB : Σdébit 41*`), masse salariale (`|RK|`), trésorerie (Total Trésorerie **par rubrique** : BS… − dépréciations − DRA/DRB/DRC/DQ, `lib/reporting/tresorerie.ts`), taux de recouvrement, créances/encaissements (rubrique **BI** hors 418/419 sur `compte` **et** `n_tiers`, + 4495 ; **solde** des comptes, séparés par type de journal — `lib/reporting/creances.ts`), `produitsAdditionnels` (TE..TI), `totalAchats` (`|RA..RJ|`), `impotResultat` (`|RS|`).
 
 **Top 10** : clients (2 branches assujetti/non-assujetti, `R:644-792`), créances (`REC:154-216`), dettes par type et par fournisseur (`DET:218-335`).
 
@@ -153,3 +153,6 @@ Réponse : `{ client, period, checks: QcCheck[], summary: { total, pass, warn, f
 | UI / nettoyage | A7 | Recouvrement : suppression de l'état mort `recouvrementMode` ; label KPI/période clarifié (cumulé). |
 | UI | A8 | Bilan : mode verrouillé sur « Cumulé » (option Périodique retirée), granularité simplifiée. |
 | Labels | A9 | Narration + descriptions « solde » alignées sur le calcul réel (exercice). Décision : périmètre exercice conservé (pas de report à-nouveau). |
+| 21/10/2026 | Définitions | Recouvrement Clients : créances = solde BI hors 418/419 **hors journaux de trésorerie**, encaissements = solde des mêmes comptes **sur journaux de trésorerie uniquement** (Synthèse, Recouvrement, QC). Règlement Fournisseurs : dettes = solde DJ hors 408/409 hors trésorerie, décaissements = solde DJ hors 408/409 sur trésorerie. Journal de trésorerie = type « Trésorerie » de `code_journal` + `CAIS`/`BQ` (repli : journaux mouvementant 52*/57*). Définitions uniques : `lib/reporting/creances.ts`. |
+| 21/10/2026 | Trésorerie | Calcul entièrement par rubrique (actif BS… et passif DRA/DRB/DRC/DQ) ; nouveau KPI « Autres Trésorerie Passif » (DRC + DQ) ; Banque = BSB − BSB1 − DRA − DRB ; trésorerie de la Synthèse alignée sur le Total Trésorerie (plus de comptes 52/57). |
+| 21/10/2026 | États financiers | Vue mois par mois : chaque mois de janvier au mois du filtre est calculé en **périodique** (mouvements du mois, à-nouveau en janvier), suivi du **Cumul N** (somme des mois = janvier → mois) et du **Cumul N-1** (même fenêtre). À l'écran : un mois à la fois (flèches ‹ › dans l'en-tête), REF et libellé figés. Actif : NET par mois, BRUT / AMORT / NET au cumul N, NET au cumul N-1. CJ de chaque période = CJ classé + XI de la même période. Export PDF (A3 paysage au-delà de 8 colonnes) et Excel (volets figés) avec tous les mois. |

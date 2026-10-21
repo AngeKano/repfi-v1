@@ -1,11 +1,12 @@
 // ============================================================================
-// Onglet « Trésorerie » — soldes des rubriques BS… (caisse, banques, régies
-// d'avance, établissements financiers, instruments de trésorerie, monnaie
-// électronique, accréditifs), comparés à l'exercice N-1.
+// Onglet « Trésorerie » — entièrement calculé par RUBRIQUE : trésorerie
+// actif (BS… : caisse, banques, régies d'avance, établissements financiers,
+// instruments de trésorerie, monnaie électronique, accréditifs) et trésorerie
+// passif (DRA, DRB, DRC, DQ : concours bancaires), comparées à l'exercice N-1.
 //
-// Un solde de trésorerie se lit en débit − crédit ; les rubriques de
-// dépréciation (suffixe « 1 ») sont lues en crédit − débit, comme la colonne
-// AMORT. du bilan, pour pouvoir être retranchées du brut.
+// Conventions de solde (soldeRubriqueSql) : actif en débit − crédit,
+// dépréciations (suffixe « 1 ») et passif en crédit − débit, pour pouvoir être
+// retranchés dans les formules.
 // ============================================================================
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
@@ -18,7 +19,9 @@ import { planComptesMap, intituleCompte } from "@/lib/clickhouse/plan-comptable"
 import { AMORT_PREFIXES } from "@/lib/reporting/etats-financiers";
 import {
   TRESORERIE_KPIS,
-  TRESORERIE_RUBRIQUES,
+  RUBRIQUES_TRESORERIE,
+  RUBRIQUES_TOTAL_TRESORERIE,
+  soldeRubriqueSql,
   valeurTresorerie,
 } from "@/lib/reporting/tresorerie";
 
@@ -118,17 +121,25 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       if (batchIds.length === 0) return { rubriques, comptes };
 
       const { start, end } = fenetre(y);
-      const qp = { batchIds, startYM: start, endYM: end, rubriques: TRESORERIE_RUBRIQUES };
+      const qp = {
+        batchIds,
+        startYM: start,
+        endYM: end,
+        // Soldes à lire pour les indicateurs (actif et passif).
+        indicateurs: RUBRIQUES_TRESORERIE,
+        // Détail par compte : les rubriques du Total, pour que la ligne
+        // « Total Trésorerie » du tableau égale l'indicateur.
+        rubriques: RUBRIQUES_TOTAL_TRESORERIE,
+      };
       try {
         const [rRes, cRes] = await Promise.all([
           clickhouse.query({
             query: `
               SELECT ${REF_EXPR} AS ref,
-                     sumIf(debit - credit, NOT (${IS_AMORT}))
-                       + sumIf(credit - debit, ${IS_AMORT}) AS solde
+                     ${soldeRubriqueSql(REF_EXPR, IS_AMORT)} AS solde
               FROM ${dbName}.grand_livre
               WHERE batch_id IN ({batchIds:Array(String)})
-                AND startsWith(${REF_EXPR}, 'BS')
+                AND ${REF_EXPR} IN ({indicateurs:Array(String)})
                 AND ${YM} >= {startYM:String} AND ${YM} <= {endYM:String}
               GROUP BY ref
             `,
