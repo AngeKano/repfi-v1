@@ -11,6 +11,7 @@
 import { createClient as createClickhouseClient } from "@clickhouse/client";
 import { prisma } from "@/lib/prisma";
 import { hasBilanRubrique } from "./schema";
+import { chargerPle, classerCompte } from "./ple";
 
 const clickhouseClient = createClickhouseClient({
   url: process.env.CLICKHOUSE_HOST || "http://localhost:8123",
@@ -107,11 +108,42 @@ export async function syncManualBatch(
   try {
     const colonneBilan = await hasBilanRubrique(clickhouseClient, dbName);
 
-    // 0. Schéma fusionné : une saisie reprend la rubrique que ClickHouse porte
-    //    déjà pour son compte dans ce lot (éventuellement reclassée par
-    //    Airflow). La copie Postgres est alignée pour que l'onglet
-    //    Comptabilité affiche la même valeur.
-    if (!colonneBilan && entries.length > 0) {
+    // 0. Rubriques des saisies. Elles ne passent pas par l'ETL : on applique
+    //    ici le mapping `ple` avec la même règle qu'Airflow, sur le solde de
+    //    chaque compte dans le lot (sens débiteur / créditeur des comptes
+    //    mixtes). La copie Postgres est alignée pour que l'onglet Comptabilité
+    //    affiche la même valeur. Un compte sans règle garde sa rubrique.
+    const ple = entries.length > 0 ? await chargerPle(clickhouseClient, dbName) : null;
+    if (ple && ple.taille > 0) {
+      const soldes = new Map<string, number>();
+      for (const e of entries)
+        soldes.set(e.compte, (soldes.get(e.compte) || 0) + e.debit - e.credit);
+      const changees = new Map<string, { rubrique: string; bilanRubrique: string }>();
+      for (const [compte, solde] of soldes) {
+        const { pl, bilan } = classerCompte(ple, compte, solde);
+        if (!pl && !bilan) continue;
+        // Schéma fusionné : un seul code, porté par les deux champs.
+        // Ancien schéma : rubrique de gestion et rubrique de bilan séparées.
+        changees.set(
+          compte,
+          colonneBilan
+            ? { rubrique: pl, bilanRubrique: bilan }
+            : { rubrique: pl || bilan, bilanRubrique: pl || bilan },
+        );
+      }
+      for (const e of entries) {
+        const c = changees.get(e.compte);
+        if (c) Object.assign(e, c);
+      }
+      for (const [compte, data] of changees) {
+        await prisma.manualLedgerEntry.updateMany({
+          where: { clientId, year, compte, NOT: data },
+          data,
+        });
+      }
+    } else if (!colonneBilan && entries.length > 0) {
+      // Pas de mapping lisible : on reprend la rubrique que ClickHouse porte
+      // déjà pour le compte dans ce lot (éventuellement reclassée par Airflow).
       try {
         const actuelles = await rubriquesDuLot(dbName, batch);
         const changees = new Map<string, string>();

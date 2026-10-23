@@ -77,6 +77,7 @@ import {
 } from "react-icons/pi";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import ClientAnalyseCharges from "./client-analyse-charges";
 import { KpiGrid, type KpiDef, type KpiValue } from "./kpi-grid";
 
 interface DataPoint {
@@ -254,6 +255,12 @@ const NAV_ITEMS: NavItem[] = [
     subItems: [],
   },
 ];
+
+// Clients dont l'année a déjà été calée sur l'exercice le plus récent. Le
+// composant est remonté à chaque retour sur un onglet de reporting (et quand on
+// change la prise en compte des saisies) : sans ce registre, l'année choisie
+// par l'utilisateur serait écrasée à chaque remontage.
+const anneesCalees = new Set<string>();
 
 const INITIAL_TUNNEL_METRICS: TunnelMetric[] = [
   {
@@ -995,7 +1002,9 @@ export default function ClientReportingChart({
         // Initialiser aussi le recouvrement sur l'année/mois le plus récent
         setRecouvrementYear(mostRecentYear);
         setRecouvrementMonth("12");
-        if (mostRecentYear !== year) {
+        const dejaCalee = anneesCalees.has(clientId);
+        anneesCalees.add(clientId);
+        if (!dejaCalee && mostRecentYear !== year) {
           setYear(mostRecentYear);
           return;
         }
@@ -2450,6 +2459,14 @@ export default function ClientReportingChart({
 
             {/* Tunnel de rentabilité */}
             <TunnelRentabilite />
+
+            {/* Analyse des charges : cascade, poids dans le CA, pont N / N-1 */}
+            <ClientAnalyseCharges
+              clientId={clientId}
+              year={year}
+              periodType={periodType}
+              selectedMonth={selectedMonth}
+            />
           </div>
         );
 
