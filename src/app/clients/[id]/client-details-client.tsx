@@ -134,6 +134,9 @@ export default function ClientDetailsClient({
     !!initialClient?.excludeManualEntries,
   );
   const [togglingManual, setTogglingManual] = useState(false);
+  // Incrémenté pour forcer le rechargement des données de l'onglet courant
+  // (remontage du contenu) sans quitter l'onglet ni perdre les filtres.
+  const [versionDonnees, setVersionDonnees] = useState(0);
 
   const toggleExcludeManual = async (next: boolean) => {
     setTogglingManual(true);
@@ -149,8 +152,10 @@ export default function ClientDetailsClient({
         setError("Impossible de mettre à jour l'inclusion des saisies.");
         return;
       }
-      // Recharger pour refléter l'avant/après sur l'ensemble du reporting.
-      window.location.reload();
+      // Recharger les données pour refléter l'avant/après, en restant sur
+      // l'onglet en cours (un rechargement complet ramenait à la Synthèse).
+      setVersionDonnees((v) => v + 1);
+      router.refresh();
     } catch {
       setExcludeManual(!next);
       setError("Erreur réseau.");
@@ -427,7 +432,7 @@ export default function ClientDetailsClient({
               </Button>
             </div>
 
-            <div className="min-w-0">
+            <div className="min-w-0" key={versionDonnees}>
               {/* Onglets financiers — instance unique pour préserver les filtres
                 entre Synthèse / Chiffres / Résultats. Recouvrement a ses
                 propres filtres internes. */}

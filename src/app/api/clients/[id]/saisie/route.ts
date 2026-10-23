@@ -12,7 +12,8 @@ import {
   manualBatchId,
 } from "@/lib/clickhouse/manual-sync";
 import { parseGlFilters, buildClickhouseFilter } from "@/lib/comptable/gl-filters";
-import { bilanRefExpr } from "@/lib/clickhouse/schema";
+import { bilanRefExpr, hasBilanRubrique } from "@/lib/clickhouse/schema";
+import { chargerPle, classerCompte } from "@/lib/clickhouse/ple";
 import {
   planComptesMap,
   planTiersList,
@@ -456,10 +457,30 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       }));
 
     // Lignes saisies de la période (éditables).
-    const manual = await prisma.manualLedgerEntry.findMany({
-      where: { clientId: id, year: annee },
-      orderBy: [{ dateTransaction: "asc" }, { numeroPiece: "asc" }, { createdAt: "asc" }],
-    });
+    const lireSaisies = () =>
+      prisma.manualLedgerEntry.findMany({
+        where: { clientId: id, year: annee },
+        orderBy: [{ dateTransaction: "asc" }, { numeroPiece: "asc" }, { createdAt: "asc" }],
+      });
+    let manual = await lireSaisies();
+    // Saisies enregistrées sans rubrique (avant l'application du mapping) :
+    // on les reclasse une fois, ce qui réécrit aussi le lot ClickHouse. Seulement
+    // si le mapping a une règle pour l'un de ces comptes, sinon la
+    // resynchronisation serait relancée à chaque affichage pour rien.
+    const sansRubrique = manual.filter((m) => !m.rubrique && !m.bilanRubrique);
+    if (sansRubrique.length > 0) {
+      const ple = await chargerPle(clickhouse, getClickhouseDbName(id));
+      const classable =
+        !!ple &&
+        sansRubrique.some((m) => {
+          const r = classerCompte(ple, m.compte, m.debit - m.credit);
+          return !!(r.pl || r.bilan);
+        });
+      if (classable) {
+        await syncManualBatch(id, annee);
+        manual = await lireSaisies();
+      }
+    }
     const debit = manual.reduce((s, m) => s + m.debit, 0);
     const credit = manual.reduce((s, m) => s + m.credit, 0);
 
@@ -606,6 +627,29 @@ async function prepareEcritureRows(opts: {
       return { error: NextResponse.json({ error: `Compte inexistant : ${l.compte}. Utilisez un compte du plan existant.` }, { status: 400 }) };
     if (isCentralizingAccount(l.compte) && l.nTiers && !tiersMap.has(l.nTiers))
       return { error: NextResponse.json({ error: `Tiers inexistant : ${l.nTiers}.` }, { status: 400 }) };
+  }
+
+  // Rubrique d'après le mapping `ple`, comme à l'import (Airflow). Le solde
+  // pris ici est celui de l'écriture ; la synchronisation le recalcule
+  // ensuite sur l'ensemble des saisies de l'exercice. À défaut de règle, la
+  // rubrique héritée du grand livre est conservée.
+  const ple = await chargerPle(clickhouse, dbName);
+  if (ple && ple.taille > 0) {
+    const colonneBilan = await hasBilanRubrique(clickhouse, dbName);
+    const soldes = new Map<string, number>();
+    for (const l of lignes) soldes.set(l.compte, (soldes.get(l.compte) || 0) + l.debit - l.credit);
+    for (const [compte, solde] of soldes) {
+      const { pl, bilan } = classerCompte(ple, compte, solde);
+      const c = compteMap.get(compte);
+      if (!c || (!pl && !bilan)) continue;
+      if (colonneBilan) {
+        c.rubrique = pl;
+        c.bilan = bilan;
+      } else {
+        c.rubrique = pl || bilan;
+        c.bilan = pl || bilan;
+      }
+    }
   }
 
   const rows: PreparedRow[] = lignes.map((l) => {
