@@ -267,8 +267,8 @@ export default function NewClientForm() {
                       Assujetti a la TVA
                     </Label>
                     <p className="text-xs text-gray-500">
-                      Si active, le CA est calcule sur les comptes 70 (ventes HT).
-                      Sinon, sur les comptes 41 (clients TTC).
+                      Si activé, le CA est calculé sur les rubriques de ventes TA à TD (HT).
+                      Sinon, sur les créances clients, rubrique BI (TTC).
                     </p>
                   </div>
                   <Switch

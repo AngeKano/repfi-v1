@@ -10,7 +10,7 @@ import {
   BILAN_ACTIF,
   BILAN_PASSIF,
   COMPTE_RESULTAT,
-  AMORT_PREFIXES,
+  estAmortSql,
   applyTotals,
   computeResultatTotals,
   normalizeRef,
@@ -39,9 +39,6 @@ const ACTIF_REFS = new Set(BILAN_ACTIF.map((l) => l.ref));
 const PASSIF_REFS = new Set(BILAN_PASSIF.map((l) => l.ref));
 const RESULTAT_REFS = new Set(COMPTE_RESULTAT.map((l) => l.ref));
 
-// Condition SQL « le compte est un compte d'amortissement / dépréciation ».
-// Les préfixes sont des constantes du modèle (aucune entrée utilisateur).
-const IS_AMORT = AMORT_PREFIXES.map((p) => `startsWith(compte, '${p}')`).join(" OR ");
 // date_transaction est une String "DD/MM/YYYY" → période comparable "YYYYMM".
 const YM = "concat(substring(date_transaction, 7, 4), substring(date_transaction, 4, 2))";
 
@@ -150,6 +147,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     const REF_EXPR = await bilanRefExpr(clickhouse, dbName);
     const BILAN_REF = bilanRefSql(REF_EXPR);
     const BILAN_INCLUDE = bilanIncludeSql(REF_EXPR);
+    // Amortissements / dépréciations : reconnus à leur RUBRIQUE (AE1, BB1…).
+    const IS_AMORT = estAmortSql(REF_EXPR);
 
     const periods = await prisma.comptablePeriod.findMany({
       where: { clientId: id },

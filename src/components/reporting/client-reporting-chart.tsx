@@ -2249,8 +2249,9 @@ export default function ClientReportingChart({
               <div className="flex items-center gap-2 p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800">
                 <AlertTriangle className="w-4 h-4 shrink-0" />
                 <span>
-                  Client non assujetti TVA — Le CA est calcule sur les comptes
-                  clients (41*) au lieu des comptes de ventes (70*).
+                  Client non assujetti TVA — Le CA est calculé sur les créances
+                  clients TTC (rubrique BI hors 418/419) au lieu des rubriques de
+                  ventes (TA à TD).
                 </span>
               </div>
             )}

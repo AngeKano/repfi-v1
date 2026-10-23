@@ -22,21 +22,35 @@ export const CODES_JOURNAUX_TRESORERIE = ["CAIS", "BQ"];
 // Types de tiers (pour les comptes centralisateurs uniquement).
 export const TYPES_TIERS = ["Client", "Fournisseur", "Salarié", "État", "Autre"];
 
-// Un compte est "centralisateur" (rattaché à des tiers) s'il commence par 40
-// (fournisseurs) ou 41 (clients). Pour les autres comptes, les champs tiers
-// (N° Tiers, Type Tiers, Intitulé Tiers) doivent être grisés / vides.
-export function isCentralizingAccount(compte: string): boolean {
-  return /^(40|41)/.test((compte || "").trim());
+// Comptes rattachés à des tiers, reconnus par leur RUBRIQUE de bilan (et non
+// plus par le préfixe 40 / 41 du numéro de compte) :
+//   BI clients · DI clients créditeurs (avances reçues) → « Client »
+//   DJ fournisseurs · BH fournisseurs débiteurs (avances versées) → « Fournisseur »
+// Pour les autres comptes, les champs tiers (N° Tiers, Type Tiers, Intitulé
+// Tiers) sont grisés / vidés.
+const TYPE_TIERS_PAR_RUBRIQUE: Record<string, string> = {
+  BI: "Client",
+  DI: "Client",
+  DJ: "Fournisseur",
+  BH: "Fournisseur",
+};
+
+/**
+ * Rubrique de bilan d'un compte : `bilan` sur l'ancien schéma (deux
+ * colonnes), sinon la rubrique unique du schéma fusionné.
+ */
+export function rubriqueTiers(rubrique?: string, bilan?: string): string {
+  return (bilan || rubrique || "").trim().toUpperCase();
 }
 
-// Suggestion de type de tiers selon le préfixe du compte.
-export function suggestTypeTiers(compte: string): string {
-  const c = (compte || "").trim();
-  if (c.startsWith("401")) return "Fournisseur";
-  if (c.startsWith("411")) return "Client";
-  if (c.startsWith("42")) return "Salarié";
-  if (c.startsWith("44")) return "État";
-  return "";
+/** Le compte (via sa rubrique) est rattaché à des tiers. */
+export function exigeTiers(rubrique: string): boolean {
+  return rubrique in TYPE_TIERS_PAR_RUBRIQUE;
+}
+
+/** Type de tiers déduit de la rubrique (« » si le compte n'a pas de tiers). */
+export function typeTiersRubrique(rubrique: string): string {
+  return TYPE_TIERS_PAR_RUBRIQUE[rubrique] ?? "";
 }
 
 // Origine d'une ligne du grand livre (colonne "Flags" de l'export / filtres).

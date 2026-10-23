@@ -25,8 +25,9 @@ import {
   CODE_JOURNAUX_SET,
   FLAG_IMPORT,
   FLAG_SAISIE,
-  isCentralizingAccount,
-  suggestTypeTiers,
+  exigeTiers,
+  rubriqueTiers,
+  typeTiersRubrique,
 } from "@/lib/comptable/saisie-refs";
 
 const clickhouse = createClickhouseClient({
@@ -394,15 +395,26 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       }
     }
 
+    // Compte du plan jamais mouvementé : sa rubrique vient du mapping (règle
+    // Airflow, solde nul), pour que l'écran sache s'il porte un tiers.
+    const pleRef = await chargerPle(clickhouse, dbName);
+    const colonneBilanRef = pleRef ? await hasBilanRubrique(clickhouse, dbName) : false;
     comptes = [...new Set([...plan.keys(), ...rubParCompte.keys()])]
       .sort()
       .map((c) => {
         const gl = rubParCompte.get(c);
+        let rubrique = gl?.rubrique ?? "";
+        let bilan = gl?.bilan ?? "";
+        if (!rubrique && !bilan && pleRef) {
+          const r = classerCompte(pleRef, c, 0);
+          rubrique = colonneBilanRef ? r.pl : r.pl || r.bilan;
+          bilan = colonneBilanRef ? r.bilan : r.pl || r.bilan;
+        }
         return {
           compte: c,
           intitule: intituleCompte(plan, c, gl?.intitule ?? ""),
-          rubrique: gl?.rubrique ?? "",
-          bilan: gl?.bilan ?? "",
+          rubrique,
+          bilan,
         };
       });
 
@@ -611,22 +623,15 @@ async function prepareEcritureRows(opts: {
       return { error: NextResponse.json({ error: "Chaque ligne doit avoir un débit ou un crédit (valeur non nulle)." }, { status: 400 }) };
   }
 
-  // Comptes existants ; tiers uniquement pour comptes centralisateurs (401/411).
+  // Comptes existants ; tiers uniquement pour les rubriques de tiers (BI, DI, DJ, BH).
   const dbName = getClickhouseDbName(clientId);
   const refExpr = await bilanRefExpr(clickhouse, dbName);
   const allPeriods = await prisma.comptablePeriod.findMany({ where: { clientId }, select: { batchId: true } });
   const realBatchIds = allPeriods.map((p) => p.batchId).filter(Boolean);
   const compteMap = await lookupComptes(dbName, realBatchIds, [...new Set(lignes.map((l) => l.compte))], refExpr);
-  const wantedTiers = [
-    ...new Set(lignes.filter((l) => isCentralizingAccount(l.compte) && l.nTiers).map((l) => l.nTiers)),
-  ];
-  const tiersMap = await lookupTiers(dbName, realBatchIds, wantedTiers);
-
   for (const l of lignes) {
     if (!compteMap.has(l.compte))
       return { error: NextResponse.json({ error: `Compte inexistant : ${l.compte}. Utilisez un compte du plan existant.` }, { status: 400 }) };
-    if (isCentralizingAccount(l.compte) && l.nTiers && !tiersMap.has(l.nTiers))
-      return { error: NextResponse.json({ error: `Tiers inexistant : ${l.nTiers}.` }, { status: 400 }) };
   }
 
   // Rubrique d'après le mapping `ple`, comme à l'import (Airflow). Le solde
@@ -652,9 +657,23 @@ async function prepareEcritureRows(opts: {
     }
   }
 
+  // Tiers : uniquement sur les lignes dont la rubrique est rattachée à des
+  // tiers (BI, DI, DJ, BH).
+  const avecTiers = (compte: string) => {
+    const c = compteMap.get(compte);
+    return exigeTiers(rubriqueTiers(c?.rubrique, c?.bilan));
+  };
+  const wantedTiers = [...new Set(lignes.filter((l) => avecTiers(l.compte) && l.nTiers).map((l) => l.nTiers))];
+  const tiersMap = await lookupTiers(dbName, realBatchIds, wantedTiers);
+  for (const l of lignes) {
+    if (avecTiers(l.compte) && l.nTiers && !tiersMap.has(l.nTiers))
+      return { error: NextResponse.json({ error: `Tiers inexistant : ${l.nTiers}.` }, { status: 400 }) };
+  }
+
   const rows: PreparedRow[] = lignes.map((l) => {
     const c = compteMap.get(l.compte)!;
-    const central = isCentralizingAccount(l.compte);
+    const rubriqueBilan = rubriqueTiers(c.rubrique, c.bilan);
+    const central = exigeTiers(rubriqueBilan);
     return {
       clientId,
       comptablePeriodId: period.id,
@@ -663,11 +682,11 @@ async function prepareEcritureRows(opts: {
       codeJournal,
       compte: l.compte,
       intituleCompte: c.intitule,
-      // Champs tiers vidés si le compte n'est pas centralisateur (spec).
-      // Type tiers dérivé du compte (401→Fournisseur, 411→Client…), comme à l'upload.
+      // Champs tiers vidés si la rubrique n'est pas rattachée à des tiers.
+      // Type tiers dérivé de la rubrique (BI/DI → Client, DJ/BH → Fournisseur).
       nTiers: central ? l.nTiers || "" : "",
       intituleTiers: central && l.nTiers ? tiersMap.get(l.nTiers) || "" : "",
-      typeTiers: central ? suggestTypeTiers(l.compte) || l.typeTiers || "" : "",
+      typeTiers: central ? typeTiersRubrique(rubriqueBilan) || l.typeTiers || "" : "",
       rubrique: c.rubrique,
       bilanRubrique: c.bilan,
       numeroPiece,

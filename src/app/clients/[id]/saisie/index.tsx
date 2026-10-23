@@ -61,8 +61,9 @@ import { cn } from "@/lib/utils";
 import {
   CODES_JOURNAUX,
   FLAG_SAISIE,
-  isCentralizingAccount,
-  suggestTypeTiers,
+  exigeTiers,
+  rubriqueTiers,
+  typeTiersRubrique,
 } from "@/lib/comptable/saisie-refs";
 
 // ==================== Types ====================
@@ -818,7 +819,9 @@ function GrandLivreSaisie({ clientId }: { clientId: string }) {
                   <tbody>
                     {lines.map((l, i) => {
                       const info = compteInfo(l.compte);
-                      const central = isCentralizingAccount(l.compte);
+                      // Tiers selon la RUBRIQUE du compte (BI, DI, DJ, BH).
+                      const rubriqueBilan = rubriqueTiers(info?.rubrique, info?.bilan);
+                      const central = exigeTiers(rubriqueBilan);
                       return (
                         <tr key={i}>
                           <td className="p-1 text-muted-foreground">{i + 1}</td>
@@ -828,10 +831,12 @@ function GrandLivreSaisie({ clientId }: { clientId: string }) {
                               value={l.compte}
                               onChange={(e) => {
                                 const compte = e.target.value;
-                                const c = isCentralizingAccount(compte);
+                                const ref = compteInfo(compte);
+                                const r = rubriqueTiers(ref?.rubrique, ref?.bilan);
+                                const c = exigeTiers(r);
                                 setLine(i, {
                                   compte,
-                                  typeTiers: c ? suggestTypeTiers(compte) : "",
+                                  typeTiers: c ? typeTiersRubrique(r) : "",
                                   nTiers: c ? l.nTiers : "",
                                 });
                               }}
@@ -865,7 +870,7 @@ function GrandLivreSaisie({ clientId }: { clientId: string }) {
                             />
                           </td>
                           <td className="p-1">
-                            <AutoCell value={central ? suggestTypeTiers(l.compte) : ""} className="w-24" />
+                            <AutoCell value={central ? typeTiersRubrique(rubriqueBilan) : ""} className="w-24" />
                           </td>
                           <td className="p-1">
                             <AutoCell value={rubriqueUnique(info?.rubrique, info?.bilan)} className="w-20" />

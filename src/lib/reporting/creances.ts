@@ -32,13 +32,21 @@ export const JOURNAL_TRESORERIE_SQL =
  * exactement comme les autres.
  */
 export function perimetreCreancesSql(refExpr: string): string {
+  return `(${perimetreClientsSql(refExpr)} OR startsWith(compte, '4495'))`;
+}
+
+/**
+ * Clients au sens strict : rubrique BI hors 418/419, SANS le 4495. Sert à
+ * retrouver le tiers client d'une vente (Top 10 clients) : une subvention à
+ * recevoir n'est pas une ligne client.
+ */
+export function perimetreClientsSql(refExpr: string): string {
   return (
-    `((${refExpr} = 'BI' ` +
+    `(${refExpr} = 'BI' ` +
     "AND NOT startsWith(compte, '418') " +
     "AND NOT startsWith(compte, '419') " +
     "AND NOT startsWith(n_tiers, '418') " +
-    "AND NOT startsWith(n_tiers, '419')) " +
-    "OR startsWith(compte, '4495'))"
+    "AND NOT startsWith(n_tiers, '419'))"
   );
 }
 

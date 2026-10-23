@@ -13,7 +13,17 @@ import {
   PRODUITS_RUBRIQUES,
   PRODUITS_PERIMETRE_SQL,
 } from "@/lib/reporting/chiffre-affaires";
-import { creancesTTCSql, encaissementsTTCSql } from "@/lib/reporting/creances";
+import {
+  creancesTTCSql,
+  encaissementsTTCSql,
+  perimetreClientsSql,
+  perimetreCreancesSql,
+} from "@/lib/reporting/creances";
+import {
+  XB_RUBRIQUES,
+  RUBRIQUES_CHARGES,
+  RUBRIQUES_PRODUITS,
+} from "@/lib/reporting/etats-financiers";
 import { bilanRefExpr } from "@/lib/clickhouse/schema";
 import { journauxTresorerie } from "@/lib/clickhouse/plan-comptable";
 import { RUBRIQUES_TOTAL_TRESORERIE } from "@/lib/reporting/tresorerie";
@@ -24,6 +34,15 @@ const clickhouseClient = createClickhouseClient({
   username: process.env.CLICKHOUSE_USER || "default",
   password: process.env.CLICKHOUSE_PASSWORD || "",
 });
+
+// Charges et produits par RUBRIQUE du compte de résultat (R… / T…), et non
+// plus par classe de comptes (6/81/83… et 7/82/84…). Le préfixe de deux
+// lettres absorbe d'éventuelles subdivisions (RK1…).
+const CHARGES_SQL =
+  "sumIf(debit - credit, substring(rubrique, 1, 2) IN ({rubriquesCharges:Array(String)}))";
+const PRODUITS_SQL =
+  "sumIf(credit - debit, substring(rubrique, 1, 2) IN ({rubriquesProduits:Array(String)}))";
+const PARAMS_FLUX = { rubriquesCharges: RUBRIQUES_CHARGES, rubriquesProduits: RUBRIQUES_PRODUITS };
 
 function getClickhouseDbName(id: string): string {
   const cleanId = id.replace(/[^a-zA-Z0-9]/g, "_");
@@ -304,10 +323,11 @@ async function recupererRubriquesParJour(
 }
 
 // ============================================================================
-// CA COMPTES 70* — Somme directe credit-debit sur les comptes 70
+// CHIFFRE D'AFFAIRES — rubriques XB (TA + TB + TC + TD), crédit − débit.
+// (Anciennement les comptes 70* : la règle est désormais la rubrique.)
 // ============================================================================
 
-async function recupererCA70ParMois(
+async function recupererCAXBParMois(
   dbName: string,
   batchIds: string[],
 ): Promise<Map<string, number>> {
@@ -318,30 +338,30 @@ async function recupererCA70ParMois(
     query: `
       SELECT
         substring(date_transaction, 4, 2) as period,
-        sum(credit - debit) as ca70
+        sum(credit - debit) as caXB
       FROM ${dbName}.grand_livre
       WHERE batch_id IN ({batchIds:Array(String)})
-        AND startsWith(compte, '70')
+        AND rubrique IN ({xbRubriques:Array(String)})
       GROUP BY period
       ORDER BY period
     `,
-    query_params: { batchIds },
+    query_params: { batchIds, xbRubriques: XB_RUBRIQUES },
     format: "JSONEachRow",
   });
 
   const rows = (await data.json()) as Array<{
     period: string;
-    ca70: string;
+    caXB: string;
   }>;
 
   for (const row of rows) {
-    result.set(row.period, parseFloat(row.ca70) || 0);
+    result.set(row.period, parseFloat(row.caXB) || 0);
   }
 
   return result;
 }
 
-async function recupererCA70ParJour(
+async function recupererCAXBParJour(
   dbName: string,
   batchIds: string[],
   monthFilter: string,
@@ -353,25 +373,25 @@ async function recupererCA70ParJour(
     query: `
       SELECT
         substring(date_transaction, 1, 2) as period,
-        sum(credit - debit) as ca70
+        sum(credit - debit) as caXB
       FROM ${dbName}.grand_livre
       WHERE batch_id IN ({batchIds:Array(String)})
         AND substring(date_transaction, 4, 2) = {monthFilter:String}
-        AND startsWith(compte, '70')
+        AND rubrique IN ({xbRubriques:Array(String)})
       GROUP BY period
       ORDER BY period
     `,
-    query_params: { batchIds, monthFilter },
+    query_params: { batchIds, monthFilter, xbRubriques: XB_RUBRIQUES },
     format: "JSONEachRow",
   });
 
   const rows = (await data.json()) as Array<{
     period: string;
-    ca70: string;
+    caXB: string;
   }>;
 
   for (const row of rows) {
-    result.set(row.period, parseFloat(row.ca70) || 0);
+    result.set(row.period, parseFloat(row.caXB) || 0);
   }
 
   return result;
@@ -687,11 +707,20 @@ async function recupererTop10Clients(
   assujettiTVA: boolean = true,
 ): Promise<TopClient[]> {
   if (batchIds.length === 0) return [];
+  // Rubrique bilan (schéma fusionné ou d'origine) et journaux de trésorerie.
+  const [refExpr, journaux] = await Promise.all([
+    bilanRefExpr(clickhouseClient, dbName),
+    journauxTresorerie(clickhouseClient, dbName),
+  ]);
 
   // Construire le filtre de période selon le mode sélectionné
   // date_transaction format: DD/MM/YYYY
   let periodFilter = "";
-  const queryParams: Record<string, unknown> = { batchIds, caRubriques: CA_RUBRIQUES };
+  const queryParams: Record<string, unknown> = {
+    batchIds,
+    caRubriques: CA_RUBRIQUES,
+    journauxTresorerie: journaux,
+  };
 
   if (periodType === "month" && selectedMonth) {
     periodFilter = `AND substring(date_transaction, 4, 2) = {monthFilter:String}`;
@@ -710,7 +739,7 @@ async function recupererTop10Clients(
 
   if (assujettiTVA) {
     // ============================================================
-    // ASSUJETTI TVA : CA basé sur rubrique TC (comptes 70*, CA HT)
+    // ASSUJETTI TVA : CA HT par rubrique (TA à TD + TG, et le 4495)
     // Rapprochement numero_piece + date_transaction pour trouver le tiers
     // ============================================================
     const data = await clickhouseClient.query({
@@ -742,8 +771,8 @@ async function recupererTop10Clients(
         -- Un seul tiers client par (pièce, date) pour éviter le fan-out de
         -- jointure : sans le DISTINCT, une pièce portant plusieurs lignes avec
         -- tiers (lignes 411 multiples, TVA, produits…) dupliquait montant_ht.
-        -- On ne retient que les comptes clients 41* (hors 418/419), seuls
-        -- porteurs légitimes du tiers d'une vente.
+        -- On ne retient que les lignes clients (rubrique BI hors 418/419),
+        -- seules porteuses légitimes du tiers d'une vente.
         tiers_piece AS (
           SELECT DISTINCT
             numero_piece,
@@ -752,11 +781,7 @@ async function recupererTop10Clients(
             intitule_tiers
           FROM ${dbName}.grand_livre
           WHERE batch_id IN ({batchIds:Array(String)})
-            AND startsWith(compte, '41')
-            AND NOT startsWith(compte, '418')
-            AND NOT startsWith(compte, '419')
-            AND NOT startsWith(n_tiers, '418')
-            AND NOT startsWith(n_tiers, '419')
+            AND ${perimetreClientsSql(refExpr)}
             AND n_tiers != ''
             AND intitule_tiers != ''
         ),
@@ -806,27 +831,19 @@ async function recupererTop10Clients(
     caTotal = parseFloat(totalRows[0]?.ca_total) || 0;
   } else {
     // ============================================================
-    // NON ASSUJETTI TVA : CA basé sur comptes 41* (clients, TTC)
-    // CA d'un client = somme des débits du compte 411XXXX du tiers
-    // Pas de rapprochement nécessaire : chaque 411XXXX est un tiers
+    // NON ASSUJETTI TVA : CA d'un client = Créances Clients TTC, comme
+    // le KPI (solde BI hors 418/419 + 4495, hors journaux de trésorerie).
+    // Pas de rapprochement nécessaire : chaque ligne client porte son tiers.
     // ============================================================
     const data = await clickhouseClient.query({
       query: `
         SELECT
           n_tiers AS numero_client,
           intitule_tiers AS nom_client,
-          sum(debit) AS ca_client
+          ${creancesTTCSql(refExpr)} AS ca_client
         FROM ${dbName}.grand_livre
         WHERE batch_id IN ({batchIds:Array(String)})
-          AND (
-            (startsWith(compte, '41')
-              AND NOT startsWith(compte, '418')
-              AND NOT startsWith(compte, '419')
-              AND NOT startsWith(n_tiers, '418')
-              AND NOT startsWith(n_tiers, '419'))
-            -- Subventions à recevoir : même traitement que les créances clients.
-            OR ${CA_EST_SUBVENTION_SQL}
-          )
+          AND ${perimetreCreancesSql(refExpr)}
           AND n_tiers != ''
           ${periodFilter}
         GROUP BY n_tiers, intitule_tiers
@@ -841,17 +858,10 @@ async function recupererTop10Clients(
 
     const totalQuery = await clickhouseClient.query({
       query: `
-        SELECT sum(debit) as ca_total
+        SELECT ${creancesTTCSql(refExpr)} as ca_total
         FROM ${dbName}.grand_livre
         WHERE batch_id IN ({batchIds:Array(String)})
-          AND (
-            (startsWith(compte, '41')
-              AND NOT startsWith(compte, '418')
-              AND NOT startsWith(compte, '419')
-              AND NOT startsWith(n_tiers, '418')
-              AND NOT startsWith(n_tiers, '419'))
-            OR ${CA_EST_SUBVENTION_SQL}
-          )
+          AND ${perimetreCreancesSql(refExpr)}
           AND n_tiers != ''
           ${periodFilter}
       `,
@@ -889,15 +899,15 @@ async function recupererFluxParMois(
     query: `
       SELECT
         substring(date_transaction, 4, 2) as period,
-        sum(CASE WHEN startsWith(compte, '6') OR startsWith(compte, '81') OR startsWith(compte, '83') OR startsWith(compte, '85') OR startsWith(compte, '87') OR startsWith(compte, '89') THEN debit - credit ELSE 0 END) as charges,
-        sum(CASE WHEN startsWith(compte, '7') OR startsWith(compte, '82') OR startsWith(compte, '84') OR startsWith(compte, '86') OR startsWith(compte, '88') THEN credit - debit ELSE 0 END) as produits,
+        ${CHARGES_SQL} as charges,
+        ${PRODUITS_SQL} as produits,
         count(*) as nb_transactions
       FROM ${dbName}.grand_livre
       WHERE batch_id IN ({batchIds:Array(String)})
       GROUP BY period
       ORDER BY period
     `,
-    query_params: { batchIds },
+    query_params: { batchIds, ...PARAMS_FLUX },
     format: "JSONEachRow",
   });
 
@@ -936,8 +946,8 @@ async function recupererFluxParJour(
     query: `
       SELECT 
         substring(date_transaction, 1, 2) as period,
-        sum(CASE WHEN startsWith(compte, '6') OR startsWith(compte, '81') OR startsWith(compte, '83') OR startsWith(compte, '85') OR startsWith(compte, '87') OR startsWith(compte, '89') THEN debit - credit ELSE 0 END) as charges,
-        sum(CASE WHEN startsWith(compte, '7') OR startsWith(compte, '82') OR startsWith(compte, '84') OR startsWith(compte, '86') OR startsWith(compte, '88') THEN credit - debit ELSE 0 END) as produits,
+        ${CHARGES_SQL} as charges,
+        ${PRODUITS_SQL} as produits,
         count(*) as nb_transactions
       FROM ${dbName}.grand_livre
       WHERE batch_id IN ({batchIds:Array(String)})
@@ -945,7 +955,7 @@ async function recupererFluxParJour(
       GROUP BY period
       ORDER BY period
     `,
-    query_params: { batchIds, monthFilter },
+    query_params: { batchIds, monthFilter, ...PARAMS_FLUX },
     format: "JSONEachRow",
   });
 
@@ -1071,7 +1081,7 @@ function calculerIndicateursPeriode(
   const tauxRecouvrement =
     caTTCTotalSum !== 0 ? (caEncaisseTTCSum / caTTCTotalSum) * 100 : 0;
 
-  // CA : comptes 70* (XB) si assujetti TVA, comptes 41* (débits) sinon
+  // CA : rubriques XB si assujetti TVA, créances clients TTC (rubrique BI) sinon
   const chiffreAffaires = assujettiTVA ? sig.XB : caTTCTotalSum;
 
   return {
@@ -1287,12 +1297,12 @@ export async function GET(
         batchIdsN1,
         selectedMonth,
       );
-      const ca70ParJourN = await recupererCA70ParJour(
+      const caXBParJourN = await recupererCAXBParJour(
         dbName,
         batchIds,
         selectedMonth,
       );
-      const ca70ParJourN1 = await recupererCA70ParJour(
+      const caXBParJourN1 = await recupererCAXBParJour(
         dbName,
         batchIdsN1,
         selectedMonth,
@@ -1304,8 +1314,8 @@ export async function GET(
       let cumulativeCaTTCN = 0;
       let cumulativeCaEncaisseN = 0;
       let cumulativeCaTTCN1 = 0;
-      let cumulativeCA70N = 0;
-      let cumulativeCA70N1 = 0;
+      let cumulativeCAXBN = 0;
+      let cumulativeCAXBN1 = 0;
       let cumulTGN = 0;
       let cumulTGN1 = 0;
       let cumulativeCaEncaisseN1 = 0;
@@ -1316,16 +1326,16 @@ export async function GET(
       // mois sélectionné démarre au cumul de fin de mois précédent.
       if (periodType === "ytd-day" && monthNum > 1) {
         const [
-          ca70ParMoisBaseN,
-          ca70ParMoisBaseN1,
+          caXBParMoisBaseN,
+          caXBParMoisBaseN1,
           recouvrementParMoisBaseN,
           recouvrementParMoisBaseN1,
           tresorerieParMoisBaseN,
           tresorerieParMoisBaseN1,
           fluxParMoisBaseN,
         ] = await Promise.all([
-          recupererCA70ParMois(dbName, batchIds),
-          recupererCA70ParMois(dbName, batchIdsN1),
+          recupererCAXBParMois(dbName, batchIds),
+          recupererCAXBParMois(dbName, batchIdsN1),
           recupererRecouvrementParMois(dbName, batchIds),
           recupererRecouvrementParMois(dbName, batchIdsN1),
           recupererTresorerieParMois(dbName, batchIds),
@@ -1335,8 +1345,8 @@ export async function GET(
 
         for (let m = 1; m < monthNum; m++) {
           const mStr = m.toString().padStart(2, "0");
-          cumulativeCA70N += ca70ParMoisBaseN.get(mStr) || 0;
-          cumulativeCA70N1 += ca70ParMoisBaseN1.get(mStr) || 0;
+          cumulativeCAXBN += caXBParMoisBaseN.get(mStr) || 0;
+          cumulativeCAXBN1 += caXBParMoisBaseN1.get(mStr) || 0;
           const rN = recouvrementParMoisBaseN.get(mStr);
           if (rN) {
             cumulativeCaTTCN += rN.caTTCTotal;
@@ -1397,11 +1407,11 @@ export async function GET(
         cumulativeCaTTCN1 += recouvrementN1Jour.caTTCTotal;
         cumulativeCaEncaisseN1 += recouvrementN1Jour.caEncaisseTTC;
 
-        // CA comptes 70* — valeurs journalières (périodique) et cumulées
-        const ca70JourN = ca70ParJourN.get(dayStr) || 0;
-        const ca70JourN1 = ca70ParJourN1.get(dayStr) || 0;
-        cumulativeCA70N += ca70JourN;
-        cumulativeCA70N1 += ca70JourN1;
+        // CA (rubriques XB) — valeurs journalières (périodique) et cumulées
+        const caXBJourN = caXBParJourN.get(dayStr) || 0;
+        const caXBJourN1 = caXBParJourN1.get(dayStr) || 0;
+        cumulativeCAXBN += caXBJourN;
+        cumulativeCAXBN1 += caXBJourN1;
 
         const tauxRecouvrementN =
           cumulativeCaTTCN !== 0
@@ -1421,14 +1431,14 @@ export async function GET(
           resultat: resultatN,
           cumulativeBalance: cumulativeBalanceN,
           nbTransactions: fluxN.nbTransactions,
-          chiffreAffaires: cumulativeCA70N,
-          chiffreAffairesN1: cumulativeCA70N1,
+          chiffreAffaires: cumulativeCAXBN,
+          chiffreAffairesN1: cumulativeCAXBN1,
           subventions: cumulTGN,
           subventionsN1: cumulTGN1,
           subventionsPeriodique: rubriquesN.TG,
           subventionsPeriodiqueN1: rubriquesN1Jour.TG,
-          chiffreAffairesPeriodique: ca70JourN,
-          chiffreAffairesPeriodiqueN1: ca70JourN1,
+          chiffreAffairesPeriodique: caXBJourN,
+          chiffreAffairesPeriodiqueN1: caXBJourN1,
           soldeTresorerie: cumulativeTresoN,
           soldeTresorerieN1: cumulativeTresoN1,
           margeCommerciale: sigN.XA,
@@ -1459,7 +1469,7 @@ export async function GET(
       );
 
       // A3 — Harmonisation CA : pour un assujetti TVA, le KPI "Chiffre
-      // d'affaires" reprend le CA comptes 70* (dernier point cumulé de la
+      // d'affaires" reprend le CA des rubriques XB (dernier point cumulé de la
       // courbe) au lieu de XB, afin que KPI / narration Bilan / tendance
       // affichent strictement la même valeur.
       if (client.assujettiTVA && chartData.length > 0) {
@@ -1600,8 +1610,8 @@ export async function GET(
       dbName,
       batchIdsN1,
     );
-    const ca70ParMoisN = await recupererCA70ParMois(dbName, batchIds);
-    const ca70ParMoisN1 = await recupererCA70ParMois(dbName, batchIdsN1);
+    const caXBParMoisN = await recupererCAXBParMois(dbName, batchIds);
+    const caXBParMoisN1 = await recupererCAXBParMois(dbName, batchIdsN1);
 
     let cumulativeBalance = 0;
     let cumulativeTresorerieN = 0;
@@ -1610,8 +1620,8 @@ export async function GET(
     let cumulativeCaEncaisseN = 0;
     let cumulativeCaTTCN1 = 0;
     let cumulativeCaEncaisseN1 = 0;
-    let cumulativeCA70N = 0;
-    let cumulativeCA70N1 = 0;
+    let cumulativeCAXBN = 0;
+    let cumulativeCAXBN1 = 0;
     let cumulTGN = 0;
     let cumulTGN1 = 0;
 
@@ -1661,11 +1671,11 @@ export async function GET(
       cumulativeCaTTCN1 += recouvrementN1Mois.caTTCTotal;
       cumulativeCaEncaisseN1 += recouvrementN1Mois.caEncaisseTTC;
 
-      // CA comptes 70* — valeurs mensuelles (périodique) et cumulées (YTD)
-      const ca70MoisN = ca70ParMoisN.get(monthStr) || 0;
-      const ca70MoisN1 = ca70ParMoisN1.get(monthStr) || 0;
-      cumulativeCA70N += ca70MoisN;
-      cumulativeCA70N1 += ca70MoisN1;
+      // CA (rubriques XB) — valeurs mensuelles (périodique) et cumulées (YTD)
+      const caXBMoisN = caXBParMoisN.get(monthStr) || 0;
+      const caXBMoisN1 = caXBParMoisN1.get(monthStr) || 0;
+      cumulativeCAXBN += caXBMoisN;
+      cumulativeCAXBN1 += caXBMoisN1;
 
       const tauxRecouvrementN =
         cumulativeCaTTCN !== 0
@@ -1686,15 +1696,15 @@ export async function GET(
         cumulativeBalance,
         nbTransactions: fluxN.nbTransactions,
         // CA cumulé YTD (compat existante)
-        chiffreAffaires: cumulativeCA70N,
-        chiffreAffairesN1: cumulativeCA70N1,
+        chiffreAffaires: cumulativeCAXBN,
+        chiffreAffairesN1: cumulativeCAXBN1,
         // CA périodique (valeur du mois seul) — utilisé par le mode Périodique
         subventions: cumulTGN,
         subventionsN1: cumulTGN1,
         subventionsPeriodique: rubriquesN.TG,
         subventionsPeriodiqueN1: rubriquesN1Mois.TG,
-        chiffreAffairesPeriodique: ca70MoisN,
-        chiffreAffairesPeriodiqueN1: ca70MoisN1,
+        chiffreAffairesPeriodique: caXBMoisN,
+        chiffreAffairesPeriodiqueN1: caXBMoisN1,
         soldeTresorerie: cumulativeTresorerieN,
         soldeTresorerieN1: cumulativeTresorerieN1,
         margeCommerciale: sigN.XA,
@@ -1729,7 +1739,7 @@ export async function GET(
       client.assujettiTVA,
     );
 
-    // A3 — Harmonisation CA (cf. branche journalière) : KPI CA = CA70 cumulé.
+    // A3 — Harmonisation CA (cf. branche journalière) : KPI CA = CAXB cumulé.
     if (client.assujettiTVA && chartData.length > 0) {
       const lastCA = chartData[chartData.length - 1];
       indicateursN.chiffreAffaires = lastCA.chiffreAffaires;
@@ -1853,13 +1863,13 @@ async function enrichirPeriodes(postgresPeriodsData: any[], dbName: string) {
           const statsData = await clickhouseClient.query({
             query: `
               SELECT 
-                sum(CASE WHEN startsWith(compte, '6') OR startsWith(compte, '81') OR startsWith(compte, '83') OR startsWith(compte, '85') OR startsWith(compte, '87') OR startsWith(compte, '89') THEN debit - credit ELSE 0 END) as charges,
-                sum(CASE WHEN startsWith(compte, '7') OR startsWith(compte, '82') OR startsWith(compte, '84') OR startsWith(compte, '86') OR startsWith(compte, '88') THEN credit - debit ELSE 0 END) as produits,
+                ${CHARGES_SQL} as charges,
+                ${PRODUITS_SQL} as produits,
                 count(*) as nb_transactions
               FROM ${dbName}.grand_livre
               WHERE batch_id = {batchId:String}
             `,
-            query_params: { batchId: pgPeriod.batchId },
+            query_params: { batchId: pgPeriod.batchId, ...PARAMS_FLUX },
             format: "JSONEachRow",
           });
           const statsRows = (await statsData.json()) as any[];
