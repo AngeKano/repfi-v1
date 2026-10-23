@@ -5,7 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { requirePermission } from "@/lib/permissions";
 import { SAISIE_ACTIONS } from "@/lib/permissions/actions";
 import { getClickhouseDbName, syncManualBatch } from "@/lib/clickhouse/manual-sync";
-import { isCentralizingAccount, suggestTypeTiers } from "@/lib/comptable/saisie-refs";
+import { exigeTiers, rubriqueTiers, typeTiersRubrique } from "@/lib/comptable/saisie-refs";
 import { bilanRefExpr } from "@/lib/clickhouse/schema";
 
 const clickhouse = createClickhouseClient({
@@ -83,15 +83,9 @@ export async function PATCH(
       return NextResponse.json({ error: "La date doit être dans la période." }, { status: 400 });
 
     const compte = p.compte ?? entry.compte;
-    // Tiers uniquement pour comptes centralisateurs (401/411) — sinon vidés.
-    const central = isCentralizingAccount(compte);
-    const nTiers = central ? p.nTiers ?? entry.nTiers : "";
-    // Type tiers dérivé du compte (même logique qu'à l'upload).
-    const typeTiers = central ? suggestTypeTiers(compte) || p.typeTiers || entry.typeTiers : "";
     let intituleCompte = entry.intituleCompte;
     let rubrique = entry.rubrique;
     let bilanRubrique = entry.bilanRubrique;
-    let intituleTiers = central ? entry.intituleTiers : "";
 
     // Si compte/tiers changent, revérifier l'existence + réhériter les rubriques.
     const dbName = getClickhouseDbName(id);
@@ -121,6 +115,14 @@ export async function PATCH(
       rubrique = rows[0].r;
       bilanRubrique = rows[0].b;
     }
+
+    // Tiers uniquement pour les rubriques de tiers (BI, DI, DJ, BH) — sinon
+    // vidés. Type tiers dérivé de la rubrique.
+    const rubriqueBilan = rubriqueTiers(rubrique, bilanRubrique);
+    const central = exigeTiers(rubriqueBilan);
+    const nTiers = central ? p.nTiers ?? entry.nTiers : "";
+    const typeTiers = central ? typeTiersRubrique(rubriqueBilan) || p.typeTiers || entry.typeTiers : "";
+    let intituleTiers = central ? entry.intituleTiers : "";
     if (p.nTiers !== undefined && nTiers && nTiers !== entry.nTiers) {
       const rows = (await (
         await clickhouse.query({

@@ -490,7 +490,7 @@ export function ClientDetailsDialog({
                     Assujetti à la TVA
                   </Label>
                   <p className="text-xs text-[#94A3B8]">
-                    CA sur comptes 70 (HT) si activé, sinon 41 (TTC).
+                    CA sur les rubriques de ventes TA à TD (HT) si activé, sinon sur les créances clients BI (TTC).
                   </p>
                 </div>
                 <Switch

@@ -16,7 +16,7 @@ import { prisma } from "@/lib/prisma";
 import { getClickhouseDbName, manualBatchId } from "@/lib/clickhouse/manual-sync";
 import { bilanRefExpr } from "@/lib/clickhouse/schema";
 import { planComptesMap, intituleCompte } from "@/lib/clickhouse/plan-comptable";
-import { AMORT_PREFIXES } from "@/lib/reporting/etats-financiers";
+import { estAmortSql } from "@/lib/reporting/etats-financiers";
 import {
   TRESORERIE_KPIS,
   RUBRIQUES_TRESORERIE,
@@ -31,8 +31,6 @@ const clickhouse = createClickhouseClient({
   password: process.env.CLICKHOUSE_PASSWORD || "",
 });
 
-// Condition SQL « compte d'amortissement / dépréciation » (constantes du modèle).
-const IS_AMORT = AMORT_PREFIXES.map((p) => `startsWith(compte, '${p}')`).join(" OR ");
 // date_transaction est une String "DD/MM/YYYY" → période comparable "YYYYMM".
 const YM = "concat(substring(date_transaction, 7, 4), substring(date_transaction, 4, 2))";
 
@@ -136,7 +134,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
           clickhouse.query({
             query: `
               SELECT ${REF_EXPR} AS ref,
-                     ${soldeRubriqueSql(REF_EXPR, IS_AMORT)} AS solde
+                     ${soldeRubriqueSql(REF_EXPR, estAmortSql(REF_EXPR))} AS solde
               FROM ${dbName}.grand_livre
               WHERE batch_id IN ({batchIds:Array(String)})
                 AND ${REF_EXPR} IN ({indicateurs:Array(String)})

@@ -295,8 +295,8 @@ export function NewClientDialog({ open, onClose }: NewClientDialogProps) {
                       Assujetti à la TVA
                     </Label>
                     <p className="text-xs text-[#94A3B8]">
-                      CA calculé sur comptes 70 (HT) si activé, sinon comptes 41
-                      (TTC).
+                      CA calculé sur les rubriques de ventes TA à TD (HT) si activé,
+                      sinon sur les créances clients, rubrique BI (TTC).
                     </p>
                   </div>
                   <Switch

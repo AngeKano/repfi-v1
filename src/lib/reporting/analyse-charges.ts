@@ -16,6 +16,8 @@
 //   - CA nul : ratios « n.a. » (null), montants conservés.              F10
 // ============================================================================
 
+import { XB_RUBRIQUES } from "./etats-financiers";
+
 export interface CategorieCharge {
   id: string;
   libelle: string;
@@ -74,7 +76,7 @@ export function complementDe(nom: string): string {
 }
 
 /** Rubriques du chiffre d'affaires (XB). */
-export const REFS_CA = ["TA", "TB", "TC", "TD"];
+export const REFS_CA = XB_RUBRIQUES;
 
 /**
  * Autres produits et ajustements hors CA. TN = produits de cession, TO =

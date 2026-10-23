@@ -138,18 +138,36 @@ export const COMPTE_RESULTAT: LigneEtat[] = [
   { ref: "XI", libelle: "RÉSULTAT NET (XG + XH + RQ + RS)", total: true },
 ];
 
-// Rubriques composant le CHIFFRE D'AFFAIRES (ligne XB du modèle officiel :
-// XB = TA + TB + TC + TD + TG). Toute analyse de CA — Top clients, CA par nature —
-// doit porter sur ces quatre natures, et non sur la seule TC.
+// CHIFFRE D'AFFAIRES au sens du modèle officiel : XB = TA + TB + TC + TD.
+// C'est la définition du KPI « Chiffre d'affaires », de sa courbe, du SIG, de
+// l'analyse des charges et du DSO.
+export const XB_RUBRIQUES = ["TA", "TB", "TC", "TD"];
+
+// Périmètre des ANALYSES de CA (Top 10 clients, CA total servant de
+// dénominateur) : XB élargi aux subventions d'exploitation (TG).
 // export const CA_RUBRIQUES = ["TA", "TB", "TC", "TD", "4495*"];
-export const CA_RUBRIQUES = ["TA", "TB", "TC", "TD", "TG"];
+export const CA_RUBRIQUES = [...XB_RUBRIQUES, "TG"];
+
+// Rubriques de CHARGES (R…) et de PRODUITS (T…) du compte de résultat : base
+// du graphique « Charges vs Produits » (et non plus les classes de comptes).
+export const RUBRIQUES_CHARGES = COMPTE_RESULTAT.filter((l) => !l.total && l.ref.startsWith("R")).map((l) => l.ref);
+export const RUBRIQUES_PRODUITS = COMPTE_RESULTAT.filter((l) => !l.total && l.ref.startsWith("T")).map((l) => l.ref);
 
 // REF « feuilles » du compte de résultat réellement présents dans le grand livre.
 export const RESULTAT_LEAF_REFS = COMPTE_RESULTAT.filter((l) => !l.total).map((l) => l.ref);
 
-// Comptes d'amortissements / dépréciations : leur solde alimente la colonne
-// « AMORT. et DÉPREC. » de l'Actif, jamais la colonne BRUT.
-export const AMORT_PREFIXES = ["28", "29", "39", "49", "59"];
+/**
+ * « La ligne porte une rubrique d'amortissement / dépréciation d'actif ».
+ *
+ * Le mapping attribue à ces comptes le code d'actif suivi d'un chiffre :
+ * AE1 (amortissements de AE), AE2 (dépréciations de AE), BB1, BI1, BQ2,
+ * BSB1… Leur solde alimente la colonne « AMORT. et DÉPREC. » de l'Actif,
+ * jamais la colonne BRUT. Les subdivisions du passif (DK1, DK2…) commencent
+ * par C ou D et ne sont donc pas concernées.
+ */
+export function estAmortSql(refExpr: string): string {
+  return "match(" + refExpr + ", '^[AB][A-Z]+[0-9]$')";
+}
 
 /**
  * Normalise un code du grand livre vers un REF du modèle.

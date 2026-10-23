@@ -76,7 +76,7 @@ export function intituleCompte(
 // `compte_tiers` ou `n_tiers`). On lit donc les colonnes réellement présentes
 // plutôt que de les supposer.
 // ---------------------------------------------------------------------------
-import { tableColumns } from "./schema";
+import { tableColumns, bilanRefExpr } from "./schema";
 import { CODES_JOURNAUX_TRESORERIE } from "@/lib/comptable/saisie-refs";
 
 // ---------------------------------------------------------------------------
@@ -136,10 +136,12 @@ export function codeJournauxMap(
 // Source : la table code_journal du client, colonne type = « Trésorerie »
 // (valeur Sage, cf. TYPES_JOURNAUX du parseur Airflow), complétée des
 // journaux de trésorerie de la saisie (CAIS, BQ). Si le référentiel n'en
-// déclare aucun, on retient les journaux qui mouvementent des comptes de
-// banque ou de caisse (52*, 57*), ce qui est la définition comptable d'un
-// journal de trésorerie.
+// déclare aucun, on retient les journaux qui mouvementent les RUBRIQUES de
+// trésorerie (caisse BSA, banques BSB, régies BSC, établissements financiers
+// BSD, instruments BSE à BSG, banques créditrices DRA / DRB), ce qui est la
+// définition comptable d'un journal de trésorerie.
 // ---------------------------------------------------------------------------
+const RUBRIQUES_JOURNAUX_TRESORERIE = ["BSA", "BSB", "BSC", "BSD", "BSE", "BSF", "BSG", "DRA", "DRB"];
 const tresorerieCache = new Map<string, { at: number; liste: Promise<string[]> }>();
 
 export function journauxTresorerie(
@@ -178,11 +180,13 @@ export function journauxTresorerie(
 
     if (duReferentiel === 0) {
       try {
+        const refExpr = await bilanRefExpr(client, dbName);
         const res = await client.query({
           query: `SELECT DISTINCT trim(code_journal) AS c
                   FROM ${dbName}.grand_livre
                   WHERE code_journal != ''
-                    AND (startsWith(compte, '52') OR startsWith(compte, '57'))`,
+                    AND ${refExpr} IN ({rubriques:Array(String)})`,
+          query_params: { rubriques: RUBRIQUES_JOURNAUX_TRESORERIE },
           format: "JSONEachRow",
         });
         for (const r of (await res.json()) as Array<{ c: string }>) if (r.c) codes.add(r.c);

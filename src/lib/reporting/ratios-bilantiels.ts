@@ -58,9 +58,14 @@ export function calculerRatios(s: SoldesBilan): RatiosBilantiels {
   };
 }
 
-/** Rubriques du chiffre d'affaires retenues pour le DSO (hors subventions). */
+/** Rubriques du chiffre d'affaires retenues pour le DSO (XB, hors subventions). */
 export const DSO_CA_RUBRIQUES = ["TA", "TB", "TC", "TD"];
-/** Comptes de TVA collectée ajoutés au CA HT pour obtenir le CA TTC. */
+/**
+ * Comptes de TVA collectée ajoutés au CA HT pour obtenir le CA TTC.
+ * EXCEPTION à la règle « par rubrique » (définition métier du DSO) : la TVA
+ * collectée n'a pas de rubrique propre, elle est fondue dans DK (dettes
+ * fiscales). Idem pour le compte 414, retranché des créances BI.
+ */
 export const DSO_TVA_COMPTES = ["4431", "4432", "4433", "4434", "4435"];
 
 /**

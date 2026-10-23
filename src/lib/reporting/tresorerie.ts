@@ -15,7 +15,8 @@
 //   Ce sont des concours bancaires : ils viennent EN MOINS de la trésorerie.
 //
 // Convention des soldes par rubrique (voir soldeRubriqueSql) :
-//   - actif  : débit − crédit ; dépréciations (28/29/39/49/59) : crédit − débit ;
+//   - actif  : débit − crédit ; rubriques de dépréciation (BSB1, BSD1, BSE1) :
+//     crédit − débit ;
 //   - passif : crédit − débit (un découvert est un montant positif).
 // Ainsi « BSB − DRA » se lit naturellement : trésorerie − concours bancaires.
 // ============================================================================

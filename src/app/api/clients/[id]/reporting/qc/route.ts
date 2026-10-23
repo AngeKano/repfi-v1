@@ -8,6 +8,7 @@ import {
   creancesTTCSql,
   encaissementsTTCSql,
   perimetreCreancesSql,
+  perimetreClientsSql,
 } from "@/lib/reporting/creances";
 import { bilanRefExpr } from "@/lib/clickhouse/schema";
 import { journauxTresorerie } from "@/lib/clickhouse/plan-comptable";
@@ -219,11 +220,7 @@ export async function GET(
               SELECT DISTINCT numero_piece, date_transaction
               FROM ${dbName}.grand_livre
               WHERE batch_id IN ({batchIds:Array(String)})
-                AND startsWith(compte, '41')
-                AND NOT startsWith(compte, '418')
-                AND NOT startsWith(compte, '419')
-                AND NOT startsWith(n_tiers, '418')
-                AND NOT startsWith(n_tiers, '419')
+                AND ${perimetreClientsSql(refExpr)}
                 AND n_tiers != ''
                 AND intitule_tiers != ''
             )
@@ -243,21 +240,19 @@ export async function GET(
         parseFloat(((await qAttr.json()) as Array<{ attributed: string }>)[0]?.attributed) || 0;
       checks.push(checkAttributedNotExceedTotal(attributed, totalCa));
     } else {
-      // Non-assujetti : Top clients = débit 41* ; parts bornées + no 418/419.
+      // Non-assujetti : Top clients = Créances Clients TTC par tiers (même
+      // définition que le KPI) ; parts bornées + aucun 418/419.
       const qc = await clickhouseClient.query({
         query: `
           WITH clients AS (
-            SELECT n_tiers, sum(debit) AS ca
+            SELECT n_tiers, ${creancesTTCSql(refExpr)} AS ca
             FROM ${dbName}.grand_livre
             WHERE batch_id IN ({batchIds:Array(String)})
-              AND startsWith(compte, '41')
-              AND NOT startsWith(compte, '418')
-              AND NOT startsWith(compte, '419')
-              AND NOT startsWith(n_tiers, '418')
-              AND NOT startsWith(n_tiers, '419')
+              AND ${perimetreCreancesSql(refExpr)}
               AND n_tiers != ''
               ${PERIOD_FILTER}
             GROUP BY n_tiers
+            HAVING ca > 0
           )
           SELECT (SELECT sum(ca) FROM clients) AS total_ca, n_tiers, ca
           FROM clients ORDER BY ca DESC LIMIT 10
