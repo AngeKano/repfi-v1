@@ -700,8 +700,8 @@ importée.
 | Immuabilité | Les lignes importées n'ont **aucune API d'écriture** |
 | Référentiel | Comptes et tiers **existants** uniquement |
 | Équilibre | `Σ débit = Σ crédit` **bloquant** |
-| Montants | Positifs ou négatifs |
-| Tiers | Comptes dont la **rubrique** est `BI`, `DI`, `DJ` ou `BH` (§2) ; type de tiers déduit de la rubrique |
+| Montants | Positifs ou négatifs ; une ligne porte **soit un débit, soit un crédit**, jamais les deux (la colonne opposée est grisée dès qu'un montant est saisi) |
+| Tiers | Comptes dont la **rubrique** est `BI`, `DI`, `DJ` ou `BH` (§2) : le tiers y est **obligatoire** et doit exister (grand livre ou Plan tiers) ; type de tiers déduit de la rubrique. Champ vidé et grisé sur les autres comptes |
 | N° facture | Saisi une fois au niveau de l'écriture |
 | Rubrique | Calculée par le **Mapping** (`ple`) avec la règle d'Airflow : racine la plus longue, exclusions, sens du solde du compte sur les saisies de l'exercice. Recalculée à chaque synchronisation (suit les modifications du Mapping) ; saisies anciennes sans rubrique reclassées à l'ouverture de l'onglet |
 
@@ -1442,6 +1442,7 @@ Inclut ou exclut les écritures saisies manuellement de tous les calculs du repo
 | 23/06/2026 | Version d'origine : 17 sections (architecture, SIG, CA, trésorerie par comptes, recouvrement 41*, dettes, endpoints et schémas de réponse). |
 | 21/10/2026 | Recouvrement Clients et Règlement Fournisseurs en solde, séparés par type de journal (journaux de trésorerie) ; Trésorerie entièrement par rubrique, KPI « Autres Trésorerie Passif » ; onglets Dettes Financières et Ratios bilantiels, DSO déplacé au Recouvrement ; KPI configurables sur tous les onglets ; référentiels (tables de dimension) consultables, modifiables, mis à jour par fichier via Airflow ; Mapping (`ple`) table à part entière ; Comptabilité en deux sous-onglets ; États Financiers : filtre périodique, dates d'exercice, export PDF / Excel en FCFA. |
 | 23/10/2026 | **Règle par rubrique** pour tous les KPI, hors exceptions E1 à E5 (§2) : CA et courbe sur `XB`, Charges vs Produits sur les rubriques R / T, Top 10 clients sur `BI`, amortissements reconnus par rubrique, repli des journaux de trésorerie sur les rubriques, tiers des saisies par rubrique. États Financiers **mois par mois** avec Cumul N et Cumul N-1 (§17). Carte **Charges et rentabilité** (§22). Rubriques des écritures saisies calculées par le Mapping (§19). Année conservée entre onglets, bascule des saisies sans changer d'onglet (§4, §20). Schémas de réponse des API rétablis et mis à jour (§25). Document déplacé dans le dépôt (`docs/`), PDF régénéré par `npm run docs:metrics`. |
+| 24/10/2026 | Saisie d'écritures : une ligne porte **soit un débit, soit un crédit** (l'autre colonne est grisée, refus serveur sinon) ; sur un compte client ou fournisseur (rubriques `BI`, `DI`, `DJ`, `BH`), le **tiers est obligatoire** (champ en rouge, refus serveur sinon) ; les tiers du Plan tiers sont acceptés même jamais mouvementés ; points bloquants listés sous le tableau (§19). |
 
 ---
 
