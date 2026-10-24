@@ -470,6 +470,34 @@ function GrandLivreSaisie({ clientId }: { clientId: string }) {
     return { d, c, delta: d - c };
   }, [lines]);
 
+  // Contrôles bloquants ligne par ligne, listés sous le tableau (mêmes règles
+  // que le serveur) : débit OU crédit, tiers obligatoire sur un compte client
+  // ou fournisseur.
+  const problemes = useMemo(() => {
+    const out: string[] = [];
+    lines.forEach((l, i) => {
+      const n = i + 1;
+      const compte = l.compte.trim();
+      const d = num(l.debit);
+      const c = num(l.credit);
+      if (!compte) {
+        if (d !== 0 || c !== 0) out.push(`Ligne ${n} : renseignez le compte.`);
+        return;
+      }
+      if (d !== 0 && c !== 0) out.push(`Ligne ${n} : saisissez soit un débit, soit un crédit, pas les deux.`);
+      else if (d === 0 && c === 0) out.push(`Ligne ${n} : saisissez un débit ou un crédit.`);
+      const info = compteInfo(compte);
+      const rubrique = rubriqueTiers(info?.rubrique, info?.bilan);
+      if (exigeTiers(rubrique)) {
+        const t = l.nTiers.trim();
+        if (!t)
+          out.push(`Ligne ${n} : le tiers est obligatoire pour le compte ${compte} (${typeTiersRubrique(rubrique).toLowerCase()}).`);
+        else if (!tiersInfo(t)) out.push(`Ligne ${n} : tiers ${t} inconnu.`);
+      }
+    });
+    return out;
+  }, [lines, compteInfo, tiersInfo]);
+
   const canSubmit =
     !!ecrJournal &&
     !!ecrDate &&
@@ -477,6 +505,7 @@ function GrandLivreSaisie({ clientId }: { clientId: string }) {
     Math.abs(formDelta.delta) < 0.01 &&
     (formDelta.d !== 0 || formDelta.c !== 0) &&
     lines.every((l) => l.compte && (num(l.debit) !== 0 || num(l.credit) !== 0)) &&
+    problemes.length === 0 &&
     !submitting;
 
   const submitForm = async () => {
@@ -822,6 +851,13 @@ function GrandLivreSaisie({ clientId }: { clientId: string }) {
                       // Tiers selon la RUBRIQUE du compte (BI, DI, DJ, BH).
                       const rubriqueBilan = rubriqueTiers(info?.rubrique, info?.bilan);
                       const central = exigeTiers(rubriqueBilan);
+                      // Tiers manquant ou inconnu sur un compte client / fournisseur.
+                      const tiersEnErreur =
+                        central && (!l.nTiers.trim() || !tiersInfo(l.nTiers.trim()));
+                      // Débit OU crédit : dès qu'un côté porte un montant, l'autre est grisé.
+                      const debitBloque = num(l.credit) !== 0 && num(l.debit) === 0;
+                      const creditBloque = num(l.debit) !== 0 && num(l.credit) === 0;
+                      const montantsEnErreur = num(l.debit) !== 0 && num(l.credit) !== 0;
                       return (
                         <tr key={i}>
                           <td className="p-1 text-muted-foreground">{i + 1}</td>
@@ -852,8 +888,15 @@ function GrandLivreSaisie({ clientId }: { clientId: string }) {
                               value={l.nTiers}
                               disabled={!central}
                               onChange={(e) => setLine(i, { nTiers: e.target.value })}
-                              className={cn(cellInput, "w-24", !central && "opacity-40")}
-                              placeholder={central ? "" : "—"}
+                              aria-invalid={tiersEnErreur}
+                              className={cn(
+                                cellInput,
+                                "w-24",
+                                !central && "opacity-40",
+                                tiersEnErreur && "border-red-500 ring-1 ring-red-500/30",
+                              )}
+                              placeholder={central ? "Obligatoire" : "—"}
+                              title={central ? "Tiers obligatoire pour un compte client ou fournisseur" : undefined}
                             />
                             {central && (
                               <datalist id={`saisie-tiers-${i}`}>
@@ -876,10 +919,38 @@ function GrandLivreSaisie({ clientId }: { clientId: string }) {
                             <AutoCell value={rubriqueUnique(info?.rubrique, info?.bilan)} className="w-20" />
                           </td>
                           <td className="p-1">
-                            <Input inputMode="decimal" value={l.debit} onChange={(e) => setLine(i, { debit: e.target.value })} className={cn(cellInput, "w-24 text-right")} />
+                            <Input
+                              inputMode="decimal"
+                              value={l.debit}
+                              disabled={debitBloque}
+                              onChange={(e) => setLine(i, { debit: e.target.value })}
+                              aria-invalid={montantsEnErreur}
+                              title={debitBloque ? "Ligne au crédit : videz le crédit pour saisir un débit" : undefined}
+                              placeholder={debitBloque ? "—" : ""}
+                              className={cn(
+                                cellInput,
+                                "w-24 text-right",
+                                debitBloque && "opacity-40",
+                                montantsEnErreur && "border-red-500 ring-1 ring-red-500/30",
+                              )}
+                            />
                           </td>
                           <td className="p-1">
-                            <Input inputMode="decimal" value={l.credit} onChange={(e) => setLine(i, { credit: e.target.value })} className={cn(cellInput, "w-24 text-right")} />
+                            <Input
+                              inputMode="decimal"
+                              value={l.credit}
+                              disabled={creditBloque}
+                              onChange={(e) => setLine(i, { credit: e.target.value })}
+                              aria-invalid={montantsEnErreur}
+                              title={creditBloque ? "Ligne au débit : videz le débit pour saisir un crédit" : undefined}
+                              placeholder={creditBloque ? "—" : ""}
+                              className={cn(
+                                cellInput,
+                                "w-24 text-right",
+                                creditBloque && "opacity-40",
+                                montantsEnErreur && "border-red-500 ring-1 ring-red-500/30",
+                              )}
+                            />
                           </td>
                           <td className="p-1">
                             <button onClick={() => setLines((ls) => ls.filter((_, j) => j !== i))} disabled={lines.length <= 1} className="text-muted-foreground hover:text-red-600 disabled:opacity-30" title="Retirer la ligne">
@@ -901,6 +972,14 @@ function GrandLivreSaisie({ clientId }: { clientId: string }) {
                 </table>
               </div>
 
+              {problemes.length > 0 && (
+                <ul className="space-y-0.5 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+                  {problemes.map((p) => (
+                    <li key={p}>{p}</li>
+                  ))}
+                </ul>
+              )}
+
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <Button variant="outline" size="sm" onClick={() => setLines((ls) => [...ls, newLine()])} className="gap-1">
                   <Plus className="w-3.5 h-3.5" /> Ligne
@@ -920,8 +999,9 @@ function GrandLivreSaisie({ clientId }: { clientId: string }) {
                 </div>
               </div>
               <p className="text-[11px] text-muted-foreground">
-                Les champs Tiers / Type Tiers ne sont actifs que pour les comptes centralisateurs (401X, 411X).
-                L&apos;enregistrement n&apos;est possible que si total débit = total crédit.
+                Les champs Tiers / Type Tiers ne sont actifs que pour les comptes clients et fournisseurs
+                (rubriques BI, DI, DJ, BH) : le tiers y est alors obligatoire. Une ligne porte soit un débit,
+                soit un crédit. L&apos;enregistrement n&apos;est possible que si total débit = total crédit.
               </p>
             </div>
           )}

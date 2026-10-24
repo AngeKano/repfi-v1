@@ -132,21 +132,28 @@ async function lookupTiers(
 ): Promise<Map<string, string>> {
   const map = new Map<string, string>();
   const wanted = tiers.filter((t) => t && t.trim() !== "");
-  if (batchIds.length === 0 || wanted.length === 0) return map;
-  const rows = await clickhouse
-    .query({
-      query: `
-        SELECT n_tiers, anyIf(intitule_tiers, intitule_tiers != '') AS intitule
-        FROM ${dbName}.grand_livre
-        WHERE batch_id IN ({batchIds:Array(String)})
-          AND n_tiers IN ({tiers:Array(String)})
-        GROUP BY n_tiers
-      `,
-      query_params: { batchIds, tiers: wanted },
-      format: "JSONEachRow",
-    })
-    .then((r) => r.json() as Promise<Array<{ n_tiers: string; intitule: string }>>);
-  for (const r of rows) map.set(r.n_tiers, r.intitule);
+  if (wanted.length === 0) return map;
+  if (batchIds.length > 0) {
+    const rows = await clickhouse
+      .query({
+        query: `
+          SELECT n_tiers, anyIf(intitule_tiers, intitule_tiers != '') AS intitule
+          FROM ${dbName}.grand_livre
+          WHERE batch_id IN ({batchIds:Array(String)})
+            AND n_tiers IN ({tiers:Array(String)})
+          GROUP BY n_tiers
+        `,
+        query_params: { batchIds, tiers: wanted },
+        format: "JSONEachRow",
+      })
+      .then((r) => r.json() as Promise<Array<{ n_tiers: string; intitule: string }>>);
+    for (const r of rows) map.set(r.n_tiers, r.intitule);
+  }
+  // Le plan des tiers fait foi, comme dans la liste proposée à l'écran : un
+  // tiers créé au référentiel est utilisable même s'il n'a jamais été mouvementé.
+  const voulus = new Set(wanted);
+  for (const t of await planTiersList(clickhouse, dbName))
+    if (voulus.has(t.nTiers)) map.set(t.nTiers, t.intitule || map.get(t.nTiers) || "");
   return map;
 }
 
@@ -616,11 +623,13 @@ async function prepareEcritureRows(opts: {
       ),
     };
 
-  // Chaque ligne doit porter au moins une valeur (débit ou crédit ≠ 0). Les
-  // montants peuvent être positifs ou négatifs.
-  for (const l of lignes) {
+  // Chaque ligne porte SOIT un débit, SOIT un crédit (valeur non nulle, et
+  // jamais les deux à la fois). Les montants peuvent être positifs ou négatifs.
+  for (const [i, l] of lignes.entries()) {
     if (l.debit === 0 && l.credit === 0)
-      return { error: NextResponse.json({ error: "Chaque ligne doit avoir un débit ou un crédit (valeur non nulle)." }, { status: 400 }) };
+      return { error: NextResponse.json({ error: `Ligne ${i + 1} : saisissez un débit ou un crédit (valeur non nulle).` }, { status: 400 }) };
+    if (l.debit !== 0 && l.credit !== 0)
+      return { error: NextResponse.json({ error: `Ligne ${i + 1} : une ligne porte soit un débit, soit un crédit, pas les deux.` }, { status: 400 }) };
   }
 
   // Comptes existants ; tiers uniquement pour les rubriques de tiers (BI, DI, DJ, BH).
@@ -665,9 +674,13 @@ async function prepareEcritureRows(opts: {
   };
   const wantedTiers = [...new Set(lignes.filter((l) => avecTiers(l.compte) && l.nTiers).map((l) => l.nTiers))];
   const tiersMap = await lookupTiers(dbName, realBatchIds, wantedTiers);
-  for (const l of lignes) {
-    if (avecTiers(l.compte) && l.nTiers && !tiersMap.has(l.nTiers))
-      return { error: NextResponse.json({ error: `Tiers inexistant : ${l.nTiers}.` }, { status: 400 }) };
+  // Sur un compte client ou fournisseur, le tiers est OBLIGATOIRE et doit exister.
+  for (const [i, l] of lignes.entries()) {
+    if (!avecTiers(l.compte)) continue;
+    if (!l.nTiers)
+      return { error: NextResponse.json({ error: `Ligne ${i + 1} (compte ${l.compte}) : le tiers est obligatoire pour un compte client ou fournisseur.` }, { status: 400 }) };
+    if (!tiersMap.has(l.nTiers))
+      return { error: NextResponse.json({ error: `Ligne ${i + 1} : tiers inexistant (${l.nTiers}).` }, { status: 400 }) };
   }
 
   const rows: PreparedRow[] = lignes.map((l) => {

@@ -123,6 +123,11 @@ export async function PATCH(
     const nTiers = central ? p.nTiers ?? entry.nTiers : "";
     const typeTiers = central ? typeTiersRubrique(rubriqueBilan) || p.typeTiers || entry.typeTiers : "";
     let intituleTiers = central ? entry.intituleTiers : "";
+    if (central && !nTiers)
+      return NextResponse.json(
+        { error: "Le tiers est obligatoire pour un compte client ou fournisseur." },
+        { status: 400 },
+      );
     if (p.nTiers !== undefined && nTiers && nTiers !== entry.nTiers) {
       const rows = (await (
         await clickhouse.query({
