@@ -249,7 +249,8 @@ export default function DimensionsViewer({
 
       // En-têtes = noms techniques : le fichier peut être modifié puis
       // redéposé tel quel dans Import pour une mise à jour par fichier.
-      const colonnes = def.colonnesFichier ?? def.colonnes.map((c) => c.nom);
+      // Les colonnes calculées (compte centralisateur) ne font pas partie du format de dépôt.
+      const colonnes = def.colonnesFichier ?? def.colonnes.filter((c) => !c.calculee).map((c) => c.nom);
       const XLSX = await import("xlsx");
       const ws = XLSX.utils.aoa_to_sheet([
         colonnes,
@@ -340,6 +341,8 @@ export default function DimensionsViewer({
 
   /** Champ de saisie d'une nouvelle ligne, selon le type de la colonne. */
   const champAjout = (c: ColonneDimension) => {
+    // Champ calculé : rien à saisir, il se déduit du grand livre.
+    if (c.calculee) return <span className="text-xs text-muted-foreground italic">Calculé</span>;
     const valeur = ajout?.[c.nom] ?? "";
     const maj = (v: string) => setAjout((a) => (a ? { ...a, [c.nom]: v } : a));
     if (c.choix) {
@@ -432,7 +435,13 @@ export default function DimensionsViewer({
           ? {
               ...d,
               lignes: d.lignes.map((l) =>
-                identifiantLigne(def, l) === edition.id ? (json.ligne as Ligne) : l,
+                identifiantLigne(def, l) === edition.id
+                  ? {
+                      ...(json.ligne as Ligne),
+                      // Les champs calculés ne sont pas renvoyés : on garde leur valeur.
+                      ...Object.fromEntries(def.colonnes.filter((c) => c.calculee).map((c) => [c.nom, l[c.nom]])),
+                    }
+                  : l,
               ),
             }
           : d,

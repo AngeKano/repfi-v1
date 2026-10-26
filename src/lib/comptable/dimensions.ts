@@ -50,6 +50,13 @@ export interface ColonneDimension {
   grandLivre?: string;
   /** Champ équivalent des écritures saisies (ManualLedgerEntry). */
   saisie?: "intituleCompte" | "intituleTiers" | "typeTiers";
+  /**
+   * Colonne CALCULÉE, en lecture seule : sa valeur ne vient pas de la table
+   * mais d'une jointure (compte centralisateur d'un tiers, lu dans le grand
+   * livre). Recherchable, filtrable et triable ; jamais modifiable, ni saisie
+   * à l'ajout, ni exportée au format de dépôt.
+   */
+  calculee?: "compteCentralisateur";
 
   // ---- Règles de saisie d'une nouvelle ligne ----
   /** Seules ces valeurs sont acceptées (liste déroulante). */
@@ -214,7 +221,16 @@ export const DIMENSIONS: DimensionDef[] = [
         grandLivre: "type_tiers",
         saisie: "typeTiers",
       },
+      {
+        nom: "compte_centralisateur",
+        libelle: "Compte centralisateur",
+        calculee: "compteCentralisateur",
+      },
     ],
+    note:
+      "Compte centralisateur : compte collectif (rubrique BI, DI, DJ ou BH : 401…, 411…) sur lequel " +
+      "le tiers est mouvementé dans le grand livre, avec son intitulé du plan comptable. Valeur " +
+      "calculée, non modifiable ; un tiers jamais mouvementé n'en a pas encore.",
   },
   {
     id: FileType.CODE_JOURNAL,
@@ -281,6 +297,8 @@ export function preparerNouvelleLigne(
 ): { ligne: Record<string, string> } | { erreur: string } {
   const ligne: Record<string, string> = {};
   for (const c of def.colonnes) {
+    // Une colonne calculée n'est jamais saisie.
+    if (c.calculee) continue;
     let v = (saisie[c.nom] ?? "").trim();
     if (c.majuscules) v = v.toUpperCase();
 
