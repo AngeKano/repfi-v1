@@ -1,57 +1,75 @@
 // ============================================================================
 // Export des États Financiers (Bilan + Compte de résultat) en Excel ou PDF.
 //
-// L'export se fait côté navigateur, à partir des données déjà chargées. À la
-// différence de l'écran (qui montre un mois à la fois), il contient TOUS les
-// mois de janvier au mois sélectionné, suivis du cumul N et du cumul N-1.
+// L'export se fait côté navigateur, à partir des données déjà affichées : ce
+// qui est téléchargé correspond exactement à ce que l'utilisateur voit, mêmes
+// filtres et mêmes exercices comparés. Le Compte d'exploitation (12 mois en
+// net périodique + total) suit le Compte de résultat : une feuille Excel de
+// plus, des pages PDF en A3 paysage pour ses 13 colonnes de montants.
 //
-// La mise en forme reproduit celle de l'écran : en-tête sur deux niveaux,
-// grille complète, lignes de total en gras sur fond gris, montants alignés à
-// droite et montant nul laissé vide hors lignes de total.
+// La mise en forme reproduit celle de l'écran : en-tête sur deux niveaux
+// (EXERCICE au … / BRUT · AMORT. et DEPREC. · NET), grille complète, lignes de
+// total en gras sur fond gris, montants alignés à droite et montant nul laissé
+// vide hors lignes de total.
 // ============================================================================
 import { DEVISE } from "@/lib/devise";
 
-export interface MoisExport {
-  ym: string;
+export interface ExerciceExport {
+  year: number;
   label: string;
-}
-export interface CumulExport {
-  label: string;
-  dateFin: string;
 }
 export interface LigneActifExport {
   ref: string;
   libelle: string;
   total: boolean;
-  mois: number[];
-  brut: number;
-  amort: number;
-  net: number;
-  netN1: number;
+  bruts: number[];
+  amorts: number[];
+  nets: number[];
 }
 export interface LignePassifExport {
   ref: string;
   libelle: string;
   total: boolean;
-  mois: number[];
-  cumul: number;
-  cumulN1: number;
+  nets: number[];
 }
-export interface LigneResultatExport extends LignePassifExport {
+export interface LigneResultatExport {
+  ref: string;
+  libelle: string;
+  total: boolean;
   sens: string | null;
   repere: string | null;
+  montants: number[];
+}
+
+export interface LigneExploitationExport {
+  ref: string;
+  libelle: string;
+  total: boolean;
+  sens: string | null;
+  repere: string | null;
+  /** Net périodique de janvier à décembre. */
+  mois: number[];
+  /** Cumul depuis janvier. */
+  cumul: number;
+}
+export interface ExploitationExport {
+  year: number;
+  mois: { ym: string; label: string }[];
+  lignes: LigneExploitationExport[];
 }
 
 export interface EtatsExportData {
   clientName: string;
   periodeLabel: string;
-  yearN: number;
-  mois: MoisExport[];
-  cumulN: CumulExport;
-  cumulN1: CumulExport | null;
+  /** Exercices affichés, dans l'ordre des colonnes. */
+  exercices: ExerciceExport[];
+  /** Décalage des exercices visibles dans les tableaux de montants. */
+  offset: number;
   actif: LigneActifExport[];
   passif: LignePassifExport[];
   resultat: LigneResultatExport[];
+  /** Compte d'exploitation de l'exercice, s'il a été chargé. */
+  exploitation?: ExploitationExport | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -78,16 +96,14 @@ interface Tableau {
   titre: string;
   /** Intitulé de la colonne des libellés : ACTIF, PASSIF ou LIBELLES. */
   colLibelle: string;
-  /**
-   * Deux lignes d'en-tête. La première contient REF et le libellé (fusionnés
-   * sur deux niveaux) puis les regroupements ; la seconde, une cellule par
-   * colonne de montant.
-   */
+  /** Deux lignes d'en-tête, à l'identique de l'écran. */
   entetes: CelluleEntete[][];
   /** Intitulé « à plat » d'une colonne de montant, pour Excel. */
   colonnesMontant: string[];
   lignes: LigneTableau[];
   note?: string;
+  /** Format de page PDF (A3 pour les tableaux larges). */
+  format?: "a4" | "a3";
 }
 
 const arrondi = (n: number) => Math.round(n || 0);
@@ -118,8 +134,8 @@ function montantTexte(n: number, total: boolean): string {
 /** Nom de fichier sans caractère gênant pour le système. */
 function nomFichier(d: EtatsExportData, ext: string): string {
   const client = d.clientName.replace(/[^a-zA-Z0-9]/g, "_");
-  const fin = d.mois[d.mois.length - 1]?.ym ?? String(d.yearN);
-  return `ETATS_FINANCIERS_${client}_${fin}.${ext}`;
+  const exercices = d.exercices.map((e) => e.year).join("-");
+  return `ETATS_FINANCIERS_${client}_${exercices}.${ext}`;
 }
 
 function telecharger(blob: Blob, nom: string) {
@@ -137,20 +153,9 @@ function telecharger(blob: Blob, nom: string) {
 // Construction des trois tableaux.
 // ---------------------------------------------------------------------------
 
-/** Regroupement « Mois (périodique) » au-dessus des colonnes mensuelles. */
-function enteteMois(d: EtatsExportData, sousTitre: string) {
-  return {
-    groupe: { texte: ["MOIS (PÉRIODIQUE)"], colSpan: d.mois.length },
-    detail: d.mois.map((m) => ({ texte: [m.label.toUpperCase(), sousTitre] })),
-  };
-}
-
-/**
- * ACTIF : NET de chaque mois, puis BRUT / AMORT. / NET du cumul N, puis NET du
- * cumul N-1.
- */
+/** ACTIF : BRUT / AMORT. / NET sur le premier exercice, NET sur les suivants. */
 function tableauActif(d: EtatsExportData): Tableau {
-  const m = enteteMois(d, "NET");
+  const [premier, ...autres] = d.exercices;
   return {
     titre: "BILAN — ACTIF",
     colLibelle: "ACTIF",
@@ -158,124 +163,136 @@ function tableauActif(d: EtatsExportData): Tableau {
       [
         { texte: ["REF"], rowSpan: 2 },
         { texte: ["ACTIF"], rowSpan: 2 },
-        m.groupe,
-        { texte: [`CUMUL ${d.cumulN.label.toUpperCase()}`], colSpan: 3 },
-        ...(d.cumulN1 ? [{ texte: [`CUMUL ${d.cumulN1.label.toUpperCase()}`] }] : []),
+        { texte: [`EXERCICE au ${premier?.label ?? "—"}`], colSpan: 3 },
+        ...autres.map((e) => ({ texte: ["EXERCICE AU", e.label] })),
       ],
       [
-        ...m.detail,
         { texte: ["BRUT"] },
         { texte: ["AMORT. et", "DEPREC."] },
         { texte: ["NET"] },
-        ...(d.cumulN1 ? [{ texte: ["NET"] }] : []),
+        ...autres.map(() => ({ texte: ["NET"] })),
       ],
     ],
     colonnesMontant: [
-      ...d.mois.map((x) => `NET ${x.label}`),
-      `BRUT cumul ${d.cumulN.label}`,
-      `AMORT. et DEPREC. cumul ${d.cumulN.label}`,
-      `NET cumul ${d.cumulN.label}`,
-      ...(d.cumulN1 ? [`NET cumul ${d.cumulN1.label}`] : []),
+      `BRUT au ${premier?.label ?? "—"}`,
+      `AMORT. et DEPREC. au ${premier?.label ?? "—"}`,
+      `NET au ${premier?.label ?? "—"}`,
+      ...autres.map((e) => `NET au ${e.label}`),
     ],
     lignes: d.actif.map((l) => ({
       ref: l.ref,
       libelle: l.libelle,
       total: l.total,
       montants: [
-        ...d.mois.map((_, i) => arrondi(l.mois[i] ?? 0)),
-        arrondi(l.brut),
-        arrondi(l.amort),
-        arrondi(l.net),
-        ...(d.cumulN1 ? [arrondi(l.netN1)] : []),
+        arrondi(l.bruts[d.offset] ?? 0),
+        arrondi(l.amorts[d.offset] ?? 0),
+        arrondi(l.nets[d.offset] ?? 0),
+        ...autres.map((_, i) => arrondi(l.nets[d.offset + 1 + i] ?? 0)),
       ],
     })),
   };
 }
 
-/** PASSIF / RÉSULTAT : chaque mois, puis le cumul N et le cumul N-1. */
-function tableauSimple(
-  d: EtatsExportData,
-  titre: string,
-  colLibelle: string,
-  sousTitre: string,
-  lignes: LigneTableau[],
-  note?: string,
-): Tableau {
-  const m = enteteMois(d, sousTitre);
+/** PASSIF : une colonne NET par exercice. */
+function tableauPassif(d: EtatsExportData): Tableau {
   return {
-    titre,
-    colLibelle,
+    titre: "BILAN — PASSIF",
+    colLibelle: "PASSIF",
     entetes: [
       [
         { texte: ["REF"], rowSpan: 2 },
-        { texte: [colLibelle], rowSpan: 2 },
-        m.groupe,
-        { texte: [`CUMUL ${d.cumulN.label.toUpperCase()}`] },
-        ...(d.cumulN1 ? [{ texte: [`CUMUL ${d.cumulN1.label.toUpperCase()}`] }] : []),
+        { texte: ["PASSIF"], rowSpan: 2 },
+        ...d.exercices.map((e) => ({ texte: ["EXERCICE AU", e.label] })),
       ],
-      [
-        ...m.detail,
-        { texte: [sousTitre] },
-        ...(d.cumulN1 ? [{ texte: [sousTitre] }] : []),
-      ],
+      [...d.exercices.map(() => ({ texte: ["NET"] }))],
     ],
-    colonnesMontant: [
-      ...d.mois.map((x) => x.label),
-      `Cumul ${d.cumulN.label}`,
-      ...(d.cumulN1 ? [`Cumul ${d.cumulN1.label}`] : []),
-    ],
-    lignes,
-    note,
-  };
-}
-
-function montantsSimples(d: EtatsExportData, l: LignePassifExport): number[] {
-  return [
-    ...d.mois.map((_, i) => arrondi(l.mois[i] ?? 0)),
-    arrondi(l.cumul),
-    ...(d.cumulN1 ? [arrondi(l.cumulN1)] : []),
-  ];
-}
-
-function tableauPassif(d: EtatsExportData): Tableau {
-  return tableauSimple(
-    d,
-    "BILAN — PASSIF",
-    "PASSIF",
-    "NET",
-    d.passif.map((l) => ({
+    colonnesMontant: d.exercices.map((e) => `NET au ${e.label}`),
+    lignes: d.passif.map((l) => ({
       ref: l.ref,
       libelle: l.libelle,
       total: l.total,
-      montants: montantsSimples(d, l),
+      montants: d.exercices.map((_, i) => arrondi(l.nets[d.offset + i] ?? 0)),
     })),
-  );
+  };
 }
 
+/** COMPTE DE RÉSULTAT : une colonne par exercice, repère et sens en annotation. */
 function tableauResultat(d: EtatsExportData): Tableau {
-  return tableauSimple(
-    d,
-    "COMPTE DE RÉSULTAT",
-    "LIBELLES",
-    "NET (1)",
-    d.resultat.map((l) => ({
+  return {
+    titre: "COMPTE DE RÉSULTAT",
+    colLibelle: "LIBELLES",
+    entetes: [
+      [
+        { texte: ["REF"], rowSpan: 2 },
+        { texte: ["LIBELLES"], rowSpan: 2 },
+        ...d.exercices.map((e) => ({ texte: ["EXERCICE AU", e.label] })),
+      ],
+      [...d.exercices.map(() => ({ texte: ["NET (1)"] }))],
+    ],
+    colonnesMontant: d.exercices.map((e) => `EXERCICE au ${e.label}`),
+    lignes: d.resultat.map((l) => ({
       ref: l.ref,
       libelle: l.libelle,
       annotation: [l.repere ? `(${l.repere})` : "", !l.total ? l.sens ?? "" : ""]
         .filter(Boolean)
         .join(" "),
       total: l.total,
-      montants: montantsSimples(d, l),
+      montants: d.exercices.map((_, i) => arrondi(l.montants[d.offset + i] ?? 0)),
     })),
-    "(1) Les montants sont précédés du signe (+) ou (−) en fonction de leurs soldes dans la " +
+    note:
+      "(1) Les montants sont précédés du signe (+) ou (−) en fonction de leurs soldes dans la " +
       "balance générale. (2) Les signes affichés à côté des libellés indiquent le sens structurel " +
-      "des soldes ; ils ne jouent pas le rôle de signes opérateurs. Les colonnes mensuelles sont " +
-      "calculées en périodique (mouvements du mois) ; le cumul N est leur somme.",
-  );
+      "des soldes ; ils ne jouent pas le rôle de signes opérateurs.",
+  };
+}
+
+/** COMPTE D'EXPLOITATION : 12 mois en net périodique, puis le cumul. */
+function tableauExploitation(e: ExploitationExport): Tableau {
+  return {
+    titre: `COMPTE D'EXPLOITATION ${e.year}`,
+    colLibelle: "LIBELLES",
+    entetes: [
+      [
+        { texte: ["REF"], rowSpan: 2 },
+        { texte: ["LIBELLES"], rowSpan: 2 },
+        { texte: ["MOIS — NET PÉRIODIQUE"], colSpan: e.mois.length },
+        { texte: ["TOTAL"] },
+      ],
+      [
+        ...e.mois.map((m) => ({ texte: [m.label.toUpperCase()] })),
+        { texte: ["CUMUL", "JANV. - DÉC."] },
+      ],
+    ],
+    colonnesMontant: [...e.mois.map((m) => `${m.label} ${e.year}`), `Total ${e.year} (cumul janvier)`],
+    lignes: e.lignes.map((l) => ({
+      ref: l.ref,
+      libelle: l.libelle,
+      annotation: [l.repere ? `(${l.repere})` : "", !l.total ? l.sens ?? "" : ""]
+        .filter(Boolean)
+        .join(" "),
+      total: l.total,
+      montants: [...e.mois.map((_, i) => arrondi(l.mois[i] ?? 0)), arrondi(l.cumul)],
+    })),
+    note:
+      "Chaque mois est en net périodique (mouvements du seul mois) ; le total est le cumul depuis janvier.",
+    format: "a3",
+  };
+}
+
+/** Les états à exporter, dans l'ordre, avec leur nom d'onglet Excel. */
+function tableauxNommes(d: EtatsExportData): Array<[Tableau, string]> {
+  return [
+    [tableauActif(d), "Bilan Actif"],
+    [tableauPassif(d), "Bilan Passif"],
+    [tableauResultat(d), "Compte de Résultat"],
+    ...(d.exploitation
+      ? ([[tableauExploitation(d.exploitation), "Compte d'exploitation"]] as Array<[Tableau, string]>)
+      : []),
+  ];
 }
 
 function tousLesTableaux(d: EtatsExportData): Tableau[] {
-  return [tableauActif(d), tableauPassif(d), tableauResultat(d)];
+  return tableauxNommes(d).map(([t]) => t);
 }
 
 // ---------------------------------------------------------------------------
@@ -285,11 +302,7 @@ export async function exporterEtatsExcel(d: EtatsExportData) {
   const XLSX = await import("xlsx");
   const wb = XLSX.utils.book_new();
 
-  for (const [t, nomOnglet] of [
-    [tableauActif(d), "Bilan Actif"],
-    [tableauPassif(d), "Bilan Passif"],
-    [tableauResultat(d), "Compte de Résultat"],
-  ] as const) {
+  for (const [t, nomOnglet] of tableauxNommes(d)) {
     const nbMontants = t.colonnesMontant.length;
     const largeur = 2 + nbMontants;
 
@@ -306,12 +319,13 @@ export async function exporterEtatsExcel(d: EtatsExportData) {
     ligne1[0] = "REF";
     ligne1[1] = t.colLibelle;
     const premiereEntete = t.entetes[0].slice(2);
+    const detailEntete = t.entetes[1];
     let col = 2;
     for (const cel of premiereEntete) {
       ligne1[col] = cel.texte.join(" ");
       col += cel.colSpan ?? 1;
     }
-    t.entetes[1].forEach((cel, i) => {
+    detailEntete.forEach((cel, i) => {
       ligne2[2 + i] = cel.texte.join(" ");
     });
     aoa.push(ligne1, ligne2);
@@ -330,7 +344,7 @@ export async function exporterEtatsExcel(d: EtatsExportData) {
     const ws = XLSX.utils.aoa_to_sheet(aoa);
 
     // Fusions : REF et le libellé couvrent les deux lignes d'en-tête ; chaque
-    // regroupement couvre ses colonnes de détail.
+    // regroupement d'exercice couvre ses colonnes de détail.
     const merges: { s: { r: number; c: number }; e: { r: number; c: number } }[] = [
       { s: { r: 3, c: 0 }, e: { r: 4, c: 0 } },
       { s: { r: 3, c: 1 }, e: { r: 4, c: 1 } },
@@ -345,11 +359,7 @@ export async function exporterEtatsExcel(d: EtatsExportData) {
     }
     ws["!merges"] = merges;
 
-    // REF et libellé figés à gauche, en-tête figé en haut, comme à l'écran.
-    ws["!cols"] = [{ wch: 6 }, { wch: 52 }, ...t.colonnesMontant.map(() => ({ wch: 18 }))];
-    (ws as Record<string, unknown>)["!views"] = [
-      { state: "frozen", xSplit: 2, ySplit: premiereLigneDonnees },
-    ];
+    ws["!cols"] = [{ wch: 6 }, { wch: 52 }, ...t.colonnesMontant.map(() => ({ wch: 20 }))];
 
     // Format des montants : séparateur de milliers, sans décimale.
     for (let r = premiereLigneDonnees; r < premiereLigneDonnees + t.lignes.length; r++) {
@@ -373,27 +383,17 @@ export async function exporterEtatsExcel(d: EtatsExportData) {
 }
 
 // ---------------------------------------------------------------------------
-// PDF : reproduction de la grille affichée à l'écran, avec tous les mois.
+// PDF : reproduction de la grille affichée à l'écran.
 // ---------------------------------------------------------------------------
 export async function exporterEtatsPdf(d: EtatsExportData) {
   const { jsPDF } = await import("jspdf");
+  const pdf = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
 
-  // Le nombre de colonnes dépend du mois sélectionné (jusqu'à 12 mois + 4
-  // cumuls à l'actif) : au-delà de 8 colonnes de montant, l'A4 paysage ne
-  // laisse plus la place aux grands montants — on passe en A3 paysage.
-  const maxMontants = Math.max(...tousLesTableaux(d).map((t) => t.colonnesMontant.length));
-  const grand = maxMontants > 8;
-  const pdf = new jsPDF({ orientation: "landscape", unit: "mm", format: grand ? "a3" : "a4" });
-
-  const LARGEUR_PAGE = pdf.internal.pageSize.getWidth();
-  const HAUTEUR_PAGE = pdf.internal.pageSize.getHeight();
   const MARGE = 10;
   const H_LIGNE = 5;
-  const H_ENTETE = 7;
-  const L_REF = 12;
-  const L_LIBELLE_MIN = 70;
-  const L_MONTANT_MAX = 32;
-  const TAILLE_TEXTE = grand ? 6.6 : 7;
+  const H_ENTETE = 6;
+  const L_REF = 14;
+  const L_MONTANT = 32;
 
   // Gris de l'écran : en-tête #EDEDED, lignes de total #F2F2F2, filets #9AA9BC.
   const GRIS_ENTETE: [number, number, number] = [237, 237, 237];
@@ -401,14 +401,17 @@ export async function exporterEtatsPdf(d: EtatsExportData) {
   const FILET: [number, number, number] = [154, 169, 188];
 
   const dessiner = (t: Tableau, premierePage: boolean) => {
-    if (!premierePage) pdf.addPage();
+    // Chaque état a son format de page (A3 paysage pour le compte
+    // d'exploitation et ses 13 colonnes de montants).
+    const format = t.format ?? "a4";
+    const nouvellePage = () => pdf.addPage(format, "landscape");
+    if (!premierePage) nouvellePage();
+    const LARGEUR_PAGE = pdf.internal.pageSize.getWidth();
+    const HAUTEUR_PAGE = pdf.internal.pageSize.getHeight();
 
     const nbMontants = t.colonnesMontant.length;
     const largeurTable = LARGEUR_PAGE - 2 * MARGE;
-    const lMontant = Math.min(
-      L_MONTANT_MAX,
-      (largeurTable - L_REF - L_LIBELLE_MIN) / Math.max(nbMontants, 1),
-    );
+    const lMontant = Math.min(L_MONTANT, (largeurTable - L_REF - 70) / Math.max(nbMontants, 1));
     const lLibelle = largeurTable - L_REF - nbMontants * lMontant;
     const largeurs = [L_REF, lLibelle, ...Array<number>(nbMontants).fill(lMontant)];
     const x0 = MARGE;
@@ -444,7 +447,7 @@ export async function exporterEtatsPdf(d: EtatsExportData) {
       pdf.setDrawColor(...FILET);
       pdf.setLineWidth(0.15);
       pdf.setFont("helvetica", "bold");
-      pdf.setFontSize(grand ? 6 : 6.4);
+      pdf.setFontSize(6.8);
 
       const cellule = (
         texte: string[],
@@ -454,12 +457,10 @@ export async function exporterEtatsPdf(d: EtatsExportData) {
         yFin: number,
       ) => {
         pdf.rect(xDebut, yDebut, xFin - xDebut, yFin - yDebut);
-        // Un intitulé trop long pour sa colonne passe sur plusieurs lignes.
-        const lignes = texte.flatMap((l) => pdf.splitTextToSize(l, xFin - xDebut - 1.5) as string[]);
         const milieuY = (yDebut + yFin) / 2;
-        const depart = milieuY - ((lignes.length - 1) * 2.3) / 2 + 0.9;
-        lignes.forEach((ligne, i) => {
-          pdf.text(ligne, (xDebut + xFin) / 2, depart + i * 2.3, { align: "center" });
+        const depart = milieuY - ((texte.length - 1) * 2.4) / 2 + 0.9;
+        texte.forEach((ligne, i) => {
+          pdf.text(ligne, (xDebut + xFin) / 2, depart + i * 2.4, { align: "center" });
         });
       };
 
@@ -473,10 +474,13 @@ export async function exporterEtatsPdf(d: EtatsExportData) {
         cellule(cel.texte, xDebut, xFin, y, yFin);
         col += span;
       }
-      // Seconde ligne : une cellule par colonne de montant.
+      // Seconde ligne : uniquement sous les regroupements (REF / libellé sont
+      // déjà fusionnés sur toute la hauteur).
       col = 2;
       for (const cel of t.entetes[1]) {
-        cellule(cel.texte, xs[col], xs[col] + largeurs[col], y + H_ENTETE, y + hTotal);
+        const xDebut = xs[col];
+        const xFin = xs[col] + largeurs[col];
+        cellule(cel.texte, xDebut, xFin, y + H_ENTETE, y + hTotal);
         col += 1;
       }
       y += hTotal;
@@ -485,13 +489,13 @@ export async function exporterEtatsPdf(d: EtatsExportData) {
     dessinerEntete();
 
     // ---- Corps ----
-    pdf.setFontSize(TAILLE_TEXTE);
+    pdf.setFontSize(7);
     for (const l of t.lignes) {
       if (y + H_LIGNE > HAUTEUR_PAGE - MARGE - 4) {
-        pdf.addPage();
+        nouvellePage();
         y = MARGE + 4;
         dessinerEntete();
-        pdf.setFontSize(TAILLE_TEXTE);
+        pdf.setFontSize(7);
       }
 
       if (l.total) {
@@ -512,7 +516,7 @@ export async function exporterEtatsPdf(d: EtatsExportData) {
       pdf.text(coupe[0] ?? libelle, xs[1] + 1.5, base);
 
       l.montants.forEach((m, i) => {
-        pdf.text(montantTexte(m, l.total), xs[2 + i] + largeurs[2 + i] - 1.2, base, {
+        pdf.text(montantTexte(m, l.total), xs[2 + i] + largeurs[2 + i] - 1.5, base, {
           align: "right",
         });
       });
@@ -540,6 +544,8 @@ export async function exporterEtatsPdf(d: EtatsExportData) {
   const nbPages = pdf.getNumberOfPages();
   for (let i = 1; i <= nbPages; i++) {
     pdf.setPage(i);
+    const LARGEUR_PAGE = pdf.internal.pageSize.getWidth();
+    const HAUTEUR_PAGE = pdf.internal.pageSize.getHeight();
     pdf.setFont("helvetica", "normal");
     pdf.setFontSize(7);
     pdf.setTextColor(120);
