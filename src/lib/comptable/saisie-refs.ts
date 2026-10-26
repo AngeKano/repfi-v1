@@ -35,6 +35,9 @@ const TYPE_TIERS_PAR_RUBRIQUE: Record<string, string> = {
   BH: "Fournisseur",
 };
 
+/** Rubriques de bilan dont les comptes portent des tiers (comptes centralisateurs). */
+export const RUBRIQUES_TIERS = Object.keys(TYPE_TIERS_PAR_RUBRIQUE);
+
 /**
  * Rubrique de bilan d'un compte : `bilan` sur l'ancien schéma (deux
  * colonnes), sinon la rubrique unique du schéma fusionné.

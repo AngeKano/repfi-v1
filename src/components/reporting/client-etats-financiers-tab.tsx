@@ -35,6 +35,7 @@ import { toast } from "sonner";
 import {
   exporterEtatsExcel,
   exporterEtatsPdf,
+  libelleCumul,
   type EtatsExportData,
 } from "./etats-financiers-export";
 
@@ -78,14 +79,14 @@ interface LigneResultat {
   repere: string | null;
   montants: number[];
 }
-// Compte d'exploitation : lignes du compte de résultat, 12 mois + total.
+// Compte d'exploitation : lignes du compte de résultat, janvier → mois du filtre + total.
 interface LigneExploitation {
   ref: string;
   libelle: string;
   total: boolean;
   sens: string | null;
   repere: string | null;
-  /** Net périodique de janvier à décembre. */
+  /** Net périodique de chaque mois, de janvier au mois du filtre. */
   mois: number[];
   /** Cumul depuis janvier. */
   cumul: number;
@@ -207,7 +208,9 @@ export default function ClientEtatsFinanciersTab({
   // Compte d'exploitation : chargé à la première ouverture du sous-onglet (ou
   // au téléchargement), pour l'année du filtre. La clé écarte un résultat
   // obtenu pour un autre client ou une autre année.
-  const cleExploitation = `${clientId}:${year}`;
+  // Mois de fin du filtre : décembre en granularité Année.
+  const moisFinExploitation = periodType === "year" || cumulGranularity === "annee" ? "12" : selectedMonth;
+  const cleExploitation = `${clientId}:${year}:${moisFinExploitation}`;
   const [exploitation, setExploitation] = useState<{
     cle: string;
     data: ExploitationData | null;
@@ -217,10 +220,11 @@ export default function ClientEtatsFinanciersTab({
   const exploitationCourante = exploitation?.cle === cleExploitation ? exploitation : null;
 
   const chargerExploitation = useCallback(async (): Promise<ExploitationData | null> => {
-    const cle = `${clientId}:${year}`;
+    const cle = `${clientId}:${year}:${moisFinExploitation}`;
     setExploitationLoading(true);
     try {
-      const res = await fetch(`/api/clients/${clientId}/reporting/compte-exploitation?year=${year}`);
+      const qs = new URLSearchParams({ year, month: moisFinExploitation, periodType: "ytd" });
+      const res = await fetch(`/api/clients/${clientId}/reporting/compte-exploitation?${qs}`);
       if (!res.ok) throw new Error("Erreur API");
       const json = (await res.json()) as ExploitationData;
       setExploitation({ cle, data: json, erreur: "" });
@@ -232,7 +236,7 @@ export default function ClientEtatsFinanciersTab({
     } finally {
       setExploitationLoading(false);
     }
-  }, [clientId, year]);
+  }, [clientId, year, moisFinExploitation]);
 
   useEffect(() => {
     if (subTab === "exploitation" && !exploitationCourante && !exploitationLoading) chargerExploitation();
@@ -245,6 +249,10 @@ export default function ClientEtatsFinanciersTab({
     : cumulGranularity === "annee"
       ? `Janvier - Décembre ${year}`
       : `${monthLabel} ${year}`;
+
+  // Compte d'exploitation : « Juillet », « CUMUL JANV. - JUIL. ».
+  const libelleMoisFin = MONTHS.find((m) => m.value === moisFinExploitation)?.label ?? "Décembre";
+  const cumulExploitation = libelleCumul(parseInt(moisFinExploitation, 10) || 12);
 
   const yearOptions = (data?.availableYears ?? []).map(String);
   const handleYearChange = (dir: "prev" | "next") => {
@@ -507,7 +515,7 @@ export default function ClientEtatsFinanciersTab({
             <DialogDescription>
               Bilan (actif et passif) et compte de résultat, pour{" "}
               {visibles.map((e) => e.label).join(" et ")} — période : {periodLabel} ; compte
-              d&apos;exploitation {year} (12 mois et total).
+              d&apos;exploitation {year} (janvier → {libelleMoisFin} et total).
             </DialogDescription>
           </DialogHeader>
           <div className="grid grid-cols-2 gap-3 pt-2">
@@ -749,9 +757,9 @@ export default function ClientEtatsFinanciersTab({
       {subTab === "exploitation" && (
         <div className="space-y-3">
           <p className="text-xs text-[#335890]">
-            Exercice {exploitationCourante?.data?.year ?? year} — de janvier à décembre, chaque mois en{" "}
-            <strong>net périodique</strong> (mouvements du seul mois) ; le <strong>total</strong> est le cumul
-            depuis janvier. Le mode de calcul et le mois du filtre ne s&apos;appliquent pas à cette vue.
+            Exercice {exploitationCourante?.data?.year ?? year} — de janvier à {libelleMoisFin.toLowerCase()} (mois du
+            filtre), chaque mois en <strong>net périodique</strong> (mouvements du seul mois) ; le{" "}
+            <strong>total</strong> est le cumul de janvier à {libelleMoisFin.toLowerCase()}.
           </p>
           {exploitationCourante?.erreur ? (
             <div className="flex flex-col items-center justify-center h-40 text-muted-foreground">
@@ -787,7 +795,7 @@ export default function ClientEtatsFinanciersTab({
                     <th className={cn(TH, "min-w-[130px]")}>
                       CUMUL
                       <br />
-                      JANV. - DÉC.
+                      {cumulExploitation}
                     </th>
                   </tr>
                 </thead>

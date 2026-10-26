@@ -14,7 +14,7 @@
 >
 > **Dernière mise à jour : 26/10/2026** — États Financiers : Bilan et Compte de
 > résultat dans leur présentation d'origine, nouveau sous-onglet **Compte
-> d'exploitation** (12 mois + total, §18). Détail de toutes les évolutions :
+> d'exploitation** (janvier → mois du filtre + total, §18). Détail de toutes les évolutions :
 > historique, §29.
 >
 > *23/10/2026* — **tous les indicateurs se calculent par rubrique** et non
@@ -221,6 +221,18 @@ préfixe 40 / 41) :
 
 Quatre référentiels : **Plan comptable**, **Mapping**, **Plan tiers**, **Codes
 journaux**.
+
+### Plan tiers — compte centralisateur
+
+La colonne **Compte centralisateur** du Plan tiers est **calculée** : ce sont
+les comptes de rubrique `BI`, `DI`, `DJ` ou `BH` (401…, 411…) sur lesquels
+le tiers est mouvementé dans le grand livre, avec l'intitulé du plan comptable
+(« 411100 — Collectif Client Ménages » ; plusieurs comptes séparés par « ; »).
+Elle se recherche, se filtre et se trie comme les autres colonnes, mais n'est
+ni modifiable, ni saisie à l'ajout d'un tiers, ni exportée au format de
+dépôt. Un tiers jamais mouvementé n'a pas encore de compte centralisateur.
+
+> `src/lib/clickhouse/dimensions-table.ts` — `jointureCompteCentralisateur()`
 
 ### Intitulés
 
@@ -675,7 +687,8 @@ Bouton **Télécharger** : PDF et/ou Excel, même présentation que l'écran —
 en-tête sur deux niveaux, quadrillage, totaux en gras sur fond gris, zéros
 masqués hors total. Contenu : Bilan Actif, Bilan Passif et Compte de résultat
 pour les exercices affichés (A4 paysage), puis le **Compte d'exploitation**
-de l'année (12 mois + total, **A3 paysage**). Excel en 4 onglets. Montants en
+de janvier au mois du filtre + total (**A3 paysage** au-delà de 8 colonnes de
+montants, A4 sinon). Excel en 4 onglets. Montants en
 **FCFA**, milliers séparés par une espace, pagination « Page x / n ».
 
 ---
@@ -695,14 +708,16 @@ Troisième sous-onglet : les mêmes 42 lignes, **mois par mois**.
 | Colonne | Calcul |
 |---|---|
 | REF, LIBELLES | Figées pendant le défilement horizontal |
-| Janvier … Décembre (12 colonnes) | **Net périodique** : `Σ(crédit − débit)` des mouvements du seul mois, par rubrique |
-| TOTAL — cumul janvier → décembre | Somme des 12 mois |
+| Janvier … mois du filtre (ex. 7 colonnes pour juillet) | **Net périodique** : `Σ(crédit − débit)` des mouvements du seul mois, par rubrique |
+| TOTAL — cumul janvier → mois du filtre | Somme des mois affichés (« CUMUL JANV. - JUIL. ») |
 
 - Les sous-totaux `XA…XI` sont recalculés pour chaque mois avec les formules
   de la §7 ; elles sont linéaires, donc le total d'un sous-total égale la
   somme de ses mois.
-- Exercice = l'**année du filtre** ; le mode de calcul et le mois du filtre
-  ne s'appliquent pas à cette vue (toujours janvier → décembre).
+- Exercice = l'**année du filtre** ; les colonnes vont de janvier au **mois
+  du filtre** (décembre en granularité Année). Le mode de calcul ne change
+  rien : chaque mois est toujours en net périodique et le total toujours
+  cumulé depuis janvier.
 - Chargé à la première ouverture du sous-onglet ; inclus dans les exports
   (§17).
 
@@ -1254,7 +1269,7 @@ GET :
 
 ```
 {
-  lignes,          // [{ <colonne>: string }]
+  lignes,          // [{ <colonne>: string }] ; Plan tiers : + compte_centralisateur (calculé)
   total, page, pageSize, totalPages,   // pageSize 50, ou nombre de lignes en export
   diagnostic?,     // anomalie de schéma expliquée à l'utilisateur
   options?,        // { <colonne>: [{ code, libelle? }] }, 5000 valeurs au plus par colonne
@@ -1401,21 +1416,24 @@ Inclut ou exclut les écritures saisies manuellement de tous les calculs du repo
 ```
 
 ### 25.17 `GET /reporting/compte-exploitation`
-Sous-onglet Compte d'exploitation : lignes du compte de résultat sur les 12 mois de l'exercice, plus le total.
+Sous-onglet Compte d'exploitation : lignes du compte de résultat de janvier au mois du filtre, plus le total.
 
 | Paramètre | Type | Défaut | Effet |
 |---|---|---|---|
 | `year` | AAAA | exercice le plus récent | Exercice affiché, sinon le plus récent qui le précède |
+| `month` | MM | `12` | Dernier mois affiché |
+| `periodType` | `year` ou autre | `ytd` | `year` force décembre |
 
 ```
 {
   client: { id, name },
   availableYears, manualIncluded,
   year,
-  mois: [{ ym, label }],   // 12 mois : "AAAAMM", "Janvier"…
+  moisFin,                 // 1 à 12
+  mois: [{ ym, label }],   // janvier → moisFin : "AAAAMM", "Janvier"…
   lignes: [{ ref, libelle, total, sens, repere, mois, cumul }]
-      // mois : 12 montants en net périodique (crédit − débit du seul mois) ; sous-totaux XA…XI recalculés par mois
-      // cumul : total janvier → décembre (= somme des mois)
+      // mois : un montant par mois affiché, en net périodique (crédit − débit du seul mois) ; sous-totaux XA…XI recalculés par mois
+      // cumul : total janvier → moisFin (= somme des mois)
 }
 ```
 
@@ -1482,6 +1500,8 @@ Sous-onglet Compte d'exploitation : lignes du compte de résultat sur les 12 moi
 | 23/10/2026 | **Règle par rubrique** pour tous les KPI, hors exceptions E1 à E5 (§2) : CA et courbe sur `XB`, Charges vs Produits sur les rubriques R / T, Top 10 clients sur `BI`, amortissements reconnus par rubrique, repli des journaux de trésorerie sur les rubriques, tiers des saisies par rubrique. États Financiers **mois par mois** avec Cumul N et Cumul N-1 (§17). Carte **Charges et rentabilité** (§22). Rubriques des écritures saisies calculées par le Mapping (§19). Année conservée entre onglets, bascule des saisies sans changer d'onglet (§4, §20). Schémas de réponse des API rétablis et mis à jour (§25). Document déplacé dans le dépôt (`docs/`), PDF régénéré par `npm run docs:metrics`. |
 | 24/10/2026 | Saisie d'écritures : une ligne porte **soit un débit, soit un crédit** (l'autre colonne est grisée, refus serveur sinon) ; sur un compte client ou fournisseur (rubriques `BI`, `DI`, `DJ`, `BH`), le **tiers est obligatoire** (champ en rouge, refus serveur sinon) ; les tiers du Plan tiers sont acceptés même jamais mouvementés ; points bloquants listés sous le tableau (§19). |
 | 26/10/2026 | États Financiers : **Bilan** et **Compte de Résultat** rétablis dans leur présentation d'origine (exercices comparés, BRUT / AMORT / NET, mode périodique ou cumulé) ; la vue mois par mois devient un **3e sous-onglet « Compte d'exploitation »** : 12 mois en net périodique + TOTAL cumulé depuis janvier, REF et libellés figés, inclus dans les exports (Excel 4 onglets, PDF en A3 paysage pour ce tableau) — §17, §18, §25.6, §25.17. |
+| 26/10/2026 | Tables de dimension › Plan tiers : nouvelle colonne **Compte centralisateur** — compte collectif (rubrique BI, DI, DJ ou BH : 401…, 411…) sur lequel le tiers est mouvementé dans le grand livre, avec son intitulé du plan comptable (« 411100 — Collectif Client Ménages » ; plusieurs comptes séparés par « ; »). Colonne calculée : recherchable, filtrable, triable, non modifiable, absente du fichier exporté au format de dépôt (§3). |
+| 26/10/2026 | Compte d'exploitation **borné au mois du filtre** : colonnes de janvier au mois choisi (décembre en granularité Année), TOTAL = cumul de janvier à ce mois (« CUMUL JANV. - JUIL. ») ; export identique, en A4 jusqu'à 8 colonnes de montants, A3 au-delà (§17, §18, §25.17). |
 
 ---
 

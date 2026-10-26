@@ -28,9 +28,10 @@
 // type, longueur de racine, sens du solde).
 // ============================================================================
 import type { ClickHouseClient } from "@clickhouse/client";
-import { tableColumns } from "./schema";
+import { tableColumns, bilanRefExpr } from "./schema";
 import type { ColonneDimension, TableReferentiel } from "@/lib/comptable/dimensions";
 import { colonneCle, colonnesCles } from "@/lib/comptable/dimensions";
+import { RUBRIQUES_TIERS } from "@/lib/comptable/saisie-refs";
 
 export type LigneDimension = Record<string, string>;
 
@@ -68,6 +69,13 @@ interface Schema {
   reelles: string[];
   /** Champ de référence → colonnes réelles candidates présentes, dans l'ordre de préférence. */
   candidats: Map<string, string[]>;
+  /** Champ calculé → expression SQL de sa valeur (colonne de la jointure). */
+  derivees: Map<string, string>;
+  /**
+   * Clause FROM de la lecture : la table seule, ou la table jointe aux
+   * valeurs des champs calculés.
+   */
+  source: string;
 }
 
 /** Identifiant ClickHouse protégé (casse ou caractères inhabituels). */
@@ -87,7 +95,70 @@ async function lireSchema(
       .filter((n): n is string => !!n);
     candidats.set(c.nom, [...new Set(presents)]);
   }
-  return { reelles, candidats };
+  const schema: Schema = { reelles, candidats, derivees: new Map(), source: `${dbName}.${def.table} FINAL` };
+
+  const calculees = def.colonnes.filter((c) => c.calculee === "compteCentralisateur");
+  if (calculees.length > 0 && reelles.length > 0) {
+    const jointure = await jointureCompteCentralisateur(client, dbName, def, schema);
+    if (jointure) {
+      schema.source = jointure;
+      for (const c of calculees) schema.derivees.set(c.nom, "__cc_valeur");
+    }
+  }
+  return schema;
+}
+
+/**
+ * Compte centralisateur de chaque tiers : les comptes de rubrique BI, DI, DJ
+ * ou BH (clients, fournisseurs) sur lesquels il est mouvementé dans le grand
+ * livre, avec l'intitulé du plan comptable (à défaut, celui du grand livre).
+ * « 411100 — Collectif Client Ménages » ; plusieurs comptes sont séparés par
+ * « ; ». Renvoie la clause FROM jointe, ou null si le grand livre manque.
+ */
+async function jointureCompteCentralisateur(
+  client: ClickHouseClient,
+  dbName: string,
+  def: TableReferentiel,
+  schema: Schema,
+): Promise<string | null> {
+  const exprCle = expression(schema, colonneCle(def).nom);
+  const gl = await tableColumns(client, dbName, "grand_livre");
+  if (!exprCle || !gl.has("n_tiers") || !gl.has("compte")) return null;
+
+  const refExpr = await bilanRefExpr(client, dbName);
+  // Codes constants (aucune entrée utilisateur).
+  const rubriques = RUBRIQUES_TIERS.map((r) => `'${r}'`).join(", ");
+  const intituleGl = gl.has("intitule_compte") ? "anyIf(intitule_compte, intitule_compte != '')" : "''";
+  const plan = await tableColumns(client, dbName, "plan_compte");
+  const avecPlan = plan.has("compte") && plan.has("intitule_compte");
+
+  const comptes = `
+    SELECT n_tiers AS cc_tiers, compte AS cc_compte, ${intituleGl} AS cc_intitule_gl
+    FROM ${dbName}.grand_livre
+    WHERE n_tiers != '' AND ${refExpr} IN (${rubriques})
+    GROUP BY n_tiers, compte`;
+  const libelles = avecPlan
+    ? `
+      SELECT g.cc_tiers AS cc_tiers,
+             if(p.cc_intitule_plan != '', p.cc_intitule_plan, g.cc_intitule_gl) AS cc_intitule,
+             concat(g.cc_compte, if(cc_intitule != '', concat(' — ', cc_intitule), '')) AS cc_libelle
+      FROM (${comptes}) AS g
+      LEFT JOIN (
+        SELECT toString(compte) AS cc_compte_plan, any(toString(intitule_compte)) AS cc_intitule_plan
+        FROM ${dbName}.plan_compte FINAL
+        GROUP BY cc_compte_plan
+      ) AS p ON p.cc_compte_plan = g.cc_compte`
+    : `
+      SELECT cc_tiers,
+             concat(cc_compte, if(cc_intitule_gl != '', concat(' — ', cc_intitule_gl), '')) AS cc_libelle
+      FROM (${comptes})`;
+
+  return `(SELECT *, ${exprCle} AS __cle FROM ${dbName}.${def.table} FINAL) AS __t
+    LEFT JOIN (
+      SELECT cc_tiers AS __cc_cle, arrayStringConcat(arraySort(groupArray(cc_libelle)), ' ; ') AS __cc_valeur
+      FROM (${libelles})
+      GROUP BY cc_tiers
+    ) AS __cc ON __t.__cle = __cc.__cc_cle`;
 }
 
 /**
@@ -95,6 +166,8 @@ async function lireSchema(
  * colonnes candidates. `null` si aucune colonne candidate n'existe.
  */
 function expression(schema: Schema, nom: string): string | null {
+  const derivee = schema.derivees.get(nom);
+  if (derivee) return derivee;
   const cols = schema.candidats.get(nom) ?? [];
   if (cols.length === 0) return null;
   if (cols.length === 1) return `toString(${ident(cols[0])})`;
@@ -193,7 +266,7 @@ export async function listerDimension(
       .join(", ");
 
     const cRes = await client.query({
-      query: `SELECT count() AS n FROM ${dbName}.${def.table} FINAL ${whereSql}`,
+      query: `SELECT count() AS n FROM ${schema.source} ${whereSql}`,
       query_params: params,
       format: "JSONEachRow",
     });
@@ -209,7 +282,7 @@ export async function listerDimension(
     const champs = def.colonnes.map((c, i) => ({ nom: c.nom, alias: `__c${i}`, e: expression(schema, c.nom) }));
     const res = await client.query({
       query: `SELECT ${champs.map((f) => `${f.e ?? "''"} AS ${f.alias}`).join(", ")}
-              FROM ${dbName}.${def.table} FINAL
+              FROM ${schema.source}
               ${whereSql}
               ORDER BY ${tri} ${sens}, ${departage}
               ${limite}`,
@@ -280,15 +353,17 @@ export async function optionsFiltresDimension(
       const e = expression(schema, c.nom);
       if (!e) return [c.nom, []];
       const lib = c.libelleDe ? expression(schema, c.libelleDe) : null;
+      // La jointure n'est utile qu'au champ calculé.
+      const source = schema.derivees.has(c.nom) ? schema.source : `${dbName}.${def.table} FINAL`;
       try {
         const res = await client.query({
           query: lib
             ? `SELECT ${e} AS v, anyIf(${lib}, ${lib} != '') AS l
-               FROM ${dbName}.${def.table} FINAL
+               FROM ${source}
                WHERE ${e} != ''
                GROUP BY v ORDER BY v LIMIT ${MAX_OPTIONS}`
             : `SELECT DISTINCT ${e} AS v
-               FROM ${dbName}.${def.table} FINAL
+               FROM ${source}
                WHERE ${e} != ''
                ORDER BY v LIMIT ${MAX_OPTIONS}`,
           format: "JSONEachRow",
