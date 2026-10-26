@@ -12,11 +12,15 @@
 > `npm run docs:metrics`. Il est mis à jour à chaque évolution du reporting
 > (voir l'historique, §29).
 >
-> **Mise à jour du 23/10/2026** — **tous les indicateurs se calculent par
-> rubrique** et non plus par numéro de compte, hors cinq exceptions métier
-> (§2) ; nouvelle carte **Charges et rentabilité** (§22) ; États Financiers
-> **mois par mois** avec cumuls N et N-1 (§17) ; rubriques et tiers des
-> écritures saisies déterminés par le Mapping (§19).
+> **Dernière mise à jour : 26/10/2026** — États Financiers : Bilan et Compte de
+> résultat dans leur présentation d'origine, nouveau sous-onglet **Compte
+> d'exploitation** (12 mois + total, §18). Détail de toutes les évolutions :
+> historique, §29.
+>
+> *23/10/2026* — **tous les indicateurs se calculent par rubrique** et non
+> plus par numéro de compte, hors cinq exceptions métier (§2) ; carte
+> **Charges et rentabilité** (§22) ; rubriques et tiers des écritures saisies
+> déterminés par le Mapping (§19).
 >
 > *21/10/2026* — définitions du Recouvrement Clients et du Règlement
 > Fournisseurs (solde, séparation par type de journal), Trésorerie par
@@ -44,7 +48,7 @@
 15. [Dettes Financières](#15-dettes-financières)
 16. [Ratios bilantiels](#16-ratios-bilantiels)
 17. [États Financiers — Bilan](#17-états-financiers--bilan)
-18. [États Financiers — Compte de résultat](#18-états-financiers--compte-de-résultat)
+18. [États Financiers — Compte de résultat et Compte d'exploitation](#18-états-financiers--compte-de-résultat-et-compte-dexploitation)
 19. [Comptabilité — écritures saisies](#19-comptabilité--écritures-saisies)
 20. [Inclusion / exclusion des saisies dans le reporting](#20-inclusion--exclusion-des-saisies-dans-le-reporting)
 21. [Tunnel de rentabilité](#21-tunnel-de-rentabilité)
@@ -624,33 +628,31 @@ choix : global, exploitation ou HAO, en N et N-1).
 
 ## 17. États Financiers — Bilan
 
-Modèle **SYSCOHADA Système Normal**, conforme aux formulaires DGI.
+Modèle **SYSCOHADA Système Normal**, conforme aux formulaires DGI. Trois
+sous-onglets : **Bilan**, **Compte de Résultat** (§18) et **Compte
+d'exploitation** (§18).
 
-### Vue mois par mois
+### Colonnes
 
-| Colonne | Calcul |
-|---|---|
-| Chaque mois, de janvier au mois du filtre | **Périodique** : mouvements du seul mois (janvier porte l'à-nouveau) |
-| **Cumul N** | Somme des mois = solde de janvier au mois du filtre |
-| **Cumul N-1** | Même fenêtre sur l'exercice précédent (masqué s'il n'a aucune écriture) |
-
-- **Écran** : un mois à la fois, flèches ‹ › dans l'en-tête pour parcourir
-  les mois ; les colonnes **REF** et libellé restent figées.
-- Granularité *Année* : jusqu'à décembre. Le mode de calcul est sans objet
-  (mois toujours périodiques, cumul toujours depuis janvier).
-- Toutes les formules étant linéaires, la somme des mois égale le cumul.
-
-### Colonnes de l'Actif
-
-| Colonne | Formule |
-|---|---|
-| Mois | NET du mois |
-| Cumul N — BRUT | `Σ(débit − crédit)` hors rubriques d'amortissement (§2) |
-| Cumul N — AMORT. et DÉPREC. | `Σ(crédit − débit)` des rubriques d'amortissement (`AE1`, `BB1`…) |
-| Cumul N — NET | `BRUT − AMORT` |
-| Cumul N-1 — NET | idem sur N-1 |
+| Colonne | Exercice | Formule |
+|---|---|---|
+| BRUT | N | `Σ(débit − crédit)` hors rubriques d'amortissement (§2) |
+| AMORT et DEPREC. | N | `Σ(crédit − débit)` des rubriques d'amortissement (`AE1`, `BB1`…) |
+| NET | N | `BRUT − AMORT` |
+| NET | N-1 | idem |
 
 Côté **Passif** : `NET = Σ(crédit − débit)`.
+
+### Fenêtre et exercices
+
+- Le **Bilan** est une photo à une date : il part **toujours du 1er janvier**,
+  quel que soit le mode. Le **Compte de résultat** suit le mode choisi
+  (périodique : le mois seul ; cumulé : janvier → mois).
+- L'en-tête d'un exercice affiche la **date de fin de la fenêtre filtrée**,
+  bornée à la clôture réelle (ex. « EXERCICE au 30/04/2026 »).
+- Deux exercices affichés au maximum (N et N-1), navigation par flèches
+  au-delà. Un exercice **sans aucune écriture** sur la fenêtre n'est pas
+  affiché.
 
 ### Normalisation des codes
 
@@ -664,25 +666,48 @@ Le code est réduit **par la droite** jusqu'à un REF connu.
 
 ### Résultat net (`CJ`) et subventions
 
-Dans chaque colonne, `CJ` = solde déjà classé en `CJ` + `XI` **de la même
-période** (pas de double compte si les comptes de gestion sont soldés). Le
-compte **4495** est reclassé en **`BJ` (Autres créances)** (E3).
+`CJ` est alimenté par `XI` (résultat **cumulé** depuis janvier). Le compte
+**4495** est reclassé en **`BJ` (Autres créances)** (E3).
 
 ### Export PDF / Excel
 
-Bouton **Télécharger** : PDF et/ou Excel (3 onglets) contenant **tous les
-mois**, puis le Cumul N et le Cumul N-1. PDF en A4 paysage, **A3 paysage**
-au-delà de 8 colonnes de montants ; Excel avec volets figés (REF, libellé,
-en-tête). Montants en **FCFA**, milliers séparés par une espace, zéros masqués
-hors total, pagination « Page x / n ».
+Bouton **Télécharger** : PDF et/ou Excel, même présentation que l'écran —
+en-tête sur deux niveaux, quadrillage, totaux en gras sur fond gris, zéros
+masqués hors total. Contenu : Bilan Actif, Bilan Passif et Compte de résultat
+pour les exercices affichés (A4 paysage), puis le **Compte d'exploitation**
+de l'année (12 mois + total, **A3 paysage**). Excel en 4 onglets. Montants en
+**FCFA**, milliers séparés par une espace, pagination « Page x / n ».
 
 ---
 
-## 18. États Financiers — Compte de résultat
+## 18. États Financiers — Compte de résultat et Compte d'exploitation
+
+### Compte de Résultat
 
 42 lignes, `TA → XI`, avec repères A/B/C/D et sens structurels (+, −, −/+).
-Les soldes intermédiaires `XA…XI` suivent la §7. **Mêmes colonnes que le
-Bilan** : mois en périodique, Cumul N, Cumul N-1.
+Les soldes intermédiaires `XA…XI` suivent la §7. Colonnes NET de l'exercice
+N et de l'exercice N-1, même fenêtre que le Bilan (§17).
+
+### Compte d'exploitation
+
+Troisième sous-onglet : les mêmes 42 lignes, **mois par mois**.
+
+| Colonne | Calcul |
+|---|---|
+| REF, LIBELLES | Figées pendant le défilement horizontal |
+| Janvier … Décembre (12 colonnes) | **Net périodique** : `Σ(crédit − débit)` des mouvements du seul mois, par rubrique |
+| TOTAL — cumul janvier → décembre | Somme des 12 mois |
+
+- Les sous-totaux `XA…XI` sont recalculés pour chaque mois avec les formules
+  de la §7 ; elles sont linéaires, donc le total d'un sous-total égale la
+  somme de ses mois.
+- Exercice = l'**année du filtre** ; le mode de calcul et le mois du filtre
+  ne s'appliquent pas à cette vue (toujours janvier → décembre).
+- Chargé à la première ouverture du sous-onglet ; inclus dans les exports
+  (§17).
+
+> `…/reporting/compte-exploitation/route.ts`,
+> `src/components/reporting/client-etats-financiers-tab.tsx`
 
 ---
 
@@ -1082,30 +1107,24 @@ Onglet Ratios bilantiels : FRNG, BFR, dettes financières et DSO, en encours cum
 ```
 
 ### 25.6 `GET /reporting/etats-financiers`
-Bilan actif, bilan passif et compte de résultat, mois par mois, avec colonnes Cumul N et Cumul N-1.
+Sous-onglets Bilan et Compte de résultat : exercices comparés (N, N-1…), colonnes BRUT / AMORT / NET à l'actif.
 
 | Paramètre | Type | Défaut | Effet |
 |---|---|---|---|
-| `year` | AAAA | exercice le plus récent | Exercice N = `year`, sinon l'exercice disponible le plus récent qui le précède |
-| `periodType` | `year` ou autre | `ytd` | `year` force le mois de fin à 12 |
-| `month` | MM | `12` | Mois de fin. Hors de 1–12, il vaut 12 |
+| `year` | AAAA | tous les exercices | Exercice N : les exercices suivants sont ignorés |
+| `periodType` | `year` ou `month` ou `ytd` ou `ytd-day` | `ytd` | Bilan toujours janvier → mois de fin. Compte de résultat : le mois seul en `month`, janvier → mois sinon. `year` force décembre |
+| `month` | MM | `12` | Mois de fin de la fenêtre |
 
 ```
 {
   client: { id, name },
-  availableYears, manualIncluded,
-  periodeLabel,          // "Janvier - Mars 2025"
-  yearN,
-  yearN1,                // null si N-1 n'a aucune écriture sur la fenêtre
-  mois: [{ ym, label }], // "AAAAMM", "Janvier 2025", … jusqu'à month
-  cumulN: { label, dateFin },            // dateFin "JJ/MM/AAAA", bornée à la clôture réelle
-  cumulN1: { label, dateFin } ou null,
-  actif: [{ ref, libelle, total, mois, brut, amort, net, netN1 }],
-      // mois = net périodique de chaque mois ; brut (débit − crédit), amort (crédit − débit) et net = Cumul N
-  passif: [{ ref, libelle, total, mois, cumul, cumulN1 }],
-      // crédit − débit ; CJ inclut le résultat XI de la période
-  resultat: [{ ref, libelle, total, sens, repere, mois, cumul, cumulN1 }]
-      // crédit − débit ; sens "+" ou "-" ou "-/+" ou null ; repere ou null ; total = ligne de sous-total
+  exercices: [{ year, label }],   // du plus récent au plus ancien, sans écriture → écarté ; label "JJ/MM/AAAA" (fin de fenêtre bornée à la clôture)
+  availableYears,                 // number[] décroissant
+  manualIncluded,
+  periodeLabel,                   // "Janvier - avril", "Janvier - Décembre" ou "avril"
+  actif: [{ ref, libelle, total, bruts, amorts, nets }],   // un montant par exercice ; brut (débit − crédit), amort (crédit − débit)
+  passif: [{ ref, libelle, total, nets }],                 // crédit − débit ; CJ += XI cumulé
+  resultat: [{ ref, libelle, total, sens, repere, montants }]   // crédit − débit ; sens "+" ou "-" ou "-/+" ou null
 }
 ```
 
@@ -1381,6 +1400,25 @@ Inclut ou exclut les écritures saisies manuellement de tous les calculs du repo
 { ok, excludeManualEntries }
 ```
 
+### 25.17 `GET /reporting/compte-exploitation`
+Sous-onglet Compte d'exploitation : lignes du compte de résultat sur les 12 mois de l'exercice, plus le total.
+
+| Paramètre | Type | Défaut | Effet |
+|---|---|---|---|
+| `year` | AAAA | exercice le plus récent | Exercice affiché, sinon le plus récent qui le précède |
+
+```
+{
+  client: { id, name },
+  availableYears, manualIncluded,
+  year,
+  mois: [{ ym, label }],   // 12 mois : "AAAAMM", "Janvier"…
+  lignes: [{ ref, libelle, total, sens, repere, mois, cumul }]
+      // mois : 12 montants en net périodique (crédit − débit du seul mois) ; sous-totaux XA…XI recalculés par mois
+      // cumul : total janvier → décembre (= somme des mois)
+}
+```
+
 ---
 
 ## 26. Composition par onglet UI
@@ -1396,7 +1434,7 @@ Inclut ou exclut les écritures saisies manuellement de tous les calculs du repo
 | Trésorerie | KPI par rubrique, trésorerie par comptes |
 | Dettes Financières | Dettes financières, emprunts, crédit-bail |
 | Ratios bilantiels | FRNG, BFR (global, exploitation, HAO) |
-| États Financiers | Bilan et Compte de résultat mois par mois, cumuls N et N-1, export PDF / Excel |
+| États Financiers | Bilan et Compte de résultat (exercices comparés), Compte d'exploitation (12 mois + total), export PDF / Excel |
 | Bilan d'activité | Lecture narrative de l'exercice |
 | Import | Fichiers comptables, mise à jour des référentiels et historique |
 | Comptabilité | Grand livre (saisie) et Tables de dimension |
@@ -1443,6 +1481,7 @@ Inclut ou exclut les écritures saisies manuellement de tous les calculs du repo
 | 21/10/2026 | Recouvrement Clients et Règlement Fournisseurs en solde, séparés par type de journal (journaux de trésorerie) ; Trésorerie entièrement par rubrique, KPI « Autres Trésorerie Passif » ; onglets Dettes Financières et Ratios bilantiels, DSO déplacé au Recouvrement ; KPI configurables sur tous les onglets ; référentiels (tables de dimension) consultables, modifiables, mis à jour par fichier via Airflow ; Mapping (`ple`) table à part entière ; Comptabilité en deux sous-onglets ; États Financiers : filtre périodique, dates d'exercice, export PDF / Excel en FCFA. |
 | 23/10/2026 | **Règle par rubrique** pour tous les KPI, hors exceptions E1 à E5 (§2) : CA et courbe sur `XB`, Charges vs Produits sur les rubriques R / T, Top 10 clients sur `BI`, amortissements reconnus par rubrique, repli des journaux de trésorerie sur les rubriques, tiers des saisies par rubrique. États Financiers **mois par mois** avec Cumul N et Cumul N-1 (§17). Carte **Charges et rentabilité** (§22). Rubriques des écritures saisies calculées par le Mapping (§19). Année conservée entre onglets, bascule des saisies sans changer d'onglet (§4, §20). Schémas de réponse des API rétablis et mis à jour (§25). Document déplacé dans le dépôt (`docs/`), PDF régénéré par `npm run docs:metrics`. |
 | 24/10/2026 | Saisie d'écritures : une ligne porte **soit un débit, soit un crédit** (l'autre colonne est grisée, refus serveur sinon) ; sur un compte client ou fournisseur (rubriques `BI`, `DI`, `DJ`, `BH`), le **tiers est obligatoire** (champ en rouge, refus serveur sinon) ; les tiers du Plan tiers sont acceptés même jamais mouvementés ; points bloquants listés sous le tableau (§19). |
+| 26/10/2026 | États Financiers : **Bilan** et **Compte de Résultat** rétablis dans leur présentation d'origine (exercices comparés, BRUT / AMORT / NET, mode périodique ou cumulé) ; la vue mois par mois devient un **3e sous-onglet « Compte d'exploitation »** : 12 mois en net périodique + TOTAL cumulé depuis janvier, REF et libellés figés, inclus dans les exports (Excel 4 onglets, PDF en A3 paysage pour ce tableau) — §17, §18, §25.6, §25.17. |
 
 ---
 

@@ -29,7 +29,7 @@ import {
   FileSpreadsheet,
   FileText,
 } from "lucide-react";
-import { PiScalesDuotone, PiChartDonutDuotone } from "react-icons/pi";
+import { PiScalesDuotone, PiChartDonutDuotone, PiTableDuotone } from "react-icons/pi";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import {
@@ -52,47 +52,56 @@ interface ClientEtatsFinanciersTabProps {
   setCumulGranularity: (g: "mois" | "annee") => void;
 }
 
-interface Mois {
-  ym: string;
+interface Exercice {
+  year: number;
   label: string;
-}
-interface Cumul {
-  label: string;
-  dateFin: string;
 }
 interface LigneActif {
   ref: string;
   libelle: string;
   total: boolean;
-  /** NET périodique de chaque mois, de janvier au mois sélectionné. */
-  mois: number[];
-  brut: number;
-  amort: number;
-  net: number;
-  netN1: number;
+  bruts: number[];
+  amorts: number[];
+  nets: number[];
 }
 interface LignePassif {
   ref: string;
   libelle: string;
   total: boolean;
-  mois: number[];
-  cumul: number;
-  cumulN1: number;
+  nets: number[];
 }
-interface LigneResultat extends LignePassif {
+interface LigneResultat {
+  ref: string;
+  libelle: string;
+  total: boolean;
   sens: string | null;
   repere: string | null;
+  montants: number[];
 }
+// Compte d'exploitation : lignes du compte de résultat, 12 mois + total.
+interface LigneExploitation {
+  ref: string;
+  libelle: string;
+  total: boolean;
+  sens: string | null;
+  repere: string | null;
+  /** Net périodique de janvier à décembre. */
+  mois: number[];
+  /** Cumul depuis janvier. */
+  cumul: number;
+}
+interface ExploitationData {
+  year: number;
+  mois: { ym: string; label: string }[];
+  lignes: LigneExploitation[];
+}
+
 interface EtatsData {
   client: { id: string; name: string };
+  exercices: Exercice[];
   availableYears: number[];
   manualIncluded: boolean;
   periodeLabel: string;
-  yearN: number;
-  yearN1: number | null;
-  mois: Mois[];
-  cumulN: Cumul;
-  cumulN1: Cumul | null;
   actif: LigneActif[];
   passif: LignePassif[];
   resultat: LigneResultat[];
@@ -113,32 +122,23 @@ const MONTHS = [
   { value: "12", label: "Décembre" },
 ];
 
+// Deux exercices au maximum affichés simultanément (modèle officiel).
+const MAX_EXERCICES = 2;
+
 // ==================== Styles (grille type état officiel) ====================
 const TH =
   "border border-[#9AA9BC] bg-[#EDEDED] px-3 py-2 text-center text-xs font-semibold text-[#1A1A1A] whitespace-nowrap";
 const TD = "border border-[#9AA9BC] px-3 py-1.5 align-middle";
-// REF et libellé restent fixes pendant le défilement horizontal. Le filet de
-// droite est redessiné en ombre : avec border-collapse, la bordure d'une
-// cellule collante ne suit pas le défilement.
-const STICKY_REF = "sticky left-0 z-10 w-16 min-w-16";
-const STICKY_LIB = "sticky left-16 z-10 shadow-[1px_0_0_#9AA9BC]";
-// Colonne du mois affiché, légèrement teintée pour la distinguer des cumuls.
-const COL_MOIS = "bg-[#F5F9FF]";
 
 const fmt = (n: number, showZero: boolean) => {
-  if (!Math.round(n || 0)) return showZero ? "0" : "";
+  if (!n) return showZero ? "0" : "";
   return Math.round(n).toLocaleString("fr-FR");
 };
 
-function Amount({ value, total, className }: { value: number; total: boolean; className?: string }) {
+function Amount({ value, total }: { value: number; total: boolean }) {
   return (
     <td
-      className={cn(
-        TD,
-        "text-right tabular-nums whitespace-nowrap",
-        total && "font-bold",
-        className,
-      )}
+      className={cn(TD, "text-right tabular-nums whitespace-nowrap", total && "font-bold")}
     >
       {fmt(value, total)}
     </td>
@@ -148,7 +148,14 @@ function Amount({ value, total, className }: { value: number; total: boolean; cl
 const SUB_TABS = [
   { id: "bilan" as const, label: "Bilan", icon: PiScalesDuotone },
   { id: "resultat" as const, label: "Compte de Résultat", icon: PiChartDonutDuotone },
+  { id: "exploitation" as const, label: "Compte d'exploitation", icon: PiTableDuotone },
 ];
+
+// REF et libellé restent fixes pendant le défilement horizontal du compte
+// d'exploitation. Le filet de droite est redessiné en ombre : avec
+// border-collapse, la bordure d'une cellule collante ne suit pas le défilement.
+const STICKY_REF = "sticky left-0 w-16 min-w-16";
+const STICKY_LIB = "sticky left-16 min-w-[300px] shadow-[1px_0_0_#9AA9BC]";
 
 export default function ClientEtatsFinanciersTab({
   clientId,
@@ -164,10 +171,9 @@ export default function ClientEtatsFinanciersTab({
   const [data, setData] = useState<EtatsData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [subTab, setSubTab] = useState<"bilan" | "resultat">("bilan");
-  // Mois affiché à l'écran (index dans data.mois) ; par défaut, le mois
-  // sélectionné dans le filtre, c'est-à-dire le dernier.
-  const [moisIdx, setMoisIdx] = useState(0);
+  const [subTab, setSubTab] = useState<"bilan" | "resultat" | "exploitation">("bilan");
+  // Index de départ de la fenêtre de comparaison (2 exercices maximum).
+  const [exOffset, setExOffset] = useState(0);
   const [showExport, setShowExport] = useState(false);
   const [exporting, setExporting] = useState(false);
   // Formats cochés : un seul ou les deux à la fois.
@@ -184,9 +190,8 @@ export default function ClientEtatsFinanciersTab({
       });
       const res = await fetch(`/api/clients/${clientId}/reporting/etats-financiers?${qs}`);
       if (!res.ok) throw new Error("Erreur API");
-      const json = (await res.json()) as EtatsData;
-      setData(json);
-      setMoisIdx(Math.max(0, json.mois.length - 1));
+      setData((await res.json()) as EtatsData);
+      setExOffset(0);
     } catch (e) {
       console.error(e);
       setError("Impossible de charger les états financiers.");
@@ -199,11 +204,47 @@ export default function ClientEtatsFinanciersTab({
     load();
   }, [load]);
 
-  // Les colonnes mensuelles sont toujours en périodique et le cumul part de
-  // janvier : seul le mois de fin du filtre compte ici.
-  const moisFin = cumulGranularity === "annee" ? "12" : selectedMonth;
-  const monthLabel = MONTHS.find((m) => m.value === moisFin)?.label ?? "Décembre";
-  const periodLabel = `Janvier - ${monthLabel} ${year}`;
+  // Compte d'exploitation : chargé à la première ouverture du sous-onglet (ou
+  // au téléchargement), pour l'année du filtre. La clé écarte un résultat
+  // obtenu pour un autre client ou une autre année.
+  const cleExploitation = `${clientId}:${year}`;
+  const [exploitation, setExploitation] = useState<{
+    cle: string;
+    data: ExploitationData | null;
+    erreur: string;
+  } | null>(null);
+  const [exploitationLoading, setExploitationLoading] = useState(false);
+  const exploitationCourante = exploitation?.cle === cleExploitation ? exploitation : null;
+
+  const chargerExploitation = useCallback(async (): Promise<ExploitationData | null> => {
+    const cle = `${clientId}:${year}`;
+    setExploitationLoading(true);
+    try {
+      const res = await fetch(`/api/clients/${clientId}/reporting/compte-exploitation?year=${year}`);
+      if (!res.ok) throw new Error("Erreur API");
+      const json = (await res.json()) as ExploitationData;
+      setExploitation({ cle, data: json, erreur: "" });
+      return json;
+    } catch (e) {
+      console.error(e);
+      setExploitation({ cle, data: null, erreur: "Impossible de charger le compte d'exploitation." });
+      return null;
+    } finally {
+      setExploitationLoading(false);
+    }
+  }, [clientId, year]);
+
+  useEffect(() => {
+    if (subTab === "exploitation" && !exploitationCourante && !exploitationLoading) chargerExploitation();
+  }, [subTab, exploitationCourante, exploitationLoading, chargerExploitation]);
+
+  const cumule = periodType === "ytd" || periodType === "ytd-day";
+  const monthLabel = MONTHS.find((m) => m.value === selectedMonth)?.label ?? "Décembre";
+  const periodLabel = cumule
+    ? `Janvier - ${monthLabel} ${year}${periodType === "ytd-day" ? " (jour par jour)" : ""}`
+    : cumulGranularity === "annee"
+      ? `Janvier - Décembre ${year}`
+      : `${monthLabel} ${year}`;
 
   const yearOptions = (data?.availableYears ?? []).map(String);
   const handleYearChange = (dir: "prev" | "next") => {
@@ -216,6 +257,29 @@ export default function ClientEtatsFinanciersTab({
   // ==================== Barre de filtres (commune au reporting) ====================
   const filtres = (
     <div className="flex flex-wrap items-center gap-3">
+      <div className="flex items-center gap-2 border border-[#D0E3F5] rounded-lg px-4 h-10">
+        <span className="text-xs text-[#335890]">Mode calcul :</span>
+        <Select
+          value={cumule ? "cumule" : "periodique"}
+          onValueChange={(v: string) => {
+            if (v === "cumule") {
+              setPeriodType(cumulGranularity === "annee" ? "ytd" : "ytd-day");
+              if (cumulGranularity === "annee") setSelectedMonth("12");
+            } else {
+              setPeriodType(cumulGranularity === "annee" ? "year" : "month");
+            }
+          }}
+        >
+          <SelectTrigger className="border-0 p-0 h-auto shadow-none min-w-[90px] font-semibold text-[#00122E]">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="periodique">Périodique</SelectItem>
+            <SelectItem value="cumule">Cumulé</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
       <div className="flex items-center gap-2 border border-[#D0E3F5] rounded-lg px-4 h-10">
         <span className="text-xs text-[#335890]">Année :</span>
         <span className="font-semibold text-[#00122E]">{year}</span>
@@ -245,11 +309,13 @@ export default function ClientEtatsFinanciersTab({
           value={cumulGranularity}
           onValueChange={(v: string) => {
             const g = v as "mois" | "annee";
-            const cumule = periodType === "ytd" || periodType === "ytd-day";
             setCumulGranularity(g);
-            if (cumule) setPeriodType(g === "annee" ? "ytd" : "ytd-day");
-            else setPeriodType(g === "annee" ? "year" : "month");
-            if (g === "annee") setSelectedMonth("12");
+            if (cumule) {
+              setPeriodType(g === "annee" ? "ytd" : "ytd-day");
+              if (g === "annee") setSelectedMonth("12");
+            } else {
+              setPeriodType(g === "annee" ? "year" : "month");
+            }
           }}
         >
           <SelectTrigger className="border-0 p-0 h-auto shadow-none min-w-[80px] font-semibold text-[#00122E]">
@@ -282,7 +348,7 @@ export default function ClientEtatsFinanciersTab({
 
       <div className="flex items-center gap-2 bg-[#F5F9FF] rounded-lg px-4 h-10 text-xs text-[#335890]">
         <CalendarRange className="w-3.5 h-3.5 text-[#0077C3]" />
-        <span>{periodLabel} — mois en périodique, cumul N et N-1</span>
+        <span>{periodLabel}</span>
       </div>
     </div>
   );
@@ -309,85 +375,20 @@ export default function ClientEtatsFinanciersTab({
     );
   }
 
-  const nbMois = data.mois.length;
-  const idx = Math.min(moisIdx, Math.max(0, nbMois - 1));
-  const moisCourant = data.mois[idx];
-  const cumulN1 = data.cumulN1;
+  const allEx = data.exercices;
+  const visibles = allEx.slice(exOffset, exOffset + MAX_EXERCICES);
+  const canPrev = exOffset > 0;
+  const canNext = exOffset + MAX_EXERCICES < allEx.length;
 
-  // Cellules REF et libellé, figées à gauche. Le fond est explicite pour que
-  // les montants ne transparaissent pas dessous pendant le défilement.
-  const refCell = (ref: string, total: boolean) => (
-    <td
-      className={cn(
-        TD,
-        STICKY_REF,
-        "font-mono text-xs text-center",
-        total ? "bg-[#F2F2F2] font-bold" : "bg-white",
-      )}
-    >
-      {ref}
-    </td>
-  );
   const libCell = (libelle: string, total: boolean, extra?: ReactNode) => (
-    <td
-      className={cn(
-        TD,
-        STICKY_LIB,
-        "min-w-[320px]",
-        total ? "bg-[#F2F2F2] font-bold uppercase" : "bg-white",
-      )}
-    >
+    <td className={cn(TD, total && "font-bold uppercase")}>
       {libelle}
       {extra}
     </td>
   );
-  const thRef = (
-    <th rowSpan={2} className={cn(TH, STICKY_REF, "z-20")}>
-      REF
-    </th>
-  );
-  const thLib = (titre: string) => (
-    <th rowSpan={2} className={cn(TH, STICKY_LIB, "z-20 text-left min-w-[320px]")}>
-      {titre}
-    </th>
-  );
 
-  // En-tête du mois affiché, avec les flèches de navigation juste au-dessus
-  // des montants : de janvier jusqu'au mois sélectionné.
-  const thMois = (
-    <th className={cn(TH, "min-w-[180px]")}>
-      <div className="flex items-center justify-between gap-2">
-        <button
-          type="button"
-          title="Mois précédent"
-          onClick={() => setMoisIdx(Math.max(0, idx - 1))}
-          disabled={idx <= 0}
-          className="rounded p-0.5 text-[#335890] hover:bg-white hover:text-[#0077C3] disabled:opacity-30 disabled:hover:bg-transparent"
-        >
-          <ChevronLeft className="w-4 h-4" />
-        </button>
-        <span className="uppercase">{moisCourant?.label ?? "—"}</span>
-        <button
-          type="button"
-          title="Mois suivant"
-          onClick={() => setMoisIdx(Math.min(nbMois - 1, idx + 1))}
-          disabled={idx >= nbMois - 1}
-          className="rounded p-0.5 text-[#335890] hover:bg-white hover:text-[#0077C3] disabled:opacity-30 disabled:hover:bg-transparent"
-        >
-          <ChevronRight className="w-4 h-4" />
-        </button>
-      </div>
-    </th>
-  );
-  const thCumul = (c: Cumul, colSpan = 1) => (
-    <th colSpan={colSpan} className={TH}>
-      CUMUL
-      <br />
-      {c.label.toUpperCase()}
-    </th>
-  );
-
-  // L'export contient TOUS les mois de la période, suivis des deux cumuls.
+  // L exportation reprend exactement ce qui est à l écran : mêmes filtres,
+  // mêmes exercices comparés.
   const toggleFormat = (f: "xlsx" | "pdf") =>
     setFormats((l) => (l.includes(f) ? l.filter((x) => x !== f) : [...l, f]));
 
@@ -395,16 +396,18 @@ export default function ClientEtatsFinanciersTab({
     if (formats.length === 0) return;
     setExporting(true);
     try {
+      // Le compte d'exploitation fait partie de l'export : on le charge s'il
+      // ne l'a pas encore été.
+      const exploitationExport = exploitationCourante?.data ?? (await chargerExploitation());
       const charge: EtatsExportData = {
         clientName: data.client.name,
-        periodeLabel: data.periodeLabel,
-        yearN: data.yearN,
-        mois: data.mois,
-        cumulN: data.cumulN,
-        cumulN1: data.cumulN1,
+        periodeLabel: periodLabel,
+        exercices: visibles,
+        offset: exOffset,
         actif: data.actif,
         passif: data.passif,
         resultat: data.resultat,
+        exploitation: exploitationExport,
       };
       // Les deux formats cochés produisent deux fichiers, l'un après l'autre.
       if (formats.includes("xlsx")) await exporterEtatsExcel(charge);
@@ -418,6 +421,31 @@ export default function ClientEtatsFinanciersTab({
     }
   };
 
+  const navExercices = allEx.length > MAX_EXERCICES && (
+    <div className="flex items-center gap-2">
+      <span className="text-xs text-[#335890]">Exercices comparés :</span>
+      <button
+        title="Exercices plus récents"
+        onClick={() => setExOffset((o) => Math.max(0, o - 1))}
+        disabled={!canPrev}
+        className="text-[#94A3B8] hover:text-[#0077C3] disabled:opacity-30"
+      >
+        <ChevronLeft className="w-4 h-4" />
+      </button>
+      <span className="font-semibold text-[#00122E] text-sm">
+        {visibles.map((e) => e.year).join(" / ")}
+      </span>
+      <button
+        title="Exercices plus anciens"
+        onClick={() => setExOffset((o) => Math.min(allEx.length - MAX_EXERCICES, o + 1))}
+        disabled={!canNext}
+        className="text-[#94A3B8] hover:text-[#0077C3] disabled:opacity-30"
+      >
+        <ChevronRight className="w-4 h-4" />
+      </button>
+    </div>
+  );
+
   return (
     <div className="space-y-6">
       {filtres}
@@ -425,7 +453,7 @@ export default function ClientEtatsFinanciersTab({
       <div>
         <h1 className="text-3xl font-bold text-[#00122E]">États Financiers</h1>
         <p className="text-sm text-[#335890] italic mt-1">
-          {data.client.name} — Système Normal SYSCOHADA. Période : {data.periodeLabel}.
+          {data.client.name} — Système Normal SYSCOHADA. Période : {periodLabel}.
         </p>
       </div>
 
@@ -452,11 +480,7 @@ export default function ClientEtatsFinanciersTab({
       </div>
 
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <p className="text-xs text-[#335890]">
-          Mois {idx + 1} / {nbMois} — utilisez les flèches de l&apos;en-tête pour parcourir
-          les mois.
-          {!cumulN1 && " Aucune écriture sur l'exercice précédent : pas de cumul N-1."}
-        </p>
+        {(subTab !== "exploitation" && navExercices) || <span />}
         <div className="flex items-center gap-3">
           <Badge variant="outline" className="text-xs">
             {data.manualIncluded ? "Saisies incluses" : "Saisies masquées"}
@@ -474,15 +498,16 @@ export default function ClientEtatsFinanciersTab({
         </div>
       </div>
 
-      {/* Choix du format d'export — l'export contient tous les mois. */}
+      {/* Choix du format d'export — l'export reprend les filtres et les
+          exercices actuellement comparés. */}
       <Dialog open={showExport} onOpenChange={setShowExport}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Télécharger les états financiers</DialogTitle>
             <DialogDescription>
-              Bilan (actif et passif) et compte de résultat : les {nbMois} mois de{" "}
-              {data.periodeLabel} en périodique, le cumul N
-              {cumulN1 ? ` et le cumul N-1 (${cumulN1.label})` : ""}.
+              Bilan (actif et passif) et compte de résultat, pour{" "}
+              {visibles.map((e) => e.label).join(" et ")} — période : {periodLabel} ; compte
+              d&apos;exploitation {year} (12 mois et total).
             </DialogDescription>
           </DialogHeader>
           <div className="grid grid-cols-2 gap-3 pt-2">
@@ -490,15 +515,14 @@ export default function ClientEtatsFinanciersTab({
               {
                 id: "xlsx" as const,
                 label: "Excel",
-                detail: "3 onglets (.xlsx)",
+                detail: "4 onglets (.xlsx)",
                 icon: FileSpreadsheet,
                 color: "text-green-600",
               },
               {
                 id: "pdf" as const,
                 label: "PDF",
-                // Même règle que l'export : A3 au-delà de 8 colonnes de montant.
-                detail: nbMois + 3 + (cumulN1 ? 1 : 0) > 8 ? "A3 paysage" : "A4 paysage",
+                detail: "A4 paysage",
                 icon: FileText,
                 color: "text-red-600",
               },
@@ -566,34 +590,47 @@ export default function ClientEtatsFinanciersTab({
             <table className="w-full text-sm border-collapse">
               <thead>
                 <tr>
-                  {thRef}
-                  {thLib("ACTIF")}
-                  {thMois}
-                  {thCumul(data.cumulN, 3)}
-                  {cumulN1 && thCumul(cumulN1)}
+                  <th rowSpan={2} className={cn(TH, "w-16")}>
+                    REF
+                  </th>
+                  <th rowSpan={2} className={cn(TH, "text-left min-w-[320px]")}>
+                    ACTIF
+                  </th>
+                  <th colSpan={3} className={TH}>
+                    EXERCICE au {visibles[0]?.label ?? "—"}
+                  </th>
+                  {visibles.slice(1).map((e) => (
+                    <th key={e.year} className={TH}>
+                      EXERCICE AU
+                      <br />
+                      {e.label}
+                    </th>
+                  ))}
                 </tr>
                 <tr>
-                  <th className={TH}>NET (périodique)</th>
                   <th className={TH}>BRUT</th>
                   <th className={TH}>AMORT et DEPREC.</th>
                   <th className={TH}>NET</th>
-                  {cumulN1 && <th className={TH}>NET</th>}
+                  {visibles.slice(1).map((e) => (
+                    <th key={e.year} className={TH}>
+                      NET
+                    </th>
+                  ))}
                 </tr>
               </thead>
               <tbody>
                 {data.actif.map((l) => (
                   <tr key={l.ref} className={cn(l.total ? "bg-[#F2F2F2]" : "hover:bg-muted/20")}>
-                    {refCell(l.ref, l.total)}
+                    <td className={cn(TD, "font-mono text-xs text-center", l.total && "font-bold")}>
+                      {l.ref}
+                    </td>
                     {libCell(l.libelle, l.total)}
-                    <Amount
-                      value={l.mois[idx] ?? 0}
-                      total={l.total}
-                      className={!l.total ? COL_MOIS : undefined}
-                    />
-                    <Amount value={l.brut} total={l.total} />
-                    <Amount value={l.amort} total={l.total} />
-                    <Amount value={l.net} total={l.total} />
-                    {cumulN1 && <Amount value={l.netN1} total={l.total} />}
+                    <Amount value={l.bruts[exOffset] ?? 0} total={l.total} />
+                    <Amount value={l.amorts[exOffset] ?? 0} total={l.total} />
+                    <Amount value={l.nets[exOffset] ?? 0} total={l.total} />
+                    {visibles.slice(1).map((e, i) => (
+                      <Amount key={e.year} value={l.nets[exOffset + 1 + i] ?? 0} total={l.total} />
+                    ))}
                   </tr>
                 ))}
               </tbody>
@@ -605,30 +642,38 @@ export default function ClientEtatsFinanciersTab({
             <table className="w-full text-sm border-collapse">
               <thead>
                 <tr>
-                  {thRef}
-                  {thLib("PASSIF")}
-                  {thMois}
-                  {thCumul(data.cumulN)}
-                  {cumulN1 && thCumul(cumulN1)}
+                  <th rowSpan={2} className={cn(TH, "w-16")}>
+                    REF
+                  </th>
+                  <th rowSpan={2} className={cn(TH, "text-left min-w-[320px]")}>
+                    PASSIF
+                  </th>
+                  {visibles.map((e) => (
+                    <th key={e.year} className={TH}>
+                      EXERCICE AU
+                      <br />
+                      {e.label}
+                    </th>
+                  ))}
                 </tr>
                 <tr>
-                  <th className={TH}>NET (périodique)</th>
-                  <th className={TH}>NET</th>
-                  {cumulN1 && <th className={TH}>NET</th>}
+                  {visibles.map((e) => (
+                    <th key={e.year} className={TH}>
+                      NET
+                    </th>
+                  ))}
                 </tr>
               </thead>
               <tbody>
                 {data.passif.map((l) => (
                   <tr key={l.ref} className={cn(l.total ? "bg-[#F2F2F2]" : "hover:bg-muted/20")}>
-                    {refCell(l.ref, l.total)}
+                    <td className={cn(TD, "font-mono text-xs text-center", l.total && "font-bold")}>
+                      {l.ref}
+                    </td>
                     {libCell(l.libelle, l.total)}
-                    <Amount
-                      value={l.mois[idx] ?? 0}
-                      total={l.total}
-                      className={!l.total ? COL_MOIS : undefined}
-                    />
-                    <Amount value={l.cumul} total={l.total} />
-                    {cumulN1 && <Amount value={l.cumulN1} total={l.total} />}
+                    {visibles.map((e, i) => (
+                      <Amount key={e.year} value={l.nets[exOffset + i] ?? 0} total={l.total} />
+                    ))}
                   </tr>
                 ))}
               </tbody>
@@ -644,22 +689,34 @@ export default function ClientEtatsFinanciersTab({
             <table className="w-full text-sm border-collapse">
               <thead>
                 <tr>
-                  {thRef}
-                  {thLib("LIBELLES")}
-                  {thMois}
-                  {thCumul(data.cumulN)}
-                  {cumulN1 && thCumul(cumulN1)}
+                  <th rowSpan={2} className={cn(TH, "w-16")}>
+                    REF
+                  </th>
+                  <th rowSpan={2} className={cn(TH, "text-left min-w-[360px]")}>
+                    LIBELLES
+                  </th>
+                  {visibles.map((e) => (
+                    <th key={e.year} className={TH}>
+                      EXERCICE AU
+                      <br />
+                      {e.label}
+                    </th>
+                  ))}
                 </tr>
                 <tr>
-                  <th className={TH}>NET (1) périodique</th>
-                  <th className={TH}>NET (1)</th>
-                  {cumulN1 && <th className={TH}>NET (1)</th>}
+                  {visibles.map((e) => (
+                    <th key={e.year} className={TH}>
+                      NET (1)
+                    </th>
+                  ))}
                 </tr>
               </thead>
               <tbody>
                 {data.resultat.map((l) => (
                   <tr key={l.ref} className={cn(l.total ? "bg-[#F2F2F2]" : "hover:bg-muted/20")}>
-                    {refCell(l.ref, l.total)}
+                    <td className={cn(TD, "font-mono text-xs text-center", l.total && "font-bold")}>
+                      {l.ref}
+                    </td>
                     {libCell(
                       l.libelle,
                       l.total,
@@ -672,13 +729,9 @@ export default function ClientEtatsFinanciersTab({
                         )}
                       </>,
                     )}
-                    <Amount
-                      value={l.mois[idx] ?? 0}
-                      total={l.total}
-                      className={!l.total ? COL_MOIS : undefined}
-                    />
-                    <Amount value={l.cumul} total={l.total} />
-                    {cumulN1 && <Amount value={l.cumulN1} total={l.total} />}
+                    {visibles.map((e, i) => (
+                      <Amount key={e.year} value={l.montants[exOffset + i] ?? 0} total={l.total} />
+                    ))}
                   </tr>
                 ))}
               </tbody>
@@ -687,10 +740,94 @@ export default function ClientEtatsFinanciersTab({
           <p className="text-[11px] text-muted-foreground mt-3">
             (1) Les montants sont précédés du signe (+) ou (−) en fonction de leurs soldes dans la
             balance générale. (2) Les signes affichés à côté des libellés indiquent le sens
-            structurel des soldes ; ils ne jouent pas le rôle de signes opérateurs. La colonne du
-            mois est calculée en périodique (mouvements du seul mois) ; le cumul N est la somme
-            des mois de janvier au mois sélectionné.
+            structurel des soldes ; ils ne jouent pas le rôle de signes opérateurs.
           </p>
+        </div>
+      )}
+
+      {/* ============== COMPTE D'EXPLOITATION ============== */}
+      {subTab === "exploitation" && (
+        <div className="space-y-3">
+          <p className="text-xs text-[#335890]">
+            Exercice {exploitationCourante?.data?.year ?? year} — de janvier à décembre, chaque mois en{" "}
+            <strong>net périodique</strong> (mouvements du seul mois) ; le <strong>total</strong> est le cumul
+            depuis janvier. Le mode de calcul et le mois du filtre ne s&apos;appliquent pas à cette vue.
+          </p>
+          {exploitationCourante?.erreur ? (
+            <div className="flex flex-col items-center justify-center h-40 text-muted-foreground">
+              <AlertTriangle className="w-8 h-8 mb-2 opacity-30" />
+              <p>{exploitationCourante.erreur}</p>
+            </div>
+          ) : !exploitationCourante?.data ? (
+            <div className="flex items-center justify-center h-40">
+              <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm border-collapse">
+                <thead>
+                  <tr>
+                    <th rowSpan={2} className={cn(TH, STICKY_REF, "z-20")}>
+                      REF
+                    </th>
+                    <th rowSpan={2} className={cn(TH, STICKY_LIB, "z-20 text-left")}>
+                      LIBELLES
+                    </th>
+                    <th colSpan={exploitationCourante.data.mois.length} className={TH}>
+                      MOIS — NET PÉRIODIQUE
+                    </th>
+                    <th className={TH}>TOTAL</th>
+                  </tr>
+                  <tr>
+                    {exploitationCourante.data.mois.map((m) => (
+                      <th key={m.ym} className={cn(TH, "min-w-[110px]")}>
+                        {m.label.toUpperCase()}
+                      </th>
+                    ))}
+                    <th className={cn(TH, "min-w-[130px]")}>
+                      CUMUL
+                      <br />
+                      JANV. - DÉC.
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {exploitationCourante.data.lignes.map((l) => (
+                    <tr key={l.ref} className={cn(l.total ? "bg-[#F2F2F2]" : "hover:bg-muted/20")}>
+                      <td
+                        className={cn(
+                          TD,
+                          STICKY_REF,
+                          "z-10 font-mono text-xs text-center",
+                          l.total ? "bg-[#F2F2F2] font-bold" : "bg-white",
+                        )}
+                      >
+                        {l.ref}
+                      </td>
+                      <td
+                        className={cn(
+                          TD,
+                          STICKY_LIB,
+                          "z-10",
+                          l.total ? "bg-[#F2F2F2] font-bold uppercase" : "bg-white",
+                        )}
+                      >
+                        {l.libelle}
+                        {l.repere && <span className="ml-2 text-xs text-muted-foreground">({l.repere})</span>}
+                        {l.sens && !l.total && (
+                          <span className="ml-2 text-xs text-muted-foreground">{l.sens}</span>
+                        )}
+                      </td>
+                      {l.mois.map((v, i) => (
+                        <Amount key={i} value={v} total={l.total} />
+                      ))}
+                      <Amount value={l.cumul} total={l.total} />
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       )}
     </div>
