@@ -91,7 +91,7 @@ interface LigneExploitation {
   /** Cumul depuis janvier. */
   cumul: number;
 }
-interface ExploitationData {
+export interface ExploitationData {
   year: number;
   mois: { ym: string; label: string }[];
   lignes: LigneExploitation[];
@@ -157,6 +157,76 @@ const SUB_TABS = [
 // border-collapse, la bordure d'une cellule collante ne suit pas le défilement.
 const STICKY_REF = "sticky left-0 w-16 min-w-16";
 const STICKY_LIB = "sticky left-16 min-w-[300px] shadow-[1px_0_0_#9AA9BC]";
+
+/** Tableau du Compte d'exploitation : un mois par colonne, puis le total cumulé. */
+export function TableauExploitation({ data, cumul }: { data: ExploitationData; cumul: string }) {
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full text-sm border-collapse">
+        <thead>
+          <tr>
+            <th rowSpan={2} className={cn(TH, STICKY_REF, "z-20")}>
+              REF
+            </th>
+            <th rowSpan={2} className={cn(TH, STICKY_LIB, "z-20 text-left")}>
+              LIBELLES
+            </th>
+            <th colSpan={data.mois.length} className={TH}>
+              MOIS — NET PÉRIODIQUE
+            </th>
+            <th className={TH}>TOTAL</th>
+          </tr>
+          <tr>
+            {data.mois.map((m) => (
+              <th key={m.ym} className={cn(TH, "min-w-[110px]")}>
+                {m.label.toUpperCase()}
+              </th>
+            ))}
+            <th className={cn(TH, "min-w-[130px]")}>
+              CUMUL
+              <br />
+              {cumul}
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          {data.lignes.map((l) => (
+            <tr key={l.ref} className={cn(l.total ? "bg-[#F2F2F2]" : "hover:bg-muted/20")}>
+              <td
+                className={cn(
+                  TD,
+                  STICKY_REF,
+                  "z-10 font-mono text-xs text-center",
+                  l.total ? "bg-[#F2F2F2] font-bold" : "bg-white",
+                )}
+              >
+                {l.ref}
+              </td>
+              <td
+                className={cn(
+                  TD,
+                  STICKY_LIB,
+                  "z-10",
+                  l.total ? "bg-[#F2F2F2] font-bold uppercase" : "bg-white",
+                )}
+              >
+                {l.libelle}
+                {l.repere && <span className="ml-2 text-xs text-muted-foreground">({l.repere})</span>}
+                {l.sens && !l.total && (
+                  <span className="ml-2 text-xs text-muted-foreground">{l.sens}</span>
+                )}
+              </td>
+              {l.mois.map((v, i) => (
+                <Amount key={i} value={v} total={l.total} />
+              ))}
+              <Amount value={l.cumul} total={l.total} />
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
 
 export default function ClientEtatsFinanciersTab({
   clientId,
@@ -758,8 +828,9 @@ export default function ClientEtatsFinanciersTab({
         <div className="space-y-3">
           <p className="text-xs text-[#335890]">
             Exercice {exploitationCourante?.data?.year ?? year} — de janvier à {libelleMoisFin.toLowerCase()} (mois du
-            filtre), chaque mois en <strong>net périodique</strong> (mouvements du seul mois) ; le{" "}
-            <strong>total</strong> est le cumul de janvier à {libelleMoisFin.toLowerCase()}.
+            filtre). Chaque mois est <strong>indépendant</strong> : il porte les mouvements du seul mois
+            (net périodique), en mode périodique comme en mode cumulé. Le <strong>total</strong> est le
+            cumul de janvier à {libelleMoisFin.toLowerCase()}.
           </p>
           {exploitationCourante?.erreur ? (
             <div className="flex flex-col items-center justify-center h-40 text-muted-foreground">
@@ -771,70 +842,7 @@ export default function ClientEtatsFinanciersTab({
               <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm border-collapse">
-                <thead>
-                  <tr>
-                    <th rowSpan={2} className={cn(TH, STICKY_REF, "z-20")}>
-                      REF
-                    </th>
-                    <th rowSpan={2} className={cn(TH, STICKY_LIB, "z-20 text-left")}>
-                      LIBELLES
-                    </th>
-                    <th colSpan={exploitationCourante.data.mois.length} className={TH}>
-                      MOIS — NET PÉRIODIQUE
-                    </th>
-                    <th className={TH}>TOTAL</th>
-                  </tr>
-                  <tr>
-                    {exploitationCourante.data.mois.map((m) => (
-                      <th key={m.ym} className={cn(TH, "min-w-[110px]")}>
-                        {m.label.toUpperCase()}
-                      </th>
-                    ))}
-                    <th className={cn(TH, "min-w-[130px]")}>
-                      CUMUL
-                      <br />
-                      {cumulExploitation}
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {exploitationCourante.data.lignes.map((l) => (
-                    <tr key={l.ref} className={cn(l.total ? "bg-[#F2F2F2]" : "hover:bg-muted/20")}>
-                      <td
-                        className={cn(
-                          TD,
-                          STICKY_REF,
-                          "z-10 font-mono text-xs text-center",
-                          l.total ? "bg-[#F2F2F2] font-bold" : "bg-white",
-                        )}
-                      >
-                        {l.ref}
-                      </td>
-                      <td
-                        className={cn(
-                          TD,
-                          STICKY_LIB,
-                          "z-10",
-                          l.total ? "bg-[#F2F2F2] font-bold uppercase" : "bg-white",
-                        )}
-                      >
-                        {l.libelle}
-                        {l.repere && <span className="ml-2 text-xs text-muted-foreground">({l.repere})</span>}
-                        {l.sens && !l.total && (
-                          <span className="ml-2 text-xs text-muted-foreground">{l.sens}</span>
-                        )}
-                      </td>
-                      {l.mois.map((v, i) => (
-                        <Amount key={i} value={v} total={l.total} />
-                      ))}
-                      <Amount value={l.cumul} total={l.total} />
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <TableauExploitation data={exploitationCourante.data} cumul={cumulExploitation} />
           )}
         </div>
       )}
