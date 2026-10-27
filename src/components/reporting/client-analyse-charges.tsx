@@ -315,7 +315,9 @@ export function AnalyseChargesVue({
 
   const detail = (id: string) => (
     <div className="ml-5 mb-2 border-l-2 border-[#D0E3F5] pl-3">
-      {refsDetail(id).map((ref) => {
+      {refsDetail(id)
+        .filter((ref) => Math.round(n.rubriques[ref] || 0) !== 0 || (n.comptes[ref] ?? []).length > 0)
+        .map((ref) => {
         const v = n.rubriques[ref] || 0;
         const comptes = n.comptes[ref] ?? [];
         const ouvert = rubriqueOuverte === ref;
@@ -502,6 +504,25 @@ export function AnalyseChargesVue({
     },
   ];
 
+  // Une ligne à 0 % ne figure pas au classement : elle n'apporte rien à la
+  // lecture. Le CA et le résultat net restent toujours affichés. « 0 % » =
+  // ce qui s'affiche « 0,00 % » (moins de 0,005 % du CA), ou un montant nul
+  // quand le CA est nul.
+  const estNul = (montantLigne: number) =>
+    Math.round(montantLigne) === 0 || (pN.ca !== 0 && Math.abs(montantLigne / pN.ca) < 0.00005);
+  const etapesAffichees = etapes.filter(
+    (e) => e.type === "ca" || e.type === "resultat" || !estNul(e.impact),
+  );
+  // Tableau : une catégorie (ou les autres produits) disparaît si elle est
+  // nulle en N et en N-1 — une charge présente l'an passé reste comparée.
+  const lignesPoidsAffichees = lignesPoids.filter(
+    (l) =>
+      l.total ||
+      l.id === "marge" ||
+      !estNul(l.mN) ||
+      (l.mN1 !== null && Math.round(l.mN1) !== 0),
+  );
+
   const resume = (label: string, v: number) => (
     <div className="text-sm text-[#335890]">
       {label} : <span className="font-semibold text-[#00122E] tabular-nums">{montant(v)}</span>
@@ -568,7 +589,7 @@ export function AnalyseChargesVue({
 
           <div className="overflow-x-auto">
             <div className="min-w-[640px] divide-y divide-[#EEF2F7]">
-              {etapes.map((e) => {
+              {etapesAffichees.map((e) => {
                 const gauche = position(Math.min(e.avant, e.apres));
                 const largeur = position(Math.max(e.avant, e.apres)) - gauche;
                 const poids = pN.ca === 0 ? null : (e.type === "charge" ? -e.impact : e.impact) / pN.ca;
@@ -658,7 +679,7 @@ export function AnalyseChargesVue({
                 </tr>
               </thead>
               <tbody>
-                {lignesPoids.map((l) => (
+                {lignesPoidsAffichees.map((l) => (
                   <tr key={l.id} className={cn("border-b border-[#EEF2F7]", l.total && "font-semibold")}>
                     <td className="py-2 px-2 text-[#00122E]">{l.libelle}</td>
                     <td className="py-2 px-2 text-xs text-muted-foreground whitespace-nowrap">{l.refs}</td>
@@ -721,7 +742,10 @@ export function AnalyseChargesVue({
                     l: `${pont.impactCharges >= 0 ? "Diminution" : "Augmentation"} du total des charges`,
                     v: pont.impactCharges,
                   },
-                ].map((x) => (
+                ]
+                  // Un facteur sans effet sur le résultat n'est pas listé.
+                  .filter((x) => Math.round(x.v) !== 0)
+                  .map((x) => (
                   <tr key={x.l} className="border-b border-[#EEF2F7]">
                     <td className="py-2 px-2 text-[#00122E]">{x.l}</td>
                     <td className={cn(TD, "text-right")}>{montantSigne(x.v)}</td>

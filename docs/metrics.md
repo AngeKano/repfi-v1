@@ -716,8 +716,8 @@ Troisième sous-onglet : les mêmes 42 lignes, **mois par mois**.
   somme de ses mois.
 - Exercice = l'**année du filtre** ; les colonnes vont de janvier au **mois
   du filtre** (décembre en granularité Année). Le mode de calcul ne change
-  rien : chaque mois est toujours en net périodique et le total toujours
-  cumulé depuis janvier.
+  rien : chaque mois est **indépendant** (net périodique, période 1 sans lien
+  avec période 2) et seul le total est cumulé depuis janvier.
 - Chargé à la première ouverture du sous-onglet ; inclus dans les exports
   (§17).
 
@@ -824,7 +824,12 @@ sur la même fenêtre.
 
 - **Cascade** : CA (bleu) → charges (orange ; reprise en vert) → **Autres
   produits** (bleu, couleur du CA) → Résultat net (rose, rouge s'il est
-  négatif). Une ligne à zéro garde son libellé, sans barre.
+  négatif). Une catégorie à **0 %** (moins de 0,005 % du CA) et des autres
+  produits nuls **ne figurent pas** au classement ; le CA et le résultat net
+  restent toujours affichés.
+- **Lignes nulles** : le tableau des poids écarte une catégorie nulle en N et
+  en N-1 ; le pont de résultat écarte un facteur nul ; le détail écarte une
+  rubrique sans montant ni compte.
 - **Détail au clic** : catégorie → rubriques → comptes → écritures (300
   premières).
 - **Poids de chaque charge dans le chiffre d'affaires** : montants et poids N
@@ -1502,6 +1507,8 @@ Sous-onglet Compte d'exploitation : lignes du compte de résultat de janvier au 
 | 26/10/2026 | États Financiers : **Bilan** et **Compte de Résultat** rétablis dans leur présentation d'origine (exercices comparés, BRUT / AMORT / NET, mode périodique ou cumulé) ; la vue mois par mois devient un **3e sous-onglet « Compte d'exploitation »** : 12 mois en net périodique + TOTAL cumulé depuis janvier, REF et libellés figés, inclus dans les exports (Excel 4 onglets, PDF en A3 paysage pour ce tableau) — §17, §18, §25.6, §25.17. |
 | 26/10/2026 | Tables de dimension › Plan tiers : nouvelle colonne **Compte centralisateur** — compte collectif (rubrique BI, DI, DJ ou BH : 401…, 411…) sur lequel le tiers est mouvementé dans le grand livre, avec son intitulé du plan comptable (« 411100 — Collectif Client Ménages » ; plusieurs comptes séparés par « ; »). Colonne calculée : recherchable, filtrable, triable, non modifiable, absente du fichier exporté au format de dépôt (§3). |
 | 26/10/2026 | Compte d'exploitation **borné au mois du filtre** : colonnes de janvier au mois choisi (décembre en granularité Année), TOTAL = cumul de janvier à ce mois (« CUMUL JANV. - JUIL. ») ; export identique, en A4 jusqu'à 8 colonnes de montants, A3 au-delà (§17, §18, §25.17). |
+| 27/10/2026 | Compte d'exploitation : confirmé que le **mode de calcul ne s'applique pas** — chaque mois reste indépendant (mouvements du seul mois), en périodique comme en cumulé, et seule la colonne TOTAL cumule de janvier au mois du filtre ; texte explicatif de l'écran précisé en ce sens (§18). |
+| 27/10/2026 | Charges et rentabilité : les lignes à **0 %** ne figurent plus au classement — cascade sans les catégories ni les autres produits nuls (CA et résultat net toujours affichés), tableau des poids sans les catégories nulles en N et en N-1, pont de résultat sans facteur nul, détail sans rubrique vide (§22). |
 
 ---
 
