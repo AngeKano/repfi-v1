@@ -62,6 +62,11 @@ import {
 import { DashboardLayout } from "@/components/dashboard-layout";
 import { DEVISE, UNITE_ABREGEE } from "@/lib/devise";
 
+/** Granularité correspondant à un periodType : année entière ou un mois. */
+function granulariteDe(p: string): "mois" | "annee" {
+  return p === "year" || p === "ytd" ? "annee" : "mois";
+}
+
 interface ClientDetailsClientProps {
   session: any;
   initialClient: any;
@@ -180,9 +185,37 @@ export default function ClientDetailsClient({
     "year" | "month" | "ytd" | "ytd-day"
   >(initialPeriodType || "year");
   const [selectedMonth, setSelectedMonth] = useState<string>("12");
+  // La granularité affichée doit correspondre au periodType : « year »
+  // (Périodique) et « ytd » (Cumulé) portent sur l'année entière, « month » et
+  // « ytd-day » sur un mois. Démarrer sur « Mois » avec un periodType annuel
+  // affichait un filtre Mois / Février sur des chiffres calculés à l'année.
   const [cumulGranularity, setCumulGranularity] = useState<"mois" | "annee">(
-    "mois",
+    () => granulariteDe(initialPeriodType || "year"),
   );
+
+  // Paramètres appliqués par l'URL (choix mémorisé ou fenêtre de paramètres) :
+  // le mode ET la granularité suivent, sans quoi l'état restait sur sa valeur
+  // initiale.
+  useEffect(() => {
+    if (!initialPeriodType) return;
+    setPeriodType(initialPeriodType);
+    setCumulGranularity(granulariteDe(initialPeriodType));
+  }, [initialPeriodType]);
+
+  // Garde-fou : le periodType suit toujours la granularité affichée (et le
+  // mode, périodique ou cumulé, qu'il porte déjà).
+  useEffect(() => {
+    const cumule = periodType === "ytd" || periodType === "ytd-day";
+    const attendu =
+      cumulGranularity === "annee"
+        ? cumule
+          ? "ytd"
+          : "year"
+        : cumule
+          ? "ytd-day"
+          : "month";
+    if (attendu !== periodType) setPeriodType(attendu);
+  }, [periodType, cumulGranularity]);
 
   // Les paramètres de reporting ne sont demandés qu'une seule fois par client.
   // Si l'URL contient déjà un filtre, ou si on a mémorisé un choix précédent,

@@ -297,6 +297,12 @@ onglets. À la première ouverture d'un client, l'année se cale sur l'exercice
 le plus récent ; ensuite, **l'année choisie est conservée** d'un onglet à
 l'autre et lors de la bascule « Prendre en compte les saisies ».
 
+**Cohérence du filtre** : le calcul suit toujours ce qu'affiche la barre de
+filtres. Granularité « Année » → l'année entière (périodique) ou janvier →
+décembre (cumulé) ; granularité « Mois » → le mois choisi (périodique) ou
+janvier → ce mois (cumulé). Au premier affichage d'un client, la granularité
+est déduite du mode mémorisé (Périodique ou Cumulé portent sur l'année).
+
 ---
 
 ## 5. Rubriques OHADA — charges (RA à RS)
@@ -1509,6 +1515,7 @@ Sous-onglet Compte d'exploitation : lignes du compte de résultat de janvier au 
 | 26/10/2026 | Compte d'exploitation **borné au mois du filtre** : colonnes de janvier au mois choisi (décembre en granularité Année), TOTAL = cumul de janvier à ce mois (« CUMUL JANV. - JUIL. ») ; export identique, en A4 jusqu'à 8 colonnes de montants, A3 au-delà (§17, §18, §25.17). |
 | 27/10/2026 | Compte d'exploitation : confirmé que le **mode de calcul ne s'applique pas** — chaque mois reste indépendant (mouvements du seul mois), en périodique comme en cumulé, et seule la colonne TOTAL cumule de janvier au mois du filtre ; texte explicatif de l'écran précisé en ce sens (§18). |
 | 27/10/2026 | Charges et rentabilité : les lignes à **0 %** ne figurent plus au classement — cascade sans les catégories ni les autres produits nuls (CA et résultat net toujours affichés), tableau des poids sans les catégories nulles en N et en N-1, pont de résultat sans facteur nul, détail sans rubrique vide (§22). |
+| 27/10/2026 | **Filtres partagés — correction** : la granularité démarrait toujours sur « Mois » alors que le choix initial (Périodique ou Cumulé) calcule sur l'**année entière** ; le filtre affichait « Mois : Février » sur des chiffres annuels (Compte d'exploitation de janvier à décembre, Compte de résultat sur l'année…). La granularité est désormais déduite du mode initial et un garde-fou maintient le calcul aligné sur la granularité et le mois affichés, dans tous les onglets (§4). |
 
 ---
 
