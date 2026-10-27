@@ -51,10 +51,11 @@ export interface ColonneDimension {
   /** Champ équivalent des écritures saisies (ManualLedgerEntry). */
   saisie?: "intituleCompte" | "intituleTiers" | "typeTiers";
   /**
-   * Colonne CALCULÉE, en lecture seule : sa valeur ne vient pas de la table
-   * mais d'une jointure (compte centralisateur d'un tiers, lu dans le grand
-   * livre). Recherchable, filtrable et triable ; jamais modifiable, ni saisie
-   * à l'ajout, ni exportée au format de dépôt.
+   * Colonne en LECTURE SEULE enrichie par une jointure : compte centralisateur
+   * d'un tiers, lu dans la table (compte_collectif) avec l'intitulé du plan
+   * comptable, et déduit du grand livre quand la table n'en porte pas.
+   * Recherchable, filtrable et triable ; jamais modifiable, ni saisie à
+   * l'ajout, ni exportée au format de dépôt.
    */
   calculee?: "compteCentralisateur";
 
@@ -222,15 +223,18 @@ export const DIMENSIONS: DimensionDef[] = [
         saisie: "typeTiers",
       },
       {
-        nom: "compte_centralisateur",
+        // Colonne Airflow : compte général de rattachement du fichier Sage (.pnc).
+        nom: "compte_collectif",
+        alias: ["compte_centralisateur", "compte_rattachement", "compte_general", "collectif"],
         libelle: "Compte centralisateur",
         calculee: "compteCentralisateur",
       },
     ],
     note:
-      "Compte centralisateur : compte collectif (rubrique BI, DI, DJ ou BH : 401…, 411…) sur lequel " +
-      "le tiers est mouvementé dans le grand livre, avec son intitulé du plan comptable. Valeur " +
-      "calculée, non modifiable ; un tiers jamais mouvementé n'en a pas encore.",
+      "Compte centralisateur : compte de rattachement du tiers lu dans le Plan tiers (fichier Sage " +
+      ".pnc), avec son intitulé du plan comptable. S'il n'y figure pas (Plan tiers importé en Excel), " +
+      "il est déduit du grand livre : compte de rubrique BI, DI, DJ ou BH sur lequel le tiers est " +
+      "mouvementé. Non modifiable.",
   },
   {
     id: FileType.CODE_JOURNAL,

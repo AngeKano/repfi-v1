@@ -99,28 +99,34 @@ async function lireSchema(
 
   const calculees = def.colonnes.filter((c) => c.calculee === "compteCentralisateur");
   if (calculees.length > 0 && reelles.length > 0) {
-    const jointure = await jointureCompteCentralisateur(client, dbName, def, schema);
+    // Valeur portée par la table (compte_collectif), si la colonne existe.
+    const exprTable = expression(schema, calculees[0].nom);
+    const jointure = await jointureCompteCentralisateur(client, dbName, def, schema, exprTable);
     if (jointure) {
-      schema.source = jointure;
-      for (const c of calculees) schema.derivees.set(c.nom, "__cc_valeur");
+      schema.source = jointure.source;
+      for (const c of calculees) schema.derivees.set(c.nom, jointure.valeur);
     }
   }
   return schema;
 }
 
 /**
- * Compte centralisateur de chaque tiers : les comptes de rubrique BI, DI, DJ
- * ou BH (clients, fournisseurs) sur lesquels il est mouvementé dans le grand
- * livre, avec l'intitulé du plan comptable (à défaut, celui du grand livre).
- * « 411100 — Collectif Client Ménages » ; plusieurs comptes sont séparés par
- * « ; ». Renvoie la clause FROM jointe, ou null si le grand livre manque.
+ * Compte centralisateur de chaque tiers, « 411100 — Collectif Client Ménages » :
+ *   1. le compte de rattachement porté par la table (compte_collectif, issu du
+ *      fichier Sage .pnc), avec l'intitulé du plan comptable ;
+ *   2. à défaut, les comptes de rubrique BI, DI, DJ ou BH (clients,
+ *      fournisseurs) sur lesquels le tiers est mouvementé dans le grand livre
+ *      (plusieurs comptes séparés par « ; »).
+ * Renvoie la clause FROM jointe et l'expression de la valeur, ou null si le
+ * grand livre manque.
  */
 async function jointureCompteCentralisateur(
   client: ClickHouseClient,
   dbName: string,
   def: TableReferentiel,
   schema: Schema,
-): Promise<string | null> {
+  exprTable: string | null,
+): Promise<{ source: string; valeur: string } | null> {
   const exprCle = expression(schema, colonneCle(def).nom);
   const gl = await tableColumns(client, dbName, "grand_livre");
   if (!exprCle || !gl.has("n_tiers") || !gl.has("compte")) return null;
@@ -153,12 +159,30 @@ async function jointureCompteCentralisateur(
              concat(cc_compte, if(cc_intitule_gl != '', concat(' — ', cc_intitule_gl), '')) AS cc_libelle
       FROM (${comptes})`;
 
-  return `(SELECT *, ${exprCle} AS __cle FROM ${dbName}.${def.table} FINAL) AS __t
+  // Intitulé du compte porté par la table, lu dans le plan comptable.
+  const jointurePlan = avecPlan
+    ? `
+    LEFT JOIN (
+      SELECT toString(compte) AS __pc_compte, any(toString(intitule_compte)) AS __pc_intitule
+      FROM ${dbName}.plan_compte FINAL
+      GROUP BY __pc_compte
+    ) AS __pc ON __pc.__pc_compte = __t.__collectif`
+    : "";
+  const libelleTable = avecPlan
+    ? "concat(__collectif, if(__pc_intitule != '', concat(' — ', __pc_intitule), ''))"
+    : "__collectif";
+
+  return {
+    source: `(SELECT *, ${exprCle} AS __cle, ${exprTable ?? "''"} AS __collectif
+            FROM ${dbName}.${def.table} FINAL) AS __t
     LEFT JOIN (
       SELECT cc_tiers AS __cc_cle, arrayStringConcat(arraySort(groupArray(cc_libelle)), ' ; ') AS __cc_valeur
       FROM (${libelles})
       GROUP BY cc_tiers
-    ) AS __cc ON __t.__cle = __cc.__cc_cle`;
+    ) AS __cc ON __t.__cle = __cc.__cc_cle${jointurePlan}`,
+    // La table fait foi ; le grand livre ne sert que si elle est vide.
+    valeur: `if(__collectif != '', ${libelleTable}, __cc_valeur)`,
+  };
 }
 
 /**

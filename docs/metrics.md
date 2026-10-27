@@ -224,13 +224,20 @@ journaux**.
 
 ### Plan tiers — compte centralisateur
 
-La colonne **Compte centralisateur** du Plan tiers est **calculée** : ce sont
-les comptes de rubrique `BI`, `DI`, `DJ` ou `BH` (401…, 411…) sur lesquels
-le tiers est mouvementé dans le grand livre, avec l'intitulé du plan comptable
-(« 411100 — Collectif Client Ménages » ; plusieurs comptes séparés par « ; »).
-Elle se recherche, se filtre et se trie comme les autres colonnes, mais n'est
-ni modifiable, ni saisie à l'ajout d'un tiers, ni exportée au format de
-dépôt. Un tiers jamais mouvementé n'a pas encore de compte centralisateur.
+La colonne **Compte centralisateur** du Plan tiers est **lue dans la table
+`plan_tiers`** : colonne `compte_collectif`, alimentée par Airflow à partir du
+**compte général de rattachement** du fichier Sage `.pnc` (positions 50 à 62),
+avec l'intitulé du plan comptable (« 411100 — Collectif Client Ménages »).
+
+| Source | Quand |
+|---|---|
+| `plan_tiers.compte_collectif` | Toujours en priorité |
+| Grand livre (repli) | Colonne vide : Plan tiers importé en Excel (le format Excel ne porte pas le compte), ou table pas encore réimportée depuis un `.pnc`. On prend alors les comptes de rubrique `BI`, `DI`, `DJ` ou `BH` sur lesquels le tiers est mouvementé (plusieurs séparés par « ; ») |
+
+Côté Airflow, la colonne est ajoutée aux tables existantes, et un import qui ne
+fournit pas le compte (Excel) **n'efface pas** la valeur déjà connue. La
+colonne se recherche, se filtre et se trie ; elle n'est ni modifiable, ni
+saisie à l'ajout d'un tiers, ni exportée au format de dépôt.
 
 > `src/lib/clickhouse/dimensions-table.ts` — `jointureCompteCentralisateur()`
 
@@ -1516,6 +1523,7 @@ Sous-onglet Compte d'exploitation : lignes du compte de résultat de janvier au 
 | 27/10/2026 | Compte d'exploitation : confirmé que le **mode de calcul ne s'applique pas** — chaque mois reste indépendant (mouvements du seul mois), en périodique comme en cumulé, et seule la colonne TOTAL cumule de janvier au mois du filtre ; texte explicatif de l'écran précisé en ce sens (§18). |
 | 27/10/2026 | Charges et rentabilité : les lignes à **0 %** ne figurent plus au classement — cascade sans les catégories ni les autres produits nuls (CA et résultat net toujours affichés), tableau des poids sans les catégories nulles en N et en N-1, pont de résultat sans facteur nul, détail sans rubrique vide (§22). |
 | 27/10/2026 | **Filtres partagés — correction** : la granularité démarrait toujours sur « Mois » alors que le choix initial (Périodique ou Cumulé) calcule sur l'**année entière** ; le filtre affichait « Mois : Février » sur des chiffres annuels (Compte d'exploitation de janvier à décembre, Compte de résultat sur l'année…). La granularité est désormais déduite du mode initial et un garde-fou maintient le calcul aligné sur la granularité et le mois affichés, dans tous les onglets (§4). |
+| 28/10/2026 | Plan tiers : le **compte centralisateur** est désormais **lu dans la table `plan_tiers`** (nouvelle colonne `compte_collectif`, alimentée par Airflow depuis le compte général de rattachement du fichier Sage .pnc), avec l'intitulé du plan comptable ; le grand livre ne sert plus que de repli quand la colonne est vide (Plan tiers importé en Excel, table pas encore réimportée). Airflow : colonne ajoutée aux tables existantes, un import sans compte collectif n'efface pas la valeur connue (§3). |
 
 ---
 
