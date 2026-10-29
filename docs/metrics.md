@@ -844,7 +844,8 @@ sur la même fenêtre.
   (« 55,11 % ») écrits dans la barre quand elle occupe au moins 22 % de la
   piste ; au survol de toute barre (curseur main), une infobulle rappelle le
   libellé, le montant en K et le pourcentage — utile pour les petites barres.
-  La colonne de droite garde le montant complet.
+  Pas de colonne de valeurs à droite : tout se lit dans la barre ou
+  l'infobulle.
 - **Lignes nulles** : le tableau des poids écarte une catégorie nulle en N et
   en N-1 ; le pont de résultat écarte un facteur nul ; le détail écarte une
   rubrique sans montant ni compte.
@@ -1540,6 +1541,7 @@ sous le titre de la page et recharge les données de l'onglet affiché.
 | 29/10/2026 | Charges et rentabilité : **montant (en K, ÷ 1 000) et pourcentage du CA dans la barre** quand elle est assez large, **infobulle au survol** de chaque barre (libellé, montant K, %), curseur main ; colonne des rubriques retirée de la cascade et colonne « Référence » retirée du tableau des poids ; « n.d. » remplacé par une case vide (§22). |
 | 29/10/2026 | Navigation de la fiche client : « Retour aux clients » et la devise remontés en haut de la colonne ; onglets regroupés sous **« Reporting financier »** (Synthèse … Bilan d'activité), puis Membres, Import, Comptabilité, Autres fichiers (§26). |
 | 29/10/2026 | Fiche client : **« Reporting financier » en accordéon** (en-tête cliquable avec chevron, ouvert par défaut ; replié, l'en-tête reste surligné si un onglet du groupe est affiché) ; libellés sur deux lignes alignés à gauche ; bouton **Rafraîchir** déplacé sous le titre de la page, et il recharge désormais les données de l'onglet en cours (§26). |
+| 29/10/2026 | Charges et rentabilité : colonne des valeurs à droite de la cascade **retirée** — montant (K) et pourcentage se lisent dans la barre ou dans l'infobulle ; la barre occupe la place libérée (§22). |
 
 ---
 
