@@ -620,7 +620,7 @@ export function AnalyseChargesVue({
                         setCompteOuvert(null);
                       }}
                       className={cn(
-                        "grid w-full grid-cols-[minmax(170px,1.3fr)_minmax(220px,2fr)_minmax(150px,1fr)] items-center gap-3 py-2 text-left",
+                        "grid w-full grid-cols-[minmax(170px,1.3fr)_minmax(260px,3fr)] items-center gap-3 py-2 text-left",
                         cliquable && "hover:bg-[#F5F9FF] cursor-pointer",
                       )}
                     >
@@ -679,13 +679,6 @@ export function AnalyseChargesVue({
                             style={{ left: `${position(0)}%` }}
                           />
                         )}
-                      </span>
-                      <span className={cn("text-right text-sm tabular-nums whitespace-nowrap", fort && "font-semibold")}>
-                        {e.type === "charge" || e.type === "autresProduits"
-                          ? montantSigne(e.impact)
-                          : montant(e.impact)}
-                        {" · "}
-                        {e.type === "ca" ? (pN.ca === 0 ? "n.a." : "100 %") : pct(poids)}
                       </span>
                     </button>
                     {ouvert && detail(e.id)}
