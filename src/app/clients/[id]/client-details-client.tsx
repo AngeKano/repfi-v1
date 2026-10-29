@@ -22,6 +22,7 @@ import {
   Plus,
   RefreshCw,
   ChevronLeft,
+  ChevronDown,
 } from "lucide-react";
 import {
   PiChartScatterDuotone,
@@ -38,6 +39,7 @@ import {
   PiUsersThreeDuotone,
   PiUploadSimpleDuotone,
   PiFilesDuotone,
+  PiPresentationChartDuotone,
   PiNotePencilDuotone,
 } from "react-icons/pi";
 import Link from "next/link";
@@ -98,8 +100,9 @@ const CLIENT_TABS = [
   { id: "files", label: "Autres Fichiers", icon: PiFilesDuotone },
 ];
 
-// Onglets regroupés sous « Reporting financier » dans la navigation ; les
-// suivants (Membres, Import, Comptabilité, Autres fichiers) viennent après.
+// Onglets regroupés dans l'accordéon « Reporting financier » de la
+// navigation ; les suivants (Membres, Import, Comptabilité, Autres fichiers)
+// viennent après un séparateur.
 const GROUPE_REPORTING = new Set([
   "overview",
   "chiffres",
@@ -147,6 +150,8 @@ export default function ClientDetailsClient({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [activeTab, setActiveTab] = useState("overview");
+  // Accordéon « Reporting financier » de la navigation : ouvert par défaut.
+  const [reportingOuvert, setReportingOuvert] = useState(true);
   const [showUploadDialog, setShowUploadDialog] = useState(false);
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
@@ -300,16 +305,6 @@ export default function ClientDetailsClient({
             </span>
           </Link>
 
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => router.refresh()}
-            className="rounded-full bg-[#EBF5FF] text-[#335890] border-[#D0E3F5] hover:bg-[#D0E3F5] w-fit mb-6"
-          >
-            <RefreshCw className="w-4 h-4 mr-2" />
-            Rafraichir
-          </Button>
-
           {/* Client Info */}
           <div className="flex items-center gap-3 mb-6">
             <div className="w-12 h-12 rounded-full bg-[#EBF5FF] flex items-center justify-center text-xl font-bold text-[#0077C3] shrink-0">
@@ -347,30 +342,17 @@ export default function ClientDetailsClient({
           </div>
 
           <nav className="space-y-1">
-            {CLIENT_TABS.map((tab) => {
-              const active = activeTab === tab.id;
-              // « Reporting financier » : titre avant le premier onglet du
-              // groupe, onglets du groupe légèrement en retrait ; séparateur avant le
-              // premier onglet hors groupe (Membres). Repérés par identifiant
-              // et non par index, pour ne pas dériver si un onglet est ajouté.
-              const dansGroupe = GROUPE_REPORTING.has(tab.id);
-              const index = CLIENT_TABS.indexOf(tab);
-              const premierDuGroupe = dansGroupe && index === CLIENT_TABS.findIndex((t) => GROUPE_REPORTING.has(t.id));
-              const showSeparator =
-                !dansGroupe && index > 0 && GROUPE_REPORTING.has(CLIENT_TABS[index - 1].id);
-              const permanentlyDisabled = DISABLED_TAB_IDS.has(tab.id);
-              const disabled =
-                permanentlyDisabled ||
-                (REPORTING_TAB_IDS.has(tab.id) && !hasReporting);
-              return (
-                <div key={tab.id}>
-                  {premierDuGroupe && (
-                    <p className="mb-1 px-4 pt-1 text-[11px] font-semibold uppercase tracking-wide text-[#94A3B8]">
-                      Reporting financier
-                    </p>
-                  )}
-                  {showSeparator && <div className="h-px bg-[#D0E3F5] my-2" />}
+            {(() => {
+              // Un onglet de la navigation (reporting ou non).
+              const onglet = (tab: (typeof CLIENT_TABS)[number], dansGroupe: boolean) => {
+                const active = activeTab === tab.id;
+                const permanentlyDisabled = DISABLED_TAB_IDS.has(tab.id);
+                const disabled =
+                  permanentlyDisabled ||
+                  (REPORTING_TAB_IDS.has(tab.id) && !hasReporting);
+                return (
                   <button
+                    key={tab.id}
                     onClick={() => {
                       if (disabled) return;
                       setActiveTab(tab.id);
@@ -384,7 +366,7 @@ export default function ClientDetailsClient({
                           : undefined
                     }
                     aria-disabled={disabled}
-                    className={`flex items-center gap-3 w-full ${dansGroupe ? "pl-5 pr-3" : "px-4"} py-3 rounded-lg text-sm font-medium transition-colors ${
+                    className={`flex items-center gap-3 w-full text-left leading-tight ${dansGroupe ? "px-3 py-2.5" : "px-4 py-3"} rounded-lg text-sm font-medium transition-colors ${
                       active
                         ? "bg-[#0077C3] text-white"
                         : disabled
@@ -392,12 +374,56 @@ export default function ClientDetailsClient({
                           : "text-[#335890] hover:bg-[#EBF5FF] hover:text-[#0077C3]"
                     }`}
                   >
-                    <tab.icon className="w-5 h-5" />
+                    <tab.icon className="w-5 h-5 shrink-0" />
                     {tab.label}
                   </button>
-                </div>
+                );
+              };
+
+              const ongletsReporting = CLIENT_TABS.filter((t) => GROUPE_REPORTING.has(t.id));
+              const autresOnglets = CLIENT_TABS.filter((t) => !GROUPE_REPORTING.has(t.id));
+              // Replié, l'en-tête signale qu'un onglet du groupe est affiché.
+              const groupeActif = GROUPE_REPORTING.has(activeTab);
+
+              return (
+                <>
+                  {/* Accordéon « Reporting financier » */}
+                  <button
+                    type="button"
+                    onClick={() => setReportingOuvert((o) => !o)}
+                    aria-expanded={reportingOuvert}
+                    aria-controls="nav-reporting-financier"
+                    className={`flex items-center gap-3 w-full px-4 py-3 rounded-lg text-left text-sm font-semibold transition-colors ${
+                      !reportingOuvert && groupeActif
+                        ? "bg-[#EBF5FF] text-[#0077C3]"
+                        : "text-[#00122E] hover:bg-[#EBF5FF] hover:text-[#0077C3]"
+                    }`}
+                  >
+                    <PiPresentationChartDuotone className="w-5 h-5 shrink-0" />
+                    <span className="flex-1">Reporting financier</span>
+                    <ChevronDown
+                      className={`w-4 h-4 shrink-0 transition-transform duration-200 ${reportingOuvert ? "rotate-180" : ""}`}
+                    />
+                  </button>
+                  <div
+                    id="nav-reporting-financier"
+                    className={`grid transition-[grid-template-rows] duration-200 ease-out ${
+                      reportingOuvert ? "grid-rows-[1fr]" : "grid-rows-[0fr]"
+                    }`}
+                  >
+                    <div className="overflow-hidden">
+                      <div className="ml-4 space-y-1 border-l border-[#D0E3F5] pl-2 py-1">
+                        {ongletsReporting.map((tab) => onglet(tab, true))}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="h-px bg-[#D0E3F5] my-2" />
+
+                  {autresOnglets.map((tab) => onglet(tab, false))}
+                </>
               );
-            })}
+            })()}
           </nav>
         </aside>
 
@@ -406,10 +432,26 @@ export default function ClientDetailsClient({
           <div className="px-8 py-6">
             {/* Top bar: title + user */}
             <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-bold text-[#00122E]">
-                {CLIENT_TABS.find((t) => t.id === activeTab)?.label ||
-                  "Synthèse Financière"}
-              </h2>
+              <div>
+                <h2 className="text-xl font-bold text-[#00122E]">
+                  {CLIENT_TABS.find((t) => t.id === activeTab)?.label ||
+                    "Synthèse Financière"}
+                </h2>
+                {/* Rafraîchir : sous le titre de la page. Recharge les données de
+                    l'onglet en cours (remontage) et celles du serveur. */}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setVersionDonnees((v) => v + 1);
+                    router.refresh();
+                  }}
+                  className="mt-2 h-8 rounded-full bg-[#EBF5FF] text-[#335890] border-[#D0E3F5] hover:bg-[#D0E3F5]"
+                >
+                  <RefreshCw className="w-4 h-4 mr-2" />
+                  Rafraîchir
+                </Button>
+              </div>
               <div className="flex items-center gap-3">
                 <div className="text-right">
                   <p className="text-xs text-[#335890]">Utilisateur</p>
