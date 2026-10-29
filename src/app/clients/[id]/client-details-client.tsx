@@ -98,6 +98,22 @@ const CLIENT_TABS = [
   { id: "files", label: "Autres Fichiers", icon: PiFilesDuotone },
 ];
 
+// Onglets regroupés sous « Reporting financier » dans la navigation ; les
+// suivants (Membres, Import, Comptabilité, Autres fichiers) viennent après.
+const GROUPE_REPORTING = new Set([
+  "overview",
+  "chiffres",
+  "resultats",
+  "recouvrement",
+  "dettes",
+  "dettes-ct",
+  "tresorerie",
+  "dettes-fi",
+  "ratios",
+  "etats",
+  "bilan",
+]);
+
 // Onglets de reporting financier qui dépendent de la présence d'au moins
 // un reporting. Ils sont grisés tant qu'aucun reporting n'existe.
 const REPORTING_TAB_IDS = new Set([
@@ -277,6 +293,13 @@ export default function ClientDetailsClient({
       <div className="h-screen flex overflow-hidden">
         {/* ===== LEFT: Locked nav column ===== */}
         <aside className="w-[260px] shrink-0 border-r border-[#D0E3F5] flex flex-col px-6 py-6 overflow-y-auto">
+          <Link href="/clients" className="mb-3">
+            <span className="flex items-center gap-2 w-full px-3 py-2 rounded-lg text-sm font-medium text-[#335890] hover:bg-[#EBF5FF] hover:text-[#0077C3] transition-colors">
+              <ChevronLeft className="w-4 h-4" />
+              Retour aux clients
+            </span>
+          </Link>
+
           <Button
             variant="outline"
             size="sm"
@@ -310,21 +333,42 @@ export default function ClientDetailsClient({
             </div>
           </div>
 
+          {/* Currency info */}
+          <div className="mb-6 px-4 py-3 bg-[#F5F9FF] rounded-lg border border-[#D0E3F5]">
+            <p className="text-[10px] text-[#94A3B8] uppercase mb-0.5">
+              Devise
+            </p>
+            <p className="text-sm font-semibold text-[#00122E]">
+              {DEVISE}{" "}
+              <span className="text-xs font-normal text-[#335890]">
+                (unité : {UNITE_ABREGEE})
+              </span>
+            </p>
+          </div>
+
           <nav className="space-y-1">
             {CLIENT_TABS.map((tab) => {
               const active = activeTab === tab.id;
-              // Séparateur juste avant "Membres" : tous les onglets de reporting
-              // (Synthèse, Chiffres, Résultats, Recouvrement, Dettes, États
-              // Financiers, Bilan d'activité) restent groupés au-dessus.
-              // Repéré par identifiant et non par index, pour ne pas dériver
-              // lorsqu'un onglet est ajouté.
-              const showSeparator = tab.id === "members";
+              // « Reporting financier » : titre avant le premier onglet du
+              // groupe, onglets du groupe légèrement en retrait ; séparateur avant le
+              // premier onglet hors groupe (Membres). Repérés par identifiant
+              // et non par index, pour ne pas dériver si un onglet est ajouté.
+              const dansGroupe = GROUPE_REPORTING.has(tab.id);
+              const index = CLIENT_TABS.indexOf(tab);
+              const premierDuGroupe = dansGroupe && index === CLIENT_TABS.findIndex((t) => GROUPE_REPORTING.has(t.id));
+              const showSeparator =
+                !dansGroupe && index > 0 && GROUPE_REPORTING.has(CLIENT_TABS[index - 1].id);
               const permanentlyDisabled = DISABLED_TAB_IDS.has(tab.id);
               const disabled =
                 permanentlyDisabled ||
                 (REPORTING_TAB_IDS.has(tab.id) && !hasReporting);
               return (
                 <div key={tab.id}>
+                  {premierDuGroupe && (
+                    <p className="mb-1 px-4 pt-1 text-[11px] font-semibold uppercase tracking-wide text-[#94A3B8]">
+                      Reporting financier
+                    </p>
+                  )}
                   {showSeparator && <div className="h-px bg-[#D0E3F5] my-2" />}
                   <button
                     onClick={() => {
@@ -340,7 +384,7 @@ export default function ClientDetailsClient({
                           : undefined
                     }
                     aria-disabled={disabled}
-                    className={`flex items-center gap-3 w-full px-4 py-3 rounded-lg text-sm font-medium transition-colors ${
+                    className={`flex items-center gap-3 w-full ${dansGroupe ? "pl-5 pr-3" : "px-4"} py-3 rounded-lg text-sm font-medium transition-colors ${
                       active
                         ? "bg-[#0077C3] text-white"
                         : disabled
@@ -355,28 +399,6 @@ export default function ClientDetailsClient({
               );
             })}
           </nav>
-
-          {/* Currency info */}
-          <div className="mt-6 px-4 py-3 bg-[#F5F9FF] rounded-lg border border-[#D0E3F5]">
-            <p className="text-[10px] text-[#94A3B8] uppercase mb-0.5">
-              Devise
-            </p>
-            <p className="text-sm font-semibold text-[#00122E]">
-              {DEVISE}{" "}
-              <span className="text-xs font-normal text-[#335890]">
-                (unité : {UNITE_ABREGEE})
-              </span>
-            </p>
-          </div>
-
-          <div className="mt-4">
-            <Link href="/clients">
-              <button className="flex items-center gap-3 w-full px-4 py-3 rounded-lg text-sm font-medium text-[#335890] hover:bg-[#EBF5FF] hover:text-[#0077C3] transition-colors">
-                <ChevronLeft className="w-5 h-5" />
-                Retour aux clients
-              </button>
-            </Link>
-          </div>
         </aside>
 
         {/* ===== RIGHT: Scrollable content ===== */}

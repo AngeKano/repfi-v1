@@ -840,13 +840,19 @@ sur la même fenêtre.
   négatif). Une catégorie à **0 %** (moins de 0,005 % du CA) et des autres
   produits nuls **ne figurent pas** au classement ; le CA et le résultat net
   restent toujours affichés.
+- **Barres** : montant en milliers (« −11 766K ») et poids dans le CA
+  (« 55,11 % ») écrits dans la barre quand elle occupe au moins 22 % de la
+  piste ; au survol de toute barre (curseur main), une infobulle rappelle le
+  libellé, le montant en K et le pourcentage — utile pour les petites barres.
+  La colonne de droite garde le montant complet.
 - **Lignes nulles** : le tableau des poids écarte une catégorie nulle en N et
   en N-1 ; le pont de résultat écarte un facteur nul ; le détail écarte une
   rubrique sans montant ni compte.
 - **Détail au clic** : catégorie → rubriques → comptes → écritures (300
   premières).
 - **Poids de chaque charge dans le chiffre d'affaires** : montants et poids N
-  et N-1, écart en points, impact sur le résultat.
+  et N-1, écart en points, impact sur le résultat (sans colonne des
+  rubriques ; elles restent visibles dans le détail au clic).
 - **Écart de résultat entre les deux situations** et commentaire automatique.
 
 ### Alertes et contrôle
@@ -855,7 +861,7 @@ sur la même fenêtre.
 |---|---|
 | Dates de situation différentes (fin du dernier mois mouvementé) | « Périodes non comparables », aucune annualisation |
 | CA nul / négatif | Ratios **n.a.** / ratios signés et avertissement |
-| Exercice de référence sans écriture | Colonnes **n.d.** |
+| Exercice de référence sans écriture | Colonnes N-1 **vides** et message « comparaison non disponible » |
 | Contrôle E5 : CA + autres produits − charges − solde des comptes 6, 7, 8 ≠ 0 | Écart de réconciliation signalé (attendu : 0) |
 
 > `src/lib/reporting/analyse-charges.ts`, `…/reporting/charges/route.ts`,
@@ -1459,6 +1465,12 @@ Sous-onglet Compte d'exploitation : lignes du compte de résultat de janvier au 
 
 ## 26. Composition par onglet UI
 
+Colonne de gauche de la fiche client, de haut en bas : **Retour aux clients**,
+Rafraîchir, identité du client, **devise** (FCFA, unité K FCFA), puis les
+onglets — groupe **« Reporting financier »** (Synthèse financière → Bilan
+d'activité, en retrait), séparateur, **Membres**, **Import**, **Comptabilité**,
+**Autres fichiers**.
+
 | Onglet | Contenu principal |
 |---|---|
 | Synthèse Financière | KPI configurables, charges/produits, trésorerie |
@@ -1524,6 +1536,8 @@ Sous-onglet Compte d'exploitation : lignes du compte de résultat de janvier au 
 | 27/10/2026 | Charges et rentabilité : les lignes à **0 %** ne figurent plus au classement — cascade sans les catégories ni les autres produits nuls (CA et résultat net toujours affichés), tableau des poids sans les catégories nulles en N et en N-1, pont de résultat sans facteur nul, détail sans rubrique vide (§22). |
 | 27/10/2026 | **Filtres partagés — correction** : la granularité démarrait toujours sur « Mois » alors que le choix initial (Périodique ou Cumulé) calcule sur l'**année entière** ; le filtre affichait « Mois : Février » sur des chiffres annuels (Compte d'exploitation de janvier à décembre, Compte de résultat sur l'année…). La granularité est désormais déduite du mode initial et un garde-fou maintient le calcul aligné sur la granularité et le mois affichés, dans tous les onglets (§4). |
 | 28/10/2026 | Plan tiers : le **compte centralisateur** est désormais **lu dans la table `plan_tiers`** (nouvelle colonne `compte_collectif`, alimentée par Airflow depuis le compte général de rattachement du fichier Sage .pnc), avec l'intitulé du plan comptable ; le grand livre ne sert plus que de repli quand la colonne est vide (Plan tiers importé en Excel, table pas encore réimportée). Airflow : colonne ajoutée aux tables existantes, un import sans compte collectif n'efface pas la valeur connue (§3). |
+| 29/10/2026 | Charges et rentabilité : **montant (en K, ÷ 1 000) et pourcentage du CA dans la barre** quand elle est assez large, **infobulle au survol** de chaque barre (libellé, montant K, %), curseur main ; colonne des rubriques retirée de la cascade et colonne « Référence » retirée du tableau des poids ; « n.d. » remplacé par une case vide (§22). |
+| 29/10/2026 | Navigation de la fiche client : « Retour aux clients » et la devise remontés en haut de la colonne ; onglets regroupés sous **« Reporting financier »** (Synthèse … Bilan d'activité), puis Membres, Import, Comptabilité, Autres fichiers (§26). |
 
 ---
 
