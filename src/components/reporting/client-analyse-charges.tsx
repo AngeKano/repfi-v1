@@ -103,6 +103,13 @@ const pct = (r: number | null) =>
 const points = (p: number | null) =>
   p === null ? "n.a." : `${p > 0 ? "+" : p < 0 ? MOINS : ""}${nf2.format(Math.abs(p))}`;
 const majuscule = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+/** Montant en milliers, signé : « −11 766K », « +1 000K ». */
+const montantK = (n: number) => {
+  const k = Math.round(n / 1000);
+  return `${k < 0 ? MOINS : k > 0 ? "+" : ""}${nf0.format(Math.abs(k))}K`;
+};
+// Libellé dans la barre : affiché si la barre occupe au moins ce % de la piste.
+const LARGEUR_MIN_LIBELLE = 22;
 
 const couleurEtape = (e: EtapeCascade) => {
   if (e.type === "ca" || e.type === "autresProduits") return COULEURS.ca;
@@ -237,7 +244,7 @@ export function AnalyseChargesVue({
   const alertes: string[] = [];
   if (!n.disponible) alertes.push(`Aucune écriture sur la période ${n.year} : données non disponibles.`);
   if (!n1.disponible)
-    alertes.push(`Aucune écriture sur la période de référence ${n1.year} : comparaison non disponible (n.d.).`);
+    alertes.push(`Aucune écriture sur la période de référence ${n1.year} : comparaison non disponible.`);
   if (n.disponible && n1.disponible && !comparables)
     alertes.push(
       `Périodes non comparables : situation au ${n.fin} contre ${n1.fin}. Les écarts ne sont pas annualisés et ne se lisent pas comme une tendance.`,
@@ -589,13 +596,19 @@ export function AnalyseChargesVue({
 
           <div className="overflow-x-auto">
             <div className="min-w-[640px] divide-y divide-[#EEF2F7]">
-              {etapesAffichees.map((e) => {
+              {etapesAffichees.map((e, index) => {
                 const gauche = position(Math.min(e.avant, e.apres));
                 const largeur = position(Math.max(e.avant, e.apres)) - gauche;
                 const poids = pN.ca === 0 ? null : (e.type === "charge" ? -e.impact : e.impact) / pN.ca;
                 const cliquable = e.type === "charge" || e.type === "autresProduits";
                 const ouvert = ouverte === e.id;
                 const fort = e.type === "ca" || e.type === "resultat";
+                // « −11 766K · 55,11 % » : montant en milliers et poids dans le CA.
+                const libelleBarre = `${
+                  e.type === "charge" || e.type === "autresProduits"
+                    ? montantK(e.impact)
+                    : montantK(e.impact).replace(/^\+/, "")
+                } · ${e.type === "ca" ? (pN.ca === 0 ? "n.a." : "100 %") : pct(poids)}`;
                 return (
                   <Fragment key={e.id}>
                     <button
@@ -607,7 +620,7 @@ export function AnalyseChargesVue({
                         setCompteOuvert(null);
                       }}
                       className={cn(
-                        "grid w-full grid-cols-[minmax(170px,1.3fr)_90px_minmax(160px,1.6fr)_minmax(150px,1fr)] items-center gap-3 py-2 text-left",
+                        "grid w-full grid-cols-[minmax(170px,1.3fr)_minmax(220px,2fr)_minmax(150px,1fr)] items-center gap-3 py-2 text-left",
                         cliquable && "hover:bg-[#F5F9FF] cursor-pointer",
                       )}
                     >
@@ -623,18 +636,42 @@ export function AnalyseChargesVue({
                         )}
                         {e.libelle}
                       </span>
-                      <span className="text-xs text-muted-foreground">{e.refs.join(", ")}</span>
                       <span className="relative h-5 rounded-sm" style={{ backgroundColor: COULEURS.piste }}>
                         {/* Ligne à zéro : aucune barre artificielle. F11 */}
                         {Math.round(e.impact) !== 0 && (
                           <span
-                            className="absolute top-0 h-full rounded-sm"
+                            className="group/barre absolute top-0 h-full rounded-sm cursor-pointer"
                             style={{
                               left: `${gauche}%`,
                               width: `max(${largeur}%, 2px)`,
                               backgroundColor: couleurEtape(e),
                             }}
-                          />
+                          >
+                            {/* Montant (K) et poids dans la barre quand elle est assez large. */}
+                            {largeur >= LARGEUR_MIN_LIBELLE && (
+                              <span
+                                className={cn(
+                                  "absolute inset-0 flex items-center justify-center px-1 text-[11px] font-semibold tabular-nums whitespace-nowrap overflow-hidden",
+                                  e.type === "charge" && e.impact < 0 ? "text-[#00122E]" : "text-white",
+                                )}
+                              >
+                                {libelleBarre}
+                              </span>
+                            )}
+                            {/* Infobulle au survol : toujours disponible, indispensable
+                                pour les petites barres. Sous la barre pour la première
+                                ligne, pour ne pas sortir du cadre. */}
+                            <span
+                              role="tooltip"
+                              className={cn(
+                                "pointer-events-none absolute left-1/2 z-30 hidden -translate-x-1/2 whitespace-nowrap rounded-md bg-[#00122E] px-2.5 py-1.5 text-xs text-white shadow-lg group-hover/barre:block",
+                                index === 0 ? "top-full mt-1.5" : "bottom-full mb-1.5",
+                              )}
+                            >
+                              <span className="block font-semibold">{e.libelle}</span>
+                              <span className="block tabular-nums">{libelleBarre}</span>
+                            </span>
+                          </span>
                         )}
                         {min < 0 && (
                           <span
@@ -669,7 +706,6 @@ export function AnalyseChargesVue({
               <thead>
                 <tr className="border-b border-[#D0E3F5]">
                   <th className={cn(TH, "text-left")}>Charge</th>
-                  <th className={cn(TH, "text-left")}>Référence</th>
                   <th className={cn(TH, "text-right")}>{n.year}</th>
                   <th className={cn(TH, "text-right")}>{n.year} / CA</th>
                   <th className={cn(TH, "text-right")}>{n1.year}</th>
@@ -682,24 +718,23 @@ export function AnalyseChargesVue({
                 {lignesPoidsAffichees.map((l) => (
                   <tr key={l.id} className={cn("border-b border-[#EEF2F7]", l.total && "font-semibold")}>
                     <td className="py-2 px-2 text-[#00122E]">{l.libelle}</td>
-                    <td className="py-2 px-2 text-xs text-muted-foreground whitespace-nowrap">{l.refs}</td>
                     <td className={cn(TD, "text-right")}>{montant(l.mN)}</td>
                     <td className={cn(TD, "text-right")}>{pct(l.rN)}</td>
-                    <td className={cn(TD, "text-right")}>{l.mN1 === null ? "n.d." : montant(l.mN1)}</td>
-                    <td className={cn(TD, "text-right")}>{l.mN1 === null ? "n.d." : pct(l.rN1)}</td>
+                    <td className={cn(TD, "text-right")}>{l.mN1 === null ? "" : montant(l.mN1)}</td>
+                    <td className={cn(TD, "text-right")}>{l.mN1 === null ? "" : pct(l.rN1)}</td>
                     <td className={cn(TD, "text-right")}>
-                      {l.mN1 === null ? "n.d." : l.id === "ca" ? "" : points(ecartPoints(l.rN, l.rN1))}
+                      {l.mN1 === null || l.id === "ca" ? "" : points(ecartPoints(l.rN, l.rN1))}
                     </td>
-                    <td className={cn(TD, "text-right")}>{l.impact === null ? "n.d." : montantSigne(l.impact)}</td>
+                    <td className={cn(TD, "text-right")}>{l.impact === null ? "" : montantSigne(l.impact)}</td>
                   </tr>
                 ))}
                 {/* Contrôle indépendant : attendu 0 (à la précision de stockage). F12 */}
                 <tr className="text-xs text-muted-foreground">
-                  <td className="py-2 px-2" colSpan={2}>
+                  <td className="py-2 px-2">
                     Contrôle du résultat (CA + autres produits − charges − comptes 6/7/8)
                   </td>
                   <td className={cn(TD, "text-right", Math.abs(controleN) >= 1 && "text-red-600 font-semibold")}>
-                    {n.disponible ? montantSigne(controleN) : "n.d."}
+                    {n.disponible ? montantSigne(controleN) : ""}
                   </td>
                   <td />
                   <td
@@ -709,7 +744,7 @@ export function AnalyseChargesVue({
                       controleN1 !== null && Math.abs(controleN1) >= 1 && "text-red-600 font-semibold",
                     )}
                   >
-                    {controleN1 === null ? "n.d." : montantSigne(controleN1)}
+                    {controleN1 === null ? "" : montantSigne(controleN1)}
                   </td>
                   <td colSpan={3} className="py-2 px-2 text-right">
                     Attendu : 0. Tout écart doit être expliqué avant interprétation.
