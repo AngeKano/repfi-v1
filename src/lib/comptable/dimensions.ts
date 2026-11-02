@@ -169,20 +169,21 @@ export const DIMENSIONS: DimensionDef[] = [
     colonnes: [
       { nom: "racine", libelle: "Racine", cle: true },
       {
+        // Colonne Airflow : rubrique d'origine de la ligne, figée. Placée
+        // avant la rubrique actuelle, qui peut en avoir été modifiée.
+        nom: "rubrique_defaut",
+        alias: ["rubrique_origine"],
+        libelle: "Rubrique par défaut",
+        calculee: "origine",
+        origineDe: "rubrique",
+      },
+      {
         nom: "rubrique",
         libelle: "Rubrique",
         editable: true,
         requis: true,
         categorie: true,
         majuscules: true,
-      },
-      {
-        // Colonne Airflow : rubrique d'origine de la ligne, figée.
-        nom: "rubrique_defaut",
-        alias: ["rubrique_origine"],
-        libelle: "Rubrique par défaut",
-        calculee: "origine",
-        origineDe: "rubrique",
       },
       { nom: "type_rubrique", libelle: "Type", cle: true, choix: ["PL", "BILAN"] },
       {

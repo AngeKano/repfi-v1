@@ -243,7 +243,7 @@ saisie à l'ajout d'un tiers, ni exportée au format de dépôt.
 
 ### Mapping — rubrique par défaut
 
-La colonne **Rubrique par défaut** du Mapping garde la rubrique attribuée à la
+La colonne **Rubrique par défaut** du Mapping, placée avant la colonne Rubrique, garde la rubrique attribuée à la
 **création** de la ligne ; elle ne change **jamais**, même quand la rubrique
 est modifiée. Elle est lue dans la table `ple` (colonne `rubrique_defaut`).
 
@@ -944,7 +944,7 @@ libellé, formule, valeur, rappel N-1, variation.
 |---|---|---|
 | Synthèse | `ca`, `ms` (masse salariale), `rex`, `rn`, `treso`, `marge`, `ratiomsca` | `kpi-config-{clientId}` |
 | Chiffre d'affaires | `ca`, `caN1`, `subventions`, `subventionsN1` | `kpi-config-chiffre-affaires-{clientId}` |
-| Résultats | `marge`, `va`, `ebe`, `rex`, `rf`, `rn`, `rhao` (masqué par défaut) | `kpi-config-resultat-v2-{clientId}` |
+| Résultats | `marge`, `va`, `ebe`, `rex`, `rf`, `rn`, `rhao` (masqué par défaut) — formule du SIG sous chaque libellé (§7) | `kpi-config-resultat-v2-{clientId}` |
 | Recouvrement Clients | `taux`, `creances`, `encaisse`, `dso` | `kpi-config-recouvrement-{clientId}` |
 | Règlement Fournisseurs | `dettesFournisseursTTC`, `decaissementFournisseursTTC`, `taux` | `kpi-config-dettes-{clientId}` |
 | Dettes court terme | `total`, `dettesFournisseurs`, `dettesSociales`, `dettesPersonnel`, `dettesFiscales`, `dettesHAO` | `kpi-config-dettes-ct-{clientId}` |
@@ -1662,6 +1662,9 @@ ouvert par défaut, replié d'un clic sur son en-tête), séparateur, **Membres*
 | 29/10/2026 | Charges et rentabilité : colonne des valeurs à droite de la cascade **retirée** — montant (K) et pourcentage se lisent dans la barre ou dans l'infobulle ; la barre occupe la place libérée (§22). |
 | 02/11/2026 | Charges et rentabilité : pourcentage du CA **entre parenthèses** dans les barres et l'infobulle — « −11 766K (55,11 %) » (§22). |
 | 02/11/2026 | **Import d'une période avec le Grand Livre seul** : Plan comptable, Plan des tiers et Codes journaux deviennent facultatifs (écran de création, « Modifier » et fenêtre d'ajout). Airflow **contrôle le Grand Livre avant toute écriture** : un compte (après conversion PCG → SYSCOHADA), un code journal (RAN compris) ou un n° de tiers absent des référentiels — en base ou dans les fichiers du même import — fait échouer l'import sans rien enregistrer, avec le nombre d'éléments manquants et les 20 premiers par catégorie ; on complète les référentiels puis « Relancer le traitement ». Un nouvel envoi remplace entièrement les fichiers de la période ; l'échec du contrôle n'efface pas les données d'une période déjà importée. « Modifier » corrigé (il attendait encore les 5 anciens fichiers) et soumis au droit Charger des fichiers (§3, §25.18 à §25.20). |
+| 02/11/2026 | Tables de dimension › Mapping : la colonne **Rubrique par défaut** est placée **avant** la colonne Rubrique (Racine, Rubrique par défaut, Rubrique, Type…) (§3). |
+| 02/11/2026 | Comptabilité (grand livre) et Tables de dimension : la pagination indique les lignes affichées, « Lignes 51 à 75 sur 1 636 », au lieu de « 1636 lignes · 25/page » (total sans séparateur de milliers) (§19). |
+| 02/11/2026 | Résultats : chaque carte KPI affiche sa **formule en rubriques** sous le libellé, comme les autres onglets — Excédent Brut d'Exploitation « XD = XC + RK (Valeur ajoutée − Charges de personnel) », ainsi que Marge commerciale, Valeur ajoutée, Résultat d'exploitation, financier, net et HAO (§7, §23). |
 | 02/11/2026 | Nom de l'application : **REPFI remplacé par Click Insight** dans tous les textes visibles (titre de l'onglet du navigateur, e-mail de demande de démo, noms des fichiers de la présentation, titre de ce catalogue). Les identifiants techniques (bases `repfi_*`, clés de stockage, DAG Airflow) ne changent pas. |
 | 02/11/2026 | Fiche client : **Rafraîchir** passe en tête de la colonne de gauche ; **Retour aux clients** et la **devise** (FCFA, unité K FCFA) passent sous le titre de la page, à la place de Rafraîchir (§26). |
 | 02/11/2026 | **Graphiques masquables** : chaque graphique des onglets de reporting (hors KPI) s'affiche ou se masque depuis le menu **« Graphiques »**, à côté de « Configurer les KPIs » (Bilan d'activité : au bout de la barre de filtres) — une case par graphique, « Tout afficher », nombre de graphiques masqués sur le bouton ; mémorisé par onglet et par client dans le navigateur (§23). |

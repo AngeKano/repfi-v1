@@ -830,8 +830,10 @@ export default function DimensionsViewer({
         {data && data.totalPages > 1 && (
           <div className="flex items-center justify-between mt-4 gap-3 flex-wrap">
             <span className="text-xs text-muted-foreground">
-              {data.total.toLocaleString("fr-FR")} ligne{data.total > 1 ? "s" : ""} ·{" "}
-              {data.pageSize}/page
+              {/* « Lignes 51 à 100 sur 1 636 » : lignes de la page affichée. */}
+              Lignes {((data.page - 1) * data.pageSize + 1).toLocaleString("fr-FR")} à{" "}
+              {Math.min(data.page * data.pageSize, data.total).toLocaleString("fr-FR")} sur{" "}
+              {data.total.toLocaleString("fr-FR")}
             </span>
             <div className="flex items-center gap-1">
               <Button
