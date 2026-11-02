@@ -552,6 +552,10 @@ Onglet **entièrement calculé par rubrique**, mode verrouillé sur Cumulé.
 | Dépréciation (`BSB1`, `BSD1`, `BSE1`) | `crédit − débit` |
 | Passif (`D…`) | `crédit − débit` — un découvert est positif |
 
+Un compte de passif a un solde normal **créditeur** : son montant est
+`crédit − débit`, soit `(débit − crédit) × −1`. Les indicateurs et le
+détail par compte appliquent la même convention.
+
 ### Indicateurs
 
 | KPI | Formule | Affiché |
@@ -568,9 +572,13 @@ Onglet **entièrement calculé par rubrique**, mode verrouillé sur Cumulé.
 
 ### Trésorerie par comptes
 
-Histogramme et tableau par compte sur **toutes les rubriques du Total**,
-valeur `débit − crédit` : concours bancaires et dépréciations y apparaissent en
-négatif, et la ligne **Total Trésorerie du tableau égale l'indicateur**.
+Histogramme et tableau par compte sur **toutes les rubriques du Total**, dans
+la **convention des indicateurs** : compte d'actif en `débit − crédit`,
+compte de passif ou de dépréciation en `crédit − débit` (repéré « en moins »).
+Un indicateur vaut donc la somme de ses comptes (ex. 565000, rubrique `DQ`,
+débiteur de 1 : −1 dans le tableau comme dans « Autres Trésorerie Passif »).
+La ligne **Total Trésorerie** reprend l'indicateur : comptes d'actif moins
+comptes « en moins ».
 
 ### Trésorerie de la Synthèse
 
@@ -987,7 +995,7 @@ tableau Top 10 Clients n'ont pas de graphique à masquer.
 ## 24. Variations N vs N-1 & devise
 
 ```
-variation = (N − N-1) / |N-1| × 100        (N-1 = 0 et N ≠ 0 → 100 %)
+variation = (N − N-1) / |N-1| × 100        (N-1 = 0 : +100 % si N > 0, −100 % si N < 0, 0 si N = 0)
 ```
 
 **Devise** : FCFA, définie en un seul endroit et reprise par l'application et
@@ -1662,6 +1670,7 @@ ouvert par défaut, replié d'un clic sur son en-tête), séparateur, **Membres*
 | 29/10/2026 | Charges et rentabilité : colonne des valeurs à droite de la cascade **retirée** — montant (K) et pourcentage se lisent dans la barre ou dans l'infobulle ; la barre occupe la place libérée (§22). |
 | 02/11/2026 | Charges et rentabilité : pourcentage du CA **entre parenthèses** dans les barres et l'infobulle — « −11 766K (55,11 %) » (§22). |
 | 02/11/2026 | **Import d'une période avec le Grand Livre seul** : Plan comptable, Plan des tiers et Codes journaux deviennent facultatifs (écran de création, « Modifier » et fenêtre d'ajout). Airflow **contrôle le Grand Livre avant toute écriture** : un compte (après conversion PCG → SYSCOHADA), un code journal (RAN compris) ou un n° de tiers absent des référentiels — en base ou dans les fichiers du même import — fait échouer l'import sans rien enregistrer, avec le nombre d'éléments manquants et les 20 premiers par catégorie ; on complète les référentiels puis « Relancer le traitement ». Un nouvel envoi remplace entièrement les fichiers de la période ; l'échec du contrôle n'efface pas les données d'une période déjà importée. « Modifier » corrigé (il attendait encore les 5 anciens fichiers) et soumis au droit Charger des fichiers (§3, §25.18 à §25.20). |
+| 02/11/2026 | **Trésorerie — détail par compte aligné sur les indicateurs** : un compte de passif (rubrique D…, solde normal créditeur) ou de dépréciation est lu en **crédit − débit**, soit (débit − crédit) × −1, dans « Trésorerie par comptes » comme dans les indicateurs ; 565000 (DQ, débiteur de 1) vaut −1 dans le tableau comme dans « Autres Trésorerie Passif » (il valait 1 dans le tableau). Ces comptes sont repérés « en moins » et déduits ; la ligne Total Trésorerie reprend l'indicateur. Indicateurs inchangés. **Variations** : quand N-1 = 0, ±100 % selon le signe de N (de 0 à −1 n'affiche plus « +100 % ») — tous les KPI, Produits par Nature, Trésorerie (§11, §24). |
 | 02/11/2026 | Tables de dimension › Mapping : la colonne **Rubrique par défaut** est placée **avant** la colonne Rubrique (Racine, Rubrique par défaut, Rubrique, Type…) (§3). |
 | 02/11/2026 | Comptabilité (grand livre) et Tables de dimension : la pagination indique les lignes affichées, « Lignes 51 à 75 sur 1 636 », au lieu de « 1636 lignes · 25/page » (total sans séparateur de milliers) (§19). |
 | 02/11/2026 | Résultats : chaque carte KPI affiche sa **formule en rubriques** sous le libellé, comme les autres onglets — Excédent Brut d'Exploitation « XD = XC + RK (Valeur ajoutée − Charges de personnel) », ainsi que Marge commerciale, Valeur ajoutée, Résultat d'exploitation, financier, net et HAO (§7, §23). |

@@ -83,6 +83,8 @@ interface CompteTreso {
   intituleCompte: string;
   montantN: number;
   montantN1: number;
+  /** Passif ou dépréciation : solde crédit − débit, en moins du Total. */
+  deduit?: boolean;
   variation: number;
 }
 interface TresorerieData {
@@ -322,8 +324,15 @@ export default function ClientTresorerieTab({
   }));
   // Hauteur dynamique : 70px par compte, comme l'histogramme « Produits par Nature ».
   const chartHeight = Math.max(data.comptes.length * 70 + 40, 200);
-  const totalN = data.comptes.reduce((s, c) => s + c.montantN, 0);
-  const totalN1 = data.comptes.reduce((s, c) => s + c.montantN1, 0);
+  // Total Trésorerie : comptes d'actif moins comptes de passif et de
+  // dépréciation (lus en crédit − débit). On reprend l'indicateur, qui fait
+  // foi même si un compte change de rubrique en cours d'exercice ; le calcul
+  // par les comptes ne sert qu'à défaut.
+  const signe = (c: CompteTreso) => (c.deduit ? -1 : 1);
+  const totalN =
+    data.kpis.total?.valeurN ?? data.comptes.reduce((s, c) => s + signe(c) * c.montantN, 0);
+  const totalN1 =
+    data.kpis.total?.valeurN1 ?? data.comptes.reduce((s, c) => s + signe(c) * c.montantN1, 0);
 
   return (
     <div className="space-y-6">
@@ -352,8 +361,8 @@ export default function ClientTresorerieTab({
                 <CardTitle>Trésorerie par comptes</CardTitle>
                 <CardDescription>
                   Soldes des comptes des rubriques du Total Trésorerie (
-                  {RUBRIQUES_TOTAL_TRESORERIE.join(", ")}) — concours bancaires et dépréciations
-                  en négatif — {data.yearN} vs {data.yearN1}
+                  {RUBRIQUES_TOTAL_TRESORERIE.join(", ")}) — comptes de passif et de dépréciation
+                  en crédit − débit, déduits du total — {data.yearN} vs {data.yearN1}
                 </CardDescription>
               </div>
               <div className="flex flex-col gap-1 shrink-0">
@@ -461,6 +470,14 @@ export default function ClientTresorerieTab({
                               {c.compte}
                             </span>
                             <span className="font-medium">{c.intituleCompte}</span>
+                            {c.deduit && (
+                              <span
+                                className="text-[10px] px-1.5 py-0.5 rounded border border-[#D0E3F5] text-muted-foreground"
+                                title="Compte de passif ou de dépréciation : solde crédit − débit, déduit du Total Trésorerie"
+                              >
+                                en moins
+                              </span>
+                            )}
                           </div>
                         </td>
                         <td className="text-right py-2.5 font-semibold">
@@ -475,7 +492,12 @@ export default function ClientTresorerieTab({
                       </tr>
                     ))}
                     <tr className="border-t-2 font-bold">
-                      <td className="py-2.5">Total Trésorerie</td>
+                      <td className="py-2.5">
+                        Total Trésorerie
+                        <span className="ml-2 text-xs font-normal text-muted-foreground">
+                          (comptes « en moins » déduits)
+                        </span>
+                      </td>
                       <td className="text-right py-2.5 text-blue-600">
                         {formatCompactOnly(totalN)}
                       </td>
@@ -487,9 +509,7 @@ export default function ClientTresorerieTab({
                           value={
                             totalN1 !== 0
                               ? ((totalN - totalN1) / Math.abs(totalN1)) * 100
-                              : totalN !== 0
-                                ? 100
-                                : 0
+                              : Math.sign(totalN) * 100
                           }
                         />
                       </td>

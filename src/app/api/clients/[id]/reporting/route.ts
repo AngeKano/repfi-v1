@@ -669,9 +669,7 @@ async function recupererCAParNature(
     const variation =
       montantN1 !== 0
         ? ((montantN - montantN1) / Math.abs(montantN1)) * 100
-        : montantN !== 0
-          ? 100
-          : 0;
+        : Math.sign(montantN) * 100;
 
     items.push({
       compte,
@@ -1131,8 +1129,9 @@ function calculerIndicateursPeriode(
   };
 }
 
+// N-1 nul : ±100 % selon le signe de N (de 0 à −1 est une baisse).
 const calculerVariation = (n: number, n1: number): number =>
-  n1 !== 0 ? ((n - n1) / Math.abs(n1)) * 100 : n !== 0 ? 100 : 0;
+  n1 !== 0 ? ((n - n1) / Math.abs(n1)) * 100 : Math.sign(n) * 100;
 
 export async function GET(
   req: NextRequest,
