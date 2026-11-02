@@ -1584,12 +1584,12 @@ Corps `{ batchId }`. Refuse (400) un lot sans Grand Livre, de plus de 4 fichiers
 
 ## 26. Composition par onglet UI
 
-Colonne de gauche de la fiche client, de haut en bas : **Retour aux clients**,
-identité du client, **devise** (FCFA, unité K FCFA), puis les onglets :
+Colonne de gauche de la fiche client, de haut en bas : **Rafraîchir** (recharge
+les données de l'onglet affiché), identité du client, puis les onglets :
 **accordéon « Reporting financier »** (Synthèse financière → Bilan d'activité ;
 ouvert par défaut, replié d'un clic sur son en-tête), séparateur, **Membres**,
-**Import**, **Comptabilité**, **Autres fichiers**. Le bouton **Rafraîchir** est
-sous le titre de la page et recharge les données de l'onglet affiché.
+**Import**, **Comptabilité**, **Autres fichiers**. Sous le titre de la page :
+**Retour aux clients** et la **devise** (FCFA, unité K FCFA).
 
 | Onglet | Contenu principal |
 |---|---|
@@ -1662,6 +1662,7 @@ sous le titre de la page et recharge les données de l'onglet affiché.
 | 29/10/2026 | Charges et rentabilité : colonne des valeurs à droite de la cascade **retirée** — montant (K) et pourcentage se lisent dans la barre ou dans l'infobulle ; la barre occupe la place libérée (§22). |
 | 02/11/2026 | Charges et rentabilité : pourcentage du CA **entre parenthèses** dans les barres et l'infobulle — « −11 766K (55,11 %) » (§22). |
 | 02/11/2026 | **Import d'une période avec le Grand Livre seul** : Plan comptable, Plan des tiers et Codes journaux deviennent facultatifs (écran de création, « Modifier » et fenêtre d'ajout). Airflow **contrôle le Grand Livre avant toute écriture** : un compte (après conversion PCG → SYSCOHADA), un code journal (RAN compris) ou un n° de tiers absent des référentiels — en base ou dans les fichiers du même import — fait échouer l'import sans rien enregistrer, avec le nombre d'éléments manquants et les 20 premiers par catégorie ; on complète les référentiels puis « Relancer le traitement ». Un nouvel envoi remplace entièrement les fichiers de la période ; l'échec du contrôle n'efface pas les données d'une période déjà importée. « Modifier » corrigé (il attendait encore les 5 anciens fichiers) et soumis au droit Charger des fichiers (§3, §25.18 à §25.20). |
+| 02/11/2026 | Fiche client : **Rafraîchir** passe en tête de la colonne de gauche ; **Retour aux clients** et la **devise** (FCFA, unité K FCFA) passent sous le titre de la page, à la place de Rafraîchir (§26). |
 | 02/11/2026 | **Graphiques masquables** : chaque graphique des onglets de reporting (hors KPI) s'affiche ou se masque depuis le menu **« Graphiques »**, à côté de « Configurer les KPIs » (Bilan d'activité : au bout de la barre de filtres) — une case par graphique, « Tout afficher », nombre de graphiques masqués sur le bouton ; mémorisé par onglet et par client dans le navigateur (§23). |
 | 02/11/2026 | Tables de dimension › Mapping : nouvelle colonne **Rubrique par défaut**, en lecture seule — rubrique attribuée à la **création** de la ligne (mapping par défaut SYSCOHADA pour un nouveau client, rubrique saisie ou du fichier pour une ligne ajoutée), **jamais modifiée** ensuite, même quand la rubrique change (saisie ou fichier). Colonne `ple.rubrique_defaut` ajoutée par Airflow aux tables existantes et renseignée depuis le mapping par défaut (sinon rubrique actuelle) ; recherchable, filtrable, triable, absente du fichier exporté (§3). |
 | 02/11/2026 | **Filtres partagés — correction** : en mode Périodique, le choix de granularité (Mois / Année) était aussitôt annulé par le garde-fou du 27/10, qui alignait le calcul sur l'ancienne granularité ; les filtres restaient bloqués (sur l'année le plus souvent). Tout changement de mode ou de granularité met désormais à jour les deux ensemble, dans tous les onglets (§4). |
