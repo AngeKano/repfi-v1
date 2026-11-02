@@ -348,6 +348,8 @@ interface KpiItem {
   colorNeg?: string;
   icon: React.ElementType;
   percent?: boolean; // affiche la valeur en % (ratio) au lieu de K
+  /** Formule en rubriques, affichée en italique sous le libellé. */
+  formule?: string;
   visible: boolean;
   order: number;
 }
@@ -570,6 +572,7 @@ const DEFAULT_RESULTAT_KPIS: KpiItem[] = [
     label: "Marge Commerciale",
     key: "margeCommerciale",
     variationKey: "margeCommerciale",
+    formule: "XA = TA + RA + RB (Ventes de marchandises − Achats ± Variation de stocks)",
     color: "text-indigo-600",
     colorNeg: "text-red-600",
     icon: PiShoppingCartSimpleDuotone,
@@ -581,6 +584,7 @@ const DEFAULT_RESULTAT_KPIS: KpiItem[] = [
     label: "Valeur Ajoutée",
     key: "valeurAjoutee",
     variationKey: "valeurAjoutee",
+    formule: "XC = XB + RA + RB + (somme TE à RJ)",
     color: "text-sky-600",
     colorNeg: "text-red-600",
     icon: PiChartDonutDuotone,
@@ -592,6 +596,7 @@ const DEFAULT_RESULTAT_KPIS: KpiItem[] = [
     label: "Excédent Brut d'Exploitation",
     key: "ebe",
     variationKey: "ebe",
+    formule: "XD = XC + RK (Valeur ajoutée − Charges de personnel)",
     color: "text-cyan-600",
     colorNeg: "text-red-600",
     icon: PiChartDonutDuotone,
@@ -603,6 +608,7 @@ const DEFAULT_RESULTAT_KPIS: KpiItem[] = [
     label: "Résultat Exploitation",
     key: "resultatExploitation",
     variationKey: "resultatExploitation",
+    formule: "XE = XD + TJ + RL",
     color: "text-fuchsia-500",
     colorNeg: "text-red-600",
     icon: PiChartDonutDuotone,
@@ -614,6 +620,7 @@ const DEFAULT_RESULTAT_KPIS: KpiItem[] = [
     label: "Résultat Financier",
     key: "resultatFinancier",
     variationKey: "resultatFinancier",
+    formule: "XF = somme TK à RN",
     color: "text-amber-600",
     colorNeg: "text-red-600",
     icon: PiReceiptDuotone,
@@ -625,6 +632,7 @@ const DEFAULT_RESULTAT_KPIS: KpiItem[] = [
     label: "Résultat Net",
     key: "resultatNet",
     variationKey: "resultatNet",
+    formule: "XI = XG + XH + RQ + RS",
     color: "text-green-500",
     colorNeg: "text-red-600",
     icon: PiChartDonutDuotone,
@@ -636,6 +644,7 @@ const DEFAULT_RESULTAT_KPIS: KpiItem[] = [
     label: "Résultat HAO",
     key: "resultatHAO",
     variationKey: "resultatHAO",
+    formule: "XH = somme TN à RP",
     color: "text-yellow-500",
     colorNeg: "text-red-600",
     icon: PiCalculatorDuotone,
@@ -2467,10 +2476,17 @@ export default function ClientReportingChart({
                             </button>
                           )}
                           <CardHeader className="pb-2">
-                            <div className="flex items-center justify-between gap-2">
-                              <CardDescription className="text-sm font-medium">
-                                {kpi.label}
-                              </CardDescription>
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="min-w-0">
+                                <CardDescription className="text-sm font-medium">
+                                  {kpi.label}
+                                </CardDescription>
+                                {kpi.formule && (
+                                  <p className="text-xs text-muted-foreground italic mt-1">
+                                    {kpi.formule}
+                                  </p>
+                                )}
+                              </div>
                               {!resultatKpiEditMode && (
                                 <VariationBadge value={variation} />
                               )}

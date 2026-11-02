@@ -1262,7 +1262,10 @@ function GrandLivreSaisie({ clientId }: { clientId: string }) {
           {data.uploaded.totalPages > 1 && (
             <div className="flex items-center justify-between mt-4 gap-3 flex-wrap">
               <span className="text-xs text-muted-foreground">
-                {data.uploaded.total} ligne{data.uploaded.total > 1 ? "s" : ""} · {data.uploaded.pageSize}/page
+                {/* « Lignes 51 à 75 sur 1 636 » : lignes de la page affichée. */}
+                Lignes {((data.uploaded.page - 1) * data.uploaded.pageSize + 1).toLocaleString("fr-FR")} à{" "}
+                {Math.min(data.uploaded.page * data.uploaded.pageSize, data.uploaded.total).toLocaleString("fr-FR")} sur{" "}
+                {data.uploaded.total.toLocaleString("fr-FR")}
               </span>
               <div className="flex items-center gap-1">
                 <Button variant="outline" size="sm" onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={data.uploaded.page <= 1 || loading} className="h-8 w-8 p-0" title="Page précédente">
