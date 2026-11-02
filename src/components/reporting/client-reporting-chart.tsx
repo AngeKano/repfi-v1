@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo, useRef } from "react";
+import { useState, useEffect, useMemo } from "react";
 import {
   Card,
   CardContent,
@@ -766,7 +766,6 @@ export default function ClientReportingChart({
 }) {
   const [data, setData] = useState<ReportingData | null>(null);
   const [loading, setLoading] = useState(true);
-  const yearInitialized = useRef(false);
   const [hiddenPeriods, setHiddenPeriods] = useState<Set<string>>(new Set());
   const [tunnelMetrics, setTunnelMetrics] = useState<TunnelMetric[]>(
     INITIAL_TUNNEL_METRICS,
@@ -971,33 +970,28 @@ export default function ClientReportingChart({
       pourcentageTotal: number;
     }>;
     totalCreances: number;
+    /** Part du Top 10 dans l'ensemble des créances (%). */
+    partTop10?: number;
+    /** Fin de fenêtre réellement calculée (mois couvert par le reporting). */
+    endYear?: number;
+    endMonth?: number;
+    moisDisponibles?: string[];
   } | null>(null);
 
-  // Sélecteurs mois et année pour le recouvrement (choix libre)
-  const [recouvrementMonth, setRecouvrementMonth] = useState<string>(() => {
-    const now = new Date();
-    return (now.getMonth() + 1).toString().padStart(2, "0");
-  });
-  const [recouvrementYear, setRecouvrementYear] = useState<string>(() => {
-    return new Date().getFullYear().toString();
-  });
-  // Mode + granularité du filtre période appliqué au Top 10 Créances.
-  // Le graphe Évolution du Taux de Recouvrement reste toujours cumulé.
-  // Recouvrement : toujours cumulé (pas de mode périodique).
-  const [recouvrementGranularity, setRecouvrementGranularity] = useState<
-    "mois" | "annee"
-  >("mois");
+  // Recouvrement : MÊMES filtres que les autres onglets (année, mois,
+  // granularité), pour qu'une même période donne les mêmes résultats d'un
+  // onglet à l'autre. Le mode y est toujours Cumulé (janvier → mois).
+  const recouvrementYear = year;
+  const recouvrementMonth = selectedMonth;
+  const recouvrementGranularity = cumulGranularity;
+  const setRecouvrementYear = setYear;
+  const setRecouvrementMonth = setSelectedMonth;
+  const setRecouvrementGranularity = (g: "mois" | "annee") => {
+    setCumulGranularity(g);
+    setPeriodType(g === "annee" ? "ytd" : "ytd-day");
+    if (g === "annee") setSelectedMonth("12");
+  };
   const [recouvrementLoading, setRecouvrementLoading] = useState(false);
-
-  // Générer la liste des années disponibles (5 ans en arrière, 2 ans en avant)
-  const recouvrementYearOptions = useMemo(() => {
-    const currentYear = new Date().getFullYear();
-    const years: string[] = [];
-    for (let y = currentYear + 2; y >= currentYear - 10; y--) {
-      years.push(y.toString());
-    }
-    return years;
-  }, []);
 
   useEffect(() => {
     fetchData();
@@ -1034,12 +1028,6 @@ export default function ClientReportingChart({
       const json = await res.json();
       setData(json);
 
-      // Au premier chargement, le recouvrement part de l'année la plus récente.
-      if (!yearInitialized.current && json.availableYears?.length > 0) {
-        yearInitialized.current = true;
-        setRecouvrementYear(json.availableYears[0]);
-        setRecouvrementMonth("12");
-      }
       // Le filtre suit la période réellement calculée : une année ou un mois
       // sans reporting n'est jamais affiché. L'API se cale sur l'année la plus
       // récente et sur le dernier mois couvert ; l'année choisie reste sinon
@@ -3157,8 +3145,13 @@ export default function ClientReportingChart({
                             {formatCompactOnly(recouvrementData.totalCreances)}
                           </div>
                           <div className="col-span-1 text-right">
+                            {/* Part du Top 10 dans l'ensemble des créances. */}
                             <Badge variant="outline" className="text-xs">
-                              100%
+                              {(
+                                recouvrementData.partTop10 ??
+                                recouvrementData.topCreances.reduce((s, c) => s + c.pourcentageTotal, 0)
+                              ).toFixed(1)}
+                              %
                             </Badge>
                           </div>
                         </div>
@@ -3452,7 +3445,7 @@ export default function ClientReportingChart({
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        {MONTHS.map((month) => (
+                        {moisChoisissables.map((month) => (
                           <SelectItem key={month.value} value={month.value}>
                             {month.label}
                           </SelectItem>
@@ -3466,13 +3459,19 @@ export default function ClientReportingChart({
                   <CalendarRange className="w-3.5 h-3.5 text-[#0077C3]" />
                   <span>
                     {(() => {
-                      const monthLabel = MONTHS.find(
-                        (m) => m.value === recouvrementMonth,
-                      )?.label;
-                      if (recouvrementGranularity === "annee") {
-                        return `Janvier - Décembre ${recouvrementYear}`;
-                      }
-                      return `Janvier - ${monthLabel} ${recouvrementYear}`;
+                      // Fenêtre réellement calculée : du premier mois couvert
+                      // par le reporting au mois de fin (dernier mois couvert
+                      // en granularité Année).
+                      const nom = (v?: string) => MONTHS.find((m) => m.value === v)?.label ?? "";
+                      const dispo = recouvrementData?.moisDisponibles ?? data.moisDisponibles ?? [];
+                      const debut = nom(dispo[0] ?? "01");
+                      const fin =
+                        recouvrementData?.endMonth !== undefined
+                          ? String(recouvrementData.endMonth).padStart(2, "0")
+                          : recouvrementGranularity === "annee"
+                            ? (dispo[dispo.length - 1] ?? "12")
+                            : recouvrementMonth;
+                      return `${debut} - ${nom(fin)} ${recouvrementYear}`;
                     })()}
                   </span>
                 </div>
@@ -3567,7 +3566,7 @@ export default function ClientReportingChart({
                     <SelectValue placeholder="Mois" />
                   </SelectTrigger>
                   <SelectContent>
-                    {MONTHS.map((month) => (
+                    {moisChoisissables.map((month) => (
                       <SelectItem key={month.value} value={month.value}>
                         {month.label}
                       </SelectItem>
@@ -3582,7 +3581,7 @@ export default function ClientReportingChart({
                     <SelectValue placeholder="Année" />
                   </SelectTrigger>
                   <SelectContent>
-                    {recouvrementYearOptions.map((y) => (
+                    {data.availableYears.map((y) => (
                       <SelectItem key={y} value={y}>
                         {y}
                       </SelectItem>
