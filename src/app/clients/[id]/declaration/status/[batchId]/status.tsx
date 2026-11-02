@@ -17,11 +17,13 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 
-// Messages par étape (format v3.0 : 4 fichiers, grand livre unifié).
+// Messages par étape : Grand Livre obligatoire, référentiels facultatifs ; le
+// Grand Livre est contrôlé contre les référentiels avant toute écriture.
 const STEP_MESSAGES = {
   PENDING: ["Début du traitement..."],
   VALIDATING: [
     "Validation des formats de fichiers...",
+    "Contrôle des comptes, codes journaux et tiers du grand livre...",
     "Traitement du plan comptable...",
     "Traitement du code journal...",
     "Traitement du plan tiers...",

@@ -603,12 +603,12 @@ export function AnalyseChargesVue({
                 const cliquable = e.type === "charge" || e.type === "autresProduits";
                 const ouvert = ouverte === e.id;
                 const fort = e.type === "ca" || e.type === "resultat";
-                // « −11 766K · 55,11 % » : montant en milliers et poids dans le CA.
+                // « −11 766K (55,11 %) » : montant en milliers et poids dans le CA.
                 const libelleBarre = `${
                   e.type === "charge" || e.type === "autresProduits"
                     ? montantK(e.impact)
                     : montantK(e.impact).replace(/^\+/, "")
-                } · ${e.type === "ca" ? (pN.ca === 0 ? "n.a." : "100 %") : pct(poids)}`;
+                } (${e.type === "ca" ? (pN.ca === 0 ? "n.a." : "100 %") : pct(poids)})`;
                 return (
                   <Fragment key={e.id}>
                     <button

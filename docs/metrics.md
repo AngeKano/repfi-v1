@@ -282,6 +282,46 @@ type, longueur de racine, sens du solde).
 
 > `src/lib/comptable/dimensions.ts`, `src/lib/clickhouse/dimensions-table.ts`
 
+### Import d'une période — contrôle du Grand Livre
+
+Onglet Import › nouvelle période (ou « Modifier » une période existante) :
+
+| Fichier | Statut |
+|---|---|
+| Grand Livre | **Obligatoire** |
+| Plan comptable, Plan des tiers, Codes journaux | **Facultatifs** — un fichier par type au plus |
+
+Avant toute écriture, Airflow (tâche `controle_referentiels` du DAG
+`etl_comptable_clickhouse`) vérifie chaque ligne du Grand Livre contre les
+référentiels **connus** : ceux déjà en base **plus** ceux joints au même import
+(lus sans être écrits).
+
+| Élément du Grand Livre | Doit exister dans | Précision |
+|---|---|---|
+| Compte | `plan_compte` | Égalité exacte, sur le compte SYSCOHADA (un Grand Livre PCG est d'abord converti) |
+| Code journal | `code_journal` | Sans exception : les journaux d'à-nouveaux (RAN) aussi |
+| N° de tiers | `plan_tiers` | Une ligne sans tiers n'est pas une erreur ; un tiers ajouté dans Tables de dimension compte |
+
+**Tout ou rien** : un seul élément inconnu fait échouer l'import et **rien
+n'est enregistré** — ni Grand Livre, ni référentiel joint. Le message de la
+page de suivi donne, par catégorie, le nombre d'éléments manquants et les 20
+premiers avec leur nombre de lignes. On complète alors les référentiels
+(Tables de dimension, ou mise à jour d'un référentiel par fichier) puis
+**« Relancer le traitement »**.
+
+Le même contrôle refuse aussi, avant écriture, une période hors bornes, un
+Grand Livre déséquilibré et un Plan comptable joint dans un autre plan que le
+Grand Livre (PCG / SYSCOHADA).
+
+Un nouvel envoi sur une période **remplace** tous ses fichiers : les anciens
+sont sauvegardés (`backup/`) puis retirés, pour qu'un référentiel d'un envoi
+précédent ne soit pas réimporté avec un Grand Livre envoyé seul. Si le
+contrôle échoue sur une période déjà importée, ses données en base sont
+**conservées** ; seul un échec pendant l'écriture efface les données du batch.
+
+> Airflow : `plugins/etl/processors/controle_referentiels.py`,
+> `dags/etl_comptable_clickhouse.py` · Web : `src/app/api/files/comptable/`
+
 ---
 
 ## 4. Modes de calcul & granularités
@@ -840,8 +880,8 @@ sur la même fenêtre.
   négatif). Une catégorie à **0 %** (moins de 0,005 % du CA) et des autres
   produits nuls **ne figurent pas** au classement ; le CA et le résultat net
   restent toujours affichés.
-- **Barres** : montant en milliers (« −11 766K ») et poids dans le CA
-  (« 55,11 % ») écrits dans la barre quand elle occupe au moins 22 % de la
+- **Barres** : montant en milliers et poids dans le CA entre parenthèses
+  (« −11 766K (55,11 %) ») écrits dans la barre quand elle occupe au moins 22 % de la
   piste ; au survol de toute barre (curseur main), une infobulle rappelle le
   libellé, le montant en K et le pourcentage — utile pour les petites barres.
   Pas de colonne de valeurs à droite : tout se lit dans la barre ou
@@ -1462,6 +1502,36 @@ Sous-onglet Compte d'exploitation : lignes du compte de résultat de janvier au 
 }
 ```
 
+### 25.18 `POST /api/files/comptable/upload`
+Hors préfixe client. Dépôt des fichiers d'une nouvelle période (droit Charger des fichiers). `multipart/form-data` :
+
+| Champ | Obligatoire | Contenu |
+|---|---|---|
+| `clientId`, `periodStart`, `periodEnd` | Oui | Client et bornes de la période |
+| `GRAND_LIVRE` | Oui | Excel ou Sage `.pnm` |
+| `PLAN_COMPTES`, `PLAN_TIERS`, `CODE_JOURNAL` | Non | Excel, ou Sage `.pnc` pour le Plan des tiers |
+
+```
+// 201
+{ message, batchId, period: { id, start, end, year }, s3Prefix, files, comptablePeriod,
+  fileFormat: { version: "3.1", description, requiredFiles: [{ type, label }] } }
+```
+
+### 25.19 `PUT /api/files/comptable/update`
+« Modifier » une période : mêmes fichiers que 25.18 avec `periodId` au lieu du client et des dates. Les fichiers de la période sont remplacés, la période repasse en attente.
+
+```
+// 200
+{ message, batchId, period: { id, start, end, year }, s3Prefix, files, comptablePeriod }
+```
+
+### 25.20 `POST /api/files/comptable/trigger-etl`
+Corps `{ batchId }`. Refuse (400) un lot sans Grand Livre, de plus de 4 fichiers ou avec deux fichiers du même type ; efface le message d'erreur précédent puis déclenche le DAG `etl_comptable_clickhouse`.
+
+```
+{ message, batchId, dagRunId, status: "PROCESSING", s3Prefix }
+```
+
 ---
 
 ## 26. Composition par onglet UI
@@ -1542,6 +1612,8 @@ sous le titre de la page et recharge les données de l'onglet affiché.
 | 29/10/2026 | Navigation de la fiche client : « Retour aux clients » et la devise remontés en haut de la colonne ; onglets regroupés sous **« Reporting financier »** (Synthèse … Bilan d'activité), puis Membres, Import, Comptabilité, Autres fichiers (§26). |
 | 29/10/2026 | Fiche client : **« Reporting financier » en accordéon** (en-tête cliquable avec chevron, ouvert par défaut ; replié, l'en-tête reste surligné si un onglet du groupe est affiché) ; libellés sur deux lignes alignés à gauche ; bouton **Rafraîchir** déplacé sous le titre de la page, et il recharge désormais les données de l'onglet en cours (§26). |
 | 29/10/2026 | Charges et rentabilité : colonne des valeurs à droite de la cascade **retirée** — montant (K) et pourcentage se lisent dans la barre ou dans l'infobulle ; la barre occupe la place libérée (§22). |
+| 02/11/2026 | Charges et rentabilité : pourcentage du CA **entre parenthèses** dans les barres et l'infobulle — « −11 766K (55,11 %) » (§22). |
+| 02/11/2026 | **Import d'une période avec le Grand Livre seul** : Plan comptable, Plan des tiers et Codes journaux deviennent facultatifs (écran de création, « Modifier » et fenêtre d'ajout). Airflow **contrôle le Grand Livre avant toute écriture** : un compte (après conversion PCG → SYSCOHADA), un code journal (RAN compris) ou un n° de tiers absent des référentiels — en base ou dans les fichiers du même import — fait échouer l'import sans rien enregistrer, avec le nombre d'éléments manquants et les 20 premiers par catégorie ; on complète les référentiels puis « Relancer le traitement ». Un nouvel envoi remplace entièrement les fichiers de la période ; l'échec du contrôle n'efface pas les données d'une période déjà importée. « Modifier » corrigé (il attendait encore les 5 anciens fichiers) et soumis au droit Charger des fichiers (§3, §25.18 à §25.20). |
 
 ---
 

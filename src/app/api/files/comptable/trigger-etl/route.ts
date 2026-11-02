@@ -6,13 +6,14 @@ import { FICHIERS_ACTIONS } from "@/lib/permissions/actions";
 
 import { prisma } from "@/lib/prisma";
 import { triggerAirflowDagRun } from "@/lib/airflow";
-import { ProcessingStatus } from "../../../../../../prisma/generated/prisma/enums";
+import { FileType, ProcessingStatus } from "../../../../../../prisma/generated/prisma/enums";
 
 const triggerETLSchema = z.object({
   batchId: z.string().uuid(),
 });
 
-// Le DAG principal charge les 4 fichiers d'une période (dimensions + grand livre).
+// Le DAG principal charge le grand livre d'une période, et les référentiels
+// joints s'il y en a, après avoir contrôlé le grand livre contre les référentiels.
 function triggerAirflowDAG(
   batchId: string,
   clientId: string,
@@ -97,9 +98,17 @@ export async function POST(req: NextRequest) {
       where: { batchId },
     });
 
-    if (files.length !== 4) {
+    // Grand Livre obligatoire ; référentiels facultatifs, un fichier par type.
+    const types = files.map((f) => f.fileType);
+    if (!types.includes(FileType.GRAND_LIVRE)) {
       return NextResponse.json(
-        { error: `Fichiers invalides: ${files.length}/4` },
+        { error: "Le Grand Livre est obligatoire pour lancer l'import" },
+        { status: 400 },
+      );
+    }
+    if (files.length > 4 || new Set(types).size !== types.length) {
+      return NextResponse.json(
+        { error: `Fichiers invalides : ${files.length} fichier(s), un seul par type attendu` },
         { status: 400 },
       );
     }
@@ -137,9 +146,10 @@ export async function POST(req: NextRequest) {
       data: { status: ProcessingStatus.PROCESSING },
     });
 
+    // Relance : le message d'erreur du traitement précédent est effacé.
     await prisma.comptableFile.updateMany({
       where: { batchId },
-      data: { processingStatus: ProcessingStatus.PROCESSING },
+      data: { processingStatus: ProcessingStatus.PROCESSING, errorMessage: null },
     });
 
     for (const file of files) {

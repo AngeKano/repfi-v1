@@ -38,21 +38,21 @@ import {
 import { FileType } from "../../../../../../prisma/generated/prisma/enums";
 
 // ============================================================
-// FORMAT 4 FICHIERS (v3.0)
-// - GRAND_LIVRE: Fichier unifié (comptes + tiers + factures)
-// - PLAN_COMPTES: Plan comptable
-// - PLAN_TIERS: Plan des tiers
-// - CODE_JOURNAL: Codes journaux
+// FICHIERS D'UN IMPORT
+// - GRAND_LIVRE  : obligatoire (fichier unifié comptes + tiers + factures)
+// - PLAN_COMPTES, PLAN_TIERS, CODE_JOURNAL : facultatifs. Sans eux, chaque
+//   compte, code journal et tiers du Grand Livre doit déjà exister dans les
+//   référentiels du client, sinon Airflow refuse l'import (rien n'est écrit).
 // ============================================================
 
-const REQUIRED_FILE_TYPES = [
-  { type: "GRAND_LIVRE", label: "Grand Livre Comptable" },
-  { type: "PLAN_COMPTES", label: "Plan Comptable" },
-  { type: "PLAN_TIERS", label: "Plan des Tiers" },
-  { type: "CODE_JOURNAL", label: "Code Journal" },
+const IMPORT_FILE_TYPES = [
+  { type: "GRAND_LIVRE", label: "Grand Livre Comptable", obligatoire: true },
+  { type: "PLAN_COMPTES", label: "Plan Comptable", obligatoire: false },
+  { type: "PLAN_TIERS", label: "Plan des Tiers", obligatoire: false },
+  { type: "CODE_JOURNAL", label: "Code Journal", obligatoire: false },
 ];
 
-const MAX_FILES = 4; // Format v3.0 : Grand Livre unifié
+const MAX_FILES = 4; // un fichier par type au plus
 
 function FileTypeSelect({
   value,
@@ -63,7 +63,7 @@ function FileTypeSelect({
   onChange: (v: string) => void;
   excludeTypes?: string[];
 }) {
-  const filteredTypes = REQUIRED_FILE_TYPES.filter(
+  const filteredTypes = IMPORT_FILE_TYPES.filter(
     (t) => !excludeTypes.includes(t.type),
   );
 
@@ -391,14 +391,17 @@ export default function DeclarationComptable({
     );
   };
 
+  // Grand Livre obligatoire, un fichier par type au plus, chaque fichier
+  // typé et dans un format autorisé.
   const allFilesValid = () => {
-    if (filesCount !== MAX_FILES) return false;
+    if (filesCount < 1 || filesCount > MAX_FILES) return false;
 
     const types = files.map((f) => f.fileType);
-    const requiredTypes = REQUIRED_FILE_TYPES.map((t) => t.type);
+    const obligatoires = IMPORT_FILE_TYPES.filter((t) => t.obligatoire).map((t) => t.type);
 
     return (
-      requiredTypes.every((type) => types.includes(type)) &&
+      obligatoires.every((type) => types.includes(type)) &&
+      new Set(types).size === types.length &&
       files.every((f) => f.fileType && !f.error)
     );
   };
@@ -411,7 +414,7 @@ export default function DeclarationComptable({
 
     if (!allFilesValid()) {
       toast.error(
-        `Veuillez sélectionner les ${MAX_FILES} fichiers obligatoires avec des types valides`,
+        "Le Grand Livre est obligatoire, avec au plus un fichier par type, chacun dans un format valide",
       );
       return;
     }
@@ -601,11 +604,15 @@ export default function DeclarationComptable({
         {/* Info Format v3.0 */}
         <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
           <p className="text-sm font-medium text-blue-800">
-            📋 Format v3.0 - 4 fichiers requis
+            📋 Grand Livre obligatoire — Plan comptable, Plan des tiers et
+            Codes journaux facultatifs
           </p>
           <p className="text-xs text-blue-600 mt-1">
-            Le Grand Livre Comptable unifié remplace les anciens fichiers GL
-            Comptes et GL Tiers
+            Chaque compte, code journal et tiers du Grand Livre doit exister
+            dans les référentiels de Click Insight (Comptabilité › Tables de
+            dimension) ou dans les fichiers joints à cet import. Sinon, l&apos;import
+            est refusé et rien n&apos;est enregistré : la liste des éléments
+            manquants s&apos;affiche sur la page de suivi.
           </p>
         </div>
 
@@ -626,7 +633,7 @@ export default function DeclarationComptable({
         >
           <Upload className="w-12 h-12 text-gray-400 mx-auto mb-4" />
           <p className="text-lg font-medium mb-2">
-            Glissez-déposez vos {MAX_FILES} fichiers comptables ici
+            Glissez-déposez votre Grand Livre (et, si besoin, les référentiels)
           </p>
           <p className="text-sm text-gray-500 mb-4">
             Excel (.xlsx/.xls) ou Sage (.pnm/.pnc) — max{" "}
@@ -716,7 +723,7 @@ export default function DeclarationComptable({
         {filesCount > 0 && (
           <div className="space-y-3 mb-6">
             <Label>
-              Fichiers sélectionnés ({filesCount}/{MAX_FILES} requis)
+              Fichiers sélectionnés ({filesCount}/{MAX_FILES})
             </Label>
             {files.map((uploadFile) => (
               <div
@@ -737,7 +744,7 @@ export default function DeclarationComptable({
                   {uploadFile.fileType ? (
                     <Badge variant="default">
                       <FileCheck className="w-3 h-3 mr-1" />
-                      {REQUIRED_FILE_TYPES.find(
+                      {IMPORT_FILE_TYPES.find(
                         (t) => t.type === uploadFile.fileType,
                       )?.label || uploadFile.fileType}
                     </Badge>
@@ -773,10 +780,10 @@ export default function DeclarationComptable({
         {filesCount > 0 && (
           <div className="mb-6 p-4 bg-gray-50 rounded-lg">
             <p className="text-sm font-medium mb-2">
-              Types de fichiers requis:
+              Types de fichiers :
             </p>
             <div className="flex flex-wrap gap-2">
-              {REQUIRED_FILE_TYPES.map(({ type, label }) => {
+              {IMPORT_FILE_TYPES.map(({ type, label, obligatoire }) => {
                 const hasType = files.some((f) => f.fileType === type);
                 return (
                   <Badge key={type} variant={hasType ? "default" : "outline"}>
@@ -786,6 +793,9 @@ export default function DeclarationComptable({
                       <AlertCircle className="w-3 h-3 mr-1" />
                     )}
                     {label}
+                    <span className="ml-1 opacity-70">
+                      ({obligatoire ? "obligatoire" : "facultatif"})
+                    </span>
                   </Badge>
                 );
               })}
