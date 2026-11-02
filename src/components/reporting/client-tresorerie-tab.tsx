@@ -91,6 +91,12 @@ interface TresorerieData {
   yearN: number;
   yearN1: number;
   availableYears: number[];
+  /** false : aucun reporting en N-1. */
+  anneeN1Disponible?: boolean;
+  /** Mois « 01 »…« 12 » couverts par le reporting de N. */
+  moisDisponibles?: string[];
+  /** Mois de fin réellement calculé. */
+  month?: string;
   kpis: Record<string, KpiValeur>;
   comptes: CompteTreso[];
 }
@@ -186,21 +192,38 @@ export default function ClientTresorerieTab({
         `?year=${year}&periodType=ytd&month=${moisFin}`;
       const res = await fetch(url);
       if (!res.ok) throw new Error("Erreur API Trésorerie");
-      setData((await res.json()) as TresorerieData);
+      const json = (await res.json()) as TresorerieData;
+      setData(json);
+      // Le filtre suit la période réellement calculée : une année ou un mois
+      // sans reporting n'est jamais affiché (l'API se cale sur l'année la plus
+      // récente et sur le dernier mois couvert).
+      if (json.yearN && String(json.yearN) !== year) {
+        setYear(String(json.yearN));
+        return;
+      }
+      if (json.month && json.month !== selectedMonth) setSelectedMonth(json.month);
     } catch (e) {
       console.error(e);
       toast.error("Erreur lors du chargement de la trésorerie");
     } finally {
       setLoading(false);
     }
-  }, [clientId, year, moisFin]);
+  }, [clientId, year, moisFin, selectedMonth, setYear, setSelectedMonth]);
 
   useEffect(() => {
     load();
   }, [load]);
 
-  const monthLabel = MONTHS.find((m) => m.value === moisFin)?.label ?? "Décembre";
-  const periodLabel = `Janvier - ${monthLabel} ${year}`;
+  // Fenêtre réellement calculée : du premier mois couvert au mois de fin.
+  const nomMois = (v?: string) => MONTHS.find((m) => m.value === v)?.label ?? "";
+  const dispo = data?.moisDisponibles ?? [];
+  const periodLabel = `${nomMois(dispo[0] ?? "01")} - ${nomMois(data?.month ?? moisFin)} ${year}`;
+  // Mois et années proposés : ceux du reporting importé.
+  const moisChoisissables = MONTHS.filter((m) => !dispo.length || dispo.includes(m.value));
+  const annees = (data?.availableYears ?? [parseInt(year, 10)]).map(String);
+  const indexAnnee = annees.indexOf(year);
+  // Comparaison N-1 seulement si N-1 a un reporting.
+  const n1Dispo = data?.anneeN1Disponible !== false;
 
   const filtres = (
     <div className="flex flex-wrap items-center gap-3">
@@ -217,17 +240,20 @@ export default function ClientTresorerieTab({
         <span className="text-xs text-[#335890]">Année :</span>
         <span className="font-semibold text-[#00122E]">{year}</span>
         <div className="flex gap-1 ml-1">
+          {/* Années d'un reporting importé uniquement (liste décroissante). */}
           <button
             title="Année précédente"
-            onClick={() => setYear(String(parseInt(year, 10) - 1))}
-            className="text-[#94A3B8] hover:text-[#0077C3]"
+            onClick={() => setYear(annees[indexAnnee + 1])}
+            disabled={indexAnnee < 0 || indexAnnee >= annees.length - 1}
+            className="text-[#94A3B8] hover:text-[#0077C3] disabled:opacity-30"
           >
             <ChevronLeft className="w-4 h-4" />
           </button>
           <button
             title="Année suivante"
-            onClick={() => setYear(String(parseInt(year, 10) + 1))}
-            className="text-[#94A3B8] hover:text-[#0077C3]"
+            onClick={() => setYear(annees[indexAnnee - 1])}
+            disabled={indexAnnee <= 0}
+            className="text-[#94A3B8] hover:text-[#0077C3] disabled:opacity-30"
           >
             <ChevronRight className="w-4 h-4" />
           </button>
@@ -263,7 +289,7 @@ export default function ClientTresorerieTab({
               <SelectValue placeholder="Mois" />
             </SelectTrigger>
             <SelectContent>
-              {MONTHS.map((m) => (
+              {moisChoisissables.map((m) => (
                 <SelectItem key={m.value} value={m.value}>
                   {m.label}
                 </SelectItem>
@@ -311,7 +337,8 @@ export default function ClientTresorerieTab({
           valeur: v.valeurN,
           valeurN1: v.valeurN1,
           labelN1: data.yearN1,
-          variation: v.variation,
+          n1Indisponible: !n1Dispo,
+          variation: n1Dispo ? v.variation : undefined,
         },
       ];
     }),
@@ -455,6 +482,7 @@ export default function ClientTresorerieTab({
                       </th>
                       <th className="text-right py-2 font-medium text-muted-foreground">
                         {data.yearN1}
+                        {!n1Dispo && <span className="font-normal"> (non disponible)</span>}
                       </th>
                       <th className="text-right py-2 font-medium text-muted-foreground">
                         Variation
@@ -484,10 +512,10 @@ export default function ClientTresorerieTab({
                           {formatCompactOnly(c.montantN)}
                         </td>
                         <td className="text-right py-2.5 text-muted-foreground">
-                          {formatCompactOnly(c.montantN1)}
+                          {n1Dispo ? formatCompactOnly(c.montantN1) : "—"}
                         </td>
                         <td className="text-right py-2.5">
-                          <VariationBadge value={c.variation} />
+                          {n1Dispo && <VariationBadge value={c.variation} />}
                         </td>
                       </tr>
                     ))}
@@ -502,16 +530,18 @@ export default function ClientTresorerieTab({
                         {formatCompactOnly(totalN)}
                       </td>
                       <td className="text-right py-2.5 text-muted-foreground">
-                        {formatCompactOnly(totalN1)}
+                        {n1Dispo ? formatCompactOnly(totalN1) : "—"}
                       </td>
                       <td className="text-right py-2.5">
-                        <VariationBadge
-                          value={
-                            totalN1 !== 0
-                              ? ((totalN - totalN1) / Math.abs(totalN1)) * 100
-                              : Math.sign(totalN) * 100
-                          }
-                        />
+                        {n1Dispo && (
+                          <VariationBadge
+                            value={
+                              totalN1 !== 0
+                                ? ((totalN - totalN1) / Math.abs(totalN1)) * 100
+                                : Math.sign(totalN) * 100
+                            }
+                          />
+                        )}
                       </td>
                     </tr>
                   </tbody>

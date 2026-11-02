@@ -609,6 +609,14 @@ débiteur de 1 : −1 dans le tableau comme dans « Autres Trésorerie Passif »
 La ligne **Total Trésorerie** reprend l'indicateur : comptes d'actif moins
 comptes « en moins ».
 
+### Filtres et fenêtre
+
+Mode toujours **Cumulé** : janvier → mois choisi, ou → dernier mois importé en
+granularité Année. Années et mois limités au reporting importé ; une année
+sans import devient la plus récente et le filtre de l'écran s'y aligne (§4).
+Exercice d'un lot = année de début de sa période. Sans reporting en N-1, la
+colonne et la ligne N-1 affichent « non disponible », sans variation.
+
 ### Trésorerie de la Synthèse
 
 L'indicateur « Trésorerie » et la courbe « Évolution de la Trésorerie » de la
@@ -737,7 +745,16 @@ Vue dédiée au **passif circulant**.
 | Dettes fiscales | `DK3` |
 | Dettes HAO | `DH` |
 
-Contient le tableau **Analyse des Dettes par Type — Top 10**.
+Contient le tableau **Analyse des Dettes par Type — Top 10** (solde de chaque
+rubrique ; ligne « Total Top 10 » = somme des parts).
+
+**Encours** : `Σ(crédit − débit)` par rubrique, de janvier à la fin du mois
+choisi (ou du dernier mois importé en granularité Année), à-nouveaux compris :
+un à-nouveau daté du 31/12 précédent compte en janvier. Mode toujours Cumulé ;
+années et mois limités au reporting importé (§4). Un grand livre sans
+à-nouveaux ne donne que les mouvements de l'exercice. Le KPI « Dettes
+fournisseurs » porte sur toute la rubrique `DJ` (vue bilan), l'exception E2
+(408/409) ne concerne que le Règlement Fournisseurs.
 
 ---
 
@@ -1250,16 +1267,19 @@ Onglet Trésorerie : indicateurs calculés par rubrique et détail par compte, N
 
 | Paramètre | Type | Défaut | Effet |
 |---|---|---|---|
-| `year` | AAAA | exercice le plus récent | Exercice N. S'il n'est pas disponible, l'exercice le plus récent est pris |
+| `year` | AAAA | exercice le plus récent | Exercice N (année de début des périodes importées). S'il n'est pas disponible, l'exercice le plus récent est pris et renvoyé dans `yearN` |
 | `periodType` | `ytd` ou `ytd-day` ou `year` ou `month` | `ytd` | Fenêtre : janvier → `month` (ytd, ytd-day), janvier → décembre (year), ou le mois seul. Fenêtre identique sur N et N-1 |
-| `month` | MM | `12` | Mois de fin, ou mois seul |
+| `month` | MM | `12` | Mois de fin, ou mois seul ; un mois hors reporting devient le dernier mois couvert (renvoyé dans `month`). En `year`, la fenêtre s'arrête aussi à ce mois |
 
 ```
 {
   client: { id, name },
-  yearN, yearN1,         // nombres
+  yearN, yearN1,         // nombres — yearN : exercice réellement calculé
   availableYears,        // number[] décroissant
-  periodeLabel,          // "Janvier - mars", "Janvier - Décembre" ou "mars"
+  anneeN1Disponible,     // false : aucun reporting en N-1
+  moisDisponibles,       // "MM"[] couverts par le reporting de N
+  month,                 // "MM" : mois de fin réellement calculé
+  periodeLabel,          // "Janvier - Mars" (premier mois couvert → fin) ou "Mars"
   manualIncluded,        // false si les saisies sont exclues
   kpis: {
     total, caisse, banque, regies, etablissementsFinanciers, instrumentsTresorerie,
@@ -1269,8 +1289,10 @@ Onglet Trésorerie : indicateurs calculés par rubrique et détail par compte, N
       // total = BSA + BSB − BSB1 + BSC + BSD − BSD1 + BSE − BSE1 + BSF + BSG − DRA − DRB − DRC − DQ
       // banque = BSB − BSB1 − DRA − DRB ; autresTresoreriePassif = DRC + DQ (montant positif)
   },
-  comptes: [{ compte, intituleCompte, montantN, montantN1, variation }]
-      // comptes des rubriques du Total Trésorerie ; montant = débit − crédit ; tri par |montantN| décroissant ; comptes nuls sur N et N-1 exclus
+  comptes: [{ compte, intituleCompte, montantN, montantN1, deduit, variation }]
+      // comptes des rubriques du Total Trésorerie, dans la convention des indicateurs : actif en débit − crédit,
+      // passif et dépréciations en crédit − débit (deduit = true, en moins du total) ;
+      // tri par |montantN| décroissant ; comptes nuls sur N et N-1 exclus
 }
 ```
 
@@ -1734,6 +1756,8 @@ ouvert par défaut, replié d'un clic sur son en-tête), séparateur, **Membres*
 | 29/10/2026 | Charges et rentabilité : colonne des valeurs à droite de la cascade **retirée** — montant (K) et pourcentage se lisent dans la barre ou dans l'infobulle ; la barre occupe la place libérée (§22). |
 | 02/11/2026 | Charges et rentabilité : pourcentage du CA **entre parenthèses** dans les barres et l'infobulle — « −11 766K (55,11 %) » (§22). |
 | 02/11/2026 | **Import d'une période avec le Grand Livre seul** : Plan comptable, Plan des tiers et Codes journaux deviennent facultatifs (écran de création, « Modifier » et fenêtre d'ajout). Airflow **contrôle le Grand Livre avant toute écriture** : un compte (après conversion PCG → SYSCOHADA), un code journal (RAN compris) ou un n° de tiers absent des référentiels — en base ou dans les fichiers du même import — fait échouer l'import sans rien enregistrer, avec le nombre d'éléments manquants et les 20 premiers par catégorie ; on complète les référentiels puis « Relancer le traitement ». Un nouvel envoi remplace entièrement les fichiers de la période ; l'échec du contrôle n'efface pas les données d'une période déjà importée. « Modifier » corrigé (il attendait encore les 5 anciens fichiers) et soumis au droit Charger des fichiers (§3, §25.18 à §25.20). |
+| 02/11/2026 | **Audit des filtres — Trésorerie** : l'API remplaçait en silence une année sans reporting par la plus récente pendant que l'écran affichait l'année demandée (« 2026 » au-dessus des chiffres 2025) : le filtre se cale désormais sur l'année calculée ; flèches d'année bornées aux années importées, mois limités à l'import, fenêtre « Année » arrêtée au dernier mois importé ; exercice d'un lot = année de début de période (comme les autres onglets) ; N-1 sans reporting : « non disponible », sans variation (cartes et tableau) (§11, §25.4 ; audit §7.5). |
+| 02/11/2026 | **Audit des filtres — Dettes court terme** : flèches d'année limitées aux années d'un reporting importé (elles allaient à n'importe quelle année), mois limités à l'import, calage du filtre sur la période calculée, libellé arrêté au dernier mois importé (« Janvier - Décembre » codé en dur), sous-titre « encours à fin <mois> » ; à-nouveaux de décembre comptés en janvier (API partagée avec Règlement Fournisseurs) (§14 ; audit §7.4). |
 | 02/11/2026 | **Audit des filtres — Règlement Fournisseurs** : années de l'onglet = reporting importé (liste codée en dur auparavant), mois limités à l'import, calage du filtre sur la période calculée, fenêtre « Année » arrêtée au dernier mois importé ; à-nouveau du 31/12 précédent compté en janvier (doublait décembre N-1) ; graphique « Dettes Fournisseurs TTC vs Décaissement Fournisseurs TTC » sur les définitions des KPI (il montrait les crédits / débits bruts de DJ, 408/409 et tous journaux compris) ; Top 10 fournisseurs sur ces mêmes définitions, fournisseurs sans intitulé inclus, un seul rang par fournisseur, % = part de toutes les dettes fournisseurs ; ligne « Total Top 10 » = somme des parts (§13, §25.3 ; audit §7.3). |
 | 02/11/2026 | **Audit des filtres — Recouvrement Clients** : l'onglet utilise désormais les **filtres partagés** (année, mois, granularité ; mode toujours Cumulé) au lieu de ses propres sélecteurs (année et mois courants par défaut, liste d'années codée en dur) ; années et mois limités au reporting importé, fenêtre « Année » arrêtée au dernier mois importé ; à-nouveau daté du 31/12 précédent compté en janvier (lu sur tous les lots, il doublait décembre N-1 et manquait en N) ; ligne « Total Top 10 » : part réelle du Top 10 au lieu de « 100 % » (§12, §25.2 ; audit §7.2). |
 | 02/11/2026 | **Audit des filtres — Synthèse Financière** (et Chiffre d'affaires / Résultats, même API) : années et mois limités au reporting importé (plus d'année ni de mois sans import ; l'écran se cale sur l'année la plus récente et le dernier mois couvert, la fenêtre « Année » s'arrête au dernier mois importé, même fenêtre pour N-1) ; Cumulé + Mois = janvier → mois pour les KPI (ils ne portaient que sur le mois) ; Trésorerie toujours un solde de janvier à la fin de la période (le périodique mensuel n'en donnait que le mouvement) ; courbes cumulées en Cumulé + Mois parties du cumul janvier → mois précédent (Charges vs Produits, subventions) ; à-nouveaux datés du 31/12 précédent comptés en janvier (Synthèse et Trésorerie) ; N-1 sans reporting affiché « non disponible », sans variation (§4, §25.1 ; audit §7). |

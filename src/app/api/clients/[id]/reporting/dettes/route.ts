@@ -511,7 +511,7 @@ export async function GET(
     // Début de fenêtre dans la même année ; un seul mois demandé (vue
     // journalière) reste un seul mois après correction.
     if (startYear !== undefined) startYear = endYear;
-    if (startMonth !== undefined && startMonth === moisDemandeFin) startMonth = endMonth;
+    if (granularityParam === "day" && startMonth === moisDemandeFin) startMonth = endMonth;
     // + batchs des lignes saisies manuellement (intégrées au reporting), sauf si
     // le client a activé l'exclusion des saisies.
     const manualYears = [...new Set([...allPeriods.map((p) => p.year), endYear])];
