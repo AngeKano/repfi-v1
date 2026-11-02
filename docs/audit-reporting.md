@@ -289,7 +289,18 @@ de décembre comptés en janvier (`YM_SQL`).
 L'onglet Ratios bilantiels et le DSO du Recouvrement profitent des corrections
 de l'API (DF1, DF2, DF5) ; l'écran des Ratios reste à aligner (audit suivant).
 
-**Reste à traiter dans les audits suivants** : les autres écrans et API (écran des Ratios, États financiers,
+### 7.7 Ratios bilantiels (écran ; API `/reporting/ratios` corrigée en 7.6)
+
+| # | Faille constatée | Effet visible | Correction |
+|---|---|---|---|
+| RB1 | Année remplacée en silence par l'API, l'écran gardant l'année demandée ; flèches « année ± 1 » ; 12 mois proposés | Filtre sur une année, ratios d'une autre | Calage du filtre sur `yearN` / `month` ; années et mois du reporting importé |
+| RB2 | Libellé « Janvier - Décembre » et sous-titre « encours cumulés au janvier - … » | Fenêtre annoncée différente de la fenêtre calculée | Libellé arrêté au dernier mois importé ; « encours à fin <mois> <année> » |
+| RB3 | Courbes N-1 (FRNG, BFR, et DSO du Recouvrement) tracées même sans reporting N-1 | Courbe plate à 0 comparée à N | Courbe et légende N-1 masquées ; « (N-1 non disponible) » |
+
+Vérifié sans écart : le KPI est la valeur du dernier point de la courbe (même
+série, fin du mois de fenêtre).
+
+**Reste à traiter dans les audits suivants** : les autres écrans et API (États financiers,
 Charges et rentabilité, QC) filtrent encore la période par
 `concat(substring(date, 7, 4), substring(date, 4, 2))` et ont chacune leur
 propre gestion de l'année et du mois ; à aligner sur `src/lib/reporting/periode.ts`
@@ -335,6 +346,7 @@ regroupé par numéro de mois.
 | 29/10/2026 | Résultats | Charges et rentabilité : colonne des valeurs à droite de la cascade **retirée** — montant (K) et pourcentage se lisent dans la barre ou dans l'infobulle ; la barre occupe la place libérée (§22). |
 | 02/11/2026 | Résultats | Charges et rentabilité : pourcentage du CA **entre parenthèses** dans les barres et l'infobulle — « −11 766K (55,11 %) » (§22). |
 | 02/11/2026 | Import | **Import d'une période avec le Grand Livre seul** : Plan comptable, Plan des tiers et Codes journaux deviennent facultatifs (écran de création, « Modifier » et fenêtre d'ajout). Airflow **contrôle le Grand Livre avant toute écriture** : un compte (après conversion PCG → SYSCOHADA), un code journal (RAN compris) ou un n° de tiers absent des référentiels — en base ou dans les fichiers du même import — fait échouer l'import sans rien enregistrer, avec le nombre d'éléments manquants et les 20 premiers par catégorie ; on complète les référentiels puis « Relancer le traitement ». Un nouvel envoi remplace entièrement les fichiers de la période ; l'échec du contrôle n'efface pas les données d'une période déjà importée. « Modifier » corrigé (il attendait encore les 5 anciens fichiers) et soumis au droit Charger des fichiers (§3, §25.18 à §25.20). |
+| 02/11/2026 | Filtres | **Audit des filtres — Ratios bilantiels** : écran aligné sur la période calculée (l'API remplaçait en silence une année sans reporting), flèches et mois limités à l'import, libellé et sous-titre « encours à fin <mois> » ; courbes et légendes N-1 (FRNG, BFR, DSO du Recouvrement) masquées sans reporting N-1, au lieu d'une courbe plate à 0 ; corrections de l'API (à-nouveaux, variation signée) héritées de l'audit Dettes Financières (§16 ; audit §7.7). |
 | 02/11/2026 | Filtres | **Audit des filtres — Dettes Financières** (API des ratios, partagée avec Ratios bilantiels et le DSO du Recouvrement) : à-nouveau daté du 31/12 précédent désormais compté dans les encours (il était exclu de la fenêtre janvier → décembre : soldes d'ouverture manquants pour FRNG, BFR, dettes financières, DSO) ; créances d'ouverture du DSO lues sur les journaux d'à-nouveaux (et plus seulement à la date du 01/01) ; année sans reporting : le filtre se cale sur l'année calculée (l'API la remplaçait en silence) ; flèches et mois limités à l'import, fenêtre « Année » arrêtée au dernier mois importé ; variation signée quand N-1 = 0 ; N-1 sans reporting « non disponible » (§15, §16, §25.5 ; audit §7.6). |
 | 02/11/2026 | Filtres | **Audit des filtres — Trésorerie** : l'API remplaçait en silence une année sans reporting par la plus récente pendant que l'écran affichait l'année demandée (« 2026 » au-dessus des chiffres 2025) : le filtre se cale désormais sur l'année calculée ; flèches d'année bornées aux années importées, mois limités à l'import, fenêtre « Année » arrêtée au dernier mois importé ; exercice d'un lot = année de début de période (comme les autres onglets) ; N-1 sans reporting : « non disponible », sans variation (cartes et tableau) (§11, §25.4 ; audit §7.5). |
 | 02/11/2026 | Filtres | **Audit des filtres — Dettes court terme** : flèches d'année limitées aux années d'un reporting importé (elles allaient à n'importe quelle année), mois limités à l'import, calage du filtre sur la période calculée, libellé arrêté au dernier mois importé (« Janvier - Décembre » codé en dur), sous-titre « encours à fin <mois> » ; à-nouveaux de décembre comptés en janvier (API partagée avec Règlement Fournisseurs) (§14 ; audit §7.4). |
