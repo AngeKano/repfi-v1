@@ -4,9 +4,10 @@
 // instruments de trésorerie, monnaie électronique, accréditifs) et trésorerie
 // passif (DRA, DRB, DRC, DQ : concours bancaires), comparées à l'exercice N-1.
 //
-// Conventions de solde (soldeRubriqueSql) : actif en débit − crédit,
-// dépréciations (suffixe « 1 ») et passif en crédit − débit, pour pouvoir être
-// retranchés dans les formules.
+// Conventions de solde (soldeRubriqueSql, soldeCompteSql) : actif en
+// débit − crédit, dépréciations (suffixe « 1 ») et passif en crédit − débit,
+// pour pouvoir être retranchés dans les formules. Le détail par compte suit la
+// même convention : un indicateur vaut la somme de ses comptes.
 // ============================================================================
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
@@ -22,6 +23,8 @@ import {
   RUBRIQUES_TRESORERIE,
   RUBRIQUES_TOTAL_TRESORERIE,
   soldeRubriqueSql,
+  soldeCompteSql,
+  ligneDeduiteSql,
   valeurTresorerie,
 } from "@/lib/reporting/tresorerie";
 
@@ -39,8 +42,9 @@ const MOIS = [
   "juillet", "août", "septembre", "octobre", "novembre", "décembre",
 ];
 
+// N-1 nul : ±100 % selon le signe de N (de 0 à −1 est une baisse).
 const variation = (n: number, n1: number): number =>
-  n1 !== 0 ? ((n - n1) / Math.abs(n1)) * 100 : n !== 0 ? 100 : 0;
+  n1 !== 0 ? ((n - n1) / Math.abs(n1)) * 100 : Math.sign(n) * 100;
 
 interface RubriqueRow {
   ref: string;
@@ -50,6 +54,8 @@ interface CompteRow {
   compte: string;
   intitule: string;
   solde: string;
+  /** 1 si le compte est lu en crédit − débit (passif ou dépréciation). */
+  deduit: number | string;
 }
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -115,7 +121,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       const batchIds = [...(batchsParAnnee.get(y) ?? [])];
       if (!client.excludeManualEntries) batchIds.push(manualBatchId(id, y));
       const rubriques: Record<string, number> = {};
-      const comptes = new Map<string, { intitule: string; solde: number }>();
+      const comptes = new Map<string, { intitule: string; solde: number; deduit: boolean }>();
       if (batchIds.length === 0) return { rubriques, comptes };
 
       const { start, end } = fenetre(y);
@@ -148,7 +154,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
             query: `
               SELECT compte,
                      anyIf(intitule_compte, intitule_compte != '') AS intitule,
-                     sum(debit - credit) AS solde
+                     ${soldeCompteSql(REF_EXPR, estAmortSql(REF_EXPR))} AS solde,
+                     max(${ligneDeduiteSql(REF_EXPR, estAmortSql(REF_EXPR))}) AS deduit
               FROM ${dbName}.grand_livre
               WHERE batch_id IN ({batchIds:Array(String)})
                 AND ${REF_EXPR} IN ({rubriques:Array(String)})
@@ -167,6 +174,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
           comptes.set(row.compte, {
             intitule: intituleCompte(plan, row.compte, row.intitule),
             solde: parseFloat(row.solde) || 0,
+            deduit: Number(row.deduit) === 1,
           });
       } catch (e) {
         console.error(`[tresorerie] ClickHouse indisponible (exercice ${y}):`, e);
@@ -186,6 +194,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 
     // Détail par compte : union des deux exercices, du plus gros solde au plus
     // petit (un compte soldé à zéro sur les deux exercices est écarté).
+    // `deduit` : compte de passif ou de dépréciation, en moins du Total.
     const tousComptes = new Set([...n.comptes.keys(), ...n1.comptes.keys()]);
     const comptes = [...tousComptes]
       .map((compte) => {
@@ -198,6 +207,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
           intituleCompte: a?.intitule || b?.intitule || intituleCompte(plan, compte, ""),
           montantN,
           montantN1,
+          deduit: !!(a?.deduit || b?.deduit),
           variation: variation(montantN, montantN1),
         };
       })
