@@ -47,6 +47,11 @@ export function tableColumns(
   return cols;
 }
 
+/** Oublie les colonnes mémorisées d'une table (après un ALTER … ADD COLUMN). */
+export function oublierColonnes(dbName: string, table: string): void {
+  cache.delete(`${dbName}.${table}`);
+}
+
 /** Colonnes de `grand_livre`. */
 export function grandLivreColumns(
   client: ClickHouseClient,

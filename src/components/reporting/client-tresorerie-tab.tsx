@@ -58,6 +58,7 @@ import {
   RUBRIQUES_TOTAL_TRESORERIE,
   formuleTresorerie,
 } from "@/lib/reporting/tresorerie";
+import { Graphe, MenuGraphes, useGraphesMasques, type GrapheDef } from "./graphes-masquables";
 
 type PeriodType = "year" | "month" | "ytd" | "ytd-day";
 
@@ -150,6 +151,11 @@ function LegendLine({ color, dashed }: { color: string; dashed?: boolean }) {
   );
 }
 
+// Graphiques masquables de l'onglet (menu « Graphiques »).
+const GRAPHES: GrapheDef[] = [
+  { id: "comptes", label: "Trésorerie par comptes" },
+];
+
 export default function ClientTresorerieTab({
   clientId,
   year,
@@ -162,6 +168,8 @@ export default function ClientTresorerieTab({
 }: ClientTresorerieTabProps) {
   const [data, setData] = useState<TresorerieData | null>(null);
   const [loading, setLoading] = useState(true);
+  // Graphiques masqués de l'onglet, mémorisés par client.
+  const graphes = useGraphesMasques(`tresorerie-${clientId}`, GRAPHES);
 
   // Les soldes de trésorerie sont des encours : toujours cumulés depuis
   // janvier, jusqu'au mois sélectionné (ou décembre en granularité annuelle).
@@ -328,164 +336,171 @@ export default function ClientTresorerieTab({
         </p>
       </div>
 
-      <KpiGrid storageKey={`tresorerie-${clientId}`} defs={KPI_DEFS} values={kpiValues} />
+      <KpiGrid
+        storageKey={`tresorerie-${clientId}`}
+        defs={KPI_DEFS}
+        values={kpiValues}
+        actions={<MenuGraphes etat={graphes} />}
+      />
 
-      {/* Histogramme horizontal — détail par compte de trésorerie. */}
-      {data.comptes.length > 0 && (
-        <Card>
-          <CardHeader className="flex flex-row items-start justify-between gap-4">
-            <div>
-              <CardTitle>Trésorerie par comptes</CardTitle>
-              <CardDescription>
-                Soldes des comptes des rubriques du Total Trésorerie (
-                {RUBRIQUES_TOTAL_TRESORERIE.join(", ")}) — concours bancaires et dépréciations
-                en négatif — {data.yearN} vs {data.yearN1}
-              </CardDescription>
-            </div>
-            <div className="flex flex-col gap-1 shrink-0">
-              <span className="text-base font-semibold text-[#335890]">Légende</span>
-              <div className="flex items-center gap-3">
-                <LegendLine color="#2463eb" />
-                <span className="text-base font-medium" style={{ color: "#2463eb" }}>
-                  {data.yearN}
-                </span>
+      <Graphe etat={graphes} id="comptes">
+        {/* Histogramme horizontal — détail par compte de trésorerie. */}
+        {data.comptes.length > 0 && (
+          <Card>
+            <CardHeader className="flex flex-row items-start justify-between gap-4">
+              <div>
+                <CardTitle>Trésorerie par comptes</CardTitle>
+                <CardDescription>
+                  Soldes des comptes des rubriques du Total Trésorerie (
+                  {RUBRIQUES_TOTAL_TRESORERIE.join(", ")}) — concours bancaires et dépréciations
+                  en négatif — {data.yearN} vs {data.yearN1}
+                </CardDescription>
               </div>
-              <div className="flex items-center gap-3">
-                <LegendLine color="#81a5f3" />
-                <span className="text-base font-medium" style={{ color: "#81a5f3" }}>
-                  {data.yearN1}
-                </span>
+              <div className="flex flex-col gap-1 shrink-0">
+                <span className="text-base font-semibold text-[#335890]">Légende</span>
+                <div className="flex items-center gap-3">
+                  <LegendLine color="#2463eb" />
+                  <span className="text-base font-medium" style={{ color: "#2463eb" }}>
+                    {data.yearN}
+                  </span>
+                </div>
+                <div className="flex items-center gap-3">
+                  <LegendLine color="#81a5f3" />
+                  <span className="text-base font-medium" style={{ color: "#81a5f3" }}>
+                    {data.yearN1}
+                  </span>
+                </div>
               </div>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <ChartContainer
-              config={chartConfigTresorerie}
-              className="w-full"
-              style={{ height: `${chartHeight}px` }}
-            >
-              <BarChart
-                data={comptesChart}
-                layout="vertical"
-                margin={{ top: 10, right: 40, left: 10, bottom: 10 }}
-                barCategoryGap="30%"
+            </CardHeader>
+            <CardContent>
+              <ChartContainer
+                config={chartConfigTresorerie}
+                className="w-full"
+                style={{ height: `${chartHeight}px` }}
               >
-                <CartesianGrid strokeDasharray="3 3" horizontal={false} />
-                <XAxis
-                  type="number"
-                  tickLine={false}
-                  axisLine={false}
-                  fontSize={12}
-                  tickFormatter={(value) => {
-                    const absVal = Math.abs(value);
-                    if (absVal >= 1000000) return `${(value / 1000000).toFixed(0)}M`;
-                    if (absVal >= 1000) return `${(value / 1000).toFixed(0)}K`;
-                    return value.toString();
-                  }}
-                />
-                <YAxis
-                  type="category"
-                  dataKey="libelleAxe"
-                  tickLine={false}
-                  axisLine={false}
-                  fontSize={11}
-                  width={180}
-                  tick={{ fill: "hsl(var(--foreground))" }}
-                />
-                <ChartTooltip
-                  content={
-                    <ChartTooltipContent
-                      formatter={(value, name) => [
-                        formatCompactOnly(value as number),
-                        name === `${data.yearN1}`
-                          ? `Solde ${data.yearN1}`
-                          : `Solde ${data.yearN}`,
-                      ]}
-                    />
-                  }
-                />
-                <Bar
-                  dataKey="montantN1"
-                  name={`${data.yearN1}`}
-                  fill="hsl(221, 83%, 73%)"
-                  barSize={18}
-                  radius={[0, 4, 4, 0]}
-                />
-                <Bar
-                  dataKey="montantN"
-                  name={`${data.yearN}`}
-                  fill="hsl(221, 83%, 53%)"
-                  barSize={18}
-                  radius={[0, 4, 4, 0]}
-                />
-              </BarChart>
-            </ChartContainer>
+                <BarChart
+                  data={comptesChart}
+                  layout="vertical"
+                  margin={{ top: 10, right: 40, left: 10, bottom: 10 }}
+                  barCategoryGap="30%"
+                >
+                  <CartesianGrid strokeDasharray="3 3" horizontal={false} />
+                  <XAxis
+                    type="number"
+                    tickLine={false}
+                    axisLine={false}
+                    fontSize={12}
+                    tickFormatter={(value) => {
+                      const absVal = Math.abs(value);
+                      if (absVal >= 1000000) return `${(value / 1000000).toFixed(0)}M`;
+                      if (absVal >= 1000) return `${(value / 1000).toFixed(0)}K`;
+                      return value.toString();
+                    }}
+                  />
+                  <YAxis
+                    type="category"
+                    dataKey="libelleAxe"
+                    tickLine={false}
+                    axisLine={false}
+                    fontSize={11}
+                    width={180}
+                    tick={{ fill: "hsl(var(--foreground))" }}
+                  />
+                  <ChartTooltip
+                    content={
+                      <ChartTooltipContent
+                        formatter={(value, name) => [
+                          formatCompactOnly(value as number),
+                          name === `${data.yearN1}`
+                            ? `Solde ${data.yearN1}`
+                            : `Solde ${data.yearN}`,
+                        ]}
+                      />
+                    }
+                  />
+                  <Bar
+                    dataKey="montantN1"
+                    name={`${data.yearN1}`}
+                    fill="hsl(221, 83%, 73%)"
+                    barSize={18}
+                    radius={[0, 4, 4, 0]}
+                  />
+                  <Bar
+                    dataKey="montantN"
+                    name={`${data.yearN}`}
+                    fill="hsl(221, 83%, 53%)"
+                    barSize={18}
+                    radius={[0, 4, 4, 0]}
+                  />
+                </BarChart>
+              </ChartContainer>
 
-            {/* Tableau récapitulatif sous le graphique */}
-            <div className="mt-6 overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b">
-                    <th className="text-left py-2 font-medium text-muted-foreground">Compte</th>
-                    <th className="text-right py-2 font-medium text-muted-foreground">
-                      {data.yearN}
-                    </th>
-                    <th className="text-right py-2 font-medium text-muted-foreground">
-                      {data.yearN1}
-                    </th>
-                    <th className="text-right py-2 font-medium text-muted-foreground">
-                      Variation
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {data.comptes.map((c) => (
-                    <tr key={c.compte} className="border-b last:border-0 hover:bg-muted/50">
-                      <td className="py-2.5">
-                        <div className="flex items-center gap-2">
-                          <span className="font-mono text-xs text-muted-foreground">
-                            {c.compte}
-                          </span>
-                          <span className="font-medium">{c.intituleCompte}</span>
-                        </div>
-                      </td>
-                      <td className="text-right py-2.5 font-semibold">
-                        {formatCompactOnly(c.montantN)}
+              {/* Tableau récapitulatif sous le graphique */}
+              <div className="mt-6 overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b">
+                      <th className="text-left py-2 font-medium text-muted-foreground">Compte</th>
+                      <th className="text-right py-2 font-medium text-muted-foreground">
+                        {data.yearN}
+                      </th>
+                      <th className="text-right py-2 font-medium text-muted-foreground">
+                        {data.yearN1}
+                      </th>
+                      <th className="text-right py-2 font-medium text-muted-foreground">
+                        Variation
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {data.comptes.map((c) => (
+                      <tr key={c.compte} className="border-b last:border-0 hover:bg-muted/50">
+                        <td className="py-2.5">
+                          <div className="flex items-center gap-2">
+                            <span className="font-mono text-xs text-muted-foreground">
+                              {c.compte}
+                            </span>
+                            <span className="font-medium">{c.intituleCompte}</span>
+                          </div>
+                        </td>
+                        <td className="text-right py-2.5 font-semibold">
+                          {formatCompactOnly(c.montantN)}
+                        </td>
+                        <td className="text-right py-2.5 text-muted-foreground">
+                          {formatCompactOnly(c.montantN1)}
+                        </td>
+                        <td className="text-right py-2.5">
+                          <VariationBadge value={c.variation} />
+                        </td>
+                      </tr>
+                    ))}
+                    <tr className="border-t-2 font-bold">
+                      <td className="py-2.5">Total Trésorerie</td>
+                      <td className="text-right py-2.5 text-blue-600">
+                        {formatCompactOnly(totalN)}
                       </td>
                       <td className="text-right py-2.5 text-muted-foreground">
-                        {formatCompactOnly(c.montantN1)}
+                        {formatCompactOnly(totalN1)}
                       </td>
                       <td className="text-right py-2.5">
-                        <VariationBadge value={c.variation} />
+                        <VariationBadge
+                          value={
+                            totalN1 !== 0
+                              ? ((totalN - totalN1) / Math.abs(totalN1)) * 100
+                              : totalN !== 0
+                                ? 100
+                                : 0
+                          }
+                        />
                       </td>
                     </tr>
-                  ))}
-                  <tr className="border-t-2 font-bold">
-                    <td className="py-2.5">Total Trésorerie</td>
-                    <td className="text-right py-2.5 text-blue-600">
-                      {formatCompactOnly(totalN)}
-                    </td>
-                    <td className="text-right py-2.5 text-muted-foreground">
-                      {formatCompactOnly(totalN1)}
-                    </td>
-                    <td className="text-right py-2.5">
-                      <VariationBadge
-                        value={
-                          totalN1 !== 0
-                            ? ((totalN - totalN1) / Math.abs(totalN1)) * 100
-                            : totalN !== 0
-                              ? 100
-                              : 0
-                        }
-                      />
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </CardContent>
-        </Card>
-      )}
+                  </tbody>
+                </table>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+      </Graphe>
     </div>
   );
 }

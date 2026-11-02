@@ -28,7 +28,7 @@
 // type, longueur de racine, sens du solde).
 // ============================================================================
 import type { ClickHouseClient } from "@clickhouse/client";
-import { tableColumns, bilanRefExpr } from "./schema";
+import { tableColumns, bilanRefExpr, oublierColonnes } from "./schema";
 import type { ColonneDimension, TableReferentiel } from "@/lib/comptable/dimensions";
 import { colonneCle, colonnesCles } from "@/lib/comptable/dimensions";
 import { RUBRIQUES_TIERS } from "@/lib/comptable/saisie-refs";
@@ -96,6 +96,20 @@ async function lireSchema(
     candidats.set(c.nom, [...new Set(presents)]);
   }
   const schema: Schema = { reelles, candidats, derivees: new Map(), source: `${dbName}.${def.table} FINAL` };
+
+  // Valeur d'origine figée : la colonne quand elle est renseignée, sinon la
+  // valeur actuelle de sa source (table pas encore migrée par Airflow : la
+  // ligne n'a alors jamais été modifiée depuis l'ajout de la colonne).
+  for (const c of def.colonnes) {
+    if (c.calculee !== "origine" || !c.origineDe) continue;
+    const source = expression(schema, c.origineDe);
+    if (!source) continue;
+    const propre = candidats.get(c.nom)?.[0];
+    schema.derivees.set(
+      c.nom,
+      propre ? `if(toString(${ident(propre)}) != '', toString(${ident(propre)}), ${source})` : source,
+    );
+  }
 
   const calculees = def.colonnes.filter((c) => c.calculee === "compteCentralisateur");
   if (calculees.length > 0 && reelles.length > 0) {
@@ -416,6 +430,26 @@ export interface ResultatModification {
 
 const texte = (v: unknown) => (v === null || v === undefined ? "" : String(v));
 
+/**
+ * Colonne réelle d'une valeur d'origine figée, créée si la table ne l'a pas
+ * encore (même définition qu'Airflow, plugins/clickhouse/ple.py).
+ */
+async function colonneOrigine(
+  client: ClickHouseClient,
+  dbName: string,
+  def: TableReferentiel,
+  schema: Schema,
+  c: ColonneDimension,
+): Promise<string> {
+  const existante = schema.candidats.get(c.nom)?.[0];
+  if (existante) return existante;
+  await client.command({
+    query: `ALTER TABLE ${dbName}.${def.table} ADD COLUMN IF NOT EXISTS ${ident(c.nom)} String DEFAULT ''`,
+  });
+  oublierColonnes(dbName, def.table);
+  return c.nom;
+}
+
 /** Valeur effective d'un champ dans une ligne lue avec SELECT * (noms réels). */
 function valeurEffective(schema: Schema, nom: string, ligne: Record<string, unknown>): string {
   for (const col of schema.candidats.get(nom) ?? []) {
@@ -477,6 +511,15 @@ export async function modifierDimension(
   const apres = Object.fromEntries(def.colonnes.map((c) => [c.nom, valeurEffective(schema, c.nom, nouvelle)]));
   const modifiee = def.colonnes.some((c) => avant[c.nom] !== apres[c.nom]);
   if (!modifiee) return { ligne: avant, modifiee: false, grandLivre: [] };
+
+  // Valeur d'origine figée : conservée telle quelle ; absente (ligne antérieure
+  // à la colonne), elle prend la valeur de sa source AVANT cette modification.
+  for (const c of def.colonnes) {
+    if (c.calculee !== "origine" || !c.origineDe) continue;
+    const col = await colonneOrigine(client, dbName, def, schema, c);
+    if (texte(nouvelle[col]) === "") nouvelle[col] = avant[c.origineDe] ?? "";
+    apres[c.nom] = texte(nouvelle[col]);
+  }
 
   await client.insert({
     table: `${dbName}.${def.table}`,
@@ -553,7 +596,14 @@ export async function ajouterDimension(
   // Chaque champ est écrit dans sa colonne de référence présente ; les
   // colonnes numériques reçoivent un nombre. updated_at prend now().
   const valeurs: Record<string, unknown> = {};
+  const origines: Record<string, string> = {};
   for (const c of def.colonnes) {
+    // Valeur d'origine : celle de sa source à la création, figée ensuite.
+    if (c.calculee === "origine" && c.origineDe) {
+      const col = await colonneOrigine(client, dbName, def, schema, c);
+      valeurs[col] = origines[c.nom] = ligne[c.origineDe] ?? "";
+      continue;
+    }
     const col = schema.candidats.get(c.nom)?.[0];
     if (!col) continue;
     const v = ligne[c.nom] ?? "";
@@ -565,7 +615,7 @@ export async function ajouterDimension(
     format: "JSONEachRow",
   });
 
-  const apres = Object.fromEntries(def.colonnes.map((c) => [c.nom, ligne[c.nom] ?? ""]));
+  const apres = Object.fromEntries(def.colonnes.map((c) => [c.nom, origines[c.nom] ?? ligne[c.nom] ?? ""]));
   const grandLivre = await reporterGrandLivre(
     client,
     dbName,

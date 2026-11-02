@@ -51,13 +51,17 @@ export interface ColonneDimension {
   /** Champ équivalent des écritures saisies (ManualLedgerEntry). */
   saisie?: "intituleCompte" | "intituleTiers" | "typeTiers";
   /**
-   * Colonne en LECTURE SEULE enrichie par une jointure : compte centralisateur
-   * d'un tiers, lu dans la table (compte_collectif) avec l'intitulé du plan
-   * comptable, et déduit du grand livre quand la table n'en porte pas.
-   * Recherchable, filtrable et triable ; jamais modifiable, ni saisie à
-   * l'ajout, ni exportée au format de dépôt.
+   * Colonne en LECTURE SEULE, recherchable, filtrable et triable ; jamais
+   * modifiable, ni saisie à l'ajout, ni exportée au format de dépôt.
+   *   - « compteCentralisateur » : compte centralisateur d'un tiers, lu dans
+   *     la table (compte_collectif) avec l'intitulé du plan comptable, et
+   *     déduit du grand livre quand la table n'en porte pas ;
+   *   - « origine » : valeur de la colonne `origineDe` à la CRÉATION de la
+   *     ligne, puis figée (ex. rubrique par défaut du mapping).
    */
-  calculee?: "compteCentralisateur";
+  calculee?: "compteCentralisateur" | "origine";
+  /** Colonne recopiée à la création de la ligne (calculee « origine »). */
+  origineDe?: string;
 
   // ---- Règles de saisie d'une nouvelle ligne ----
   /** Seules ces valeurs sont acceptées (liste déroulante). */
@@ -159,7 +163,9 @@ export const DIMENSIONS: DimensionDef[] = [
     note:
       "Une racine de compte est rattachée à la rubrique de la racine la plus longue qui " +
       "lui correspond. Après une modification, réappliquez le mapping pour reclasser les " +
-      "écritures déjà chargées.",
+      "écritures déjà chargées. Rubrique par défaut : rubrique attribuée à la création de " +
+      "la ligne (mapping par défaut SYSCOHADA, ou rubrique saisie à l'ajout) ; elle ne " +
+      "change jamais, même quand la rubrique est modifiée.",
     colonnes: [
       { nom: "racine", libelle: "Racine", cle: true },
       {
@@ -169,6 +175,14 @@ export const DIMENSIONS: DimensionDef[] = [
         requis: true,
         categorie: true,
         majuscules: true,
+      },
+      {
+        // Colonne Airflow : rubrique d'origine de la ligne, figée.
+        nom: "rubrique_defaut",
+        alias: ["rubrique_origine"],
+        libelle: "Rubrique par défaut",
+        calculee: "origine",
+        origineDe: "rubrique",
       },
       { nom: "type_rubrique", libelle: "Type", cle: true, choix: ["PL", "BILAN"] },
       {

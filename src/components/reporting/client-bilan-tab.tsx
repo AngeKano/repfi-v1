@@ -42,6 +42,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { Graphe, MenuGraphes, useGraphesMasques, type GrapheDef } from "./graphes-masquables";
 
 // ============================================================================
 // Onglet "Bilan" — Bilan d'activité périodique (rapport narratif)
@@ -252,6 +253,15 @@ function ChartLegend({
   );
 }
 
+// Graphiques masquables de l'onglet (menu « Graphiques »).
+const GRAPHES: GrapheDef[] = [
+  { id: "evolutionCa", label: "Évolution du Chiffre d'Affaires" },
+  { id: "tauxRecouvrement", label: "Évolution du Taux de Recouvrement" },
+  { id: "creancesEncaissements", label: "Créances Clients TTC vs Encaissements Clients TTC" },
+  { id: "tresorerie", label: "Évolution de la Trésorerie" },
+  { id: "tunnel", label: "Tunnel de rentabilité" },
+];
+
 export default function ClientBilanTab({
   clientId,
   year,
@@ -268,6 +278,8 @@ export default function ClientBilanTab({
     null,
   );
   const [loading, setLoading] = useState(true);
+  // Graphiques masqués de l'onglet, mémorisés par client.
+  const graphes = useGraphesMasques(`bilan-${clientId}`, GRAPHES);
 
   const yearOptions = useMemo(() => {
     const current = new Date().getFullYear();
@@ -458,6 +470,7 @@ export default function ClientBilanTab({
           <CalendarRange className="w-3.5 h-3.5 text-[#0077C3]" />
           <span>{getPeriodLabel()}</span>
         </div>
+        <MenuGraphes etat={graphes} className="ml-auto" />
       </div>
 
       <h1 className="text-3xl font-bold text-[#00122E]">
@@ -493,84 +506,86 @@ export default function ClientBilanTab({
               />{" "}
               par rapport à l&apos;année précédente.
             </p>
-            <p className="text-[#335890]">
-              Voici la tendance d&apos;évolution de votre chiffre d&apos;affaires
-              (cumulé) :
-            </p>
-            <Card>
-              <CardHeader className="flex flex-row items-start justify-between gap-4">
-                <div>
-                  <CardTitle>Évolution du Chiffre d&apos;Affaires</CardTitle>
-                  <CardDescription>
-                    Cumulé — {year} vs {yearN1}
-                  </CardDescription>
-                </div>
-                <ChartLegend
-                  labelN={`CA ${year}`}
-                  labelN1={`CA ${yearN1}`}
-                  colorN="hsl(221, 83%, 53%)"
-                  colorN1="hsl(221, 83%, 73%)"
-                />
-              </CardHeader>
-              <CardContent>
-                <ChartContainer
-                  config={{
-                    caN: { label: `CA ${year}`, color: "hsl(221, 83%, 53%)" },
-                    caN1: { label: `CA ${yearN1}`, color: "hsl(221, 83%, 73%)" },
-                  }}
-                  className="h-[350px] w-full"
-                >
-                  <LineChart
-                    data={caChart}
-                    margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
+            <Graphe etat={graphes} id="evolutionCa">
+              <p className="text-[#335890]">
+                Voici la tendance d&apos;évolution de votre chiffre d&apos;affaires
+                (cumulé) :
+              </p>
+              <Card>
+                <CardHeader className="flex flex-row items-start justify-between gap-4">
+                  <div>
+                    <CardTitle>Évolution du Chiffre d&apos;Affaires</CardTitle>
+                    <CardDescription>
+                      Cumulé — {year} vs {yearN1}
+                    </CardDescription>
+                  </div>
+                  <ChartLegend
+                    labelN={`CA ${year}`}
+                    labelN1={`CA ${yearN1}`}
+                    colorN="hsl(221, 83%, 53%)"
+                    colorN1="hsl(221, 83%, 73%)"
+                  />
+                </CardHeader>
+                <CardContent>
+                  <ChartContainer
+                    config={{
+                      caN: { label: `CA ${year}`, color: "hsl(221, 83%, 53%)" },
+                      caN1: { label: `CA ${yearN1}`, color: "hsl(221, 83%, 73%)" },
+                    }}
+                    className="h-[350px] w-full"
                   >
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                    <XAxis
-                      dataKey="label"
-                      tickLine={false}
-                      axisLine={false}
-                      fontSize={11}
-                      angle={-45}
-                      textAnchor="end"
-                      height={60}
-                    />
-                    <YAxis
-                      tickLine={false}
-                      axisLine={false}
-                      tickFormatter={(v) => fmtMillions(v as number)}
-                      fontSize={12}
-                    />
-                    <ChartTooltip
-                      content={
-                        <ChartTooltipContent
-                          formatter={(value, name) => [
-                            `${fmtK(value as number)} K`,
-                            name === "caN" ? `CA ${year}` : `CA ${yearN1}`,
-                          ]}
-                        />
-                      }
-                    />
-                    <Line
-                      type="monotone"
-                      dataKey="caN1"
-                      name="caN1"
-                      stroke="hsl(221, 83%, 73%)"
-                      strokeWidth={2}
-                      dot={{ r: 3 }}
-                      strokeDasharray="5 5"
-                    />
-                    <Line
-                      type="monotone"
-                      dataKey="caN"
-                      name="caN"
-                      stroke="hsl(221, 83%, 53%)"
-                      strokeWidth={2}
-                      dot={{ r: 4 }}
-                    />
-                  </LineChart>
-                </ChartContainer>
-              </CardContent>
-            </Card>
+                    <LineChart
+                      data={caChart}
+                      margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
+                    >
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                      <XAxis
+                        dataKey="label"
+                        tickLine={false}
+                        axisLine={false}
+                        fontSize={11}
+                        angle={-45}
+                        textAnchor="end"
+                        height={60}
+                      />
+                      <YAxis
+                        tickLine={false}
+                        axisLine={false}
+                        tickFormatter={(v) => fmtMillions(v as number)}
+                        fontSize={12}
+                      />
+                      <ChartTooltip
+                        content={
+                          <ChartTooltipContent
+                            formatter={(value, name) => [
+                              `${fmtK(value as number)} K`,
+                              name === "caN" ? `CA ${year}` : `CA ${yearN1}`,
+                            ]}
+                          />
+                        }
+                      />
+                      <Line
+                        type="monotone"
+                        dataKey="caN1"
+                        name="caN1"
+                        stroke="hsl(221, 83%, 73%)"
+                        strokeWidth={2}
+                        dot={{ r: 3 }}
+                        strokeDasharray="5 5"
+                      />
+                      <Line
+                        type="monotone"
+                        dataKey="caN"
+                        name="caN"
+                        stroke="hsl(221, 83%, 53%)"
+                        strokeWidth={2}
+                        dot={{ r: 4 }}
+                      />
+                    </LineChart>
+                  </ChartContainer>
+                </CardContent>
+              </Card>
+            </Graphe>
           </section>
 
           {/* ============================ 2. RECOUVREMENT ================== */}
@@ -585,184 +600,188 @@ export default function ClientBilanTab({
               l&apos;ensemble des factures et encaissements de l&apos;exercice (du
               1er janvier au mois sélectionné).
             </p>
-            <p className="text-[#335890]">
-              Voici la courbe d&apos;évolution de votre taux de recouvrement :
-            </p>
-            <Card>
-              <CardHeader className="flex flex-row items-start justify-between gap-4">
-                <div>
-                  <CardTitle>Évolution du Taux de Recouvrement</CardTitle>
-                  <CardDescription>
-                    (Encaissements Clients TTC / Créances Clients TTC) × 100
-                  </CardDescription>
-                </div>
-                <ChartLegend
-                  labelN="Taux cumulé"
-                  labelN1="Taux périodique"
-                  colorN="hsl(262, 83%, 58%)"
-                  colorN1="hsl(262, 83%, 78%)"
-                />
-              </CardHeader>
-              <CardContent>
-                <ChartContainer
-                  config={{
-                    tauxRecouvrementCumule: {
-                      label: "Taux cumulé",
-                      color: "hsl(262, 83%, 58%)",
-                    },
-                    tauxRecouvrement: {
-                      label: "Taux périodique",
-                      color: "hsl(262, 83%, 78%)",
-                    },
-                  }}
-                  className="h-[350px] w-full"
-                >
-                  <LineChart
-                    data={recouvrement.chartData}
-                    margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
+            <Graphe etat={graphes} id="tauxRecouvrement">
+              <p className="text-[#335890]">
+                Voici la courbe d&apos;évolution de votre taux de recouvrement :
+              </p>
+              <Card>
+                <CardHeader className="flex flex-row items-start justify-between gap-4">
+                  <div>
+                    <CardTitle>Évolution du Taux de Recouvrement</CardTitle>
+                    <CardDescription>
+                      (Encaissements Clients TTC / Créances Clients TTC) × 100
+                    </CardDescription>
+                  </div>
+                  <ChartLegend
+                    labelN="Taux cumulé"
+                    labelN1="Taux périodique"
+                    colorN="hsl(262, 83%, 58%)"
+                    colorN1="hsl(262, 83%, 78%)"
+                  />
+                </CardHeader>
+                <CardContent>
+                  <ChartContainer
+                    config={{
+                      tauxRecouvrementCumule: {
+                        label: "Taux cumulé",
+                        color: "hsl(262, 83%, 58%)",
+                      },
+                      tauxRecouvrement: {
+                        label: "Taux périodique",
+                        color: "hsl(262, 83%, 78%)",
+                      },
+                    }}
+                    className="h-[350px] w-full"
                   >
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                    <XAxis
-                      dataKey="label"
-                      tickLine={false}
-                      axisLine={false}
-                      fontSize={11}
-                      angle={-45}
-                      textAnchor="end"
-                      height={60}
-                    />
-                    <YAxis
-                      tickLine={false}
-                      axisLine={false}
-                      tickFormatter={(v) => `${(v as number).toFixed(0)}%`}
-                      fontSize={12}
-                      domain={[0, "auto"]}
-                    />
-                    <ChartTooltip
-                      content={
-                        <ChartTooltipContent
-                          formatter={(value, name) => [
-                            `${(value as number).toFixed(1)}%`,
-                            name === "Taux cumulé"
-                              ? "Taux cumulé"
-                              : "Taux périodique",
-                          ]}
-                        />
-                      }
-                    />
-                    <Line
-                      type="monotone"
-                      dataKey="tauxRecouvrementCumule"
-                      name="Taux cumulé"
-                      stroke="hsl(262, 83%, 58%)"
-                      strokeWidth={2}
-                      dot={{ r: 4 }}
-                    />
-                    <Line
-                      type="monotone"
-                      dataKey="tauxRecouvrement"
-                      name="Taux périodique"
-                      stroke="hsl(262, 83%, 78%)"
-                      strokeWidth={2}
-                      dot={{ r: 3 }}
-                      strokeDasharray="5 5"
-                    />
-                  </LineChart>
-                </ChartContainer>
-              </CardContent>
-            </Card>
+                    <LineChart
+                      data={recouvrement.chartData}
+                      margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
+                    >
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                      <XAxis
+                        dataKey="label"
+                        tickLine={false}
+                        axisLine={false}
+                        fontSize={11}
+                        angle={-45}
+                        textAnchor="end"
+                        height={60}
+                      />
+                      <YAxis
+                        tickLine={false}
+                        axisLine={false}
+                        tickFormatter={(v) => `${(v as number).toFixed(0)}%`}
+                        fontSize={12}
+                        domain={[0, "auto"]}
+                      />
+                      <ChartTooltip
+                        content={
+                          <ChartTooltipContent
+                            formatter={(value, name) => [
+                              `${(value as number).toFixed(1)}%`,
+                              name === "Taux cumulé"
+                                ? "Taux cumulé"
+                                : "Taux périodique",
+                            ]}
+                          />
+                        }
+                      />
+                      <Line
+                        type="monotone"
+                        dataKey="tauxRecouvrementCumule"
+                        name="Taux cumulé"
+                        stroke="hsl(262, 83%, 58%)"
+                        strokeWidth={2}
+                        dot={{ r: 4 }}
+                      />
+                      <Line
+                        type="monotone"
+                        dataKey="tauxRecouvrement"
+                        name="Taux périodique"
+                        stroke="hsl(262, 83%, 78%)"
+                        strokeWidth={2}
+                        dot={{ r: 3 }}
+                        strokeDasharray="5 5"
+                      />
+                    </LineChart>
+                  </ChartContainer>
+                </CardContent>
+              </Card>
+            </Graphe>
             <p className="text-sm text-[#335890]">
               Le taux périodique prend en compte uniquement les factures et les
               encaissements du mois. Le taux cumulé prend en compte toutes les
               factures et tous les encaissements de l&apos;exercice, depuis le
               1er janvier jusqu&apos;au mois sélectionné.
             </p>
-            <p className="text-[#335890]">
-              Ci-dessous, une comparaison de ce que vos clients vous doivent et
-              de ce que vous avez encaissé mois par mois sur cette période :
-            </p>
-            <Card>
-              <CardHeader className="flex flex-row items-start justify-between gap-4">
-                <div>
-                  <CardTitle>
-                    Créances Clients TTC vs Encaissements Clients TTC
-                  </CardTitle>
-                  <CardDescription>
-                    Comparaison mensuelle des montants
-                  </CardDescription>
-                </div>
-                <ChartLegend
-                  labelN="Créances Clients TTC"
-                  labelN1="Encaissements Clients TTC"
-                  colorN="hsl(221, 83%, 53%)"
-                  colorN1="hsl(221, 83%, 73%)"
-                  solid
-                />
-              </CardHeader>
-              <CardContent>
-                <ChartContainer
-                  config={{
-                    caTTCTotal: {
-                      label: "Créances Clients TTC",
-                      color: "hsl(221, 83%, 53%)",
-                    },
-                    caEncaisseTTC: {
-                      label: "Encaissements Clients TTC",
-                      color: "hsl(221, 83%, 73%)",
-                    },
-                  }}
-                  className="h-[350px] w-full"
-                >
-                  <BarChart
-                    data={recouvrement.chartData}
-                    margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
+            <Graphe etat={graphes} id="creancesEncaissements">
+              <p className="text-[#335890]">
+                Ci-dessous, une comparaison de ce que vos clients vous doivent et
+                de ce que vous avez encaissé mois par mois sur cette période :
+              </p>
+              <Card>
+                <CardHeader className="flex flex-row items-start justify-between gap-4">
+                  <div>
+                    <CardTitle>
+                      Créances Clients TTC vs Encaissements Clients TTC
+                    </CardTitle>
+                    <CardDescription>
+                      Comparaison mensuelle des montants
+                    </CardDescription>
+                  </div>
+                  <ChartLegend
+                    labelN="Créances Clients TTC"
+                    labelN1="Encaissements Clients TTC"
+                    colorN="hsl(221, 83%, 53%)"
+                    colorN1="hsl(221, 83%, 73%)"
+                    solid
+                  />
+                </CardHeader>
+                <CardContent>
+                  <ChartContainer
+                    config={{
+                      caTTCTotal: {
+                        label: "Créances Clients TTC",
+                        color: "hsl(221, 83%, 53%)",
+                      },
+                      caEncaisseTTC: {
+                        label: "Encaissements Clients TTC",
+                        color: "hsl(221, 83%, 73%)",
+                      },
+                    }}
+                    className="h-[350px] w-full"
                   >
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                    <XAxis
-                      dataKey="label"
-                      tickLine={false}
-                      axisLine={false}
-                      fontSize={11}
-                      angle={-45}
-                      textAnchor="end"
-                      height={60}
-                    />
-                    <YAxis
-                      tickLine={false}
-                      axisLine={false}
-                      tickFormatter={(v) => fmtMillions(v as number)}
-                      fontSize={12}
-                    />
-                    <ChartTooltip
-                      content={
-                        <ChartTooltipContent
-                          formatter={(value, name) => [
-                            formatCompactOnly(value as number),
-                            name === "Créances Clients TTC"
-                              ? "Créances Clients TTC"
-                              : "Encaissements Clients TTC",
-                          ]}
-                        />
-                      }
-                    />
-                    <Bar
-                      dataKey="caTTCTotal"
-                      name="Créances Clients TTC"
-                      fill="hsl(221, 83%, 53%)"
-                      barSize={24}
-                      radius={[4, 4, 0, 0]}
-                    />
-                    <Bar
-                      dataKey="caEncaisseTTC"
-                      name="Encaissements Clients TTC"
-                      fill="hsl(221, 83%, 73%)"
-                      barSize={24}
-                      radius={[4, 4, 0, 0]}
-                    />
-                  </BarChart>
-                </ChartContainer>
-              </CardContent>
-            </Card>
+                    <BarChart
+                      data={recouvrement.chartData}
+                      margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
+                    >
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                      <XAxis
+                        dataKey="label"
+                        tickLine={false}
+                        axisLine={false}
+                        fontSize={11}
+                        angle={-45}
+                        textAnchor="end"
+                        height={60}
+                      />
+                      <YAxis
+                        tickLine={false}
+                        axisLine={false}
+                        tickFormatter={(v) => fmtMillions(v as number)}
+                        fontSize={12}
+                      />
+                      <ChartTooltip
+                        content={
+                          <ChartTooltipContent
+                            formatter={(value, name) => [
+                              formatCompactOnly(value as number),
+                              name === "Créances Clients TTC"
+                                ? "Créances Clients TTC"
+                                : "Encaissements Clients TTC",
+                            ]}
+                          />
+                        }
+                      />
+                      <Bar
+                        dataKey="caTTCTotal"
+                        name="Créances Clients TTC"
+                        fill="hsl(221, 83%, 53%)"
+                        barSize={24}
+                        radius={[4, 4, 0, 0]}
+                      />
+                      <Bar
+                        dataKey="caEncaisseTTC"
+                        name="Encaissements Clients TTC"
+                        fill="hsl(221, 83%, 73%)"
+                        barSize={24}
+                        radius={[4, 4, 0, 0]}
+                      />
+                    </BarChart>
+                  </ChartContainer>
+                </CardContent>
+              </Card>
+            </Graphe>
             <p className="text-[#335890]">
               Pour mieux comprendre ces chiffres, voici le détail de vos créances
               par client, limité aux dix (10) plus gros clients :
@@ -784,91 +803,93 @@ export default function ClientBilanTab({
               />{" "}
               par rapport à l&apos;année dernière.
             </p>
-            <p className="text-[#335890]">
-              Voici la courbe d&apos;évolution de vos avoirs en banque et en
-              caisse (solde toujours cumulé) :
-            </p>
-            <Card>
-              <CardHeader className="flex flex-row items-start justify-between gap-4">
-                <div>
-                  <CardTitle>Évolution de la Trésorerie</CardTitle>
-                  <CardDescription>
-                    Solde toujours cumulé — {year} vs {yearN1}
-                  </CardDescription>
-                </div>
-                <ChartLegend
-                  labelN={`Trésorerie ${year}`}
-                  labelN1={`Trésorerie ${yearN1}`}
-                  colorN="#5FC7B9"
-                />
-              </CardHeader>
-              <CardContent>
-                <ChartContainer
-                  config={{
-                    tresoN: {
-                      label: `Trésorerie ${year}`,
-                      color: "hsl(174, 72%, 46%)",
-                    },
-                    tresoN1: {
-                      label: `Trésorerie ${yearN1}`,
-                      color: "hsl(174, 72%, 66%)",
-                    },
-                  }}
-                  className="h-[350px] w-full"
-                >
-                  <LineChart
-                    data={tresoChart}
-                    margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
+            <Graphe etat={graphes} id="tresorerie">
+              <p className="text-[#335890]">
+                Voici la courbe d&apos;évolution de vos avoirs en banque et en
+                caisse (solde toujours cumulé) :
+              </p>
+              <Card>
+                <CardHeader className="flex flex-row items-start justify-between gap-4">
+                  <div>
+                    <CardTitle>Évolution de la Trésorerie</CardTitle>
+                    <CardDescription>
+                      Solde toujours cumulé — {year} vs {yearN1}
+                    </CardDescription>
+                  </div>
+                  <ChartLegend
+                    labelN={`Trésorerie ${year}`}
+                    labelN1={`Trésorerie ${yearN1}`}
+                    colorN="#5FC7B9"
+                  />
+                </CardHeader>
+                <CardContent>
+                  <ChartContainer
+                    config={{
+                      tresoN: {
+                        label: `Trésorerie ${year}`,
+                        color: "hsl(174, 72%, 46%)",
+                      },
+                      tresoN1: {
+                        label: `Trésorerie ${yearN1}`,
+                        color: "hsl(174, 72%, 66%)",
+                      },
+                    }}
+                    className="h-[350px] w-full"
                   >
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                    <XAxis
-                      dataKey="label"
-                      tickLine={false}
-                      axisLine={false}
-                      fontSize={11}
-                      angle={-45}
-                      textAnchor="end"
-                      height={60}
-                    />
-                    <YAxis
-                      tickLine={false}
-                      axisLine={false}
-                      tickFormatter={(v) => fmtMillions(v as number)}
-                      fontSize={12}
-                    />
-                    <ChartTooltip
-                      content={
-                        <ChartTooltipContent
-                          formatter={(value, name) => [
-                            `${fmtK(value as number)} K`,
-                            name === "tresoN"
-                              ? `Trésorerie ${year}`
-                              : `Trésorerie ${yearN1}`,
-                          ]}
-                        />
-                      }
-                    />
-                    <Line
-                      type="monotone"
-                      dataKey="tresoN1"
-                      name="tresoN1"
-                      stroke="hsl(174, 72%, 66%)"
-                      strokeWidth={2}
-                      dot={{ r: 3 }}
-                      strokeDasharray="5 5"
-                    />
-                    <Line
-                      type="monotone"
-                      dataKey="tresoN"
-                      name="tresoN"
-                      stroke="hsl(174, 72%, 46%)"
-                      strokeWidth={2}
-                      dot={{ r: 4 }}
-                    />
-                  </LineChart>
-                </ChartContainer>
-              </CardContent>
-            </Card>
+                    <LineChart
+                      data={tresoChart}
+                      margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
+                    >
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                      <XAxis
+                        dataKey="label"
+                        tickLine={false}
+                        axisLine={false}
+                        fontSize={11}
+                        angle={-45}
+                        textAnchor="end"
+                        height={60}
+                      />
+                      <YAxis
+                        tickLine={false}
+                        axisLine={false}
+                        tickFormatter={(v) => fmtMillions(v as number)}
+                        fontSize={12}
+                      />
+                      <ChartTooltip
+                        content={
+                          <ChartTooltipContent
+                            formatter={(value, name) => [
+                              `${fmtK(value as number)} K`,
+                              name === "tresoN"
+                                ? `Trésorerie ${year}`
+                                : `Trésorerie ${yearN1}`,
+                            ]}
+                          />
+                        }
+                      />
+                      <Line
+                        type="monotone"
+                        dataKey="tresoN1"
+                        name="tresoN1"
+                        stroke="hsl(174, 72%, 66%)"
+                        strokeWidth={2}
+                        dot={{ r: 3 }}
+                        strokeDasharray="5 5"
+                      />
+                      <Line
+                        type="monotone"
+                        dataKey="tresoN"
+                        name="tresoN"
+                        stroke="hsl(174, 72%, 46%)"
+                        strokeWidth={2}
+                        dot={{ r: 4 }}
+                      />
+                    </LineChart>
+                  </ChartContainer>
+                </CardContent>
+              </Card>
+            </Graphe>
           </section>
 
           {/* ============================ 4. RÉSULTAT ===================== */}
@@ -886,11 +907,13 @@ export default function ClientBilanTab({
               <Variation value={reporting.indicateurs.variations.resultatNet} />{" "}
               par rapport à l&apos;année précédente.
             </p>
-            <p className="text-[#335890]">
-              Analysons ce tunnel pour comprendre comment s&apos;est formé votre
-              résultat :
-            </p>
-            <TunnelRentabilite data={tunnelData} maxAbsValue={maxAbsValue} />
+            <Graphe etat={graphes} id="tunnel">
+              <p className="text-[#335890]">
+                Analysons ce tunnel pour comprendre comment s&apos;est formé votre
+                résultat :
+              </p>
+              <TunnelRentabilite data={tunnelData} maxAbsValue={maxAbsValue} />
+            </Graphe>
             <p className="text-[#00122E] leading-relaxed">
               De votre chiffre d&apos;affaires de{" "}
               <B>{fmtK(reporting.indicateurs.anneeN.chiffreAffaires)} K FCFA</B>{" "}

@@ -37,6 +37,7 @@ import {
 import { PiBankDuotone, PiHandCoinsDuotone, PiKeyDuotone } from "react-icons/pi";
 import { toast } from "sonner";
 import { KpiGrid, formatCompactOnly, type KpiDef, type KpiValue } from "./kpi-grid";
+import { Graphe, MenuGraphes, useGraphesMasques, type GrapheDef } from "./graphes-masquables";
 import { RATIOS_FORMULES } from "@/lib/reporting/ratios-bilantiels";
 
 type PeriodType = "year" | "month" | "ytd" | "ytd-day";
@@ -113,6 +114,11 @@ function LegendLine({ color }: { color: string }) {
   );
 }
 
+// Graphiques masquables de l'onglet (menu « Graphiques »).
+const GRAPHES: GrapheDef[] = [
+  { id: "evolution", label: "Évolution des dettes financières" },
+];
+
 export default function ClientDettesFinancieresTab({
   clientId,
   year,
@@ -125,6 +131,8 @@ export default function ClientDettesFinancieresTab({
 }: ClientDettesFinancieresTabProps) {
   const [data, setData] = useState<RatiosData | null>(null);
   const [loading, setLoading] = useState(true);
+  // Graphiques masqués de l'onglet, mémorisés par client.
+  const graphes = useGraphesMasques(`dettes-financieres-${clientId}`, GRAPHES);
 
   // Encours : toujours cumulé depuis janvier.
   const moisFin = cumulGranularity === "annee" ? "12" : selectedMonth;
@@ -289,69 +297,72 @@ export default function ClientDettesFinancieresTab({
         storageKey={`dettes-financieres-${clientId}`}
         defs={KPI_DEFS}
         values={kpiValues}
+        actions={<MenuGraphes etat={graphes} />}
       />
 
-      {/* Histogramme empilé : la hauteur de la pile est l'encours total. */}
-      <Card>
-        <CardHeader className="flex flex-row items-start justify-between gap-4">
-          <div>
-            <CardTitle>Évolution des dettes financières</CardTitle>
-            <CardDescription>
-              Emprunts (DA) et crédit-bail (DB), cumulés — exercice {data.yearN}
-            </CardDescription>
-          </div>
-          <div className="flex flex-col gap-1 shrink-0">
-            <span className="text-base font-semibold text-[#335890]">Légende</span>
-            <div className="flex items-center gap-3">
-              <LegendLine color="#2463eb" />
-              <span className="text-base font-medium" style={{ color: "#2463eb" }}>
-                Emprunts
-              </span>
+      <Graphe etat={graphes} id="evolution">
+        {/* Histogramme empilé : la hauteur de la pile est l'encours total. */}
+        <Card>
+          <CardHeader className="flex flex-row items-start justify-between gap-4">
+            <div>
+              <CardTitle>Évolution des dettes financières</CardTitle>
+              <CardDescription>
+                Emprunts (DA) et crédit-bail (DB), cumulés — exercice {data.yearN}
+              </CardDescription>
             </div>
-            <div className="flex items-center gap-3">
-              <LegendLine color="#81a5f3" />
-              <span className="text-base font-medium" style={{ color: "#81a5f3" }}>
-                Crédit-bail
-              </span>
+            <div className="flex flex-col gap-1 shrink-0">
+              <span className="text-base font-semibold text-[#335890]">Légende</span>
+              <div className="flex items-center gap-3">
+                <LegendLine color="#2463eb" />
+                <span className="text-base font-medium" style={{ color: "#2463eb" }}>
+                  Emprunts
+                </span>
+              </div>
+              <div className="flex items-center gap-3">
+                <LegendLine color="#81a5f3" />
+                <span className="text-base font-medium" style={{ color: "#81a5f3" }}>
+                  Crédit-bail
+                </span>
+              </div>
             </div>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <ChartContainer config={chartConfig} className="h-[380px] w-full">
-            <BarChart
-              data={data.chartData}
-              margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
-              barCategoryGap="20%"
-            >
-              <CartesianGrid strokeDasharray="3 3" vertical={false} />
-              <XAxis dataKey="label" tickLine={false} axisLine={false} fontSize={12} />
-              <YAxis tickLine={false} axisLine={false} tickFormatter={montantAxe} fontSize={12} />
-              <ChartTooltip
-                content={
-                  <ChartTooltipContent
-                    formatter={(value, name) => [formatCompactOnly(value as number), name as string]}
-                  />
-                }
-              />
-              <Bar
-                dataKey="emprunts"
-                name="Emprunts"
-                stackId="df"
-                fill="hsl(221, 83%, 53%)"
-                barSize={28}
-              />
-              <Bar
-                dataKey="creditBail"
-                name="Crédit-bail"
-                stackId="df"
-                fill="hsl(221, 83%, 73%)"
-                barSize={28}
-                radius={[4, 4, 0, 0]}
-              />
-            </BarChart>
-          </ChartContainer>
-        </CardContent>
-      </Card>
+          </CardHeader>
+          <CardContent>
+            <ChartContainer config={chartConfig} className="h-[380px] w-full">
+              <BarChart
+                data={data.chartData}
+                margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
+                barCategoryGap="20%"
+              >
+                <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                <XAxis dataKey="label" tickLine={false} axisLine={false} fontSize={12} />
+                <YAxis tickLine={false} axisLine={false} tickFormatter={montantAxe} fontSize={12} />
+                <ChartTooltip
+                  content={
+                    <ChartTooltipContent
+                      formatter={(value, name) => [formatCompactOnly(value as number), name as string]}
+                    />
+                  }
+                />
+                <Bar
+                  dataKey="emprunts"
+                  name="Emprunts"
+                  stackId="df"
+                  fill="hsl(221, 83%, 53%)"
+                  barSize={28}
+                />
+                <Bar
+                  dataKey="creditBail"
+                  name="Crédit-bail"
+                  stackId="df"
+                  fill="hsl(221, 83%, 73%)"
+                  barSize={28}
+                  radius={[4, 4, 0, 0]}
+                />
+              </BarChart>
+            </ChartContainer>
+          </CardContent>
+        </Card>
+      </Graphe>
     </div>
   );
 }
