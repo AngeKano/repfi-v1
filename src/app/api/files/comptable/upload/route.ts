@@ -5,6 +5,7 @@ import {
   PutObjectCommand,
   ListObjectsV2Command,
   CopyObjectCommand,
+  DeleteObjectCommand,
 } from "@aws-sdk/client-s3";
 import { z } from "zod";
 import { randomUUID } from "crypto";
@@ -35,18 +36,19 @@ const uploadComptableSchema = z.object({
 });
 
 // ============================================================
-// FORMAT 4 FICHIERS (v3.0)
-// - GRAND_LIVRE: Fichier unifié (remplace GRAND_LIVRE_COMPTES + GRAND_LIVRE_TIERS)
-// - PLAN_COMPTES: Plan comptable
-// - PLAN_TIERS: Plan des tiers (clients/fournisseurs)
-// - CODE_JOURNAL: Codes journaux
+// FICHIERS D'UN IMPORT
+// - GRAND_LIVRE : obligatoire (fichier unifié comptes + tiers)
+// - PLAN_COMPTES, PLAN_TIERS, CODE_JOURNAL : facultatifs. Airflow contrôle
+//   le Grand Livre contre les référentiels (base + fichiers joints) avant
+//   toute écriture et refuse l'import si un élément manque.
 // ============================================================
-const REQUIRED_FILE_TYPES = [
-  FileType.GRAND_LIVRE, // Nouveau: fichier unifié
+const IMPORT_FILE_TYPES = [
+  FileType.GRAND_LIVRE,
   FileType.PLAN_COMPTES,
   FileType.PLAN_TIERS,
   FileType.CODE_JOURNAL,
 ];
+const OBLIGATOIRES: FileType[] = [FileType.GRAND_LIVRE];
 
 // Labels pour les messages d'erreur
 const FILE_TYPE_LABELS: Record<string, string> = {
@@ -67,6 +69,12 @@ function formatPeriodFolder(start: Date, end: Date): string {
   return `periode-${formatDateYYYYMMDD(start)}-${formatDateYYYYMMDD(end)}`;
 }
 
+/**
+ * Sauvegarde (dossier backup/) puis RETIRE les fichiers d'un envoi précédent
+ * de la période. Airflow importe tout ce qui se trouve dans les dossiers de
+ * type : sans ce retrait, un référentiel d'un ancien envoi serait importé avec
+ * un Grand Livre envoyé seul.
+ */
 async function createBackupIfNeeded(s3Prefix: string): Promise<void> {
   const bucket = process.env.AWS_S3_BUCKET_NAME!;
 
@@ -75,7 +83,7 @@ async function createBackupIfNeeded(s3Prefix: string): Promise<void> {
       new ListObjectsV2Command({
         Bucket: bucket,
         Prefix: s3Prefix,
-        MaxKeys: 10,
+        MaxKeys: 1000,
       }),
     );
 
@@ -103,6 +111,8 @@ async function createBackupIfNeeded(s3Prefix: string): Promise<void> {
               Key: `${backupPrefix}${fileName}`,
             }),
           );
+          // Copie faite : l'original quitte le dossier importé par Airflow.
+          await s3Client.send(new DeleteObjectCommand({ Bucket: bucket, Key: obj.Key }));
         }
       }
     }
@@ -125,16 +135,16 @@ export async function POST(req: NextRequest) {
     const periodStartStr = formData.get("periodStart") as string;
     const periodEndStr = formData.get("periodEnd") as string;
 
-    // Récupérer les 4 fichiers requis
+    // Grand Livre obligatoire, référentiels facultatifs.
     const files: { file: File; fileType: FileType }[] = [];
     const missingFiles: string[] = [];
 
-    for (const fileType of REQUIRED_FILE_TYPES) {
-      const file = formData.get(fileType) as File;
-      if (!file) {
-        missingFiles.push(FILE_TYPE_LABELS[fileType] || fileType);
-      } else {
+    for (const fileType of IMPORT_FILE_TYPES) {
+      const file = formData.get(fileType) as File | null;
+      if (file) {
         files.push({ file, fileType });
+      } else if (OBLIGATOIRES.includes(fileType)) {
+        missingFiles.push(FILE_TYPE_LABELS[fileType] || fileType);
       }
     }
 
@@ -143,7 +153,7 @@ export async function POST(req: NextRequest) {
         {
           error: `Fichier(s) manquant(s): ${missingFiles.join(", ")}`,
           missingFiles,
-          requiredFiles: REQUIRED_FILE_TYPES.map((ft) => ({
+          requiredFiles: OBLIGATOIRES.map((ft) => ({
             type: ft,
             label: FILE_TYPE_LABELS[ft] || ft,
           })),
@@ -289,6 +299,22 @@ export async function POST(req: NextRequest) {
     // Créer un backup si des fichiers existent déjà
     await createBackupIfNeeded(s3Prefix);
 
+    // Envoi précédent sur la même période (en attente ou en échec) : ses
+    // fiches de fichiers sont remplacées par celles de cet envoi.
+    const periodeExistante = await prisma.comptablePeriod.findUnique({
+      where: {
+        clientId_periodStart_periodEnd: {
+          clientId: data.clientId,
+          periodStart: periodStart,
+          periodEnd: periodEnd,
+        },
+      },
+      select: { batchId: true },
+    });
+    if (periodeExistante) {
+      await prisma.comptableFile.deleteMany({ where: { batchId: periodeExistante.batchId } });
+    }
+
     // Créer ou mettre à jour l'enregistrement de la période
     const comptablePeriod = await prisma.comptablePeriod.upsert({
       where: {
@@ -394,9 +420,9 @@ export async function POST(req: NextRequest) {
         comptablePeriod,
         // Info pour le frontend
         fileFormat: {
-          version: "3.0",
-          description: "Format 4 fichiers avec Grand Livre unifié",
-          requiredFiles: REQUIRED_FILE_TYPES.map((ft) => ({
+          version: "3.1",
+          description: "Grand Livre obligatoire, référentiels facultatifs",
+          requiredFiles: OBLIGATOIRES.map((ft) => ({
             type: ft,
             label: FILE_TYPE_LABELS[ft],
           })),

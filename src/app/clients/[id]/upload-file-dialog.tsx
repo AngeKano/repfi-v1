@@ -57,14 +57,17 @@ interface UploadFileDialogProps {
   defaultClientId?: string;
 }
 
+// Grand Livre obligatoire ; Plan comptable, Plan des tiers et Codes journaux
+// facultatifs (le Grand Livre est alors contrôlé contre les référentiels déjà
+// enregistrés : un élément inconnu fait refuser l'import).
 const REQUIRED_FILE_TYPES = [
-  { type: FileType.GRAND_LIVRE, label: "Grand Livre Comptable" },
-  { type: FileType.PLAN_COMPTES, label: "Plan Comptable" },
-  { type: FileType.PLAN_TIERS, label: "Plan des Tiers" },
-  { type: FileType.CODE_JOURNAL, label: "Code Journal" },
+  { type: FileType.GRAND_LIVRE, label: "Grand Livre Comptable", obligatoire: true },
+  { type: FileType.PLAN_COMPTES, label: "Plan Comptable", obligatoire: false },
+  { type: FileType.PLAN_TIERS, label: "Plan des Tiers", obligatoire: false },
+  { type: FileType.CODE_JOURNAL, label: "Code Journal", obligatoire: false },
 ];
 
-const MAX_FILES = 4;
+const MAX_FILES = 4; // un fichier par type au plus
 
 interface PickedFile {
   id: string;
@@ -235,11 +238,12 @@ export function UploadFileDialog({
   const canGoNext = !!clientId && !!periodStart && !!periodEnd;
 
   const allValid = () => {
-    if (files.length !== MAX_FILES) return false;
+    if (files.length < 1 || files.length > MAX_FILES) return false;
     const types = files.map((f) => f.fileType);
-    const required = REQUIRED_FILE_TYPES.map((t) => t.type);
+    const required = REQUIRED_FILE_TYPES.filter((t) => t.obligatoire).map((t) => t.type);
     return (
       required.every((t) => types.includes(t)) &&
+      new Set(types).size === types.length &&
       files.every((f) => f.fileType && !f.error)
     );
   };
@@ -398,7 +402,7 @@ export function UploadFileDialog({
               <DialogDescription className="text-sm text-[#335890]">
                 {step === 1
                   ? "Sélectionnez le client et la période"
-                  : "Ajoutez les 4 fichiers comptables requis"}
+                  : "Ajoutez le Grand Livre (obligatoire) et, si besoin, les référentiels"}
               </DialogDescription>
             </div>
             <button

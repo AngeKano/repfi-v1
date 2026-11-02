@@ -1,14 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
 import {
   S3Client,
   PutObjectCommand,
   ListObjectsV2Command,
   DeleteObjectsCommand,
 } from "@aws-sdk/client-s3";
-import { z } from "zod";
-import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import { prisma } from "@/lib/prisma";
+import { requirePermission, FICHIERS_ACTIONS } from "@/lib/permissions";
+import {
+  detectComptableFormat,
+  validateComptableFormat,
+  MAX_COMPTABLE_FILE_SIZE,
+  FILE_TYPE_LABELS,
+} from "@/lib/comptable-formats";
 import {
   FileType,
   ProcessingStatus,
@@ -22,13 +26,15 @@ const s3Client = new S3Client({
   },
 });
 
-const REQUIRED_FILE_TYPES = [
-  FileType.GRAND_LIVRE_COMPTES,
-  FileType.GRAND_LIVRE_TIERS,
+// Mêmes fichiers qu'à l'import : Grand Livre obligatoire, référentiels
+// facultatifs (le Grand Livre est alors contrôlé contre ceux enregistrés).
+const IMPORT_FILE_TYPES = [
+  FileType.GRAND_LIVRE,
   FileType.PLAN_COMPTES,
   FileType.PLAN_TIERS,
   FileType.CODE_JOURNAL,
 ];
+const OBLIGATOIRES: FileType[] = [FileType.GRAND_LIVRE];
 
 function formatDateYYYYMMDD(date: Date): string {
   const year = date.getFullYear();
@@ -73,10 +79,12 @@ async function deleteS3Folder(prefix: string): Promise<number> {
 
 export async function PUT(req: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user) {
-      return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
+    // Même droit qu'un nouvel import.
+    const permissionResult = await requirePermission(FICHIERS_ACTIONS.CHARGER);
+    if (permissionResult instanceof NextResponse) {
+      return permissionResult;
     }
+    const { user } = permissionResult;
 
     const formData = await req.formData();
     const periodId = formData.get("periodId") as string;
@@ -85,17 +93,39 @@ export async function PUT(req: NextRequest) {
       return NextResponse.json({ error: "periodId manquant" }, { status: 400 });
     }
 
-    // Récupérer les 5 fichiers
+    // Grand Livre obligatoire, référentiels facultatifs (un fichier par type).
     const files: { file: File; fileType: FileType }[] = [];
-    for (const fileType of REQUIRED_FILE_TYPES) {
-      const file = formData.get(fileType) as File;
-      if (!file) {
+    for (const fileType of IMPORT_FILE_TYPES) {
+      const file = formData.get(fileType) as File | null;
+      if (file) {
+        files.push({ file, fileType });
+      } else if (OBLIGATOIRES.includes(fileType)) {
         return NextResponse.json(
-          { error: `Fichier manquant: ${fileType}` },
+          { error: `Fichier manquant : ${FILE_TYPE_LABELS[fileType] ?? fileType}` },
           { status: 400 },
         );
       }
-      files.push({ file, fileType });
+    }
+
+    // Format autorisé selon le type (Excel ou Sage) et taille maximale.
+    for (const { file, fileType } of files) {
+      const formatError = validateComptableFormat(fileType, detectComptableFormat(file.name));
+      if (formatError) {
+        return NextResponse.json(
+          { error: `${formatError} Fichier reçu : ${file.name}` },
+          { status: 400 },
+        );
+      }
+      if (file.size > MAX_COMPTABLE_FILE_SIZE) {
+        return NextResponse.json(
+          {
+            error: `Le fichier "${file.name}" dépasse la limite autorisée (${
+              MAX_COMPTABLE_FILE_SIZE / (1024 * 1024)
+            } Mo).`,
+          },
+          { status: 413 },
+        );
+      }
     }
 
     // Récupérer la période existante
@@ -116,7 +146,7 @@ export async function PUT(req: NextRequest) {
       );
     }
 
-    if (existingPeriod.client.companyId !== session.user.companyId) {
+    if (existingPeriod.client.companyId !== user.companyId) {
       return NextResponse.json(
         { error: "Accès non autorisé" },
         { status: 403 },
@@ -132,21 +162,6 @@ export async function PUT(req: NextRequest) {
         { error: "Impossible de modifier une période en cours de traitement" },
         { status: 400 },
       );
-    }
-
-    // Vérifier que tous les fichiers sont Excel
-    const validExcelTypes = [
-      "application/vnd.ms-excel",
-      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-    ];
-
-    for (const { file } of files) {
-      if (!validExcelTypes.includes(file.type)) {
-        return NextResponse.json(
-          { error: `Le fichier ${file.name} doit être un fichier Excel` },
-          { status: 400 },
-        );
-      }
     }
 
     const client = existingPeriod.client;
@@ -226,7 +241,7 @@ export async function PUT(req: NextRequest) {
           periodStart,
           periodEnd,
           clientId: client.id,
-          uploadedById: session.user.id,
+          uploadedById: user.id,
           processedAt: new Date(),
         },
       });
@@ -239,8 +254,8 @@ export async function PUT(req: NextRequest) {
           fileName,
           action: "UPDATE_COMPTABLE",
           details: `Fichier comptable mis à jour - Période: ${formatDateYYYYMMDD(periodStart)} au ${formatDateYYYYMMDD(periodEnd)}`,
-          userId: session.user.id,
-          userEmail: session.user.email ?? "",
+          userId: user.id,
+          userEmail: user.email ?? "",
         },
       });
     }
