@@ -15,6 +15,7 @@ import {
   computeResultatTotals,
   normalizeRef,
 } from "@/lib/reporting/etats-financiers";
+import { YM_SQL, moisCouverts } from "@/lib/reporting/periode";
 
 const clickhouse = createClickhouseClient({
   url: process.env.CLICKHOUSE_HOST || "http://localhost:8123",
@@ -26,8 +27,9 @@ const ACTIF_REFS = new Set(BILAN_ACTIF.map((l) => l.ref));
 const PASSIF_REFS = new Set(BILAN_PASSIF.map((l) => l.ref));
 const RESULTAT_REFS = new Set(COMPTE_RESULTAT.map((l) => l.ref));
 
-// date_transaction est une String "DD/MM/YYYY" → période comparable "YYYYMM".
-const YM = "concat(substring(date_transaction, 7, 4), substring(date_transaction, 4, 2))";
+// Période « AAAAMM » d'une ligne : un à-nouveau daté du 31/12 précédent compte
+// en janvier — il porte les soldes d'ouverture du bilan.
+const YM = YM_SQL;
 
 interface BilanRow {
   ref: string;
@@ -64,11 +66,62 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     const periodType = searchParams.get("periodType") || "ytd";
     const cumule = periodType === "ytd" || periodType === "ytd-day";
     const surAnnee = periodType === "year";
-    const month = (searchParams.get("month") || "12").padStart(2, "0");
+    // Mois demandé ; ramené plus bas sur un mois couvert par le reporting.
+    let month = String(
+      Math.min(12, Math.max(1, parseInt(searchParams.get("month") || "12", 10) || 12)),
+    ).padStart(2, "0");
     const selectedYear = parseInt(searchParams.get("year") || "", 10);
 
-// Mois de clôture de la fenêtre, commun aux deux états.
-    const moisFin = surAnnee ? "12" : month;
+    const dbName = getClickhouseDbName(id);
+    // Schéma fusionné (une seule colonne `rubrique`) ou schéma d'origine :
+    // l'expression est résolue à partir des colonnes réellement présentes.
+    const REF_EXPR = await bilanRefExpr(clickhouse, dbName);
+    const BILAN_REF = bilanRefSql(REF_EXPR);
+    const BILAN_INCLUDE = bilanIncludeSql(REF_EXPR);
+    // Amortissements / dépréciations : reconnus à leur RUBRIQUE (AE1, BB1…).
+    const IS_AMORT = estAmortSql(REF_EXPR);
+
+    // Exercices disponibles, du plus récent au plus ancien. Exercice d'un lot :
+    // année de début de sa période (UTC), comme les autres onglets.
+    const periods = await prisma.comptablePeriod.findMany({
+      where: { clientId: id },
+      select: { batchId: true, periodStart: true, periodEnd: true },
+    });
+    const anneeDe = (p: { periodStart: Date }) => p.periodStart.getUTCFullYear();
+
+    const byYear = new Map<number, { batchIds: string[]; periodEnd: Date }>();
+    for (const p of periods) {
+      const e = byYear.get(anneeDe(p));
+      if (e) {
+        if (p.batchId) e.batchIds.push(p.batchId);
+        if (p.periodEnd > e.periodEnd) e.periodEnd = p.periodEnd;
+      } else {
+        byYear.set(anneeDe(p), { batchIds: p.batchId ? [p.batchId] : [], periodEnd: p.periodEnd });
+      }
+    }
+
+    // Toutes les années présentes (sert au sélecteur "Année" du filtre).
+    const availableYears = [...byYear.keys()].sort((a, b) => b - a);
+
+    // Exercice N : l'année du filtre si elle a un reporting, sinon la plus
+    // récente ; l'écran aligne son filtre sur l'année renvoyée (yearN). Les
+    // exercices comparés sont N et les précédents. Sans aucun import : pas
+    // d'exercice (yearN absent de la réponse).
+    const yearN: number | undefined = availableYears.includes(selectedYear)
+      ? selectedYear
+      : availableYears[0];
+    const years = yearN === undefined ? [] : availableYears.filter((y) => y <= yearN);
+
+    // Mois couverts par le reporting de N ; un mois hors reporting devient le
+    // dernier mois couvert. La granularité Année s'arrête au dernier mois
+    // importé : tous les exercices comparés partagent la même fenêtre.
+    const moisDisponibles = moisCouverts(periods.filter((p) => anneeDe(p) === yearN));
+    const dernierMois = moisDisponibles[moisDisponibles.length - 1] ?? "12";
+    if (surAnnee || (moisDisponibles.length > 0 && !moisDisponibles.includes(month))) {
+      month = dernierMois;
+    }
+    // Mois de clôture de la fenêtre, commun aux deux états.
+    const moisFin = month;
 
     // Le BILAN est une photo à une date : il part toujours du 1er janvier.
     // Le tronquer au seul mois sélectionné exclurait l'à-nouveau et le bilan
@@ -82,46 +135,11 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       periodique
         ? { start: `${y}${month}`, end: `${y}${month}` }
         : { start: `${y}01`, end: `${y}${moisFin}` };
-    const periodeLabel = surAnnee
-      ? "Janvier - Décembre"
-      : cumule
-        ? `Janvier - ${MOIS[parseInt(month, 10) - 1]}`
-        : MOIS[parseInt(month, 10) - 1];
-
-    const dbName = getClickhouseDbName(id);
-    // Schéma fusionné (une seule colonne `rubrique`) ou schéma d'origine :
-    // l'expression est résolue à partir des colonnes réellement présentes.
-    const REF_EXPR = await bilanRefExpr(clickhouse, dbName);
-    const BILAN_REF = bilanRefSql(REF_EXPR);
-    const BILAN_INCLUDE = bilanIncludeSql(REF_EXPR);
-    // Amortissements / dépréciations : reconnus à leur RUBRIQUE (AE1, BB1…).
-    const IS_AMORT = estAmortSql(REF_EXPR);
-
-    // Exercices disponibles, du plus récent au plus ancien. Si une année est
-    // sélectionnée, elle devient l'exercice N (les suivantes sont ignorées).
-    const periods = await prisma.comptablePeriod.findMany({
-      where: { clientId: id },
-      select: { batchId: true, year: true, periodEnd: true },
-      orderBy: [{ year: "desc" }, { periodEnd: "desc" }],
-    });
-
-    const byYear = new Map<number, { batchIds: string[]; periodEnd: Date }>();
-    for (const p of periods) {
-      const e = byYear.get(p.year);
-      if (e) {
-        if (p.batchId) e.batchIds.push(p.batchId);
-        if (p.periodEnd > e.periodEnd) e.periodEnd = p.periodEnd;
-      } else {
-        byYear.set(p.year, { batchIds: p.batchId ? [p.batchId] : [], periodEnd: p.periodEnd });
-      }
-    }
-
-    // Toutes les années présentes (sert au sélecteur "Année" du filtre).
-    const availableYears = [...byYear.keys()].sort((a, b) => b - a);
-
-    const years = [...byYear.keys()]
-      .filter((y) => (Number.isFinite(selectedYear) ? y <= selectedYear : true))
-      .sort((a, b) => b - a);
+    const premierMois = moisDisponibles[0] ?? "01";
+    const nomMois = (mm: string) => MOIS[parseInt(mm, 10) - 1];
+    const periodeLabel = periodique
+      ? nomMois(month)
+      : `${nomMois(premierMois).replace(/^./, (c) => c.toUpperCase())} - ${nomMois(month)}`;
 
     // Intitulé d'un exercice : la date de fin de la fenêtre filtrée, bornée à
     // la clôture réelle (inutile d'annoncer 31/12 si l'exercice s'arrête en
@@ -267,9 +285,10 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       });
     }
 
-    // Un exercice sans aucune écriture sur la fenêtre filtrée n'apporte rien à
-    // la comparaison : on ne l'affiche pas.
-    const retenus = exercicesCalcules.filter((e) => e.avecDonnees);
+    // Un exercice antérieur sans aucune écriture sur la fenêtre filtrée
+    // n'apporte rien à la comparaison : on ne l'affiche pas. L'exercice N
+    // (celui du filtre) reste toujours en première colonne.
+    const retenus = exercicesCalcules.filter((e) => e.year === yearN || e.avecDonnees);
     const exercices = retenus.map((e) => ({ year: e.year, label: e.label }));
     const actifBrut = retenus.map((e) => e.brut);
     const actifAmort = retenus.map((e) => e.amort);
@@ -283,6 +302,10 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       client: { id: client.id, name: client.name },
       exercices,
       availableYears,
+      // Période réellement calculée : l'écran y cale son filtre.
+      yearN,
+      month,
+      moisDisponibles,
       manualIncluded: !client.excludeManualEntries,
       periodeLabel,
       // BRUT / AMORT sont fournis pour CHAQUE exercice : la colonne détaillée

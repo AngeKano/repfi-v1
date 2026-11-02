@@ -3,8 +3,8 @@
 //
 // L'export se fait côté navigateur, à partir des données déjà affichées : ce
 // qui est téléchargé correspond exactement à ce que l'utilisateur voit, mêmes
-// filtres et mêmes exercices comparés. Le Compte d'exploitation (janvier →
-// mois du filtre en net périodique + total) suit le Compte de résultat : une
+// filtres et mêmes exercices comparés. Le Compte d'exploitation (mois importés
+// jusqu'au mois du filtre en net périodique + total) suit le Compte de résultat : une
 // feuille Excel de plus, des pages PDF en A3 paysage au-delà de 8 colonnes.
 //
 // La mise en forme reproduit celle de l'écran : en-tête sur deux niveaux
@@ -47,9 +47,9 @@ export interface LigneExploitationExport {
   total: boolean;
   sens: string | null;
   repere: string | null;
-  /** Net périodique de janvier à décembre. */
+  /** Net périodique de chaque mois affiché. */
   mois: number[];
-  /** Cumul depuis janvier. */
+  /** Cumul des mois affichés. */
   cumul: number;
 }
 export interface ExploitationExport {
@@ -252,15 +252,27 @@ export const MOIS_ABREGES = [
   "JUIL.", "AOÛT", "SEPT.", "OCT.", "NOV.", "DÉC.",
 ];
 
-/** Fenêtre du cumul : « JANV. » ou « JANV. - JUIL. » pour un mois de fin 1 à 12. */
-export function libelleCumul(moisFin: number): string {
-  return moisFin <= 1 ? MOIS_ABREGES[0] : `${MOIS_ABREGES[0]} - ${MOIS_ABREGES[Math.min(moisFin, 12) - 1]}`;
+/**
+ * Fenêtre du cumul : « JANV. » ou « JANV. - JUIL. » pour des mois 1 à 12 (le
+ * premier mois est celui du reporting importé, janvier par défaut).
+ */
+export function libelleCumul(moisFin: number, moisDebut = 1): string {
+  const fin = Math.min(Math.max(moisFin, 1), 12);
+  const debut = Math.min(Math.max(moisDebut, 1), fin);
+  return debut === fin ? MOIS_ABREGES[fin - 1] : `${MOIS_ABREGES[debut - 1]} - ${MOIS_ABREGES[fin - 1]}`;
 }
 
-/** COMPTE D'EXPLOITATION : janvier → mois du filtre en net périodique, puis le cumul. */
+/** Numéro de mois (1 à 12) d'une colonne « AAAAMM ». */
+const numeroMois = (ym: string | undefined, defaut: number) => parseInt(ym?.slice(4, 6) ?? "", 10) || defaut;
+
+/** COMPTE D'EXPLOITATION : mois importés → mois du filtre en net périodique, puis le cumul. */
 function tableauExploitation(e: ExploitationExport): Tableau {
+  const premier = e.mois[0]?.label ?? "Janvier";
   const dernier = e.mois[e.mois.length - 1]?.label ?? "Décembre";
-  const fin = libelleCumul(e.mois.length);
+  const fin = libelleCumul(
+    numeroMois(e.mois[e.mois.length - 1]?.ym, 12),
+    numeroMois(e.mois[0]?.ym, 1),
+  );
   return {
     titre: `COMPTE D'EXPLOITATION ${e.year}`,
     colLibelle: "LIBELLES",
@@ -278,7 +290,7 @@ function tableauExploitation(e: ExploitationExport): Tableau {
     ],
     colonnesMontant: [
       ...e.mois.map((m) => `${m.label} ${e.year}`),
-      `Total janvier - ${dernier.toLowerCase()} ${e.year}`,
+      `Total ${premier.toLowerCase()} - ${dernier.toLowerCase()} ${e.year}`,
     ],
     lignes: e.lignes.map((l) => ({
       ref: l.ref,
@@ -290,7 +302,7 @@ function tableauExploitation(e: ExploitationExport): Tableau {
       montants: [...e.mois.map((_, i) => arrondi(l.mois[i] ?? 0)), arrondi(l.cumul)],
     })),
     note:
-      "Chaque mois est en net périodique (mouvements du seul mois) ; le total est le cumul de janvier au dernier mois affiché.",
+      "Chaque mois est en net périodique (mouvements du seul mois) ; le total est le cumul du premier au dernier mois affiché.",
     // A3 paysage au-delà de 8 colonnes de montants, A4 sinon.
     format: e.mois.length + 1 > 8 ? "a3" : "a4",
   };
