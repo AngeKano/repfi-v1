@@ -68,6 +68,14 @@ interface ChartPoint {
 interface RatiosData {
   yearN: number;
   yearN1: number;
+  /** Années d'un reporting importé, décroissantes. */
+  availableYears?: number[];
+  /** false : aucun reporting en N-1. */
+  anneeN1Disponible?: boolean;
+  /** Mois « 01 »…« 12 » couverts par le reporting de N. */
+  moisDisponibles?: string[];
+  /** Mois de fin réellement calculé. */
+  month?: string;
   kpis: Record<string, KpiValeur>;
   chartData: ChartPoint[];
 }
@@ -144,21 +152,39 @@ export default function ClientDettesFinancieresTab({
         `/api/clients/${clientId}/reporting/ratios?year=${year}&month=${moisFin}`,
       );
       if (!res.ok) throw new Error("Erreur API Dettes financières");
-      setData((await res.json()) as RatiosData);
+      const json = (await res.json()) as RatiosData;
+      setData(json);
+      // Le filtre suit la période réellement calculée : une année ou un mois
+      // sans reporting n'est jamais affiché (l'API se cale sur l'année la plus
+      // récente et sur le dernier mois couvert).
+      if (json.yearN && String(json.yearN) !== year) {
+        setYear(String(json.yearN));
+        return;
+      }
+      if (json.month && json.month !== selectedMonth) setSelectedMonth(json.month);
     } catch (e) {
       console.error(e);
       toast.error("Erreur lors du chargement des dettes financières");
     } finally {
       setLoading(false);
     }
-  }, [clientId, year, moisFin]);
+  }, [clientId, year, moisFin, selectedMonth, setYear, setSelectedMonth]);
 
   useEffect(() => {
     load();
   }, [load]);
 
-  const monthLabel = MONTHS.find((m) => m.value === moisFin)?.label ?? "Décembre";
-  const periodLabel = `Janvier - ${monthLabel} ${year}`;
+  // Fenêtre réellement calculée : du premier mois couvert au mois de fin.
+  const nomMois = (v?: string) => MONTHS.find((m) => m.value === v)?.label ?? "";
+  const dispo = data?.moisDisponibles ?? [];
+  const moisCalcule = data?.month ?? moisFin;
+  const periodLabel = `${nomMois(dispo[0] ?? "01")} - ${nomMois(moisCalcule)} ${year}`;
+  // Mois et années proposés : ceux du reporting importé.
+  const moisChoisissables = MONTHS.filter((m) => !dispo.length || dispo.includes(m.value));
+  const annees = (data?.availableYears ?? [parseInt(year, 10)]).map(String);
+  const indexAnnee = annees.indexOf(year);
+  // Comparaison N-1 seulement si N-1 a un reporting.
+  const n1Dispo = data?.anneeN1Disponible !== false;
 
   const filtres = (
     <div className="flex flex-wrap items-center gap-3">
@@ -174,17 +200,20 @@ export default function ClientDettesFinancieresTab({
         <span className="text-xs text-[#335890]">Année :</span>
         <span className="font-semibold text-[#00122E]">{year}</span>
         <div className="flex gap-1 ml-1">
+          {/* Années d'un reporting importé uniquement (liste décroissante). */}
           <button
             title="Année précédente"
-            onClick={() => setYear(String(parseInt(year, 10) - 1))}
-            className="text-[#94A3B8] hover:text-[#0077C3]"
+            onClick={() => setYear(annees[indexAnnee + 1])}
+            disabled={indexAnnee < 0 || indexAnnee >= annees.length - 1}
+            className="text-[#94A3B8] hover:text-[#0077C3] disabled:opacity-30"
           >
             <ChevronLeft className="w-4 h-4" />
           </button>
           <button
             title="Année suivante"
-            onClick={() => setYear(String(parseInt(year, 10) + 1))}
-            className="text-[#94A3B8] hover:text-[#0077C3]"
+            onClick={() => setYear(annees[indexAnnee - 1])}
+            disabled={indexAnnee <= 0}
+            className="text-[#94A3B8] hover:text-[#0077C3] disabled:opacity-30"
           >
             <ChevronRight className="w-4 h-4" />
           </button>
@@ -220,7 +249,7 @@ export default function ClientDettesFinancieresTab({
               <SelectValue placeholder="Mois" />
             </SelectTrigger>
             <SelectContent>
-              {MONTHS.map((m) => (
+              {moisChoisissables.map((m) => (
                 <SelectItem key={m.value} value={m.value}>
                   {m.label}
                 </SelectItem>
@@ -268,7 +297,8 @@ export default function ClientDettesFinancieresTab({
           valeur: v.valeurN,
           valeurN1: v.valeurN1,
           labelN1: data.yearN1,
-          variation: v.variation,
+          n1Indisponible: !n1Dispo,
+          variation: n1Dispo ? v.variation : undefined,
         },
       ];
     }),
@@ -288,8 +318,10 @@ export default function ClientDettesFinancieresTab({
       <div>
         <h1 className="text-3xl font-bold text-[#00122E]">Dettes financières</h1>
         <p className="text-sm text-[#335890] italic mt-1">
-          Encours cumulés au {periodLabel.toLowerCase()} — comparaison {data.yearN} vs{" "}
-          {data.yearN1}.
+          Encours à fin {nomMois(moisCalcule).toLowerCase()} {year} (cumul depuis{" "}
+          {nomMois(dispo[0] ?? "01").toLowerCase()}, à-nouveaux compris) — comparaison {data.yearN} vs{" "}
+          {data.yearN1}
+          {!n1Dispo && " (non disponible)"}.
         </p>
       </div>
 

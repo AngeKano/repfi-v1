@@ -766,8 +766,13 @@ fournisseurs » porte sur toute la rubrique `DJ` (vue bilan), l'exception E2
 | Emprunts | `DA` |
 | Crédit-bail | `DB` |
 
-Solde passif `crédit − débit`, cumulé depuis le 1er janvier. Graphique :
-*Évolution des dettes financières* (histogramme empilé Emprunts + Crédit-bail).
+Solde passif `crédit − débit`, cumulé depuis le 1er janvier, **à-nouveaux
+compris** (un à-nouveau daté du 31/12 précédent compte en janvier) : c'est
+l'encours à la fin du mois choisi, ou du dernier mois importé en granularité
+Année. Graphique : *Évolution des dettes financières* (histogramme empilé
+Emprunts + Crédit-bail), du premier au dernier mois couvert. Mode toujours
+Cumulé ; années et mois limités au reporting importé ; N-1 sans reporting
+affiché « non disponible » (§4).
 
 ---
 
@@ -1301,20 +1306,23 @@ Onglet Ratios bilantiels : FRNG, BFR, dettes financières et DSO, en encours cum
 
 | Paramètre | Type | Défaut | Effet |
 |---|---|---|---|
-| `year` | AAAA | exercice le plus récent | Exercice N, avec repli sur l'exercice le plus récent |
-| `month` | MM (borné à 1–12) | `12` | Mois de fin : chartData va de janvier à `month`, les KPI sont pris à la fin de `month` |
+| `year` | AAAA | exercice le plus récent | Exercice N (année de début des périodes importées), avec repli sur l'exercice le plus récent, renvoyé dans `yearN` |
+| `month` | MM (borné à 1–12) | `12` | Mois de fin, ramené sur le dernier mois couvert s'il est hors reporting (renvoyé dans `month`) : chartData va du premier mois couvert à `month`, les KPI sont pris à la fin de `month` |
 
 ```
 {
   client: { id, name },
   yearN, yearN1, availableYears, manualIncluded,
+  anneeN1Disponible,  // false : aucun reporting en N-1
+  moisDisponibles,    // "MM"[] couverts par le reporting de N
+  month,              // "MM" : mois de fin réellement calculé
   jours,              // jours écoulés du 01/01 à la fin de month (année N)
   kpis: {
     frng, bfrGlobal, bfrExploitation, bfrHao, dettesFinancieres, emprunts, creditBail, dso
       // chacun { valeurN, valeurN1, variation } ; encours à fin month ; variation en % ; dso en jours
   },
   dsoDetail: { creancesTTC, caTTC },   // N à fin month : créances = BI − 414 ; CA TTC = rubriques CA du DSO + TVA collectée
-  chartData: [{        // un point par mois, janvier → month, cumulé depuis janvier
+  chartData: [{        // un point par mois couvert jusqu'à month, cumulé depuis janvier (à-nouveaux compris)
     label,             // "Jan"…
     frng, frngN1,                            // DF − AZ
     bfrGlobal, bfrGlobalN1,                  // bfrExploitation + bfrHao
@@ -1756,6 +1764,7 @@ ouvert par défaut, replié d'un clic sur son en-tête), séparateur, **Membres*
 | 29/10/2026 | Charges et rentabilité : colonne des valeurs à droite de la cascade **retirée** — montant (K) et pourcentage se lisent dans la barre ou dans l'infobulle ; la barre occupe la place libérée (§22). |
 | 02/11/2026 | Charges et rentabilité : pourcentage du CA **entre parenthèses** dans les barres et l'infobulle — « −11 766K (55,11 %) » (§22). |
 | 02/11/2026 | **Import d'une période avec le Grand Livre seul** : Plan comptable, Plan des tiers et Codes journaux deviennent facultatifs (écran de création, « Modifier » et fenêtre d'ajout). Airflow **contrôle le Grand Livre avant toute écriture** : un compte (après conversion PCG → SYSCOHADA), un code journal (RAN compris) ou un n° de tiers absent des référentiels — en base ou dans les fichiers du même import — fait échouer l'import sans rien enregistrer, avec le nombre d'éléments manquants et les 20 premiers par catégorie ; on complète les référentiels puis « Relancer le traitement ». Un nouvel envoi remplace entièrement les fichiers de la période ; l'échec du contrôle n'efface pas les données d'une période déjà importée. « Modifier » corrigé (il attendait encore les 5 anciens fichiers) et soumis au droit Charger des fichiers (§3, §25.18 à §25.20). |
+| 02/11/2026 | **Audit des filtres — Dettes Financières** (API des ratios, partagée avec Ratios bilantiels et le DSO du Recouvrement) : à-nouveau daté du 31/12 précédent désormais compté dans les encours (il était exclu de la fenêtre janvier → décembre : soldes d'ouverture manquants pour FRNG, BFR, dettes financières, DSO) ; créances d'ouverture du DSO lues sur les journaux d'à-nouveaux (et plus seulement à la date du 01/01) ; année sans reporting : le filtre se cale sur l'année calculée (l'API la remplaçait en silence) ; flèches et mois limités à l'import, fenêtre « Année » arrêtée au dernier mois importé ; variation signée quand N-1 = 0 ; N-1 sans reporting « non disponible » (§15, §16, §25.5 ; audit §7.6). |
 | 02/11/2026 | **Audit des filtres — Trésorerie** : l'API remplaçait en silence une année sans reporting par la plus récente pendant que l'écran affichait l'année demandée (« 2026 » au-dessus des chiffres 2025) : le filtre se cale désormais sur l'année calculée ; flèches d'année bornées aux années importées, mois limités à l'import, fenêtre « Année » arrêtée au dernier mois importé ; exercice d'un lot = année de début de période (comme les autres onglets) ; N-1 sans reporting : « non disponible », sans variation (cartes et tableau) (§11, §25.4 ; audit §7.5). |
 | 02/11/2026 | **Audit des filtres — Dettes court terme** : flèches d'année limitées aux années d'un reporting importé (elles allaient à n'importe quelle année), mois limités à l'import, calage du filtre sur la période calculée, libellé arrêté au dernier mois importé (« Janvier - Décembre » codé en dur), sous-titre « encours à fin <mois> » ; à-nouveaux de décembre comptés en janvier (API partagée avec Règlement Fournisseurs) (§14 ; audit §7.4). |
 | 02/11/2026 | **Audit des filtres — Règlement Fournisseurs** : années de l'onglet = reporting importé (liste codée en dur auparavant), mois limités à l'import, calage du filtre sur la période calculée, fenêtre « Année » arrêtée au dernier mois importé ; à-nouveau du 31/12 précédent compté en janvier (doublait décembre N-1) ; graphique « Dettes Fournisseurs TTC vs Décaissement Fournisseurs TTC » sur les définitions des KPI (il montrait les crédits / débits bruts de DJ, 408/409 et tous journaux compris) ; Top 10 fournisseurs sur ces mêmes définitions, fournisseurs sans intitulé inclus, un seul rang par fournisseur, % = part de toutes les dettes fournisseurs ; ligne « Total Top 10 » = somme des parts (§13, §25.3 ; audit §7.3). |

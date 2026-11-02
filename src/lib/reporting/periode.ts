@@ -9,8 +9,10 @@
 // d'ouverture n'apparaîtrait qu'au dernier mois.
 // ============================================================================
 
-const RAN_DE_DECEMBRE =
-  "(upper(trim(code_journal)) IN ('RAN', 'AN') AND substring(date_transaction, 4, 2) = '12')";
+/** La ligne appartient à un journal d'à-nouveaux (RAN, AN). */
+export const A_NOUVEAU_SQL = "upper(trim(code_journal)) IN ('RAN', 'AN')";
+
+const RAN_DE_DECEMBRE = `(${A_NOUVEAU_SQL} AND substring(date_transaction, 4, 2) = '12')`;
 
 /** Mois « MM » d'une ligne (à-nouveau de décembre : janvier). */
 export const MOIS_SQL = `if(${RAN_DE_DECEMBRE}, '01', substring(date_transaction, 4, 2))`;

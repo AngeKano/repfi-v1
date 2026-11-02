@@ -27,6 +27,7 @@ import {
   DSO_CA_RUBRIQUES,
   DSO_TVA_COMPTES,
 } from "@/lib/reporting/ratios-bilantiels";
+import { YM_SQL, MOIS_SQL, A_NOUVEAU_SQL, moisCouverts } from "@/lib/reporting/periode";
 
 const clickhouse = createClickhouseClient({
   url: process.env.CLICKHOUSE_HOST || "http://localhost:8123",
@@ -37,9 +38,9 @@ const clickhouse = createClickhouseClient({
 const ACTIF_REFS = new Set(BILAN_ACTIF.map((l) => l.ref));
 const PASSIF_REFS = new Set(BILAN_PASSIF.map((l) => l.ref));
 
-// date_transaction est une String "DD/MM/YYYY".
-const YM = "concat(substring(date_transaction, 7, 4), substring(date_transaction, 4, 2))";
-const MOIS_SQL = "substring(date_transaction, 4, 2)";
+// Période « AAAAMM » et mois d'une ligne : un à-nouveau daté du 31/12
+// précédent compte en janvier — il porte les soldes d'ouverture des encours.
+const YM = YM_SQL;
 // Comptes de TVA collectée : préfixes du modèle, aucune entrée utilisateur.
 const TVA_SQL = DSO_TVA_COMPTES.map((c) => `startsWith(compte, '${c}')`).join(" OR ");
 
@@ -98,7 +99,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       return NextResponse.json({ error: "Accès non autorisé" }, { status: 403 });
 
     const { searchParams } = new URL(req.url);
-    const moisFin = Math.min(12, Math.max(1, parseInt(searchParams.get("month") || "12", 10) || 12));
+    // Mois de fin demandé ; ramené plus bas sur un mois couvert par le reporting.
+    let moisFin = Math.min(12, Math.max(1, parseInt(searchParams.get("month") || "12", 10) || 12));
     const selectedYear = parseInt(searchParams.get("year") || "", 10);
 
     const dbName = getClickhouseDbName(id);
@@ -108,21 +110,34 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 
     const periods = await prisma.comptablePeriod.findMany({
       where: { clientId: id },
-      select: { batchId: true, year: true },
-      orderBy: [{ year: "desc" }],
+      select: { batchId: true, year: true, periodStart: true, periodEnd: true },
     });
+    // Exercice d'un lot : année de début de sa période (UTC), comme les autres
+    // onglets de reporting.
+    const anneeDe = (p: { periodStart: Date }) => p.periodStart.getUTCFullYear();
     const batchsParAnnee = new Map<number, string[]>();
     for (const p of periods) {
-      const l = batchsParAnnee.get(p.year) ?? [];
+      const l = batchsParAnnee.get(anneeDe(p)) ?? [];
       if (p.batchId) l.push(p.batchId);
-      batchsParAnnee.set(p.year, l);
+      batchsParAnnee.set(anneeDe(p), l);
     }
     const availableYears = [...batchsParAnnee.keys()].sort((a, b) => b - a);
     if (availableYears.length === 0)
       return NextResponse.json({ error: "Aucune période comptable" }, { status: 404 });
 
+    // Année sans reporting : la plus récente ; l'écran aligne son filtre sur
+    // l'année renvoyée (yearN).
     const yearN = availableYears.includes(selectedYear) ? selectedYear : availableYears[0];
     const yearN1 = yearN - 1;
+    const anneeN1Disponible = batchsParAnnee.has(yearN1);
+
+    // Mois couverts par le reporting de N ; un mois hors reporting devient le
+    // dernier mois couvert (la fenêtre ne dépasse jamais l'import).
+    const moisDisponibles = moisCouverts(periods.filter((p) => anneeDe(p) === yearN));
+    if (moisDisponibles.length > 0 && !moisDisponibles.includes(String(moisFin).padStart(2, "0"))) {
+      moisFin = parseInt(moisDisponibles[moisDisponibles.length - 1], 10);
+    }
+    const premierMois = moisDisponibles.length > 0 ? parseInt(moisDisponibles[0], 10) : 1;
 
     // Série cumulée d'un exercice, mois par mois.
     const serieExercice = async (y: number): Promise<PointExercice[]> => {
@@ -174,14 +189,16 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
               query_params: qp,
               format: "JSONEachRow",
             }),
-            // Encours clients à l'ouverture : les à-nouveaux, datés du 01/01.
+            // Encours clients à l'ouverture : les à-nouveaux (journaux RAN / AN,
+            // quelle que soit leur date — souvent le 31/12 précédent) et, à
+            // défaut de journal d'à-nouveaux, les écritures du 01/01.
             clickhouse.query({
               query: `
                 SELECT sumIf(debit - credit, startsWith(${BILAN_REF}, 'BI'))
                          - sumIf(debit - credit, startsWith(compte, '414')) AS creances_an
                 FROM ${dbName}.grand_livre
                 WHERE batch_id IN ({batchIds:Array(String)})
-                  AND date_transaction = {anDate:String}
+                  AND (${A_NOUVEAU_SQL} OR date_transaction = {anDate:String})
               `,
               query_params: qp,
               format: "JSONEachRow",
@@ -286,8 +303,10 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 
     const [serieN, serieN1] = await Promise.all([serieExercice(yearN), serieExercice(yearN1)]);
 
-    // Série affichée : janvier → mois sélectionné.
-    const chartData = Array.from({ length: moisFin }, (_, i) => {
+    // Série affichée : premier mois couvert par le reporting → mois de fin
+    // (les encours, eux, cumulent toujours depuis janvier).
+    const chartData = Array.from({ length: moisFin - premierMois + 1 }, (_, k) => {
+      const i = premierMois - 1 + k;
       const n = serieN[i];
       const n1 = serieN1[i];
       return {
@@ -316,12 +335,11 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     const indicateur = (k: keyof PointExercice) => ({
       valeurN: finN[k],
       valeurN1: finN1[k],
+      // N-1 nul : ±100 % selon le signe de N (de 0 à −1 est une baisse).
       variation:
         finN1[k] !== 0
           ? ((finN[k] - finN1[k]) / Math.abs(finN1[k])) * 100
-          : finN[k] !== 0
-            ? 100
-            : 0,
+          : Math.sign(finN[k]) * 100,
     });
 
     return NextResponse.json({
@@ -329,6 +347,9 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       yearN,
       yearN1,
       availableYears,
+      anneeN1Disponible,
+      moisDisponibles,
+      month: String(moisFin).padStart(2, "0"),
       manualIncluded: !client.excludeManualEntries,
       jours: joursEcoules(yearN, moisFin),
       kpis: {
