@@ -1,5 +1,5 @@
 /**
- * Point d'entrée du système de permissions REPFI
+ * Point d'entrée du système de permissions Click Insight
  * Exporte toutes les fonctionnalités de permissions
  */
 

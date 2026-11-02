@@ -1,6 +1,6 @@
 /**
  * Définition des rôles et leurs métadonnées
- * Système de permissions granulaire pour REPFI
+ * Système de permissions granulaire pour Click Insight
  */
 
 export const RoleId = {

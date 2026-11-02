@@ -1368,7 +1368,7 @@ export default function ClientReportingChart({
   // Composant Charges vs Produits — LineChart 2 séries.
   //   Mode "périodique" (periodType=year/month) → valeur de la période
   //   Mode "cumulé"     (periodType=ytd/ytd-day) → running sum frontend
-  // Couleurs : palette REPFI duotone (bleu foncé / bleu clair), comme
+  // Couleurs : palette Click Insight duotone (bleu foncé / bleu clair), comme
   // CA par Nature et Créances vs Encaissements.
   const ChargesVsProduits = () => {
     const isCumule = periodType === "ytd" || periodType === "ytd-day";

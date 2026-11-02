@@ -1,7 +1,7 @@
-# 📊 REPFI — Catalogue complet des métriques du Reporting
+# 📊 Click Insight — Catalogue complet des métriques du Reporting
 
 > Référence technique exhaustive de toutes les métriques calculées et affichées
-> dans le module Reporting de REPFI. Plan comptable **SYSCOHADA révisé**.
+> dans le module Reporting de Click Insight. Plan comptable **SYSCOHADA révisé**.
 >
 > Pour chaque métrique : description, formule de calcul, comptes / rubriques
 > mobilisés, unité, mode de calcul applicable, fichier source.
@@ -80,7 +80,7 @@ ClickHouse grand_livre
 
 ## 2. Plan comptable SYSCOHADA : rappels
 
-### Classes utilisées par REPFI
+### Classes utilisées par Click Insight
 
 | Classe | Libellé | Utilisée pour |
 |---|---|---|
@@ -610,7 +610,7 @@ CREATE TABLE ${dbName}.grand_livre (
 ORDER BY (batch_id, date_transaction, compte);
 ```
 
-### Index logiques utilisés par REPFI
+### Index logiques utilisés par Click Insight
 
 - Filtre temporel : `substring(date_transaction, 7, 4)` (année), `substring(date_transaction, 4, 2)` (mois), `substring(date_transaction, 1, 2)` (jour).
 - Comparaison période : `concat(substring(7,4), substring(4,2))` = `YYYYMM`.
