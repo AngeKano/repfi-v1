@@ -18,6 +18,7 @@ import { getClickhouseDbName, manualBatchId } from "@/lib/clickhouse/manual-sync
 import { bilanRefExpr } from "@/lib/clickhouse/schema";
 import { planComptesMap, intituleCompte } from "@/lib/clickhouse/plan-comptable";
 import { estAmortSql } from "@/lib/reporting/etats-financiers";
+import { YM_SQL } from "@/lib/reporting/periode";
 import {
   TRESORERIE_KPIS,
   RUBRIQUES_TRESORERIE,
@@ -34,8 +35,9 @@ const clickhouse = createClickhouseClient({
   password: process.env.CLICKHOUSE_PASSWORD || "",
 });
 
-// date_transaction est une String "DD/MM/YYYY" → période comparable "YYYYMM".
-const YM = "concat(substring(date_transaction, 7, 4), substring(date_transaction, 4, 2))";
+// Période « AAAAMM » d'une ligne ; un à-nouveau daté du 31/12 précédent
+// compte en janvier (solde d'ouverture), comme dans la Synthèse.
+const YM = YM_SQL;
 
 const MOIS = [
   "janvier", "février", "mars", "avril", "mai", "juin",

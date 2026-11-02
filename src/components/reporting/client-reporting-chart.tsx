@@ -198,6 +198,12 @@ interface ReportingData {
   };
   topClients: TopClient[];
   caParNature: CAParNatureItem[];
+  /** Mois « 01 »…« 12 » couverts par le reporting de l'année. */
+  moisDisponibles?: string[];
+  /** false : aucun reporting en N-1, la comparaison n'est pas affichée. */
+  anneeN1Disponible?: boolean;
+  /** Charges et produits de janvier au mois précédent (Cumulé + Mois). */
+  baselineFlux?: { charges: number; produits: number };
 }
 
 // "ytd-day" : mode Cumulé + Granularité Mois — vue journalière intra-mois
@@ -257,11 +263,6 @@ const NAV_ITEMS: NavItem[] = [
   },
 ];
 
-// Clients dont l'année a déjà été calée sur l'exercice le plus récent. Le
-// composant est remonté à chaque retour sur un onglet de reporting (et quand on
-// change la prise en compte des saisies) : sans ce registre, l'année choisie
-// par l'utilisateur serait écrasée à chaque remontage.
-const anneesCalees = new Set<string>();
 
 // Graphiques masquables de chaque onglet (menu « Graphiques »).
 const GRAPHES_PAR_ONGLET: Record<string, GrapheDef[]> = {
@@ -1033,19 +1034,27 @@ export default function ClientReportingChart({
       const json = await res.json();
       setData(json);
 
-      // Au premier chargement, se caler sur l'année la plus récente du reporting
+      // Au premier chargement, le recouvrement part de l'année la plus récente.
       if (!yearInitialized.current && json.availableYears?.length > 0) {
         yearInitialized.current = true;
-        const mostRecentYear = json.availableYears[0];
-        // Initialiser aussi le recouvrement sur l'année/mois le plus récent
-        setRecouvrementYear(mostRecentYear);
+        setRecouvrementYear(json.availableYears[0]);
         setRecouvrementMonth("12");
-        const dejaCalee = anneesCalees.has(clientId);
-        anneesCalees.add(clientId);
-        if (!dejaCalee && mostRecentYear !== year) {
-          setYear(mostRecentYear);
-          return;
-        }
+      }
+      // Le filtre suit la période réellement calculée : une année ou un mois
+      // sans reporting n'est jamais affiché. L'API se cale sur l'année la plus
+      // récente et sur le dernier mois couvert ; l'année choisie reste sinon
+      // celle de l'utilisateur, d'un onglet à l'autre.
+      if (json.year && json.year !== year) {
+        setYear(json.year);
+        return;
+      }
+      if (
+        periodType !== "year" &&
+        json.selectedMonth &&
+        json.selectedMonth !== selectedMonth
+      ) {
+        setSelectedMonth(json.selectedMonth);
+        return;
       }
     } catch (error) {
       console.error("Fetch error:", error);
@@ -1269,24 +1278,29 @@ export default function ClientReportingChart({
     return `${startMonth} - ${endMonth} ${yearStr}`;
   };
 
+  // Libellé de la fenêtre réellement calculée : du premier mois couvert par le
+  // reporting au mois de fin (en granularité Année, le dernier mois couvert).
   const getPeriodLabel = (): string => {
-    if (periodType === "year") return `Janvier - Décembre ${year}`;
-    if (periodType === "ytd") {
-      const month = MONTHS.find((m) => m.value === selectedMonth);
-      return `Janvier - ${month?.label || ""} ${year}`;
-    }
+    const nom = (v?: string | null) => MONTHS.find((m) => m.value === v)?.label || "";
+    const dispo = data?.moisDisponibles ?? [];
+    const debut = nom(dispo[0] ?? "01");
+    const dernier = nom(dispo[dispo.length - 1] ?? "12");
+    if (periodType === "ytd") return `${debut} - ${nom(selectedMonth)} ${year}`;
     if (periodType === "ytd-day") {
-      // Cumulé + jour : la baseline va de Jan au mois précédent, puis on
+      // Cumulé + jour : la base va du premier mois au mois précédent, puis on
       // détaille jour par jour sur le mois sélectionné.
-      const month = MONTHS.find((m) => m.value === selectedMonth);
-      return `Janvier - ${month?.label || ""} ${year} (jour par jour)`;
+      return `${debut} - ${nom(selectedMonth)} ${year} (jour par jour)`;
     }
-    if (periodType === "month") {
-      const month = MONTHS.find((m) => m.value === selectedMonth);
-      return `${month?.label || ""} ${year}`;
-    }
-    return `Janvier - Décembre ${year}`;
+    if (periodType === "month") return `${nom(selectedMonth)} ${year}`;
+    return `${debut} - ${dernier} ${year}`;
   };
+
+  // Mois proposés : ceux couverts par le reporting de l'année.
+  const moisChoisissables = MONTHS.filter(
+    (m) => !data?.moisDisponibles?.length || data.moisDisponibles.includes(m.value),
+  );
+  // Comparaison N-1 affichée seulement si N-1 a un reporting.
+  const n1Disponible = data?.anneeN1Disponible !== false;
 
   const getXAxisLabel = (): string => {
     // "month" et "ytd-day" sont tous deux à granularité journalière.
@@ -1393,8 +1407,9 @@ export default function ClientReportingChart({
           produits: d.produits,
         }));
       }
-      let sumC = 0;
-      let sumP = 0;
+      // Cumulé + Mois : départ au cumul de janvier au mois précédent.
+      let sumC = data?.baselineFlux?.charges ?? 0;
+      let sumP = data?.baselineFlux?.produits ?? 0;
       return visibleChartData.map((d) => {
         sumC += d.charges;
         sumP += d.produits;
@@ -2155,7 +2170,7 @@ export default function ClientReportingChart({
                               <CardDescription className="text-sm font-medium">
                                 {kpi.label}
                               </CardDescription>
-                              <VariationBadge value={variation} />
+                              {n1Disponible && <VariationBadge value={variation} />}
                             </div>
                           </CardHeader>
                           <CardContent className="pt-0">
@@ -2174,10 +2189,12 @@ export default function ClientReportingChart({
                                     : formatCompactOnly(valueN)}
                                 </div>
                                 <p className="text-xs text-muted-foreground mt-1">
-                                  {yearN1}:{" "}
-                                  {kpi.percent
-                                    ? `${valueN1.toFixed(1)}%`
-                                    : formatCompactOnly(valueN1)}
+                                  {yearN1} :{" "}
+                                  {!n1Disponible
+                                    ? "non disponible"
+                                    : kpi.percent
+                                      ? `${valueN1.toFixed(1)}%`
+                                      : formatCompactOnly(valueN1)}
                                 </p>
                               </div>
                               <Icon
@@ -2276,12 +2293,12 @@ export default function ClientReportingChart({
         const caKpiValues: Record<string, KpiValue> = {
           ca: {
             valeur: data.indicateurs.anneeN.chiffreAffaires,
-            variation: data.indicateurs.variations.chiffreAffaires,
+            variation: n1Disponible ? data.indicateurs.variations.chiffreAffaires : undefined,
           },
           caN1: { valeur: data.indicateurs.anneeN1.chiffreAffaires },
           subventions: {
             valeur: data.indicateurs.anneeN.subventions,
-            variation: data.indicateurs.variations.subventions,
+            variation: n1Disponible ? data.indicateurs.variations.subventions : undefined,
           },
           subventionsN1: { valeur: data.indicateurs.anneeN1.subventions },
         };
@@ -2487,7 +2504,7 @@ export default function ClientReportingChart({
                                   </p>
                                 )}
                               </div>
-                              {!resultatKpiEditMode && (
+                              {!resultatKpiEditMode && n1Disponible && (
                                 <VariationBadge value={variation} />
                               )}
                             </div>
@@ -3355,7 +3372,7 @@ export default function ClientReportingChart({
                         <SelectValue placeholder="Mois" />
                       </SelectTrigger>
                       <SelectContent>
-                        {MONTHS.map((month) => (
+                        {moisChoisissables.map((month) => (
                           <SelectItem key={month.value} value={month.value}>
                             {month.label}
                           </SelectItem>
@@ -3504,7 +3521,7 @@ export default function ClientReportingChart({
                       <SelectValue placeholder="Mois" />
                     </SelectTrigger>
                     <SelectContent>
-                      {MONTHS.map((month) => (
+                      {moisChoisissables.map((month) => (
                         <SelectItem key={month.value} value={month.value}>
                           {month.label}
                         </SelectItem>
