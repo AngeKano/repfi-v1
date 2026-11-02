@@ -69,7 +69,7 @@ async function waitForImages(imgs: ArrayLike<Element>) {
 export function DeckExportProvider({
   children,
   slides,
-  fileBase = "REPFI-presentation",
+  fileBase = "Click-Insight-presentation",
 }: {
   children: React.ReactNode;
   slides: ComponentType[];
@@ -254,8 +254,8 @@ async function buildPptx(images: string[], fileBase: string) {
     .PptxGenJS;
   if (!PptxGenJS) throw new Error("PptxGenJS indisponible");
   const pptx = new PptxGenJS();
-  pptx.defineLayout({ name: "REPFI16x9", width: 13.333, height: 7.5 });
-  pptx.layout = "REPFI16x9";
+  pptx.defineLayout({ name: "ClickInsight16x9", width: 13.333, height: 7.5 });
+  pptx.layout = "ClickInsight16x9";
   images.forEach((img) => {
     const slide = pptx.addSlide();
     slide.addImage({ data: img, x: 0, y: 0, w: 13.333, h: 7.5 });

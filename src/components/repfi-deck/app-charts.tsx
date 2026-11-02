@@ -1,7 +1,7 @@
 "use client";
 
 /* ============================================================
-   Illustrations fidèles de l'app REPFI (reporting clients).
+   Illustrations fidèles de l'app Click Insight (reporting clients).
    Recrée les visuels de client-reporting-chart.tsx :
    - cartes KPI (valeur + badge variation + comparatif N-1)
    - 7 graphiques clés (CA, trésorerie, taux, créances, dettes, tunnel)

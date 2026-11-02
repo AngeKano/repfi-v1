@@ -151,7 +151,7 @@ function versHtml(md) {
 
   return `<!doctype html>
 <html lang="fr"><head><meta charset="utf-8">
-<title>REPFI — Catalogue des métriques</title>
+<title>Click Insight — Catalogue des métriques</title>
 <style>
   @page { size: A4; margin: 18mm 16mm; }
   body { font-family: "Segoe UI", Arial, Helvetica, sans-serif; font-size: 10.5pt;

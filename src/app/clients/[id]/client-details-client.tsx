@@ -311,12 +311,19 @@ export default function ClientDetailsClient({
       <div className="h-screen flex overflow-hidden">
         {/* ===== LEFT: Locked nav column ===== */}
         <aside className="w-[260px] shrink-0 border-r border-[#D0E3F5] flex flex-col px-6 py-6 overflow-y-auto">
-          <Link href="/clients" className="mb-3">
-            <span className="flex items-center gap-2 w-full px-3 py-2 rounded-lg text-sm font-medium text-[#335890] hover:bg-[#EBF5FF] hover:text-[#0077C3] transition-colors">
-              <ChevronLeft className="w-4 h-4" />
-              Retour aux clients
-            </span>
-          </Link>
+          {/* Rafraîchir : en tête de colonne. Recharge les données de l'onglet
+              en cours (remontage) et celles du serveur. */}
+          <button
+            type="button"
+            onClick={() => {
+              setVersionDonnees((v) => v + 1);
+              router.refresh();
+            }}
+            className="mb-3 flex items-center gap-2 w-full px-3 py-2 rounded-lg text-sm font-medium text-[#335890] hover:bg-[#EBF5FF] hover:text-[#0077C3] transition-colors"
+          >
+            <RefreshCw className="w-4 h-4" />
+            Rafraîchir
+          </button>
 
           {/* Client Info */}
           <div className="flex items-center gap-3 mb-6">
@@ -339,19 +346,6 @@ export default function ClientDetailsClient({
                 </Badge>
               </div>
             </div>
-          </div>
-
-          {/* Currency info */}
-          <div className="mb-6 px-4 py-3 bg-[#F5F9FF] rounded-lg border border-[#D0E3F5]">
-            <p className="text-[10px] text-[#94A3B8] uppercase mb-0.5">
-              Devise
-            </p>
-            <p className="text-sm font-semibold text-[#00122E]">
-              {DEVISE}{" "}
-              <span className="text-xs font-normal text-[#335890]">
-                (unité : {UNITE_ABREGEE})
-              </span>
-            </p>
           </div>
 
           <nav className="space-y-1">
@@ -450,20 +444,21 @@ export default function ClientDetailsClient({
                   {CLIENT_TABS.find((t) => t.id === activeTab)?.label ||
                     "Synthèse Financière"}
                 </h2>
-                {/* Rafraîchir : sous le titre de la page. Recharge les données de
-                    l'onglet en cours (remontage) et celles du serveur. */}
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    setVersionDonnees((v) => v + 1);
-                    router.refresh();
-                  }}
-                  className="mt-2 h-8 rounded-full bg-[#EBF5FF] text-[#335890] border-[#D0E3F5] hover:bg-[#D0E3F5]"
-                >
-                  <RefreshCw className="w-4 h-4 mr-2" />
-                  Rafraîchir
-                </Button>
+                {/* Sous le titre : retour à la liste et devise des montants. */}
+                <div className="mt-2 flex flex-wrap items-center gap-2">
+                  <Link
+                    href="/clients"
+                    className="inline-flex items-center gap-1.5 h-8 px-3 rounded-full text-sm font-medium bg-[#EBF5FF] text-[#335890] border border-[#D0E3F5] hover:bg-[#D0E3F5] transition-colors"
+                  >
+                    <ChevronLeft className="w-4 h-4" />
+                    Retour aux clients
+                  </Link>
+                  <span className="inline-flex items-center gap-1.5 h-8 px-3 rounded-full text-sm bg-[#F5F9FF] border border-[#D0E3F5]">
+                    <span className="text-[10px] text-[#94A3B8] uppercase">Devise</span>
+                    <span className="font-semibold text-[#00122E]">{DEVISE}</span>
+                    <span className="text-xs text-[#335890]">(unité : {UNITE_ABREGEE})</span>
+                  </span>
+                </div>
               </div>
               <div className="flex items-center gap-3">
                 <div className="text-right">

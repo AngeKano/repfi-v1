@@ -60,7 +60,7 @@ function buildEmailHtml(payload: {
   <body style="margin:0;padding:24px;background:#f5f9ff;font-family:Arial,Helvetica,sans-serif;">
     <div style="max-width:640px;margin:0 auto;background:#ffffff;border:1px solid #d0e3f5;border-radius:12px;overflow:hidden;">
       <div style="background:linear-gradient(135deg,#0077c3,#0095f4);padding:24px 28px;color:#ffffff;">
-        <h1 style="margin:0;font-size:20px;font-weight:700;">Nouvelle demande de démo REPFI</h1>
+        <h1 style="margin:0;font-size:20px;font-weight:700;">Nouvelle demande de démo Click Insight</h1>
         <p style="margin:4px 0 0 0;font-size:13px;opacity:0.9;">Reçue depuis la page /presentation</p>
       </div>
       <div style="padding:24px 28px;">
@@ -125,7 +125,7 @@ export async function POST(request: NextRequest) {
       from,
       to: [to],
       replyTo: data.email,
-      subject: `Nouvelle demande de démo REPFI — ${data.entreprise} (${data.prenom} ${data.nom})`,
+      subject: `Nouvelle demande de démo Click Insight — ${data.entreprise} (${data.prenom} ${data.nom})`,
       html: buildEmailHtml(data),
     });
 

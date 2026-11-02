@@ -29,7 +29,7 @@ export default function RepfiDeck() {
 
   const deck = DECKS[mode];
   const fileBase =
-    mode === "client" ? "REPFI-client-final" : "REPFI-cabinet";
+    mode === "client" ? "Click-Insight-client-final" : "Click-Insight-cabinet";
 
   return (
     // L'export PPTX/PDF utilise `exportSlides` (Contact + Démo fusionnées) ;

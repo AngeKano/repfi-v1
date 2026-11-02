@@ -1,5 +1,5 @@
 // src/utils/type.ts
-// Types pour REPFI - Compatible Legacy (v2) + v3.0
+// Types pour Click Insight - Compatible Legacy (v2) + v3.0
 
 // ============================================================
 // TYPES LEGACY (v2) - Pour FusionGrandLivres.tsx et compatibilité
