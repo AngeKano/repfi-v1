@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   ReportingParamsDialog,
@@ -237,6 +237,19 @@ export default function ClientDetailsClient({
           : "month";
     if (attendu !== periodType) setPeriodType(attendu);
   }, [periodType, cumulGranularity]);
+
+  // Setter transmis aux onglets : un changement de periodType emporte la
+  // granularité qui lui correspond (« month », « ytd-day » → Mois ; « year »,
+  // « ytd » → Année). Sans cela, choisir « Mois » en Périodique ne changeait
+  // que le periodType et le garde-fou ci-dessus le ramenait aussitôt à
+  // l'année : les filtres restaient bloqués sur « Année ».
+  const changerPeriodType = useCallback(
+    (p: "year" | "month" | "ytd" | "ytd-day") => {
+      setPeriodType(p);
+      setCumulGranularity(granulariteDe(p));
+    },
+    [],
+  );
 
   // Les paramètres de reporting ne sont demandés qu'une seule fois par client.
   // Si l'URL contient déjà un filtre, ou si on a mémorisé un choix précédent,
@@ -588,7 +601,7 @@ export default function ClientDetailsClient({
                     year={year}
                     setYear={setYear}
                     periodType={periodType}
-                    setPeriodType={setPeriodType}
+                    setPeriodType={changerPeriodType}
                     selectedMonth={selectedMonth}
                     setSelectedMonth={setSelectedMonth}
                     cumulGranularity={cumulGranularity}
@@ -606,7 +619,7 @@ export default function ClientDetailsClient({
                     year={year}
                     setYear={setYear}
                     periodType={periodType}
-                    setPeriodType={setPeriodType}
+                    setPeriodType={changerPeriodType}
                     selectedMonth={selectedMonth}
                     setSelectedMonth={setSelectedMonth}
                     cumulGranularity={cumulGranularity}
@@ -644,7 +657,7 @@ export default function ClientDetailsClient({
                     year={year}
                     setYear={setYear}
                     periodType={periodType}
-                    setPeriodType={setPeriodType}
+                    setPeriodType={changerPeriodType}
                     selectedMonth={selectedMonth}
                     setSelectedMonth={setSelectedMonth}
                     cumulGranularity={cumulGranularity}
@@ -667,7 +680,7 @@ export default function ClientDetailsClient({
                     clientId={client.id}
                     year={year}
                     setYear={setYear}
-                    setPeriodType={setPeriodType}
+                    setPeriodType={changerPeriodType}
                     selectedMonth={selectedMonth}
                     setSelectedMonth={setSelectedMonth}
                     cumulGranularity={cumulGranularity}
@@ -690,7 +703,7 @@ export default function ClientDetailsClient({
                     clientId={client.id}
                     year={year}
                     setYear={setYear}
-                    setPeriodType={setPeriodType}
+                    setPeriodType={changerPeriodType}
                     selectedMonth={selectedMonth}
                     setSelectedMonth={setSelectedMonth}
                     cumulGranularity={cumulGranularity}
@@ -713,7 +726,7 @@ export default function ClientDetailsClient({
                     clientId={client.id}
                     year={year}
                     setYear={setYear}
-                    setPeriodType={setPeriodType}
+                    setPeriodType={changerPeriodType}
                     selectedMonth={selectedMonth}
                     setSelectedMonth={setSelectedMonth}
                     cumulGranularity={cumulGranularity}
@@ -737,7 +750,7 @@ export default function ClientDetailsClient({
                     year={year}
                     setYear={setYear}
                     periodType={periodType}
-                    setPeriodType={setPeriodType}
+                    setPeriodType={changerPeriodType}
                     selectedMonth={selectedMonth}
                     setSelectedMonth={setSelectedMonth}
                     cumulGranularity={cumulGranularity}
@@ -761,7 +774,7 @@ export default function ClientDetailsClient({
                     year={year}
                     setYear={setYear}
                     periodType={periodType}
-                    setPeriodType={setPeriodType}
+                    setPeriodType={changerPeriodType}
                     selectedMonth={selectedMonth}
                     setSelectedMonth={setSelectedMonth}
                     cumulGranularity={cumulGranularity}
