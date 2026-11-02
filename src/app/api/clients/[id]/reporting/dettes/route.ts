@@ -9,7 +9,9 @@ import { journauxTresorerie } from "@/lib/clickhouse/plan-comptable";
 import {
   dettesFournisseursTTCSql,
   decaissementsFournisseursTTCSql,
+  perimetreDettesFournisseursSql,
 } from "@/lib/reporting/creances";
+import { YM_SQL, JOUR_SQL, moisCouverts } from "@/lib/reporting/periode";
 
 const clickhouseClient = createClickhouseClient({
   url: process.env.CLICKHOUSE_HOST || "http://localhost:8123",
@@ -83,12 +85,14 @@ interface TopDette {
   montantDette: number;
   montantRembourse: number;
   solde: number;
-  pourcentage: number; // taux de remboursement de la ligne (remboursé / dette)
+  pourcentage: number; // part du solde (Top par type : total des types ; par fournisseur : toutes les dettes fournisseurs)
 }
 
 interface TopDetteFournisseur extends TopDette {
   numeroFournisseur: string;
 }
+// Pourcentage du Top 10 fournisseurs : part du solde dans le total des soldes
+// positifs de TOUS les fournisseurs (comme « Analyse des Créances - Top 10 »).
 
 // Génère les mois de Janvier (01) jusqu'au mois sélectionné, dans l'année
 // sélectionnée uniquement (YTD), comme l'onglet Recouvrement.
@@ -133,8 +137,10 @@ async function recupererDettesParYearMonth(
   const data = await clickhouseClient.query({
     query: `
       SELECT
-        substring(date_transaction, 7, 4) as year,
-        substring(date_transaction, 4, 2) as month,
+        -- Année et mois comptables : un à-nouveau daté du 31/12 précédent
+        -- compte en janvier (solde d'ouverture), pas en décembre N-1.
+        substring(${YM_SQL}, 1, 4) as year,
+        substring(${YM_SQL}, 5, 2) as month,
         ${refExpr} as rubrique,
         sum(credit) as dette_nee,
         sum(debit) as rembourse,
@@ -197,7 +203,7 @@ async function recupererDettesParJour(
   const data = await clickhouseClient.query({
     query: `
       SELECT
-        substring(date_transaction, 1, 2) as day,
+        ${JOUR_SQL} as day,
         ${refExpr} as rubrique,
         sum(credit) as dette_nee,
         sum(debit) as rembourse,
@@ -206,8 +212,7 @@ async function recupererDettesParJour(
       FROM ${dbName}.grand_livre
       WHERE batch_id IN ({batchIds:Array(String)})
         AND ${refExpr} IN ({rubriques:Array(String)})
-        AND substring(date_transaction, 7, 4) = {year:String}
-        AND substring(date_transaction, 4, 2) = {month:String}
+        AND ${YM_SQL} = {ym:String}
       GROUP BY day, rubrique
       ORDER BY day
     `,
@@ -215,8 +220,7 @@ async function recupererDettesParJour(
       batchIds,
       rubriques: ALL_DEBT_RUBRIQUE_CODES,
       journauxTresorerie: journaux,
-      year: yyyy,
-      month: mm,
+      ym: `${yyyy}${mm}`,
     },
     format: "JSONEachRow",
   });
@@ -265,8 +269,8 @@ async function recupererTopParType(
       FROM ${dbName}.grand_livre
       WHERE batch_id IN ({batchIds:Array(String)})
         AND ${refExpr} IN ({rubriques:Array(String)})
-        AND concat(substring(date_transaction, 7, 4), substring(date_transaction, 4, 2)) >= {startYM:String}
-        AND concat(substring(date_transaction, 7, 4), substring(date_transaction, 4, 2)) <= {endYM:String}
+        AND ${YM_SQL} >= {startYM:String}
+        AND ${YM_SQL} <= {endYM:String}
       GROUP BY rubrique
       HAVING (montant_dette - montant_rembourse) > 0
       ORDER BY (montant_dette - montant_rembourse) DESC
@@ -308,7 +312,11 @@ async function recupererTopParType(
 }
 
 // ----------------------------------------------------------------------------
-// Top 10 des dettes fournisseurs (DJ) PAR FOURNISSEUR (n_tiers), sur la période.
+// Top 10 des dettes fournisseurs PAR FOURNISSEUR, sur la période, avec les
+// définitions des KPI : DJ hors 408/409 ; dette = solde hors journaux de
+// trésorerie, remboursé = décaissement sur les journaux de trésorerie.
+// Une dette sans tiers est regroupée sous son compte ; le nom est résolu par
+// agrégat (un fournisseur reste une seule ligne même si son intitulé varie).
 // ----------------------------------------------------------------------------
 async function recupererTopParFournisseur(
   dbName: string,
@@ -316,6 +324,7 @@ async function recupererTopParFournisseur(
   startYM: string,
   endYM: string,
   refExpr: string,
+  journaux: string[],
 ): Promise<TopDetteFournisseur[]> {
   if (batchIds.length === 0) return [];
 
@@ -323,35 +332,36 @@ async function recupererTopParFournisseur(
     query: `
       WITH dettes_fournisseurs AS (
         SELECT
-          n_tiers AS numero_fournisseur,
-          intitule_tiers AS nom_fournisseur,
-          sum(credit) AS montant_dette,
-          sum(debit) AS montant_rembourse
+          if(n_tiers != '', n_tiers, compte) AS numero_fournisseur,
+          multiIf(
+            anyIf(intitule_tiers, intitule_tiers != '') != '', anyIf(intitule_tiers, intitule_tiers != ''),
+            anyIf(intitule_compte, intitule_compte != '') != '', anyIf(intitule_compte, intitule_compte != ''),
+            any(compte)
+          ) AS nom_fournisseur,
+          ${dettesFournisseursTTCSql(refExpr)} AS montant_dette,
+          ${decaissementsFournisseursTTCSql(refExpr)} AS montant_rembourse,
+          montant_dette - montant_rembourse AS solde
         FROM ${dbName}.grand_livre
         WHERE batch_id IN ({batchIds:Array(String)})
-          AND ${refExpr} = {rubriqueDJ:String}
-          AND n_tiers != ''
-          AND intitule_tiers != ''
-          AND concat(substring(date_transaction, 7, 4), substring(date_transaction, 4, 2)) >= {startYM:String}
-          AND concat(substring(date_transaction, 7, 4), substring(date_transaction, 4, 2)) <= {endYM:String}
-        GROUP BY n_tiers, intitule_tiers
-        HAVING (montant_dette - montant_rembourse) > 0
+          AND ${perimetreDettesFournisseursSql(refExpr)}
+          AND ${YM_SQL} >= {startYM:String}
+          AND ${YM_SQL} <= {endYM:String}
+        GROUP BY numero_fournisseur
+        HAVING solde > 0
       )
       SELECT
         numero_fournisseur,
         nom_fournisseur,
         montant_dette,
-        montant_rembourse
+        montant_rembourse,
+        solde,
+        -- Total des soldes positifs de TOUS les fournisseurs (avant le LIMIT).
+        sum(solde) OVER () AS total_global
       FROM dettes_fournisseurs
-      ORDER BY (montant_dette - montant_rembourse) DESC
+      ORDER BY solde DESC
       LIMIT 10
     `,
-    query_params: {
-      batchIds,
-      rubriqueDJ: DEBT_RUBRIQUES.fournisseurs,
-      startYM,
-      endYM,
-    },
+    query_params: { batchIds, startYM, endYM, journauxTresorerie: journaux },
     format: "JSONEachRow",
   });
 
@@ -360,26 +370,22 @@ async function recupererTopParFournisseur(
     nom_fournisseur: string;
     montant_dette: string;
     montant_rembourse: string;
+    solde: string;
+    total_global: string;
   }>;
+  const totalGlobal = parseFloat(rows[0]?.total_global) || 0;
 
-  const mapped = rows.map((row) => {
-    const montantDette = parseFloat(row.montant_dette) || 0;
-    const montantRembourse = parseFloat(row.montant_rembourse) || 0;
+  return rows.map((row) => {
+    const solde = parseFloat(row.solde) || 0;
     return {
       numeroFournisseur: row.numero_fournisseur,
       label: row.nom_fournisseur,
-      montantDette,
-      montantRembourse,
-      solde: montantDette - montantRembourse,
-      pourcentage: 0,
+      montantDette: parseFloat(row.montant_dette) || 0,
+      montantRembourse: parseFloat(row.montant_rembourse) || 0,
+      solde,
+      pourcentage: totalGlobal > 0 ? (solde / totalGlobal) * 100 : 0,
     };
   });
-  // % = part du solde dans le total des soldes du Top 10 (total = 100 %).
-  const totalSolde = mapped.reduce((s, r) => s + r.solde, 0);
-  return mapped.map((r) => ({
-    ...r,
-    pourcentage: totalSolde !== 0 ? (r.solde / totalSolde) * 100 : 0,
-  }));
 }
 
 // Somme des soldes (crédit - débit) d'une rubrique sur une map de totaux.
@@ -438,16 +444,13 @@ export async function GET(
     // (mode cumulé/ytd-day) au lieu de 0 (mode périodique sur un seul mois).
     const dailyBaseline = searchParams.get("dailyBaseline") === "true";
 
-    let endYear: number;
-    let endMonth: number;
+    // Période demandée ; ramenée plus bas sur une période importée.
+    let endYear = 0;
+    let endMonth = 12;
     if (endPeriod) {
       const [y, m] = endPeriod.split("-");
-      endYear = parseInt(y);
-      endMonth = parseInt(m);
-    } else {
-      const now = new Date();
-      endYear = now.getFullYear();
-      endMonth = now.getMonth() + 1;
+      endYear = parseInt(y) || 0;
+      endMonth = parseInt(m) || 12;
     }
 
     let startYear: number | undefined;
@@ -479,8 +482,36 @@ export async function GET(
 
     const allPeriods = await prisma.comptablePeriod.findMany({
       where: { clientId: id },
-      select: { batchId: true, year: true },
+      select: { batchId: true, year: true, periodStart: true, periodEnd: true },
     });
+
+    // Années et mois d'un reporting importé (mêmes règles que la Synthèse) :
+    // une année sans import devient la plus récente, un mois hors reporting
+    // le dernier mois couvert ; la fenêtre ne dépasse jamais l'import.
+    const availableYears = [
+      ...new Set(allPeriods.map((p) => p.periodStart.getUTCFullYear())),
+    ].sort((a, b) => b - a);
+    if (availableYears.length > 0 && !availableYears.includes(endYear)) {
+      endYear = availableYears[0];
+    }
+    if (!endYear) endYear = new Date().getFullYear();
+    const moisDisponibles = moisCouverts(
+      allPeriods.filter((p) => p.periodStart.getUTCFullYear() === endYear),
+    );
+    const premierMois = moisDisponibles.length > 0 ? parseInt(moisDisponibles[0]) : 1;
+    const dernierMois =
+      moisDisponibles.length > 0 ? parseInt(moisDisponibles[moisDisponibles.length - 1]) : 12;
+    const moisDemandeFin = endMonth;
+    if (
+      moisDisponibles.length > 0 &&
+      !moisDisponibles.includes(String(endMonth).padStart(2, "0"))
+    ) {
+      endMonth = dernierMois;
+    }
+    // Début de fenêtre dans la même année ; un seul mois demandé (vue
+    // journalière) reste un seul mois après correction.
+    if (startYear !== undefined) startYear = endYear;
+    if (startMonth !== undefined && startMonth === moisDemandeFin) startMonth = endMonth;
     // + batchs des lignes saisies manuellement (intégrées au reporting), sauf si
     // le client a activé l'exclusion des saisies.
     const manualYears = [...new Set([...allPeriods.map((p) => p.year), endYear])];
@@ -531,7 +562,6 @@ export async function GET(
         const dayKey = d.toString().padStart(2, "0");
         const byRubrique = dailyData.get(dayKey);
         const { detteNee, rembourse } = flowsFournisseurs(byRubrique);
-        const dj = byRubrique?.get(DEBT_RUBRIQUES.fournisseurs);
 
         cumulDetteNee += detteNee;
         cumulRembourse += rembourse;
@@ -540,8 +570,10 @@ export async function GET(
           label: `${dayKey} ${MONTH_NAMES[endMonth - 1]}`,
           period: `${endYear}${endMonth.toString().padStart(2, "0")}${dayKey}`,
           yearMonth: `${endYear}-${endMonth.toString().padStart(2, "0")}-${dayKey}`,
-          detteFournisseurNee: dj?.credit || 0,
-          detteFournisseurRemboursee: dj?.debit || 0,
+          // Mêmes définitions que les KPI « Dettes Fournisseurs TTC » et
+          // « Décaissement Fournisseurs TTC » (DJ hors 408/409, par journal).
+          detteFournisseurNee: detteNee,
+          detteFournisseurRemboursee: rembourse,
           detteNeeTotal: detteNee,
           rembourseTotal: rembourse,
           tauxRemboursement: detteNee !== 0 ? (rembourse / detteNee) * 100 : 0,
@@ -557,7 +589,6 @@ export async function GET(
         const key = `${monthInfo.year}-${monthInfo.month.toString().padStart(2, "0")}`;
         const byRubrique = monthlyData.get(key);
         const { detteNee, rembourse } = flowsFournisseurs(byRubrique);
-        const dj = byRubrique?.get(DEBT_RUBRIQUES.fournisseurs);
 
         cumulDetteNee += detteNee;
         cumulRembourse += rembourse;
@@ -566,8 +597,10 @@ export async function GET(
           label: monthInfo.label,
           period: `${monthInfo.year}${monthInfo.month.toString().padStart(2, "0")}`,
           yearMonth: key,
-          detteFournisseurNee: dj?.credit || 0,
-          detteFournisseurRemboursee: dj?.debit || 0,
+          // Mêmes définitions que les KPI « Dettes Fournisseurs TTC » et
+          // « Décaissement Fournisseurs TTC » (DJ hors 408/409, par journal).
+          detteFournisseurNee: detteNee,
+          detteFournisseurRemboursee: rembourse,
           detteNeeTotal: detteNee,
           rembourseTotal: rembourse,
           tauxRemboursement: detteNee !== 0 ? (rembourse / detteNee) * 100 : 0,
@@ -578,6 +611,15 @@ export async function GET(
         });
       }
     }
+
+    // Courbes mensuelles : seuls les mois couverts par le reporting (les cumuls
+    // partent toujours de janvier).
+    const chartAffiche = useDaily
+      ? chartData
+      : chartData.filter((d) => {
+          const m = parseInt(d.yearMonth.slice(5, 7));
+          return m >= premierMois && m <= endMonth;
+        });
 
     // KPIs : solde de clôture (cumul crédit - débit) par rubrique, sur Jan→endMonth.
     let netDJ = 0;
@@ -618,7 +660,7 @@ export async function GET(
 
     const [topByType, topByFournisseur] = await Promise.all([
       recupererTopParType(dbName, allBatchIds, startYM, endYM, refExpr),
-      recupererTopParFournisseur(dbName, allBatchIds, startYM, endYM, refExpr),
+      recupererTopParFournisseur(dbName, allBatchIds, startYM, endYM, refExpr, journaux),
     ]);
 
     return NextResponse.json({
@@ -626,6 +668,8 @@ export async function GET(
       endPeriod: `${endYear}-${endMonth.toString().padStart(2, "0")}`,
       endYear,
       endMonth,
+      availableYears: availableYears.map(String),
+      moisDisponibles,
       mode,
       granularity: useDaily ? "day" : "month",
       singleMonth,
@@ -636,7 +680,7 @@ export async function GET(
         tauxRemboursement: kpis.tauxRemboursement,
         soldeDettes: cumulDetteNee - cumulRembourse,
       },
-      chartData,
+      chartData: chartAffiche,
       topByType,
       topByFournisseur,
     });

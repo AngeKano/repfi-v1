@@ -56,8 +56,10 @@ export function DetteTable({
   rows: TopDette[];
   getSubLabel?: (row: TopDette) => string | undefined;
 }) {
-  // Total du Top 10 : seul le solde est totalisé (le % du total fait 100 %).
+  // Total du Top 10 : solde et somme des parts affichées (100 % seulement si
+  // le Top 10 couvre toutes les dettes).
   const totalSolde = rows.reduce((s, r) => s + r.solde, 0);
+  const totalPart = rows.reduce((s, r) => s + r.pourcentage, 0);
 
   return (
     <Card>
@@ -137,7 +139,7 @@ export function DetteTable({
               </div>
               <div className="col-span-2 text-right">
                 <Badge variant="outline" className="text-xs">
-                  100%
+                  {totalPart.toFixed(1)}%
                 </Badge>
               </div>
             </div>

@@ -90,6 +90,13 @@ interface DetteKpis {
 
 interface DetteData {
   endPeriod: string;
+  /** Fin de fenêtre réellement calculée (année importée, mois couvert). */
+  endYear?: number;
+  endMonth?: number;
+  /** Années d'un reporting importé, décroissantes. */
+  availableYears?: string[];
+  /** Mois « 01 »…« 12 » couverts par le reporting de l'année. */
+  moisDisponibles?: string[];
   mode: "cumule" | "periodique";
   granularity: "month" | "day";
   kpis: DetteKpis;
@@ -289,12 +296,8 @@ export default function ClientDettesTab({
   // Graphiques masqués de l'onglet, mémorisés par client.
   const graphes = useGraphesMasques(`dettes-${clientId}`, GRAPHES);
 
-  const yearOptions = useMemo(() => {
-    const current = new Date().getFullYear();
-    const years: string[] = [];
-    for (let y = current + 2; y >= current - 10; y--) years.push(y.toString());
-    return years;
-  }, []);
+  // Années proposées : celles d'un reporting importé (renvoyées par l'API).
+  const yearOptions = useMemo(() => data?.availableYears ?? [year], [data, year]);
 
   useEffect(() => {
     const fetchDettes = async () => {
@@ -339,6 +342,16 @@ export default function ClientDettesTab({
         if (!res.ok) throw new Error("Erreur API Dettes");
         const json = (await res.json()) as DetteData;
         setData(json);
+        // Le filtre suit la période réellement calculée : une année ou un mois
+        // sans reporting n'est jamais affiché.
+        if (json.endYear && String(json.endYear) !== year) {
+          setYear(String(json.endYear));
+          return;
+        }
+        const finCalculee = json.endMonth ? String(json.endMonth).padStart(2, "0") : null;
+        if (finCalculee && periodType !== "year" && finCalculee !== month) {
+          setSelectedMonth(finCalculee);
+        }
       } catch (error) {
         console.error("Fetch dettes error:", error);
         toast.error("Erreur lors du chargement des données de dettes");
@@ -347,7 +360,7 @@ export default function ClientDettesTab({
       }
     };
     fetchDettes();
-  }, [clientId, year, month, mode, periodType, cumulGranularity]);
+  }, [clientId, year, month, mode, periodType, cumulGranularity, setYear, setSelectedMonth]);
 
   // ----- KPI config handlers -----
   const updateKpi = (items: DetteKpiItem[]) => {
@@ -375,22 +388,21 @@ export default function ClientDettesTab({
   const formatKpiValue = (item: DetteKpiItem, value: number) =>
     item.percent ? `${value.toFixed(1)}%` : formatCompactOnly(value);
 
-  // Label "période" affiché à droite de la barre de filtres, identique au
-  // comportement de ClientReportingChart.
+  // Libellé de la fenêtre réellement calculée : du premier mois couvert par le
+  // reporting au mois de fin (en granularité Année, le dernier mois couvert).
   const getPeriodLabel = (): string => {
-    if (periodType === "year") return `Janvier - Décembre ${year}`;
-    if (periodType === "ytd") {
-      const m = MONTHS.find((x) => x.value === month);
-      return `Janvier - ${m?.label || ""} ${year}`;
-    }
-    if (periodType === "ytd-day") {
-      const m = MONTHS.find((x) => x.value === month);
-      return `Janvier - ${m?.label || ""} ${year} (jour par jour)`;
-    }
-    // periodType === "month"
-    const m = MONTHS.find((x) => x.value === month);
-    return `${m?.label || ""} ${year}`;
+    const nom = (v?: string | null) => MONTHS.find((x) => x.value === v)?.label || "";
+    const dispo = data?.moisDisponibles ?? [];
+    const debut = nom(dispo[0] ?? "01");
+    const fin = nom(data?.endMonth ? String(data.endMonth).padStart(2, "0") : month);
+    if (periodType === "ytd-day") return `${debut} - ${fin} ${year} (jour par jour)`;
+    if (periodType === "month") return `${nom(month)} ${year}`;
+    return `${debut} - ${fin} ${year}`;
   };
+  // Mois proposés : ceux couverts par le reporting de l'année.
+  const moisChoisissables = MONTHS.filter(
+    (m) => !data?.moisDisponibles?.length || data.moisDisponibles.includes(m.value),
+  );
 
   const handleYearChange = (direction: "prev" | "next") => {
     const idx = yearOptions.indexOf(year);
@@ -495,7 +507,7 @@ export default function ClientDettesTab({
                 <SelectValue placeholder="Mois" />
               </SelectTrigger>
               <SelectContent>
-                {MONTHS.map((m) => (
+                {moisChoisissables.map((m) => (
                   <SelectItem key={m.value} value={m.value}>
                     {m.label}
                   </SelectItem>
@@ -705,11 +717,11 @@ export default function ClientDettesTab({
             <ChartContainer
               config={{
                 detteFournisseurNee: {
-                  label: "Dette fournisseurs",
+                  label: "Dettes Fournisseurs TTC",
                   color: "hsl(221, 83%, 53%)",
                 },
                 detteFournisseurRemboursee: {
-                  label: "Dette remboursée",
+                  label: "Décaissement Fournisseurs TTC",
                   color: "hsl(221, 83%, 73%)",
                 },
               }}
@@ -741,8 +753,8 @@ export default function ClientDettesTab({
                       formatter={(value, name) => [
                         formatCompactOnly(value as number),
                         name === "detteFournisseurNee"
-                          ? "Dette fournisseurs"
-                          : "Dette remboursée",
+                          ? "Dettes Fournisseurs TTC"
+                          : "Décaissement Fournisseurs TTC",
                       ]}
                     />
                   }
@@ -770,7 +782,7 @@ export default function ClientDettesTab({
       {/* Tableau Top — par fournisseur */}
       <DetteTable
         title="Analyse des Dettes par Fournisseur — Top 10"
-        description="Fournisseurs avec les dettes les plus élevées (DJ)"
+        description="Fournisseurs avec les dettes les plus élevées — solde DJ hors 408/409 (dettes hors journaux de trésorerie − décaissements) ; % = part de toutes les dettes fournisseurs"
         firstColLabel="Fournisseur"
         icon={<PiWarningDuotone className="w-5 h-5 text-orange-500" />}
         rows={data.topByFournisseur}
