@@ -79,20 +79,23 @@ interface LigneResultat {
   repere: string | null;
   montants: number[];
 }
-// Compte d'exploitation : lignes du compte de résultat, janvier → mois du filtre + total.
+// Compte d'exploitation : lignes du compte de résultat, mois importés → mois du filtre + total.
 interface LigneExploitation {
   ref: string;
   libelle: string;
   total: boolean;
   sens: string | null;
   repere: string | null;
-  /** Net périodique de chaque mois, de janvier au mois du filtre. */
+  /** Net périodique de chaque mois, du premier mois importé au mois du filtre. */
   mois: number[];
-  /** Cumul depuis janvier. */
+  /** Cumul des mois affichés. */
   cumul: number;
 }
 export interface ExploitationData {
   year: number;
+  /** Premier et dernier mois affichés (1 à 12). */
+  moisDebut?: number;
+  moisFin?: number;
   mois: { ym: string; label: string }[];
   lignes: LigneExploitation[];
 }
@@ -101,6 +104,11 @@ interface EtatsData {
   client: { id: string; name: string };
   exercices: Exercice[];
   availableYears: number[];
+  /** Période réellement calculée (année N, mois de fin « MM »). */
+  yearN?: number;
+  month?: string;
+  /** Mois « MM » couverts par le reporting de N. */
+  moisDisponibles?: string[];
   manualIncluded: boolean;
   periodeLabel: string;
   actif: LigneActif[];
@@ -250,6 +258,9 @@ export default function ClientEtatsFinanciersTab({
   // Formats cochés : un seul ou les deux à la fois.
   const [formats, setFormats] = useState<Array<"xlsx" | "pdf">>(["xlsx"]);
 
+  // Granularité Année : jusqu'au dernier mois importé (l'API s'y arrête).
+  const moisDemande = cumulGranularity === "annee" ? "12" : selectedMonth;
+
   const load = useCallback(async () => {
     setLoading(true);
     setError("");
@@ -257,19 +268,28 @@ export default function ClientEtatsFinanciersTab({
       const qs = new URLSearchParams({
         year,
         periodType,
-        month: selectedMonth,
+        month: moisDemande,
       });
       const res = await fetch(`/api/clients/${clientId}/reporting/etats-financiers?${qs}`);
       if (!res.ok) throw new Error("Erreur API");
-      setData((await res.json()) as EtatsData);
+      const json = (await res.json()) as EtatsData;
+      setData(json);
       setExOffset(0);
+      // Le filtre suit la période réellement calculée : une année ou un mois
+      // sans reporting n'est jamais affiché (l'API se cale sur l'année la plus
+      // récente et sur le dernier mois couvert).
+      if (json.yearN && String(json.yearN) !== year) {
+        setYear(String(json.yearN));
+        return;
+      }
+      if (json.month && json.month !== selectedMonth) setSelectedMonth(json.month);
     } catch (e) {
       console.error(e);
       setError("Impossible de charger les états financiers.");
     } finally {
       setLoading(false);
     }
-  }, [clientId, year, periodType, selectedMonth]);
+  }, [clientId, year, periodType, moisDemande, selectedMonth, setYear, setSelectedMonth]);
 
   useEffect(() => {
     load();
@@ -278,7 +298,8 @@ export default function ClientEtatsFinanciersTab({
   // Compte d'exploitation : chargé à la première ouverture du sous-onglet (ou
   // au téléchargement), pour l'année du filtre. La clé écarte un résultat
   // obtenu pour un autre client ou une autre année.
-  // Mois de fin du filtre : décembre en granularité Année.
+  // Mois de fin du filtre : dernier mois importé en granularité Année (l'API
+  // ramène « 12 » sur le dernier mois couvert).
   const moisFinExploitation = periodType === "year" || cumulGranularity === "annee" ? "12" : selectedMonth;
   const cleExploitation = `${clientId}:${year}:${moisFinExploitation}`;
   const [exploitation, setExploitation] = useState<{
@@ -313,16 +334,28 @@ export default function ClientEtatsFinanciersTab({
   }, [subTab, exploitationCourante, exploitationLoading, chargerExploitation]);
 
   const cumule = periodType === "ytd" || periodType === "ytd-day";
-  const monthLabel = MONTHS.find((m) => m.value === selectedMonth)?.label ?? "Décembre";
-  const periodLabel = cumule
-    ? `Janvier - ${monthLabel} ${year}${periodType === "ytd-day" ? " (jour par jour)" : ""}`
-    : cumulGranularity === "annee"
-      ? `Janvier - Décembre ${year}`
-      : `${monthLabel} ${year}`;
+  // Fenêtre réellement calculée : du premier mois importé au mois de fin
+  // renvoyé par l'API (le mois seul en périodique + Mois).
+  const nomMois = (v?: string) => MONTHS.find((m) => m.value === v)?.label ?? "";
+  const dispo = data?.moisDisponibles ?? [];
+  const moisCalcule = data?.month ?? moisDemande;
+  const periodLabel =
+    periodType === "month"
+      ? `${nomMois(moisCalcule)} ${year}`
+      : `${nomMois(dispo[0] ?? "01")} - ${nomMois(moisCalcule)} ${year}`;
+  // Mois proposés : ceux du reporting importé.
+  const moisChoisissables = MONTHS.filter((m) => !dispo.length || dispo.includes(m.value));
 
-  // Compte d'exploitation : « Juillet », « CUMUL JANV. - JUIL. ».
-  const libelleMoisFin = MONTHS.find((m) => m.value === moisFinExploitation)?.label ?? "Décembre";
-  const cumulExploitation = libelleCumul(parseInt(moisFinExploitation, 10) || 12);
+  // Compte d'exploitation : « Juillet », « CUMUL JANV. - JUIL. » — mois
+  // réellement affichés (du premier mois importé au mois de fin).
+  const moisExploitation = exploitationCourante?.data?.mois ?? [];
+  const libelleMoisDebut = moisExploitation[0]?.label ?? "Janvier";
+  const libelleMoisFin =
+    moisExploitation[moisExploitation.length - 1]?.label ?? (nomMois(moisFinExploitation) || "Décembre");
+  const cumulExploitation = libelleCumul(
+    exploitationCourante?.data?.moisFin ?? (parseInt(moisFinExploitation, 10) || 12),
+    exploitationCourante?.data?.moisDebut ?? 1,
+  );
 
   const yearOptions = (data?.availableYears ?? []).map(String);
   const handleYearChange = (dir: "prev" | "next") => {
@@ -414,7 +447,7 @@ export default function ClientEtatsFinanciersTab({
               <SelectValue placeholder="Mois" />
             </SelectTrigger>
             <SelectContent>
-              {MONTHS.map((m) => (
+              {moisChoisissables.map((m) => (
                 <SelectItem key={m.value} value={m.value}>
                   {m.label}
                 </SelectItem>
@@ -585,7 +618,7 @@ export default function ClientEtatsFinanciersTab({
             <DialogDescription>
               Bilan (actif et passif) et compte de résultat, pour{" "}
               {visibles.map((e) => e.label).join(" et ")} — période : {periodLabel} ; compte
-              d&apos;exploitation {year} (janvier → {libelleMoisFin} et total).
+              d&apos;exploitation {year} ({libelleMoisDebut.toLowerCase()} → {libelleMoisFin.toLowerCase()} et total).
             </DialogDescription>
           </DialogHeader>
           <div className="grid grid-cols-2 gap-3 pt-2">
@@ -827,10 +860,11 @@ export default function ClientEtatsFinanciersTab({
       {subTab === "exploitation" && (
         <div className="space-y-3">
           <p className="text-xs text-[#335890]">
-            Exercice {exploitationCourante?.data?.year ?? year} — de janvier à {libelleMoisFin.toLowerCase()} (mois du
-            filtre). Chaque mois est <strong>indépendant</strong> : il porte les mouvements du seul mois
-            (net périodique), en mode périodique comme en mode cumulé. Le <strong>total</strong> est le
-            cumul de janvier à {libelleMoisFin.toLowerCase()}.
+            Exercice {exploitationCourante?.data?.year ?? year} — de {libelleMoisDebut.toLowerCase()} à{" "}
+            {libelleMoisFin.toLowerCase()} (mois importés jusqu&apos;au mois du filtre). Chaque mois est{" "}
+            <strong>indépendant</strong> : il porte les mouvements du seul mois (net périodique), en mode
+            périodique comme en mode cumulé. Le <strong>total</strong> est le cumul de{" "}
+            {libelleMoisDebut.toLowerCase()} à {libelleMoisFin.toLowerCase()}.
           </p>
           {exploitationCourante?.erreur ? (
             <div className="flex flex-col items-center justify-center h-40 text-muted-foreground">

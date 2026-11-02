@@ -372,7 +372,7 @@ Sans reporting en N-1, la comparaison est affichée « non disponible » (ni
 montant N-1, ni variation).
 
 **Période disponible = reporting importé** (Synthèse, Chiffre d'affaires,
-Résultats) :
+Résultats ; mêmes règles dans les onglets des §11 à §18) :
 
 | Filtre | Règle |
 |---|---|
@@ -395,8 +395,9 @@ Charges vs Produits) partent du cumul de janvier au mois précédent.
 
 **À-nouveaux** : une écriture des journaux `RAN` / `AN` datée de décembre
 (31/12 de l'exercice précédent, acceptée à l'import) compte en **janvier** :
-c'est le solde d'ouverture (`src/lib/reporting/periode.ts`, Synthèse et
-Trésorerie).
+c'est le solde d'ouverture (`src/lib/reporting/periode.ts` : Synthèse,
+Recouvrement, Règlement Fournisseurs, Dettes, Trésorerie, Ratios, États
+financiers).
 
 **Filtres partagés** : année, mode, granularité et mois sont communs aux
 onglets. À la première ouverture d'un client, l'année se cale sur l'exercice
@@ -832,13 +833,22 @@ Côté **Passif** : `NET = Σ(crédit − débit)`.
 ### Fenêtre et exercices
 
 - Le **Bilan** est une photo à une date : il part **toujours du 1er janvier**,
-  quel que soit le mode. Le **Compte de résultat** suit le mode choisi
-  (périodique : le mois seul ; cumulé : janvier → mois).
+  quel que soit le mode, à-nouveaux compris (un à-nouveau `RAN` / `AN` daté
+  du 31/12 précédent compte en janvier, §4). Le **Compte de résultat** suit le
+  mode choisi (périodique : le mois seul ; cumulé : janvier → mois).
+- **Exercice N** = année du filtre si elle a un reporting importé, sinon la
+  plus récente (le filtre se cale sur l'année calculée). Exercice d'un lot :
+  année de **début** de sa période.
+- **Mois de fin** : mois du filtre, choisi parmi les mois couverts par
+  l'import ; un mois hors reporting devient le dernier mois couvert. En
+  granularité **Année**, la fenêtre s'arrête au **dernier mois importé**.
+  Tous les exercices comparés partagent la **même fenêtre** (ex. bilan au
+  30/04/2026 contre bilan au 30/04/2025).
 - L'en-tête d'un exercice affiche la **date de fin de la fenêtre filtrée**,
   bornée à la clôture réelle (ex. « EXERCICE au 30/04/2026 »).
 - Deux exercices affichés au maximum (N et N-1), navigation par flèches
-  au-delà. Un exercice **sans aucune écriture** sur la fenêtre n'est pas
-  affiché.
+  au-delà. L'exercice **N** est toujours en première colonne ; un exercice
+  antérieur **sans aucune écriture** sur la fenêtre n'est pas affiché.
 
 ### Normalisation des codes
 
@@ -882,16 +892,20 @@ Troisième sous-onglet : les mêmes 42 lignes, **mois par mois**.
 | Colonne | Calcul |
 |---|---|
 | REF, LIBELLES | Figées pendant le défilement horizontal |
-| Janvier … mois du filtre (ex. 7 colonnes pour juillet) | **Net périodique** : `Σ(crédit − débit)` des mouvements du seul mois, par rubrique |
-| TOTAL — cumul janvier → mois du filtre | Somme des mois affichés (« CUMUL JANV. - JUIL. ») |
+| Premier mois importé … mois du filtre (ex. 7 colonnes de janvier à juillet) | **Net périodique** : `Σ(crédit − débit)` des mouvements du seul mois, par rubrique |
+| TOTAL — cumul janvier → mois du filtre | Somme des mois affichés (« CUMUL JANV. - JUIL. », « CUMUL MARS - JUIL. » pour un import commencé en mars) |
 
 - Les sous-totaux `XA…XI` sont recalculés pour chaque mois avec les formules
   de la §7 ; elles sont linéaires, donc le total d'un sous-total égale la
   somme de ses mois.
-- Exercice = l'**année du filtre** ; les colonnes vont de janvier au **mois
-  du filtre** (décembre en granularité Année). Le mode de calcul ne change
-  rien : chaque mois est **indépendant** (net périodique, période 1 sans lien
-  avec période 2) et seul le total est cumulé depuis janvier.
+- Exercice = l'**année du filtre** (reporting importé, sinon la plus
+  récente) ; les colonnes vont du **premier mois importé** au **mois du
+  filtre** (dernier mois importé en granularité Année) : aucun mois hors
+  reporting. Une écriture saisie avant le premier mois importé fait commencer
+  les colonnes à son mois, pour que le total reste le cumul depuis janvier
+  (égal au Compte de résultat cumulé). Le mode de calcul ne change rien :
+  chaque mois est **indépendant** (net périodique, période 1 sans lien avec
+  période 2) et seul le total est cumulé.
 - Chargé à la première ouverture du sous-onglet ; inclus dans les exports
   (§17).
 
@@ -1357,17 +1371,20 @@ Sous-onglets Bilan et Compte de résultat : exercices comparés (N, N-1…), col
 
 | Paramètre | Type | Défaut | Effet |
 |---|---|---|---|
-| `year` | AAAA | tous les exercices | Exercice N : les exercices suivants sont ignorés |
-| `periodType` | `year` ou `month` ou `ytd` ou `ytd-day` | `ytd` | Bilan toujours janvier → mois de fin. Compte de résultat : le mois seul en `month`, janvier → mois sinon. `year` force décembre |
-| `month` | MM | `12` | Mois de fin de la fenêtre |
+| `year` | AAAA | exercice le plus récent | Exercice N s'il a un reporting importé, sinon le plus récent ; les exercices antérieurs sont comparés, les suivants ignorés |
+| `periodType` | `year` ou `month` ou `ytd` ou `ytd-day` | `ytd` | Bilan toujours janvier → mois de fin. Compte de résultat : le mois seul en `month`, janvier → mois sinon. `year` : dernier mois importé |
+| `month` | MM | `12` | Mois de fin de la fenêtre ; hors reporting → dernier mois couvert |
 
 ```
 {
   client: { id, name },
-  exercices: [{ year, label }],   // du plus récent au plus ancien, sans écriture → écarté ; label "JJ/MM/AAAA" (fin de fenêtre bornée à la clôture)
+  exercices: [{ year, label }],   // N puis les antérieurs ; un antérieur sans écriture est écarté ; label "JJ/MM/AAAA" (fin de fenêtre bornée à la clôture)
   availableYears,                 // number[] décroissant
+  yearN,                          // exercice réellement calculé (absent sans aucun import)
+  month,                          // "MM" : mois de fin réellement calculé
+  moisDisponibles,                // "MM"[] couverts par le reporting de N
   manualIncluded,
-  periodeLabel,                   // "Janvier - avril", "Janvier - Décembre" ou "avril"
+  periodeLabel,                   // "Janvier - avril" (premier mois couvert - mois de fin) ou "avril" (périodique + Mois)
   actif: [{ ref, libelle, total, bruts, amorts, nets }],   // un montant par exercice ; brut (débit − crédit), amort (crédit − débit)
   passif: [{ ref, libelle, total, nets }],                 // crédit − débit ; CJ += XI cumulé
   resultat: [{ ref, libelle, total, sens, repere, montants }]   // crédit − débit ; sens "+" ou "-" ou "-/+" ou null
@@ -1647,24 +1664,26 @@ Inclut ou exclut les écritures saisies manuellement de tous les calculs du repo
 ```
 
 ### 25.17 `GET /reporting/compte-exploitation`
-Sous-onglet Compte d'exploitation : lignes du compte de résultat de janvier au mois du filtre, plus le total.
+Sous-onglet Compte d'exploitation : lignes du compte de résultat du premier mois importé au mois du filtre, plus le total.
 
 | Paramètre | Type | Défaut | Effet |
 |---|---|---|---|
-| `year` | AAAA | exercice le plus récent | Exercice affiché, sinon le plus récent qui le précède |
-| `month` | MM | `12` | Dernier mois affiché |
-| `periodType` | `year` ou autre | `ytd` | `year` force décembre |
+| `year` | AAAA | exercice le plus récent | Exercice affiché s'il a un reporting importé, sinon le plus récent |
+| `month` | MM | `12` | Dernier mois affiché ; hors reporting → dernier mois couvert |
+| `periodType` | `year` ou autre | `ytd` | `year` : dernier mois importé |
 
 ```
 {
   client: { id, name },
   availableYears, manualIncluded,
   year,
+  moisDebut,               // 1 à 12 : premier mois importé (ou mois d'une saisie antérieure)
   moisFin,                 // 1 à 12
-  mois: [{ ym, label }],   // janvier → moisFin : "AAAAMM", "Janvier"…
+  moisDisponibles,         // "MM"[] couverts par le reporting de l'exercice
+  mois: [{ ym, label }],   // moisDebut → moisFin : "AAAAMM", "Janvier"…
   lignes: [{ ref, libelle, total, sens, repere, mois, cumul }]
       // mois : un montant par mois affiché, en net périodique (crédit − débit du seul mois) ; sous-totaux XA…XI recalculés par mois
-      // cumul : total janvier → moisFin (= somme des mois)
+      // cumul : total janvier → moisFin (= somme des mois affichés)
 }
 ```
 
@@ -1720,7 +1739,7 @@ ouvert par défaut, replié d'un clic sur son en-tête), séparateur, **Membres*
 | Trésorerie | KPI par rubrique, trésorerie par comptes |
 | Dettes Financières | Dettes financières, emprunts, crédit-bail |
 | Ratios bilantiels | FRNG, BFR (global, exploitation, HAO) |
-| États Financiers | Bilan et Compte de résultat (exercices comparés), Compte d'exploitation (12 mois + total), export PDF / Excel |
+| États Financiers | Bilan et Compte de résultat (exercices comparés), Compte d'exploitation (mois importés jusqu'au mois du filtre + total), export PDF / Excel |
 | Bilan d'activité | Lecture narrative de l'exercice |
 | Import | Fichiers comptables, mise à jour des référentiels et historique |
 | Comptabilité | Grand livre (saisie) et Tables de dimension |
@@ -1780,6 +1799,7 @@ ouvert par défaut, replié d'un clic sur son en-tête), séparateur, **Membres*
 | 29/10/2026 | Charges et rentabilité : colonne des valeurs à droite de la cascade **retirée** — montant (K) et pourcentage se lisent dans la barre ou dans l'infobulle ; la barre occupe la place libérée (§22). |
 | 02/11/2026 | Charges et rentabilité : pourcentage du CA **entre parenthèses** dans les barres et l'infobulle — « −11 766K (55,11 %) » (§22). |
 | 02/11/2026 | **Import d'une période avec le Grand Livre seul** : Plan comptable, Plan des tiers et Codes journaux deviennent facultatifs (écran de création, « Modifier » et fenêtre d'ajout). Airflow **contrôle le Grand Livre avant toute écriture** : un compte (après conversion PCG → SYSCOHADA), un code journal (RAN compris) ou un n° de tiers absent des référentiels — en base ou dans les fichiers du même import — fait échouer l'import sans rien enregistrer, avec le nombre d'éléments manquants et les 20 premiers par catégorie ; on complète les référentiels puis « Relancer le traitement ». Un nouvel envoi remplace entièrement les fichiers de la période ; l'échec du contrôle n'efface pas les données d'une période déjà importée. « Modifier » corrigé (il attendait encore les 5 anciens fichiers) et soumis au droit Charger des fichiers (§3, §25.18 à §25.20). |
+| 02/11/2026 | **Audit des filtres — États financiers** (Bilan, Compte de résultat, Compte d'exploitation) : exercice d'un lot lu à la date de début de période (et non au champ `year`) ; année sans reporting ramenée sur la plus récente et filtre calé sur la période calculée (une année antérieure à tout import ne donnait plus aucun exercice) ; mois limités au reporting importé ; granularité Année arrêtée au dernier mois importé, même fenêtre pour tous les exercices comparés (le bilan N au 30/04 était comparé au bilan N-1 au 31/12, le compte de résultat sur 4 mois contre 12) ; à-nouveau daté du 31/12 précédent compté en janvier (il était exclu : bilan sans soldes d'ouverture) ; exercice N toujours en première colonne ; Compte d'exploitation du premier mois importé au mois du filtre (plus de colonnes à 0 hors import), total toujours cumulé depuis janvier (§4, §17, §18, §25.6, §25.17). |
 | 02/11/2026 | **Import — contrôle des référentiels limité aux référentiels non joints** : un référentiel joint à l'import (plan comptable, codes journaux, plan tiers) fait foi et n'est plus contrôlé, comme avant ; un import complet (4 fichiers) n'est jamais bloqué par le contrôle. Seuls les référentiels absents de l'import, pris dans Click Insight, sont contrôlés (Grand Livre seul, ou incomplet). Cause : un import complet refusé pour « 4 codes journaux inconnus : CAI, BQU, PAI, VTE » alors qu'un fichier de codes journaux était joint — le format Sage .pnm porte le code journal sur 3 caractères (§3). |
 | 02/11/2026 | **Audit des filtres — Ratios bilantiels** : écran aligné sur la période calculée (l'API remplaçait en silence une année sans reporting), flèches et mois limités à l'import, libellé et sous-titre « encours à fin <mois> » ; courbes et légendes N-1 (FRNG, BFR, DSO du Recouvrement) masquées sans reporting N-1, au lieu d'une courbe plate à 0 ; corrections de l'API (à-nouveaux, variation signée) héritées de l'audit Dettes Financières (§16 ; audit §7.7). |
 | 02/11/2026 | **Audit des filtres — Dettes Financières** (API des ratios, partagée avec Ratios bilantiels et le DSO du Recouvrement) : à-nouveau daté du 31/12 précédent désormais compté dans les encours (il était exclu de la fenêtre janvier → décembre : soldes d'ouverture manquants pour FRNG, BFR, dettes financières, DSO) ; créances d'ouverture du DSO lues sur les journaux d'à-nouveaux (et plus seulement à la date du 01/01) ; année sans reporting : le filtre se cale sur l'année calculée (l'API la remplaçait en silence) ; flèches et mois limités à l'import, fenêtre « Année » arrêtée au dernier mois importé ; variation signée quand N-1 = 0 ; N-1 sans reporting « non disponible » (§15, §16, §25.5 ; audit §7.6). |
