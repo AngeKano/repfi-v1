@@ -648,8 +648,19 @@ créances, un remboursement en déduction des encaissements.
 
 - Par client : créances, encaissements et solde selon les mêmes définitions.
 - `HAVING solde > 0`, tri par solde décroissant.
-- `%` = part du solde dans le total de **toutes** les créances positives.
+- `%` = part du solde dans le total de **toutes** les créances positives ; la
+  ligne « Total Top 10 » affiche la part cumulée du Top 10 (100 % seulement si
+  le client a 10 créanciers ou moins).
 - Une créance sans tiers est regroupée sous son compte.
+
+### Filtres et fenêtre
+
+L'onglet suit les **filtres partagés** (année, mois, granularité) ; le mode y
+est toujours **Cumulé** : janvier → mois choisi (granularité Mois) ou → dernier
+mois importé (granularité Année). Années et mois limités au reporting importé
+(§4). Toutes les écritures sont lues par **date comptable**, tous lots
+confondus ; un à-nouveau daté du 31/12 précédent compte en janvier (solde
+d'ouverture des créances).
 
 ### Délai moyen de paiement clients (DSO)
 
@@ -1136,18 +1147,20 @@ Onglet Recouvrement : créances et encaissements clients mois par mois, plus le 
 
 | Paramètre | Type | Défaut | Effet |
 |---|---|---|---|
-| `endPeriod` | AAAA-MM | mois courant | Fin de la fenêtre. chartData et totals vont de janvier à `endPeriod`, dans l'année de fin |
+| `endPeriod` | AAAA-MM | dernière année importée, dernier mois couvert | Fin de la fenêtre. chartData et totals vont de janvier à `endPeriod`, dans l'année de fin. Une année sans reporting devient la plus récente, un mois hors reporting le dernier mois couvert |
 | `startPeriod` | AAAA-MM | janvier de l'année de fin | Début de la fenêtre, pour `topCreances` uniquement |
 
 ```
 {
   client: { id, name },
-  endPeriod,            // "AAAA-MM"
+  endPeriod,            // "AAAA-MM" réellement calculé
   endYear, endMonth,    // nombres
+  availableYears,       // string[] décroissant : années d'un reporting importé
+  moisDisponibles,      // "MM"[] couverts par le reporting de endYear
   chartData: [{
     label,                                  // "Jan 2025"
     period,                                 // "AAAAMM"
-    yearMonth,                              // "AAAA-MM"
+    yearMonth,                              // "AAAA-MM" (mois couverts par le reporting jusqu'à endPeriod)
     caTTCTotal,                             // créances clients TTC du mois (BI hors 418/419, hors journaux de trésorerie)
     caEncaisseTTC,                          // encaissements clients TTC du mois (journaux de trésorerie)
     tauxRecouvrement,                       // % du mois
@@ -1163,7 +1176,8 @@ Onglet Recouvrement : créances et encaissements clients mois par mois, plus le 
     soldeCreance,                // caTTCTotal − caEncaisseTTC
     pourcentageTotal             // % du total des soldes positifs de TOUS les clients
   }],
-  totalCreances                  // Σ soldeCreance du Top 10
+  totalCreances,                 // Σ soldeCreance du Top 10
+  partTop10                      // Σ pourcentageTotal du Top 10 (part du Top 10 dans toutes les créances)
 }
 ```
 
@@ -1702,6 +1716,7 @@ ouvert par défaut, replié d'un clic sur son en-tête), séparateur, **Membres*
 | 29/10/2026 | Charges et rentabilité : colonne des valeurs à droite de la cascade **retirée** — montant (K) et pourcentage se lisent dans la barre ou dans l'infobulle ; la barre occupe la place libérée (§22). |
 | 02/11/2026 | Charges et rentabilité : pourcentage du CA **entre parenthèses** dans les barres et l'infobulle — « −11 766K (55,11 %) » (§22). |
 | 02/11/2026 | **Import d'une période avec le Grand Livre seul** : Plan comptable, Plan des tiers et Codes journaux deviennent facultatifs (écran de création, « Modifier » et fenêtre d'ajout). Airflow **contrôle le Grand Livre avant toute écriture** : un compte (après conversion PCG → SYSCOHADA), un code journal (RAN compris) ou un n° de tiers absent des référentiels — en base ou dans les fichiers du même import — fait échouer l'import sans rien enregistrer, avec le nombre d'éléments manquants et les 20 premiers par catégorie ; on complète les référentiels puis « Relancer le traitement ». Un nouvel envoi remplace entièrement les fichiers de la période ; l'échec du contrôle n'efface pas les données d'une période déjà importée. « Modifier » corrigé (il attendait encore les 5 anciens fichiers) et soumis au droit Charger des fichiers (§3, §25.18 à §25.20). |
+| 02/11/2026 | **Audit des filtres — Recouvrement Clients** : l'onglet utilise désormais les **filtres partagés** (année, mois, granularité ; mode toujours Cumulé) au lieu de ses propres sélecteurs (année et mois courants par défaut, liste d'années codée en dur) ; années et mois limités au reporting importé, fenêtre « Année » arrêtée au dernier mois importé ; à-nouveau daté du 31/12 précédent compté en janvier (lu sur tous les lots, il doublait décembre N-1 et manquait en N) ; ligne « Total Top 10 » : part réelle du Top 10 au lieu de « 100 % » (§12, §25.2 ; audit §7.2). |
 | 02/11/2026 | **Audit des filtres — Synthèse Financière** (et Chiffre d'affaires / Résultats, même API) : années et mois limités au reporting importé (plus d'année ni de mois sans import ; l'écran se cale sur l'année la plus récente et le dernier mois couvert, la fenêtre « Année » s'arrête au dernier mois importé, même fenêtre pour N-1) ; Cumulé + Mois = janvier → mois pour les KPI (ils ne portaient que sur le mois) ; Trésorerie toujours un solde de janvier à la fin de la période (le périodique mensuel n'en donnait que le mouvement) ; courbes cumulées en Cumulé + Mois parties du cumul janvier → mois précédent (Charges vs Produits, subventions) ; à-nouveaux datés du 31/12 précédent comptés en janvier (Synthèse et Trésorerie) ; N-1 sans reporting affiché « non disponible », sans variation (§4, §25.1 ; audit §7). |
 | 02/11/2026 | **Trésorerie — détail par compte aligné sur les indicateurs** : un compte de passif (rubrique D…, solde normal créditeur) ou de dépréciation est lu en **crédit − débit**, soit (débit − crédit) × −1, dans « Trésorerie par comptes » comme dans les indicateurs ; 565000 (DQ, débiteur de 1) vaut −1 dans le tableau comme dans « Autres Trésorerie Passif » (il valait 1 dans le tableau). Ces comptes sont repérés « en moins » et déduits ; la ligne Total Trésorerie reprend l'indicateur. Indicateurs inchangés. **Variations** : quand N-1 = 0, ±100 % selon le signe de N (de 0 à −1 n'affiche plus « +100 % ») — tous les KPI, Produits par Nature, Trésorerie (§11, §24). |
 | 02/11/2026 | Tables de dimension › Mapping : la colonne **Rubrique par défaut** est placée **avant** la colonne Rubrique (Racine, Rubrique par défaut, Rubrique, Type…) (§3). |

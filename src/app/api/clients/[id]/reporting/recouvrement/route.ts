@@ -11,6 +11,7 @@ import {
 } from "@/lib/reporting/creances";
 import { bilanRefExpr } from "@/lib/clickhouse/schema";
 import { journauxTresorerie } from "@/lib/clickhouse/plan-comptable";
+import { YM_SQL, moisCouverts } from "@/lib/reporting/periode";
 
 const clickhouseClient = createClickhouseClient({
   url: process.env.CLICKHOUSE_HOST || "http://localhost:8123",
@@ -88,8 +89,10 @@ async function recupererRecouvrementParYearMonth(
   const data = await clickhouseClient.query({
     query: `
       SELECT
-        substring(date_transaction, 7, 4) as year,
-        substring(date_transaction, 4, 2) as month,
+        -- Année et mois comptables : un à-nouveau daté du 31/12 précédent
+        -- compte en janvier (solde d'ouverture), pas en décembre N-1.
+        substring(${YM_SQL}, 1, 4) as year,
+        substring(${YM_SQL}, 5, 2) as month,
         ${creancesTTCSql(refExpr)} as ca_ttc_total,
         ${encaissementsTTCSql(refExpr)} as ca_encaisse_ttc
       FROM ${dbName}.grand_livre
@@ -149,8 +152,8 @@ async function recupererTop10Creances(
 
   // Filtre période borné par (startYear, startMonth) → (endYear, endMonth).
   // Si startYear/startMonth absent, on prend Janvier de l'année de fin (YTD).
-  // date_transaction format: DD/MM/YYYY → year=substr(7,4), month=substr(4,2),
-  // donc on compare sur la concat YYYYMM (= substr(7,4) || substr(4,2)).
+  // Comparaison sur la période comptable AAAAMM (YM_SQL : à-nouveau du 31/12
+  // précédent en janvier).
   let periodFilter = "";
   const queryParams: Record<string, unknown> = { batchIds, journauxTresorerie: journaux };
 
@@ -160,8 +163,8 @@ async function recupererTop10Creances(
     queryParams.startYM = `${effectiveStartYear}${effectiveStartMonth.toString().padStart(2, "0")}`;
     queryParams.endYM = `${endYear}${endMonth.toString().padStart(2, "0")}`;
     periodFilter = `
-      AND concat(substring(date_transaction, 7, 4), substring(date_transaction, 4, 2)) >= {startYM:String}
-      AND concat(substring(date_transaction, 7, 4), substring(date_transaction, 4, 2)) <= {endYM:String}
+      AND ${YM_SQL} >= {startYM:String}
+      AND ${YM_SQL} <= {endYM:String}
     `;
   }
 
@@ -254,18 +257,13 @@ export async function GET(
     // Mois de début optionnel (format: YYYY-MM). Si absent → Janvier de endYear (YTD)
     const startPeriod = searchParams.get("startPeriod");
 
-    let endYear: number;
-    let endMonth: number;
-
+    // Période demandée ; ramenée plus bas sur une période importée.
+    let endYear = 0;
+    let endMonth = 12;
     if (endPeriod) {
       const [yearStr, monthStr] = endPeriod.split("-");
-      endYear = parseInt(yearStr);
-      endMonth = parseInt(monthStr);
-    } else {
-      // Par défaut: mois courant
-      const now = new Date();
-      endYear = now.getFullYear();
-      endMonth = now.getMonth() + 1;
+      endYear = parseInt(yearStr) || 0;
+      endMonth = parseInt(monthStr) || 12;
     }
 
     let startYear: number | undefined;
@@ -294,14 +292,38 @@ export async function GET(
 
     const dbName = getClickhouseDbName(id);
 
-    // Générer les mois Janvier → mois sélectionné de l'année courante uniquement
-    const ytdMonths = getYearToDateMonths(endYear, endMonth);
-
     // Récupérer toutes les périodes disponibles pour ce client
     const allPeriods = await prisma.comptablePeriod.findMany({
       where: { clientId: id },
-      select: { batchId: true, periodStart: true, year: true },
+      select: { batchId: true, periodStart: true, periodEnd: true, year: true },
     });
+
+    // Années et mois d'un reporting importé (mêmes règles que la Synthèse) :
+    // une année sans import devient la plus récente, un mois hors reporting
+    // le dernier mois couvert ; la fenêtre ne dépasse jamais l'import.
+    const availableYears = [
+      ...new Set(allPeriods.map((p) => p.periodStart.getUTCFullYear())),
+    ].sort((a, b) => b - a);
+    if (availableYears.length > 0 && !availableYears.includes(endYear)) {
+      endYear = availableYears[0];
+    }
+    if (!endYear) endYear = new Date().getFullYear();
+    const moisDisponibles = moisCouverts(
+      allPeriods.filter((p) => p.periodStart.getUTCFullYear() === endYear),
+    );
+    const premierMois = moisDisponibles.length > 0 ? parseInt(moisDisponibles[0]) : 1;
+    const dernierMois =
+      moisDisponibles.length > 0 ? parseInt(moisDisponibles[moisDisponibles.length - 1]) : 12;
+    if (
+      moisDisponibles.length > 0 &&
+      !moisDisponibles.includes(String(endMonth).padStart(2, "0"))
+    ) {
+      endMonth = dernierMois;
+    }
+    if (startYear !== endYear) startYear = undefined;
+
+    // Mois de janvier au mois de fin (les cumuls partent de janvier).
+    const ytdMonths = getYearToDateMonths(endYear, endMonth);
 
     // + batchs des lignes saisies manuellement (intégrées au reporting), sauf si
     // le client a activé l'exclusion des saisies.
@@ -363,6 +385,13 @@ export async function GET(
       });
     }
 
+    // Courbes : seuls les mois couverts par le reporting (les cumuls ci-dessus
+    // partent toujours de janvier).
+    const chartAffiche = chartData.filter((d) => {
+      const m = parseInt(d.yearMonth.slice(5, 7));
+      return m >= premierMois && m <= endMonth;
+    });
+
     // Calculer les totaux sur la période
     const totals = {
       caTTCTotal: cumulativeCaTTC,
@@ -386,25 +415,30 @@ export async function GET(
       startMonth,
     );
 
-    // Calculer le total des créances pour les stats
+    // Total du Top 10 (la part de chaque client est calculée sur l'ensemble
+    // des créances : la somme des parts du Top 10 peut être inférieure à 100 %).
     const totalCreances = topCreances.reduce(
       (sum, c) => sum + c.soldeCreance,
       0,
     );
+    const partTop10 = topCreances.reduce((s, c) => s + c.pourcentageTotal, 0);
 
     return NextResponse.json({
       client: { id: client.id, name: client.name },
       endPeriod: `${endYear}-${endMonth.toString().padStart(2, "0")}`,
       endYear,
       endMonth,
-      chartData,
+      availableYears: availableYears.map(String),
+      moisDisponibles,
+      chartData: chartAffiche,
       totals,
       periodRange: {
-        start: ytdMonths[0],
+        start: ytdMonths[Math.max(0, premierMois - 1)] ?? ytdMonths[0],
         end: ytdMonths[ytdMonths.length - 1],
       },
       topCreances,
       totalCreances,
+      partTop10,
     });
   } catch (error) {
     console.error("Recouvrement API error:", error);
