@@ -697,12 +697,27 @@ collectée (4431 à 4435) sont l'exception **E4** (§2).
 | Taux de décaissement | `tauxRemboursement` | — | `décaissements / dettes × 100` |
 
 Graphiques : *Évolution du Taux de Décaissement Fournisseurs* (cumulé et
-périodique) et *Dettes Fournisseurs TTC vs Décaissement Fournisseurs TTC*.
+périodique) et *Dettes Fournisseurs TTC vs Décaissement Fournisseurs TTC*, ce
+dernier sur les **mêmes définitions que les KPI** (DJ hors 408/409, dette hors
+journaux de trésorerie, décaissement sur journaux de trésorerie).
 
 ### Top 10 par fournisseur
 
-- `HAVING (dette − remboursé) > 0`, tri par solde décroissant.
-- `%` = part du solde dans le total → **le total fait 100 %**.
+- Mêmes définitions que les KPI : dette = `Σ(crédit − débit)` hors journaux
+  de trésorerie, remboursé = `Σ(débit − crédit)` sur journaux de trésorerie,
+  DJ hors 408/409.
+- Un fournisseur = une ligne (nom résolu par agrégat) ; une dette sans tiers
+  est regroupée sous son compte.
+- `HAVING solde > 0`, tri par solde décroissant.
+- `%` = part du solde dans le total des soldes positifs de **tous** les
+  fournisseurs ; la ligne « Total Top 10 » affiche la somme des parts.
+
+### Filtres et fenêtre
+
+Mode toujours **Cumulé** ; filtres partagés (année, mois, granularité). Années
+et mois limités au reporting importé ; granularité Année → janvier → dernier
+mois importé (§4). Écritures lues par date comptable, tous lots confondus ; un
+à-nouveau daté du 31/12 précédent compte en janvier.
 
 > `src/lib/reporting/creances.ts` — `perimetreDettesFournisseursSql()`,
 > `dettesFournisseursTTCSql()`, `decaissementsFournisseursTTCSql()`
@@ -1186,7 +1201,7 @@ Onglet Dettes : règlement fournisseurs, soldes des dettes et Top 10.
 
 | Paramètre | Type | Défaut | Effet |
 |---|---|---|---|
-| `endPeriod` | AAAA-MM | mois courant | Fin de la fenêtre. chartData et KPI vont de janvier à `endPeriod` |
+| `endPeriod` | AAAA-MM | dernière année importée, dernier mois couvert | Fin de la fenêtre. chartData et KPI vont de janvier à `endPeriod`. Une année sans reporting devient la plus récente, un mois hors reporting le dernier mois couvert |
 | `startPeriod` | AAAA-MM | janvier de l'année de fin | Début de la fenêtre des Top 10. Égal à `endPeriod`, il désigne un seul mois |
 | `mode` | `cumule` ou `periodique` | `cumule` | Renvoyé tel quel pour l'interface. Les deux séries sont toujours calculées |
 | `granularity` | `day` | mensuel | Points journaliers si `day` et si `startPeriod` = `endPeriod` |
@@ -1195,7 +1210,9 @@ Onglet Dettes : règlement fournisseurs, soldes des dettes et Top 10.
 ```
 {
   client: { id, name },
-  endPeriod, endYear, endMonth,
+  endPeriod, endYear, endMonth,   // fin réellement calculée
+  availableYears,  // string[] décroissant : années d'un reporting importé
+  moisDisponibles, // "MM"[] couverts par le reporting de endYear
   mode,           // "cumule" ou "periodique"
   granularity,    // "day" ou "month" (granularité appliquée)
   singleMonth,    // true si startPeriod = endPeriod ou si startPeriod est absent
@@ -1214,7 +1231,7 @@ Onglet Dettes : règlement fournisseurs, soldes des dettes et Top 10.
     label,                                            // "Jan 2025" ou "05 Mar"
     period,                                           // "AAAAMM" ou "AAAAMMJJ"
     yearMonth,                                        // "AAAA-MM" ou "AAAA-MM-JJ"
-    detteFournisseurNee, detteFournisseurRemboursee,  // Σ crédit et Σ débit bruts de DJ (tous comptes, tous journaux)
+    detteFournisseurNee, detteFournisseurRemboursee,  // = detteNeeTotal et rembourseTotal (définitions des KPI)
     detteNeeTotal, rembourseTotal,                    // flux du règlement fournisseurs sur le point (DJ hors 408/409)
     tauxRemboursement,                                // % du point
     cumulDetteNeeTotal, cumulRembourseTotal,          // cumuls (partant de janvier → M-1 si dailyBaseline)
@@ -1223,8 +1240,9 @@ Onglet Dettes : règlement fournisseurs, soldes des dettes et Top 10.
   topByType: [{ label, montantDette, montantRembourse, solde, pourcentage }],
       // par rubrique DJ, DK1, DK2, DK3, DH ; montantDette = Σ crédit, montantRembourse = Σ débit, solde > 0
   topByFournisseur: [{ numeroFournisseur, label, montantDette, montantRembourse, solde, pourcentage }]
-      // DJ par tiers ; label = intitulé du tiers
-}   // Top 10 : fenêtre startPeriod → endPeriod ; pourcentage = part du solde dans Σ des soldes du Top 10 (total 100 %)
+      // DJ hors 408/409 par tiers (ou compte sans tiers) ; dette hors journaux de trésorerie,
+      // remboursé sur journaux de trésorerie ; pourcentage = part de toutes les dettes fournisseurs
+}   // Top 10 : fenêtre startPeriod → endPeriod ; topByType : pourcentage = part du total des types
 ```
 
 ### 25.4 `GET /reporting/tresorerie`
@@ -1716,6 +1734,7 @@ ouvert par défaut, replié d'un clic sur son en-tête), séparateur, **Membres*
 | 29/10/2026 | Charges et rentabilité : colonne des valeurs à droite de la cascade **retirée** — montant (K) et pourcentage se lisent dans la barre ou dans l'infobulle ; la barre occupe la place libérée (§22). |
 | 02/11/2026 | Charges et rentabilité : pourcentage du CA **entre parenthèses** dans les barres et l'infobulle — « −11 766K (55,11 %) » (§22). |
 | 02/11/2026 | **Import d'une période avec le Grand Livre seul** : Plan comptable, Plan des tiers et Codes journaux deviennent facultatifs (écran de création, « Modifier » et fenêtre d'ajout). Airflow **contrôle le Grand Livre avant toute écriture** : un compte (après conversion PCG → SYSCOHADA), un code journal (RAN compris) ou un n° de tiers absent des référentiels — en base ou dans les fichiers du même import — fait échouer l'import sans rien enregistrer, avec le nombre d'éléments manquants et les 20 premiers par catégorie ; on complète les référentiels puis « Relancer le traitement ». Un nouvel envoi remplace entièrement les fichiers de la période ; l'échec du contrôle n'efface pas les données d'une période déjà importée. « Modifier » corrigé (il attendait encore les 5 anciens fichiers) et soumis au droit Charger des fichiers (§3, §25.18 à §25.20). |
+| 02/11/2026 | **Audit des filtres — Règlement Fournisseurs** : années de l'onglet = reporting importé (liste codée en dur auparavant), mois limités à l'import, calage du filtre sur la période calculée, fenêtre « Année » arrêtée au dernier mois importé ; à-nouveau du 31/12 précédent compté en janvier (doublait décembre N-1) ; graphique « Dettes Fournisseurs TTC vs Décaissement Fournisseurs TTC » sur les définitions des KPI (il montrait les crédits / débits bruts de DJ, 408/409 et tous journaux compris) ; Top 10 fournisseurs sur ces mêmes définitions, fournisseurs sans intitulé inclus, un seul rang par fournisseur, % = part de toutes les dettes fournisseurs ; ligne « Total Top 10 » = somme des parts (§13, §25.3 ; audit §7.3). |
 | 02/11/2026 | **Audit des filtres — Recouvrement Clients** : l'onglet utilise désormais les **filtres partagés** (année, mois, granularité ; mode toujours Cumulé) au lieu de ses propres sélecteurs (année et mois courants par défaut, liste d'années codée en dur) ; années et mois limités au reporting importé, fenêtre « Année » arrêtée au dernier mois importé ; à-nouveau daté du 31/12 précédent compté en janvier (lu sur tous les lots, il doublait décembre N-1 et manquait en N) ; ligne « Total Top 10 » : part réelle du Top 10 au lieu de « 100 % » (§12, §25.2 ; audit §7.2). |
 | 02/11/2026 | **Audit des filtres — Synthèse Financière** (et Chiffre d'affaires / Résultats, même API) : années et mois limités au reporting importé (plus d'année ni de mois sans import ; l'écran se cale sur l'année la plus récente et le dernier mois couvert, la fenêtre « Année » s'arrête au dernier mois importé, même fenêtre pour N-1) ; Cumulé + Mois = janvier → mois pour les KPI (ils ne portaient que sur le mois) ; Trésorerie toujours un solde de janvier à la fin de la période (le périodique mensuel n'en donnait que le mouvement) ; courbes cumulées en Cumulé + Mois parties du cumul janvier → mois précédent (Charges vs Produits, subventions) ; à-nouveaux datés du 31/12 précédent comptés en janvier (Synthèse et Trésorerie) ; N-1 sans reporting affiché « non disponible », sans variation (§4, §25.1 ; audit §7). |
 | 02/11/2026 | **Trésorerie — détail par compte aligné sur les indicateurs** : un compte de passif (rubrique D…, solde normal créditeur) ou de dépréciation est lu en **crédit − débit**, soit (débit − crédit) × −1, dans « Trésorerie par comptes » comme dans les indicateurs ; 565000 (DQ, débiteur de 1) vaut −1 dans le tableau comme dans « Autres Trésorerie Passif » (il valait 1 dans le tableau). Ces comptes sont repérés « en moins » et déduits ; la ligne Total Trésorerie reprend l'indicateur. Indicateurs inchangés. **Variations** : quand N-1 = 0, ±100 % selon le signe de N (de 0 à −1 n'affiche plus « +100 % ») — tous les KPI, Produits par Nature, Trésorerie (§11, §24). |
