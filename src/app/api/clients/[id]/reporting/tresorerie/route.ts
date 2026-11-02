@@ -18,7 +18,7 @@ import { getClickhouseDbName, manualBatchId } from "@/lib/clickhouse/manual-sync
 import { bilanRefExpr } from "@/lib/clickhouse/schema";
 import { planComptesMap, intituleCompte } from "@/lib/clickhouse/plan-comptable";
 import { estAmortSql } from "@/lib/reporting/etats-financiers";
-import { YM_SQL } from "@/lib/reporting/periode";
+import { YM_SQL, moisCouverts } from "@/lib/reporting/periode";
 import {
   TRESORERIE_KPIS,
   RUBRIQUES_TRESORERIE,
@@ -79,42 +79,57 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     const periodType = searchParams.get("periodType") || "ytd";
     const cumule = periodType === "ytd" || periodType === "ytd-day";
     const surAnnee = periodType === "year";
-    const month = (searchParams.get("month") || "12").padStart(2, "0");
+    // Mois demandé ; ramené plus bas sur un mois couvert par le reporting.
+    let month = (searchParams.get("month") || "12").padStart(2, "0");
     const selectedYear = parseInt(searchParams.get("year") || "", 10);
 
     // Même fenêtre de mois appliquée aux deux exercices, pour que la
     // comparaison N / N-1 porte sur un intervalle identique.
     const fenetre = (y: number) => {
       if (cumule) return { start: `${y}01`, end: `${y}${month}` };
-      if (surAnnee) return { start: `${y}01`, end: `${y}12` };
+      // Granularité Année : jusqu'au dernier mois couvert (month, ramené).
+      if (surAnnee) return { start: `${y}01`, end: `${y}${month}` };
       return { start: `${y}${month}`, end: `${y}${month}` };
     };
-    const periodeLabel = cumule
-      ? `Janvier - ${MOIS[parseInt(month, 10) - 1]}`
-      : surAnnee
-        ? "Janvier - Décembre"
-        : MOIS[parseInt(month, 10) - 1];
-
     const dbName = getClickhouseDbName(id);
     const REF_EXPR = await bilanRefExpr(clickhouse, dbName);
 
     const periods = await prisma.comptablePeriod.findMany({
       where: { clientId: id },
-      select: { batchId: true, year: true },
-      orderBy: [{ year: "desc" }],
+      select: { batchId: true, year: true, periodStart: true, periodEnd: true },
     });
+    // Exercice d'un lot : année de début de sa période (UTC), comme les autres
+    // onglets de reporting.
+    const anneeDe = (p: { periodStart: Date }) => p.periodStart.getUTCFullYear();
     const batchsParAnnee = new Map<number, string[]>();
     for (const p of periods) {
-      const l = batchsParAnnee.get(p.year) ?? [];
+      const l = batchsParAnnee.get(anneeDe(p)) ?? [];
       if (p.batchId) l.push(p.batchId);
-      batchsParAnnee.set(p.year, l);
+      batchsParAnnee.set(anneeDe(p), l);
     }
     const availableYears = [...batchsParAnnee.keys()].sort((a, b) => b - a);
     if (availableYears.length === 0)
       return NextResponse.json({ error: "Aucune période comptable" }, { status: 404 });
 
+    // Année sans reporting : la plus récente ; l'écran aligne son filtre sur
+    // l'année renvoyée (yearN).
     const yearN = availableYears.includes(selectedYear) ? selectedYear : availableYears[0];
     const yearN1 = yearN - 1;
+    // N-1 sans reporting : comparaison affichée « non disponible ».
+    const anneeN1Disponible = batchsParAnnee.has(yearN1);
+
+    // Mois couverts par le reporting de N ; un mois hors reporting devient le
+    // dernier mois couvert (la fenêtre ne dépasse jamais l'import).
+    const moisDisponibles = moisCouverts(periods.filter((p) => anneeDe(p) === yearN));
+    if (moisDisponibles.length > 0 && !moisDisponibles.includes(month)) {
+      month = moisDisponibles[moisDisponibles.length - 1];
+    }
+    const premierMois = moisDisponibles[0] ?? "01";
+    const periodeLabel = cumule
+      ? `${MOIS[parseInt(premierMois, 10) - 1]} - ${MOIS[parseInt(month, 10) - 1]}`
+      : surAnnee
+        ? `${MOIS[parseInt(premierMois, 10) - 1]} - ${MOIS[parseInt(month, 10) - 1]}`
+        : MOIS[parseInt(month, 10) - 1];
 
     const plan = await planComptesMap(clickhouse, dbName);
 
@@ -221,6 +236,9 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       yearN,
       yearN1,
       availableYears,
+      anneeN1Disponible,
+      moisDisponibles,
+      month,
       periodeLabel,
       manualIncluded: !client.excludeManualEntries,
       kpis,

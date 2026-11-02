@@ -37,6 +37,8 @@ export interface KpiValue {
   /** Exercice précédent, affiché sous la valeur quand `labelN1` est fourni. */
   valeurN1?: number;
   labelN1?: string | number;
+  /** Aucun reporting en N-1 : « non disponible » au lieu d'un montant. */
+  n1Indisponible?: boolean;
   /** Variation N / N-1 en %, affichée en pastille. Omise = pas de pastille. */
   variation?: number;
   /** Formatage spécifique (pourcentage, jours…). Défaut : montant compact. */
@@ -272,7 +274,7 @@ export function KpiGrid({
                       </div>
                       {v.labelN1 !== undefined && (
                         <p className="text-sm text-muted-foreground mt-1">
-                          {v.labelN1} : {fmt(v.valeurN1 ?? 0)}
+                          {v.labelN1} : {v.n1Indisponible ? "non disponible" : fmt(v.valeurN1 ?? 0)}
                         </p>
                       )}
                     </div>

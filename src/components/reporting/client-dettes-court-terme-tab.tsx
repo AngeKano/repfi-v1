@@ -47,6 +47,13 @@ interface DetteKpis {
 interface DetteData {
   kpis: DetteKpis;
   topByType: TopDette[];
+  /** Fin réellement calculée (année importée, mois couvert). */
+  endYear?: number;
+  endMonth?: number;
+  /** Années d'un reporting importé, décroissantes. */
+  availableYears?: string[];
+  /** Mois « 01 »…« 12 » couverts par le reporting de l'année. */
+  moisDisponibles?: string[];
 }
 
 const MONTHS = [
@@ -121,24 +128,38 @@ export default function ClientDettesCourtTermeTab({
         `&mode=cumule&granularity=${granularity}&dailyBaseline=true`;
       const res = await fetch(url);
       if (!res.ok) throw new Error("Erreur API Dettes");
-      setData((await res.json()) as DetteData);
+      const json = (await res.json()) as DetteData;
+      setData(json);
+      // Le filtre suit la période réellement calculée : une année ou un mois
+      // sans reporting n'est jamais affiché.
+      if (json.endYear && String(json.endYear) !== year) {
+        setYear(String(json.endYear));
+        return;
+      }
+      const finCalculee = json.endMonth ? String(json.endMonth).padStart(2, "0") : null;
+      if (finCalculee && finCalculee !== selectedMonth) setSelectedMonth(finCalculee);
     } catch (e) {
       console.error(e);
       toast.error("Erreur lors du chargement des dettes court terme");
     } finally {
       setLoading(false);
     }
-  }, [clientId, year, selectedMonth, cumulGranularity, periodType]);
+  }, [clientId, year, selectedMonth, cumulGranularity, periodType, setYear, setSelectedMonth]);
 
   useEffect(() => {
     load();
   }, [load]);
 
-  const monthLabel = MONTHS.find((m) => m.value === selectedMonth)?.label ?? "Décembre";
-  const periodLabel =
-    cumulGranularity === "annee"
-      ? `Janvier - Décembre ${year}`
-      : `Janvier - ${monthLabel} ${year}`;
+  // Fenêtre réellement calculée : du premier mois couvert par le reporting au
+  // mois de fin (en granularité Année, le dernier mois importé).
+  const nomMois = (v?: string) => MONTHS.find((m) => m.value === v)?.label ?? "";
+  const dispo = data?.moisDisponibles ?? [];
+  const moisFin = data?.endMonth ? String(data.endMonth).padStart(2, "0") : selectedMonth;
+  const periodLabel = `${nomMois(dispo[0] ?? "01")} - ${nomMois(moisFin)} ${year}`;
+  // Mois et années proposés : ceux du reporting importé.
+  const moisChoisissables = MONTHS.filter((m) => !dispo.length || dispo.includes(m.value));
+  const annees = data?.availableYears ?? [year];
+  const indexAnnee = annees.indexOf(year);
 
   const filtres = (
     <div className="flex flex-wrap items-center gap-3">
@@ -155,17 +176,20 @@ export default function ClientDettesCourtTermeTab({
         <span className="text-xs text-[#335890]">Année :</span>
         <span className="font-semibold text-[#00122E]">{year}</span>
         <div className="flex gap-1 ml-1">
+          {/* Années d'un reporting importé uniquement (liste décroissante). */}
           <button
             title="Année précédente"
-            onClick={() => setYear(String(parseInt(year, 10) - 1))}
-            className="text-[#94A3B8] hover:text-[#0077C3]"
+            onClick={() => setYear(annees[indexAnnee + 1])}
+            disabled={indexAnnee < 0 || indexAnnee >= annees.length - 1}
+            className="text-[#94A3B8] hover:text-[#0077C3] disabled:opacity-30"
           >
             <ChevronLeft className="w-4 h-4" />
           </button>
           <button
             title="Année suivante"
-            onClick={() => setYear(String(parseInt(year, 10) + 1))}
-            className="text-[#94A3B8] hover:text-[#0077C3]"
+            onClick={() => setYear(annees[indexAnnee - 1])}
+            disabled={indexAnnee <= 0}
+            className="text-[#94A3B8] hover:text-[#0077C3] disabled:opacity-30"
           >
             <ChevronRight className="w-4 h-4" />
           </button>
@@ -201,7 +225,7 @@ export default function ClientDettesCourtTermeTab({
               <SelectValue placeholder="Mois" />
             </SelectTrigger>
             <SelectContent>
-              {MONTHS.map((m) => (
+              {moisChoisissables.map((m) => (
                 <SelectItem key={m.value} value={m.value}>
                   {m.label}
                 </SelectItem>
@@ -254,7 +278,7 @@ export default function ClientDettesCourtTermeTab({
       <div>
         <h1 className="text-3xl font-bold text-[#00122E]">Dettes court terme</h1>
         <p className="text-sm text-[#335890] italic mt-1">
-          Passif circulant — encours au {periodLabel.toLowerCase()}.
+          Passif circulant — encours à fin {nomMois(moisFin).toLowerCase()} {year} (mouvements cumulés depuis {nomMois(dispo[0] ?? "01").toLowerCase()}, à-nouveaux compris).
         </p>
       </div>
 

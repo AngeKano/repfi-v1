@@ -249,7 +249,34 @@ vérifiée avec l'onglet Ratios.
 | F5 | Top 10 fournisseurs : crédits / débits bruts de DJ, fournisseurs sans intitulé exclus, un fournisseur scindé si son intitulé varie, % = part du Top 10 | Classement et montants incohérents avec les KPI | Définitions des KPI, nom résolu par agrégat, compte si pas de tiers, % = part de toutes les dettes fournisseurs |
 | F6 | Ligne « Total Top 10 » toujours à « 100 % » (composant partagé avec Dettes court terme) | Total incohérent dès 11 fournisseurs | Somme des parts affichées |
 
-**Reste à traiter dans les audits suivants** : les autres API (Dettes court terme, Dettes financières, Ratios, États financiers,
+### 7.4 Dettes court terme (API `/reporting/dettes`, KPI d'encours)
+
+| # | Faille constatée | Effet visible | Correction |
+|---|---|---|---|
+| C1 | Flèches d'année en « année ± 1 » sans borne | N'importe quelle année atteignable, valeurs à 0 | Années d'un reporting importé ; flèches désactivées aux bornes |
+| C2 | 12 mois toujours proposés ; pas de calage sur la période calculée | Mois sans import choisissables | Mois couverts par l'import ; le filtre se cale sur l'année et le mois renvoyés |
+| C3 | Libellé « Janvier - Décembre » codé en dur ; sous-titre « encours au janvier - mars » | Fenêtre annoncée différente de la fenêtre calculée ; un encours se lit à une date | Libellé arrêté au dernier mois importé ; « encours à fin <mois> <année> » |
+| C4 | Encours sans l'à-nouveau daté du 31/12 précédent (API partagée) | Dettes d'ouverture absentes | Corrigé avec le Règlement Fournisseurs (`YM_SQL`) |
+
+Vérifié sans écart : le Top 10 par type reprend exactement le solde des KPI
+(même fenêtre, `crédit − débit` par rubrique) ; « Dettes fournisseurs » porte
+sur toute la rubrique `DJ` (vue bilan, hors exception E2).
+
+### 7.5 Trésorerie (API `/reporting/tresorerie`)
+
+| # | Faille constatée | Effet visible | Correction |
+|---|---|---|---|
+| T1 | Année sans reporting remplacée en silence par la plus récente côté API ; l'écran gardait l'année demandée | « 2026 » affiché au-dessus des chiffres 2025 : même filtre, autres résultats | Le filtre se cale sur l'année et le mois renvoyés (`yearN`, `month`) |
+| T2 | Flèches d'année en « année ± 1 » sans borne ; 12 mois proposés | Années et mois sans import atteignables | Années d'un reporting importé, flèches bornées ; mois couverts par l'import |
+| T3 | Granularité Année = janvier → décembre ; libellé « Janvier - Décembre » | Fenêtre plus large que l'import | Fenêtre et libellé arrêtés au dernier mois importé |
+| T4 | Exercice d'un lot lu dans `year` (saisi à l'import) et non dans la date de début, contrairement aux autres onglets | Écart possible avec la Synthèse sur un lot mal daté | Année de début de période (UTC), comme partout |
+| T5 | N-1 sans reporting : « 2025 : 0 » et « +100 % » | Comparaison trompeuse | « non disponible », sans variation (cartes et tableau) |
+
+Déjà traité plus tôt dans la journée : convention de signe du détail par
+compte alignée sur les indicateurs (passif en crédit − débit) et à-nouveaux
+de décembre comptés en janvier (`YM_SQL`).
+
+**Reste à traiter dans les audits suivants** : les autres API (Dettes financières, Ratios, États financiers,
 Charges et rentabilité, QC) filtrent encore la période par
 `concat(substring(date, 7, 4), substring(date, 4, 2))` et ont chacune leur
 propre gestion de l'année et du mois ; à aligner sur `src/lib/reporting/periode.ts`
@@ -295,6 +322,8 @@ regroupé par numéro de mois.
 | 29/10/2026 | Résultats | Charges et rentabilité : colonne des valeurs à droite de la cascade **retirée** — montant (K) et pourcentage se lisent dans la barre ou dans l'infobulle ; la barre occupe la place libérée (§22). |
 | 02/11/2026 | Résultats | Charges et rentabilité : pourcentage du CA **entre parenthèses** dans les barres et l'infobulle — « −11 766K (55,11 %) » (§22). |
 | 02/11/2026 | Import | **Import d'une période avec le Grand Livre seul** : Plan comptable, Plan des tiers et Codes journaux deviennent facultatifs (écran de création, « Modifier » et fenêtre d'ajout). Airflow **contrôle le Grand Livre avant toute écriture** : un compte (après conversion PCG → SYSCOHADA), un code journal (RAN compris) ou un n° de tiers absent des référentiels — en base ou dans les fichiers du même import — fait échouer l'import sans rien enregistrer, avec le nombre d'éléments manquants et les 20 premiers par catégorie ; on complète les référentiels puis « Relancer le traitement ». Un nouvel envoi remplace entièrement les fichiers de la période ; l'échec du contrôle n'efface pas les données d'une période déjà importée. « Modifier » corrigé (il attendait encore les 5 anciens fichiers) et soumis au droit Charger des fichiers (§3, §25.18 à §25.20). |
+| 02/11/2026 | Filtres | **Audit des filtres — Trésorerie** : l'API remplaçait en silence une année sans reporting par la plus récente pendant que l'écran affichait l'année demandée (« 2026 » au-dessus des chiffres 2025) : le filtre se cale désormais sur l'année calculée ; flèches d'année bornées aux années importées, mois limités à l'import, fenêtre « Année » arrêtée au dernier mois importé ; exercice d'un lot = année de début de période (comme les autres onglets) ; N-1 sans reporting : « non disponible », sans variation (cartes et tableau) (§11, §25.4 ; audit §7.5). |
+| 02/11/2026 | Filtres | **Audit des filtres — Dettes court terme** : flèches d'année limitées aux années d'un reporting importé (elles allaient à n'importe quelle année), mois limités à l'import, calage du filtre sur la période calculée, libellé arrêté au dernier mois importé (« Janvier - Décembre » codé en dur), sous-titre « encours à fin <mois> » ; à-nouveaux de décembre comptés en janvier (API partagée avec Règlement Fournisseurs) (§14 ; audit §7.4). |
 | 02/11/2026 | Filtres | **Audit des filtres — Règlement Fournisseurs** : années de l'onglet = reporting importé (liste codée en dur auparavant), mois limités à l'import, calage du filtre sur la période calculée, fenêtre « Année » arrêtée au dernier mois importé ; à-nouveau du 31/12 précédent compté en janvier (doublait décembre N-1) ; graphique « Dettes Fournisseurs TTC vs Décaissement Fournisseurs TTC » sur les définitions des KPI (il montrait les crédits / débits bruts de DJ, 408/409 et tous journaux compris) ; Top 10 fournisseurs sur ces mêmes définitions, fournisseurs sans intitulé inclus, un seul rang par fournisseur, % = part de toutes les dettes fournisseurs ; ligne « Total Top 10 » = somme des parts (§13, §25.3 ; audit §7.3). |
 | 02/11/2026 | Filtres | **Audit des filtres — Recouvrement Clients** : l'onglet utilise désormais les **filtres partagés** (année, mois, granularité ; mode toujours Cumulé) au lieu de ses propres sélecteurs (année et mois courants par défaut, liste d'années codée en dur) ; années et mois limités au reporting importé, fenêtre « Année » arrêtée au dernier mois importé ; à-nouveau daté du 31/12 précédent compté en janvier (lu sur tous les lots, il doublait décembre N-1 et manquait en N) ; ligne « Total Top 10 » : part réelle du Top 10 au lieu de « 100 % » (§12, §25.2 ; audit §7.2). |
 | 02/11/2026 | Filtres | **Audit des filtres — Synthèse Financière** (et Chiffre d'affaires / Résultats, même API) : années et mois limités au reporting importé (plus d'année ni de mois sans import ; l'écran se cale sur l'année la plus récente et le dernier mois couvert, la fenêtre « Année » s'arrête au dernier mois importé, même fenêtre pour N-1) ; Cumulé + Mois = janvier → mois pour les KPI (ils ne portaient que sur le mois) ; Trésorerie toujours un solde de janvier à la fin de la période (le périodique mensuel n'en donnait que le mouvement) ; courbes cumulées en Cumulé + Mois parties du cumul janvier → mois précédent (Charges vs Produits, subventions) ; à-nouveaux datés du 31/12 précédent comptés en janvier (Synthèse et Trésorerie) ; N-1 sans reporting affiché « non disponible », sans variation (§4, §25.1 ; audit §7). |
