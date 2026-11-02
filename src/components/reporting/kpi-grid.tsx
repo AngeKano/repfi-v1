@@ -9,7 +9,7 @@
 // ordre) est mémorisée par client dans le navigateur.
 // ============================================================================
 import { useState } from "react";
-import type { DragEvent } from "react";
+import type { DragEvent, ReactNode } from "react";
 import { Card, CardContent, CardDescription, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -128,6 +128,7 @@ export function KpiGrid({
   defs,
   values,
   columns = 3,
+  actions,
 }: {
   /** Identifiant de persistance, unique par onglet et par client. */
   storageKey: string;
@@ -135,6 +136,8 @@ export function KpiGrid({
   values: Record<string, KpiValue | undefined>;
   /** Cartes par ligne. 3 par défaut ; 2 quand l'onglet n'a que 4 indicateurs. */
   columns?: 2 | 3 | 4;
+  /** Boutons placés à côté de « Configurer les KPIs » (ex. menu Graphiques). */
+  actions?: ReactNode;
 }) {
   const [config, setConfig] = useState<KpiConfigItem[]>(() => loadConfig(storageKey, defs));
   const [editMode, setEditMode] = useState(false);
@@ -171,7 +174,7 @@ export function KpiGrid({
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-3">
+      <div className="flex items-center gap-2 mb-3">
         <Button
           variant="outline"
           size="sm"
@@ -186,6 +189,7 @@ export function KpiGrid({
           <PiGearDuotone className="w-4 h-4" />
           {editMode ? "Terminer" : "Configurer les KPIs"}
         </Button>
+        {actions}
       </div>
 
       <div

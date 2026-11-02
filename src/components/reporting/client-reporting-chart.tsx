@@ -79,6 +79,7 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import ClientAnalyseCharges from "./client-analyse-charges";
 import { KpiGrid, type KpiDef, type KpiValue } from "./kpi-grid";
+import { Graphe, MenuGraphes, useGraphesMasques, type GrapheDef } from "./graphes-masquables";
 
 interface DataPoint {
   label: string;
@@ -261,6 +262,29 @@ const NAV_ITEMS: NavItem[] = [
 // change la prise en compte des saisies) : sans ce registre, l'année choisie
 // par l'utilisateur serait écrasée à chaque remontage.
 const anneesCalees = new Set<string>();
+
+// Graphiques masquables de chaque onglet (menu « Graphiques »).
+const GRAPHES_PAR_ONGLET: Record<string, GrapheDef[]> = {
+  synthese: [
+    { id: "tresorerie", label: "Évolution de la Trésorerie" },
+    { id: "chargesProduits", label: "Charges vs Produits" },
+  ],
+  "chiffre-affaires": [
+    { id: "evolutionCa", label: "Évolution du Chiffre d'Affaires" },
+    { id: "subventions", label: "Évolution des subventions d'exploitation" },
+    { id: "produitsNature", label: "Produits par Nature" },
+  ],
+  resultat: [
+    { id: "tunnel", label: "Tunnel de rentabilité" },
+    { id: "chargesRentabilite", label: "Charges et rentabilité" },
+  ],
+  recouvrement: [
+    { id: "tauxRecouvrement", label: "Évolution du Taux de Recouvrement" },
+    { id: "creancesEncaissements", label: "Créances Clients TTC vs Encaissements Clients TTC" },
+    { id: "dso", label: "Évolution du Délai Moyen de paiement Clients (DSO)" },
+    { id: "topCreances", label: "Analyse des Créances - Top 10" },
+  ],
+};
 
 const INITIAL_TUNNEL_METRICS: TunnelMetric[] = [
   {
@@ -851,6 +875,11 @@ export default function ClientReportingChart({
     loadResultatKpiConfig(clientId),
   );
   const [resultatKpiEditMode, setResultatKpiEditMode] = useState(false);
+  // Graphiques masqués de l'onglet affiché (mémorisés par onglet et client).
+  const graphes = useGraphesMasques(
+    `${activeTab}-${clientId}`,
+    GRAPHES_PAR_ONGLET[activeTab] ?? [],
+  );
   const [resultatKpiDragId, setResultatKpiDragId] = useState<string | null>(
     null,
   );
@@ -2045,7 +2074,7 @@ export default function ClientReportingChart({
           <div className="space-y-6">
             {/* KPIs — configurable grid */}
             <div>
-              <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2 mb-3">
                 <Button
                   variant="outline"
                   size="sm"
@@ -2060,6 +2089,7 @@ export default function ClientReportingChart({
                   <PiGearDuotone className="w-4 h-4" />
                   {kpiEditMode ? "Terminer" : "Configurer les KPIs"}
                 </Button>
+                <MenuGraphes etat={graphes} />
               </div>
 
               <div className="grid grid-cols-3 gap-4">
@@ -2189,11 +2219,15 @@ export default function ClientReportingChart({
             )}
 
             {/* Evolution Trésorerie */}
-            <EvolutionTresorerie />
+            <Graphe etat={graphes} id="tresorerie">
+              <EvolutionTresorerie />
+            </Graphe>
 
             {/* Charges vs Produits — remplace le Tunnel de rentabilité dans
                 l'onglet Synthèse. Sensible au mode (périodique / cumulé). */}
-            <ChargesVsProduits />
+            <Graphe etat={graphes} id="chargesProduits">
+              <ChargesVsProduits />
+            </Graphe>
           </div>
         );
 
@@ -2262,16 +2296,23 @@ export default function ClientReportingChart({
               storageKey={`chiffre-affaires-${clientId}`}
               defs={caKpiDefs}
               values={caKpiValues}
+              actions={<MenuGraphes etat={graphes} />}
             />
 
             {/* Graphique Evolution CA */}
-            <EvolutionCA />
+            <Graphe etat={graphes} id="evolutionCa">
+              <EvolutionCA />
+            </Graphe>
 
             {/* Graphique Evolution des subventions d'exploitation (TG) */}
-            <EvolutionSubventions />
+            <Graphe etat={graphes} id="subventions">
+              <EvolutionSubventions />
+            </Graphe>
 
             {/* Produits par Nature — Histogramme horizontal N vs N-1 */}
-            <CAParNature />
+            <Graphe etat={graphes} id="produitsNature">
+              <CAParNature />
+            </Graphe>
 
             {/* Top 10 Clients par CA */}
             <Card>
@@ -2362,7 +2403,7 @@ export default function ClientReportingChart({
           <div className="space-y-6">
             {/* KPIs Résultat — grille configurable */}
             <div>
-              <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2 mb-3">
                 <Button
                   variant="outline"
                   size="sm"
@@ -2377,6 +2418,7 @@ export default function ClientReportingChart({
                   <PiGearDuotone className="w-4 h-4" />
                   {resultatKpiEditMode ? "Terminer" : "Configurer les KPIs"}
                 </Button>
+                <MenuGraphes etat={graphes} />
               </div>
 
               <div className="grid grid-cols-3 gap-4">
@@ -2459,15 +2501,19 @@ export default function ClientReportingChart({
             </div>
 
             {/* Tunnel de rentabilité */}
-            <TunnelRentabilite />
+            <Graphe etat={graphes} id="tunnel">
+              <TunnelRentabilite />
+            </Graphe>
 
             {/* Analyse des charges : cascade, poids dans le CA, pont N / N-1 */}
-            <ClientAnalyseCharges
-              clientId={clientId}
-              year={year}
-              periodType={periodType}
-              selectedMonth={selectedMonth}
-            />
+            <Graphe etat={graphes} id="chargesRentabilite">
+              <ClientAnalyseCharges
+                clientId={clientId}
+                year={year}
+                periodType={periodType}
+                selectedMonth={selectedMonth}
+              />
+            </Graphe>
           </div>
         );
 
@@ -2492,7 +2538,7 @@ export default function ClientReportingChart({
           <div className="space-y-6">
             {/* KPIs Recouvrement — grille configurable */}
             <div>
-              <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2 mb-3">
                 <Button
                   variant="outline"
                   size="sm"
@@ -2511,6 +2557,7 @@ export default function ClientReportingChart({
                     ? "Terminer"
                     : "Configurer les KPIs"}
                 </Button>
+                <MenuGraphes etat={graphes} />
               </div>
 
               <div className="grid grid-cols-3 gap-4">
@@ -2601,209 +2648,40 @@ export default function ClientReportingChart({
               </div>
             </div>
 
-            {/* Graphique Evolution Taux de Recouvrement - YTD année courante */}
-            <Card>
-              <CardHeader className="flex flex-row items-start justify-between gap-4">
-                <div>
-                  <CardTitle>Évolution du Taux de Recouvrement</CardTitle>
-                  <CardDescription>
-                    Janvier → mois sélectionné — (Encaissements Clients TTC /
-                    Créances Clients TTC) × 100
-                  </CardDescription>
-                </div>
-                <ChartLegend
-                  labelN="Taux cumulé"
-                  labelN1="Taux périodique"
-                  colorN="hsl(262, 83%, 58%)"
-                  colorN1="hsl(262, 83%, 78%)"
-                />
-              </CardHeader>
-              <CardContent>
-                <ChartContainer
-                  config={{
-                    tauxRecouvrementCumule: {
-                      label: "Taux cumulé",
-                      color: "hsl(262, 83%, 58%)",
-                    },
-                    tauxRecouvrement: {
-                      label: "Taux périodique",
-                      color: "hsl(262, 83%, 78%)",
-                    },
-                  }}
-                  className="h-[400px] w-full"
-                >
-                  <LineChart
-                    data={recouvrementData.chartData}
-                    margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
-                  >
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                    <XAxis
-                      dataKey="label"
-                      tickLine={false}
-                      axisLine={false}
-                      fontSize={11}
-                      angle={-45}
-                      textAnchor="end"
-                      height={60}
-                    />
-                    <YAxis
-                      tickLine={false}
-                      axisLine={false}
-                      tickFormatter={(value) => `${value.toFixed(0)}%`}
-                      fontSize={12}
-                      domain={[0, "auto"]}
-                    />
-                    <ChartTooltip
-                      content={
-                        <ChartTooltipContent
-                          formatter={(value, name) => [
-                            `${(value as number).toFixed(1)}%`,
-                            name === "Taux cumulé"
-                              ? "Taux cumulé"
-                              : "Taux périodique",
-                          ]}
-                        />
-                      }
-                    />
-                    <Line
-                      type="monotone"
-                      dataKey="tauxRecouvrementCumule"
-                      name="Taux cumulé"
-                      stroke="hsl(262, 83%, 58%)"
-                      strokeWidth={2}
-                      dot={{ r: 4 }}
-                    />
-                    <Line
-                      type="monotone"
-                      dataKey="tauxRecouvrement"
-                      name="Taux périodique"
-                      stroke="hsl(262, 83%, 78%)"
-                      strokeWidth={2}
-                      dot={{ r: 3 }}
-                      strokeDasharray="5 5"
-                    />
-                  </LineChart>
-                </ChartContainer>
-              </CardContent>
-            </Card>
-
-            {/* Graphique Créances Clients TTC vs Encaissements Clients TTC */}
-            <Card>
-              <CardHeader className="flex flex-row items-start justify-between gap-4">
-                <div>
-                  <CardTitle>
-                    Créances Clients TTC vs Encaissements Clients TTC
-                  </CardTitle>
-                  <CardDescription>
-                    Comparaison mensuelle des montants
-                  </CardDescription>
-                </div>
-                <ChartLegend
-                  labelN="Créances Clients TTC"
-                  labelN1="Encaissements Clients TTC"
-                  colorN="hsl(221, 83%, 53%)"
-                  colorN1="hsl(221, 83%, 73%)"
-                  solid
-                />
-              </CardHeader>
-              <CardContent>
-                <ChartContainer
-                  config={{
-                    caTTCTotal: {
-                      label: "Créances Clients TTC",
-                      color: "hsl(221, 83%, 53%)",
-                    },
-                    caEncaisseTTC: {
-                      label: "Encaissements Clients TTC",
-                      color: "hsl(221, 83%, 73%)",
-                    },
-                  }}
-                  className="h-[350px] w-full"
-                >
-                  <BarChart
-                    data={recouvrementData.chartData}
-                    margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
-                  >
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                    <XAxis
-                      dataKey="label"
-                      tickLine={false}
-                      axisLine={false}
-                      fontSize={11}
-                      angle={-45}
-                      textAnchor="end"
-                      height={60}
-                    />
-                    <YAxis
-                      tickLine={false}
-                      axisLine={false}
-                      tickFormatter={(value) =>
-                        `${(value / 1000000).toFixed(0)}M`
-                      }
-                      fontSize={12}
-                    />
-                    <ChartTooltip
-                      content={
-                        <ChartTooltipContent
-                          formatter={(value, name) => [
-                            formatCompactOnly(value as number),
-                            name === "Créances Clients TTC"
-                              ? "Créances Clients TTC"
-                              : "Encaissements Clients TTC",
-                          ]}
-                        />
-                      }
-                    />
-                    <Bar
-                      dataKey="caTTCTotal"
-                      name="Créances Clients TTC"
-                      fill="hsl(221, 83%, 53%)"
-                      barSize={24}
-                      radius={[4, 4, 0, 0]}
-                    />
-                    <Bar
-                      dataKey="caEncaisseTTC"
-                      name="Encaissements Clients TTC"
-                      fill="hsl(221, 83%, 73%)"
-                      barSize={24}
-                      radius={[4, 4, 0, 0]}
-                    />
-                  </BarChart>
-                </ChartContainer>
-              </CardContent>
-            </Card>
-
-            {/* Évolution du DSO — déplacée depuis les ratios bilantiels */}
-            {dsoData && (
+            <Graphe etat={graphes} id="tauxRecouvrement">
+              {/* Graphique Evolution Taux de Recouvrement - YTD année courante */}
               <Card>
                 <CardHeader className="flex flex-row items-start justify-between gap-4">
                   <div>
-                    <CardTitle>
-                      Évolution du Délai Moyen de paiement Clients (DSO)
-                    </CardTitle>
+                    <CardTitle>Évolution du Taux de Recouvrement</CardTitle>
                     <CardDescription>
-                      (Créances clients moyennes TTC / CA TTC) × nombre de jours
-                      écoulés depuis le 1er janvier ({dsoData.jours} j à la fin de
-                      la période) — {dsoData.yearN} vs {dsoData.yearN1}
+                      Janvier → mois sélectionné — (Encaissements Clients TTC /
+                      Créances Clients TTC) × 100
                     </CardDescription>
                   </div>
                   <ChartLegend
-                    labelN={dsoData.yearN}
-                    labelN1={dsoData.yearN1}
-                    colorN="#059669"
-                    colorN1="#6ee7b7"
+                    labelN="Taux cumulé"
+                    labelN1="Taux périodique"
+                    colorN="hsl(262, 83%, 58%)"
+                    colorN1="hsl(262, 83%, 78%)"
                   />
                 </CardHeader>
                 <CardContent>
                   <ChartContainer
                     config={{
-                      dso: { label: "DSO", color: "#059669" },
-                      dsoN1: { label: "DSO N-1", color: "#6ee7b7" },
+                      tauxRecouvrementCumule: {
+                        label: "Taux cumulé",
+                        color: "hsl(262, 83%, 58%)",
+                      },
+                      tauxRecouvrement: {
+                        label: "Taux périodique",
+                        color: "hsl(262, 83%, 78%)",
+                      },
                     }}
-                    className="h-[380px] w-full"
+                    className="h-[400px] w-full"
                   >
                     <LineChart
-                      data={dsoData.chartData}
+                      data={recouvrementData.chartData}
                       margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
                     >
                       <CartesianGrid strokeDasharray="3 3" vertical={false} />
@@ -2811,280 +2689,457 @@ export default function ClientReportingChart({
                         dataKey="label"
                         tickLine={false}
                         axisLine={false}
-                        fontSize={12}
+                        fontSize={11}
+                        angle={-45}
+                        textAnchor="end"
+                        height={60}
                       />
                       <YAxis
                         tickLine={false}
                         axisLine={false}
-                        tickFormatter={(v) => `${Math.round(v as number)} j`}
+                        tickFormatter={(value) => `${value.toFixed(0)}%`}
                         fontSize={12}
+                        domain={[0, "auto"]}
                       />
                       <ChartTooltip
                         content={
                           <ChartTooltipContent
                             formatter={(value, name) => [
-                              `${Math.round(value as number).toLocaleString("fr-FR")} j`,
-                              name as string,
+                              `${(value as number).toFixed(1)}%`,
+                              name === "Taux cumulé"
+                                ? "Taux cumulé"
+                                : "Taux périodique",
                             ]}
                           />
                         }
                       />
                       <Line
                         type="monotone"
-                        dataKey="dso"
-                        name={`DSO ${dsoData.yearN}`}
-                        stroke="#059669"
+                        dataKey="tauxRecouvrementCumule"
+                        name="Taux cumulé"
+                        stroke="hsl(262, 83%, 58%)"
                         strokeWidth={2}
-                        dot={{ r: 3 }}
+                        dot={{ r: 4 }}
                       />
                       <Line
                         type="monotone"
-                        dataKey="dsoN1"
-                        name={`DSO ${dsoData.yearN1}`}
-                        stroke="#6ee7b7"
+                        dataKey="tauxRecouvrement"
+                        name="Taux périodique"
+                        stroke="hsl(262, 83%, 78%)"
                         strokeWidth={2}
-                        strokeDasharray="6 6"
                         dot={{ r: 3 }}
+                        strokeDasharray="5 5"
                       />
                     </LineChart>
                   </ChartContainer>
-
-                  {/* Détail du calcul à la date de fin de période. */}
-                  <div className="mt-6 overflow-x-auto">
-                    <table className="w-full text-sm">
-                      <tbody>
-                        <tr className="border-b">
-                          <td className="py-2.5 text-muted-foreground">
-                            Créances clients TTC (BI − comptes 414)
-                          </td>
-                          <td className="text-right py-2.5 font-semibold">
-                            {formatCompactOnly(dsoData.detail.creancesTTC)}
-                          </td>
-                        </tr>
-                        <tr className="border-b">
-                          <td className="py-2.5 text-muted-foreground">
-                            Chiffre d&apos;affaires TTC (TA + TB + TC + TD + TVA
-                            collectée 4431 à 4435)
-                          </td>
-                          <td className="text-right py-2.5 font-semibold">
-                            {formatCompactOnly(dsoData.detail.caTTC)}
-                          </td>
-                        </tr>
-                        <tr className="border-b">
-                          <td className="py-2.5 text-muted-foreground">
-                            Nombre de jours
-                          </td>
-                          <td className="text-right py-2.5 font-semibold">
-                            {dsoData.jours} j
-                          </td>
-                        </tr>
-                        <tr className="border-t-2 font-bold">
-                          <td className="py-2.5">DSO</td>
-                          <td className="text-right py-2.5 text-blue-600">
-                            {Math.round(dsoData.valeur).toLocaleString("fr-FR")} j
-                          </td>
-                        </tr>
-                      </tbody>
-                    </table>
-                  </div>
                 </CardContent>
               </Card>
-            )}
+            </Graphe>
 
-            {/* Top 10 Créances - Analyse des créances clients */}
-            <Card>
-              <CardHeader className="flex flex-row items-start justify-between gap-4">
-                <div className="flex items-center gap-2">
-                  <PiWarningDuotone className="w-5 h-5 text-orange-500" />
+            <Graphe etat={graphes} id="creancesEncaissements">
+              {/* Graphique Créances Clients TTC vs Encaissements Clients TTC */}
+              <Card>
+                <CardHeader className="flex flex-row items-start justify-between gap-4">
                   <div>
-                    <CardTitle>Analyse des Créances - Top 10</CardTitle>
+                    <CardTitle>
+                      Créances Clients TTC vs Encaissements Clients TTC
+                    </CardTitle>
                     <CardDescription>
-                      Clients avec les créances les plus élevées — solde de
-                      l&apos;exercice (Créances Clients TTC − Encaissements
-                      Clients TTC)
+                      Comparaison mensuelle des montants
                     </CardDescription>
                   </div>
-                </div>
-                <ChartLegend
-                  labelN="Solde créance"
-                  colorN="hsl(25, 95%, 53%)"
-                />
-              </CardHeader>
-              <CardContent>
-                {recouvrementData.topCreances &&
-                recouvrementData.topCreances.length > 0 ? (
-                  <div className="space-y-6">
-                    {/* Histogramme horizontal */}
+                  <ChartLegend
+                    labelN="Créances Clients TTC"
+                    labelN1="Encaissements Clients TTC"
+                    colorN="hsl(221, 83%, 53%)"
+                    colorN1="hsl(221, 83%, 73%)"
+                    solid
+                  />
+                </CardHeader>
+                <CardContent>
+                  <ChartContainer
+                    config={{
+                      caTTCTotal: {
+                        label: "Créances Clients TTC",
+                        color: "hsl(221, 83%, 53%)",
+                      },
+                      caEncaisseTTC: {
+                        label: "Encaissements Clients TTC",
+                        color: "hsl(221, 83%, 73%)",
+                      },
+                    }}
+                    className="h-[350px] w-full"
+                  >
+                    <BarChart
+                      data={recouvrementData.chartData}
+                      margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
+                    >
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                      <XAxis
+                        dataKey="label"
+                        tickLine={false}
+                        axisLine={false}
+                        fontSize={11}
+                        angle={-45}
+                        textAnchor="end"
+                        height={60}
+                      />
+                      <YAxis
+                        tickLine={false}
+                        axisLine={false}
+                        tickFormatter={(value) =>
+                          `${(value / 1000000).toFixed(0)}M`
+                        }
+                        fontSize={12}
+                      />
+                      <ChartTooltip
+                        content={
+                          <ChartTooltipContent
+                            formatter={(value, name) => [
+                              formatCompactOnly(value as number),
+                              name === "Créances Clients TTC"
+                                ? "Créances Clients TTC"
+                                : "Encaissements Clients TTC",
+                            ]}
+                          />
+                        }
+                      />
+                      <Bar
+                        dataKey="caTTCTotal"
+                        name="Créances Clients TTC"
+                        fill="hsl(221, 83%, 53%)"
+                        barSize={24}
+                        radius={[4, 4, 0, 0]}
+                      />
+                      <Bar
+                        dataKey="caEncaisseTTC"
+                        name="Encaissements Clients TTC"
+                        fill="hsl(221, 83%, 73%)"
+                        barSize={24}
+                        radius={[4, 4, 0, 0]}
+                      />
+                    </BarChart>
+                  </ChartContainer>
+                </CardContent>
+              </Card>
+            </Graphe>
+
+            <Graphe etat={graphes} id="dso">
+              {/* Évolution du DSO — déplacée depuis les ratios bilantiels */}
+              {dsoData && (
+                <Card>
+                  <CardHeader className="flex flex-row items-start justify-between gap-4">
+                    <div>
+                      <CardTitle>
+                        Évolution du Délai Moyen de paiement Clients (DSO)
+                      </CardTitle>
+                      <CardDescription>
+                        (Créances clients moyennes TTC / CA TTC) × nombre de jours
+                        écoulés depuis le 1er janvier ({dsoData.jours} j à la fin de
+                        la période) — {dsoData.yearN} vs {dsoData.yearN1}
+                      </CardDescription>
+                    </div>
+                    <ChartLegend
+                      labelN={dsoData.yearN}
+                      labelN1={dsoData.yearN1}
+                      colorN="#059669"
+                      colorN1="#6ee7b7"
+                    />
+                  </CardHeader>
+                  <CardContent>
                     <ChartContainer
                       config={{
-                        soldeCreance: {
-                          label: "Solde créance",
-                          color: "hsl(25, 95%, 53%)",
-                        },
+                        dso: { label: "DSO", color: "#059669" },
+                        dsoN1: { label: "DSO N-1", color: "#6ee7b7" },
                       }}
-                      className="w-full"
-                      style={{
-                        height: `${Math.max(
-                          recouvrementData.topCreances.length * 48 + 40,
-                          280,
-                        )}px`,
-                      }}
+                      className="h-[380px] w-full"
                     >
-                      <BarChart
-                        data={recouvrementData.topCreances}
-                        layout="vertical"
-                        margin={{ top: 10, right: 30, left: 15, bottom: 10 }}
-                        barCategoryGap="40%"
+                      <LineChart
+                        data={dsoData.chartData}
+                        margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
                       >
-                        <CartesianGrid
-                          strokeDasharray="3 3"
-                          horizontal={true}
-                          vertical={false}
-                        />
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} />
                         <XAxis
-                          type="number"
+                          dataKey="label"
                           tickLine={false}
                           axisLine={false}
-                          tickFormatter={(value) => formatCompactOnly(value)}
-                          fontSize={11}
+                          fontSize={12}
                         />
                         <YAxis
-                          type="category"
-                          dataKey="nomClient"
                           tickLine={false}
                           axisLine={false}
-                          fontSize={11}
-                          width={140}
-                          tick={{ fill: "hsl(var(--foreground))" }}
+                          tickFormatter={(v) => `${Math.round(v as number)} j`}
+                          fontSize={12}
                         />
                         <ChartTooltip
                           content={
                             <ChartTooltipContent
-                              formatter={(value, name, props) => {
-                                const item = props.payload;
-                                return [
-                                  <div key="tooltip" className="space-y-1">
-                                    <div className="grid grid-cols-2 gap-x-4 gap-y-1 mt-2 text-xs">
-                                      <span>Créances Clients TTC:</span>
-                                      <span className="font-medium">
-                                        {formatCompactOnly(item.caTTCTotal)}
-                                      </span>
-                                      <span>Encaissements Clients TTC:</span>
-                                      <span className="font-medium">
-                                        {formatCompactOnly(item.caEncaisseTTC)}
-                                      </span>
-                                      <span className="text-orange-600">
-                                        Solde créance:
-                                      </span>
-                                      <span className="font-medium text-orange-600">
-                                        {formatCompactOnly(item.soldeCreance)}
-                                      </span>
-                                      <span>% du total:</span>
-                                      <span className="font-medium">
-                                        {item.pourcentageTotal.toFixed(1)}%
-                                      </span>
-                                    </div>
-                                  </div>,
-                                  "",
-                                ];
-                              }}
+                              formatter={(value, name) => [
+                                `${Math.round(value as number).toLocaleString("fr-FR")} j`,
+                                name as string,
+                              ]}
                             />
                           }
                         />
-                        <Bar
-                          dataKey="soldeCreance"
-                          name="Solde créance"
-                          fill="hsl(25, 95%, 53%)"
-                          radius={[0, 4, 4, 0]}
-                          barSize={22}
+                        <Line
+                          type="monotone"
+                          dataKey="dso"
+                          name={`DSO ${dsoData.yearN}`}
+                          stroke="#059669"
+                          strokeWidth={2}
+                          dot={{ r: 3 }}
                         />
-                      </BarChart>
+                        <Line
+                          type="monotone"
+                          dataKey="dsoN1"
+                          name={`DSO ${dsoData.yearN1}`}
+                          stroke="#6ee7b7"
+                          strokeWidth={2}
+                          strokeDasharray="6 6"
+                          dot={{ r: 3 }}
+                        />
+                      </LineChart>
                     </ChartContainer>
 
-                    {/* Liste détaillée */}
-                    <div className="border rounded-lg overflow-hidden">
-                      <div className="grid grid-cols-12 gap-4 p-3 bg-muted/50 text-xs font-medium text-muted-foreground">
-                        <div className="col-span-1">#</div>
-                        <div className="col-span-4">Entreprise</div>
-                        <div className="col-span-2 text-right">
-                          Créances Clients TTC
-                        </div>
-                        <div className="col-span-2 text-right">
-                          Encaissements Clients TTC
-                        </div>
-                        <div className="col-span-2 text-right">Solde</div>
-                        <div className="col-span-1 text-right">%</div>
-                      </div>
-                      {recouvrementData.topCreances.map((client, index) => (
-                        <div
-                          key={client.numeroClient}
-                          className={cn(
-                            "grid grid-cols-12 gap-4 p-3 text-sm items-center",
-                            index % 2 === 0 ? "bg-background" : "bg-muted/20",
-                          )}
+                    {/* Détail du calcul à la date de fin de période. */}
+                    <div className="mt-6 overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <tbody>
+                          <tr className="border-b">
+                            <td className="py-2.5 text-muted-foreground">
+                              Créances clients TTC (BI − comptes 414)
+                            </td>
+                            <td className="text-right py-2.5 font-semibold">
+                              {formatCompactOnly(dsoData.detail.creancesTTC)}
+                            </td>
+                          </tr>
+                          <tr className="border-b">
+                            <td className="py-2.5 text-muted-foreground">
+                              Chiffre d&apos;affaires TTC (TA + TB + TC + TD + TVA
+                              collectée 4431 à 4435)
+                            </td>
+                            <td className="text-right py-2.5 font-semibold">
+                              {formatCompactOnly(dsoData.detail.caTTC)}
+                            </td>
+                          </tr>
+                          <tr className="border-b">
+                            <td className="py-2.5 text-muted-foreground">
+                              Nombre de jours
+                            </td>
+                            <td className="text-right py-2.5 font-semibold">
+                              {dsoData.jours} j
+                            </td>
+                          </tr>
+                          <tr className="border-t-2 font-bold">
+                            <td className="py-2.5">DSO</td>
+                            <td className="text-right py-2.5 text-blue-600">
+                              {Math.round(dsoData.valeur).toLocaleString("fr-FR")} j
+                            </td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+            </Graphe>
+
+            <Graphe etat={graphes} id="topCreances">
+              {/* Top 10 Créances - Analyse des créances clients */}
+              <Card>
+                <CardHeader className="flex flex-row items-start justify-between gap-4">
+                  <div className="flex items-center gap-2">
+                    <PiWarningDuotone className="w-5 h-5 text-orange-500" />
+                    <div>
+                      <CardTitle>Analyse des Créances - Top 10</CardTitle>
+                      <CardDescription>
+                        Clients avec les créances les plus élevées — solde de
+                        l&apos;exercice (Créances Clients TTC − Encaissements
+                        Clients TTC)
+                      </CardDescription>
+                    </div>
+                  </div>
+                  <ChartLegend
+                    labelN="Solde créance"
+                    colorN="hsl(25, 95%, 53%)"
+                  />
+                </CardHeader>
+                <CardContent>
+                  {recouvrementData.topCreances &&
+                  recouvrementData.topCreances.length > 0 ? (
+                    <div className="space-y-6">
+                      {/* Histogramme horizontal */}
+                      <ChartContainer
+                        config={{
+                          soldeCreance: {
+                            label: "Solde créance",
+                            color: "hsl(25, 95%, 53%)",
+                          },
+                        }}
+                        className="w-full"
+                        style={{
+                          height: `${Math.max(
+                            recouvrementData.topCreances.length * 48 + 40,
+                            280,
+                          )}px`,
+                        }}
+                      >
+                        <BarChart
+                          data={recouvrementData.topCreances}
+                          layout="vertical"
+                          margin={{ top: 10, right: 30, left: 15, bottom: 10 }}
+                          barCategoryGap="40%"
                         >
-                          <div className="col-span-1">
-                            <span
-                              className={cn(
-                                "inline-flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold",
-                                index === 0 && "bg-orange-100 text-orange-700",
-                                index === 1 && "bg-orange-50 text-orange-600",
-                                index === 2 && "bg-amber-50 text-amber-600",
-                                index > 2 && "bg-gray-100 text-gray-600",
-                              )}
-                            >
-                              {index + 1}
-                            </span>
+                          <CartesianGrid
+                            strokeDasharray="3 3"
+                            horizontal={true}
+                            vertical={false}
+                          />
+                          <XAxis
+                            type="number"
+                            tickLine={false}
+                            axisLine={false}
+                            tickFormatter={(value) => formatCompactOnly(value)}
+                            fontSize={11}
+                          />
+                          <YAxis
+                            type="category"
+                            dataKey="nomClient"
+                            tickLine={false}
+                            axisLine={false}
+                            fontSize={11}
+                            width={140}
+                            tick={{ fill: "hsl(var(--foreground))" }}
+                          />
+                          <ChartTooltip
+                            content={
+                              <ChartTooltipContent
+                                formatter={(value, name, props) => {
+                                  const item = props.payload;
+                                  return [
+                                    <div key="tooltip" className="space-y-1">
+                                      <div className="grid grid-cols-2 gap-x-4 gap-y-1 mt-2 text-xs">
+                                        <span>Créances Clients TTC:</span>
+                                        <span className="font-medium">
+                                          {formatCompactOnly(item.caTTCTotal)}
+                                        </span>
+                                        <span>Encaissements Clients TTC:</span>
+                                        <span className="font-medium">
+                                          {formatCompactOnly(item.caEncaisseTTC)}
+                                        </span>
+                                        <span className="text-orange-600">
+                                          Solde créance:
+                                        </span>
+                                        <span className="font-medium text-orange-600">
+                                          {formatCompactOnly(item.soldeCreance)}
+                                        </span>
+                                        <span>% du total:</span>
+                                        <span className="font-medium">
+                                          {item.pourcentageTotal.toFixed(1)}%
+                                        </span>
+                                      </div>
+                                    </div>,
+                                    "",
+                                  ];
+                                }}
+                              />
+                            }
+                          />
+                          <Bar
+                            dataKey="soldeCreance"
+                            name="Solde créance"
+                            fill="hsl(25, 95%, 53%)"
+                            radius={[0, 4, 4, 0]}
+                            barSize={22}
+                          />
+                        </BarChart>
+                      </ChartContainer>
+
+                      {/* Liste détaillée */}
+                      <div className="border rounded-lg overflow-hidden">
+                        <div className="grid grid-cols-12 gap-4 p-3 bg-muted/50 text-xs font-medium text-muted-foreground">
+                          <div className="col-span-1">#</div>
+                          <div className="col-span-4">Entreprise</div>
+                          <div className="col-span-2 text-right">
+                            Créances Clients TTC
                           </div>
-                          <div className="col-span-4">
-                            <div className="font-medium truncate">
-                              {client.nomClient}
+                          <div className="col-span-2 text-right">
+                            Encaissements Clients TTC
+                          </div>
+                          <div className="col-span-2 text-right">Solde</div>
+                          <div className="col-span-1 text-right">%</div>
+                        </div>
+                        {recouvrementData.topCreances.map((client, index) => (
+                          <div
+                            key={client.numeroClient}
+                            className={cn(
+                              "grid grid-cols-12 gap-4 p-3 text-sm items-center",
+                              index % 2 === 0 ? "bg-background" : "bg-muted/20",
+                            )}
+                          >
+                            <div className="col-span-1">
+                              <span
+                                className={cn(
+                                  "inline-flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold",
+                                  index === 0 && "bg-orange-100 text-orange-700",
+                                  index === 1 && "bg-orange-50 text-orange-600",
+                                  index === 2 && "bg-amber-50 text-amber-600",
+                                  index > 2 && "bg-gray-100 text-gray-600",
+                                )}
+                              >
+                                {index + 1}
+                              </span>
                             </div>
-                            <div className="text-xs text-muted-foreground">
-                              {client.numeroClient}
+                            <div className="col-span-4">
+                              <div className="font-medium truncate">
+                                {client.nomClient}
+                              </div>
+                              <div className="text-xs text-muted-foreground">
+                                {client.numeroClient}
+                              </div>
+                            </div>
+                            <div className="col-span-2 text-right font-medium text-blue-600">
+                              {formatCompactOnly(client.caTTCTotal)}
+                            </div>
+                            <div className="col-span-2 text-right font-medium text-green-600">
+                              {formatCompactOnly(client.caEncaisseTTC)}
+                            </div>
+                            <div className="col-span-2 text-right font-bold text-orange-600">
+                              {formatCompactOnly(client.soldeCreance)}
+                            </div>
+                            <div className="col-span-1 text-right">
+                              <Badge variant="outline" className="text-xs">
+                                {client.pourcentageTotal.toFixed(1)}%
+                              </Badge>
                             </div>
                           </div>
-                          <div className="col-span-2 text-right font-medium text-blue-600">
-                            {formatCompactOnly(client.caTTCTotal)}
-                          </div>
-                          <div className="col-span-2 text-right font-medium text-green-600">
-                            {formatCompactOnly(client.caEncaisseTTC)}
-                          </div>
+                        ))}
+                        {/* Total */}
+                        <div className="grid grid-cols-12 gap-4 p-3 bg-muted font-medium text-sm border-t">
+                          <div className="col-span-1"></div>
+                          <div className="col-span-4">Total Top 10</div>
+                          <div className="col-span-2 text-right"></div>
+                          <div className="col-span-2 text-right"></div>
                           <div className="col-span-2 text-right font-bold text-orange-600">
-                            {formatCompactOnly(client.soldeCreance)}
+                            {formatCompactOnly(recouvrementData.totalCreances)}
                           </div>
                           <div className="col-span-1 text-right">
                             <Badge variant="outline" className="text-xs">
-                              {client.pourcentageTotal.toFixed(1)}%
+                              100%
                             </Badge>
                           </div>
                         </div>
-                      ))}
-                      {/* Total */}
-                      <div className="grid grid-cols-12 gap-4 p-3 bg-muted font-medium text-sm border-t">
-                        <div className="col-span-1"></div>
-                        <div className="col-span-4">Total Top 10</div>
-                        <div className="col-span-2 text-right"></div>
-                        <div className="col-span-2 text-right"></div>
-                        <div className="col-span-2 text-right font-bold text-orange-600">
-                          {formatCompactOnly(recouvrementData.totalCreances)}
-                        </div>
-                        <div className="col-span-1 text-right">
-                          <Badge variant="outline" className="text-xs">
-                            100%
-                          </Badge>
-                        </div>
                       </div>
                     </div>
-                  </div>
-                ) : (
-                  <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
-                    <AlertTriangle className="w-12 h-12 mb-2 opacity-20" />
-                    <p>Aucune créance client disponible</p>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+                  ) : (
+                    <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
+                      <AlertTriangle className="w-12 h-12 mb-2 opacity-20" />
+                      <p>Aucune créance client disponible</p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </Graphe>
           </div>
         );
 

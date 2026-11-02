@@ -44,6 +44,7 @@ import {
 } from "react-icons/pi";
 import { toast } from "sonner";
 import { KpiGrid, formatCompactOnly, type KpiDef, type KpiValue } from "./kpi-grid";
+import { Graphe, MenuGraphes, useGraphesMasques, type GrapheDef } from "./graphes-masquables";
 import { RATIOS_FORMULES } from "@/lib/reporting/ratios-bilantiels";
 
 type PeriodType = "year" | "month" | "ytd" | "ytd-day";
@@ -158,6 +159,12 @@ function Legende({ items }: { items: { label: string | number; color: string; da
   );
 }
 
+// Graphiques masquables de l'onglet (menu « Graphiques »).
+const GRAPHES: GrapheDef[] = [
+  { id: "frng", label: "Évolution du Fonds de Roulement Net Global" },
+  { id: "bfr", label: "Évolution du Besoin en Fonds de Roulement" },
+];
+
 export default function ClientRatiosTab({
   clientId,
   year,
@@ -171,6 +178,8 @@ export default function ClientRatiosTab({
   const [data, setData] = useState<RatiosData | null>(null);
   const [loading, setLoading] = useState(true);
   const [serieBfr, setSerieBfr] = useState<string>("bfrGlobal");
+  // Graphiques masqués de l'onglet, mémorisés par client.
+  const graphes = useGraphesMasques(`ratios-${clientId}`, GRAPHES);
 
   // Les ratios bilantiels sont des encours : toujours cumulés depuis janvier.
   const moisFin = cumulGranularity === "annee" ? "12" : selectedMonth;
@@ -339,126 +348,131 @@ export default function ClientRatiosTab({
         defs={KPI_DEFS}
         values={kpiValues}
         columns={2}
+        actions={<MenuGraphes etat={graphes} />}
       />
 
-      {/* FRNG — courbes N vs N-1 */}
-      <Card>
-        <CardHeader className="flex flex-row items-start justify-between gap-4">
-          <div>
-            <CardTitle>Évolution du Fonds de Roulement Net Global</CardTitle>
-            <CardDescription>
-              FRNG = DF − AZ (net d&apos;amortissements), cumulé — {data.yearN} vs{" "}
-              {data.yearN1}
-            </CardDescription>
-          </div>
-          <Legende
-            items={[
-              { label: data.yearN, color: "#2463eb" },
-              { label: data.yearN1, color: "#81a5f3", dashed: true },
-            ]}
-          />
-        </CardHeader>
-        <CardContent>
-          <ChartContainer config={chartConfigRatios} className="h-[380px] w-full">
-            <LineChart data={data.chartData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" vertical={false} />
-              <XAxis dataKey="label" tickLine={false} axisLine={false} fontSize={12} />
-              <YAxis tickLine={false} axisLine={false} tickFormatter={montantAxe} fontSize={12} />
-              <ChartTooltip
-                content={
-                  <ChartTooltipContent
-                    formatter={(value, name) => [formatCompactOnly(value as number), name as string]}
-                  />
-                }
-              />
-              <Line
-                type="monotone"
-                dataKey="frng"
-                name={`FRNG ${data.yearN}`}
-                stroke="#2463eb"
-                strokeWidth={2}
-                dot={{ r: 3 }}
-              />
-              <Line
-                type="monotone"
-                dataKey="frngN1"
-                name={`FRNG ${data.yearN1}`}
-                stroke="#81a5f3"
-                strokeWidth={2}
-                strokeDasharray="6 6"
-                dot={{ r: 3 }}
-              />
-            </LineChart>
-          </ChartContainer>
-        </CardContent>
-      </Card>
-
-      {/* BFR — une composante à la fois, en N et N-1 */}
-      <Card>
-        <CardHeader className="flex flex-row items-start justify-between gap-4">
-          <div>
-            <CardTitle>Évolution du Besoin en Fonds de Roulement</CardTitle>
-            <CardDescription>
-              BFR global = BFR d&apos;exploitation + BFR HAO, cumulé — {data.yearN} vs{" "}
-              {data.yearN1}
-            </CardDescription>
-            <div className="flex items-center gap-2 border border-[#D0E3F5] rounded-lg px-4 h-10 mt-3 w-fit">
-              <span className="text-xs text-[#335890]">Donnée :</span>
-              <Select value={serieBfr} onValueChange={setSerieBfr}>
-                <SelectTrigger className="border-0 p-0 h-auto shadow-none min-w-[160px] font-semibold text-[#00122E]">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {SERIES_BFR.map((s) => (
-                    <SelectItem key={s.id} value={s.id}>
-                      {s.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+      <Graphe etat={graphes} id="frng">
+        {/* FRNG — courbes N vs N-1 */}
+        <Card>
+          <CardHeader className="flex flex-row items-start justify-between gap-4">
+            <div>
+              <CardTitle>Évolution du Fonds de Roulement Net Global</CardTitle>
+              <CardDescription>
+                FRNG = DF − AZ (net d&apos;amortissements), cumulé — {data.yearN} vs{" "}
+                {data.yearN1}
+              </CardDescription>
             </div>
-          </div>
-          <Legende
-            items={[
-              { label: `${serie.label} ${data.yearN}`, color: serie.couleur },
-              { label: `${serie.label} ${data.yearN1}`, color: serie.couleurN1, dashed: true },
-            ]}
-          />
-        </CardHeader>
-        <CardContent>
-          <ChartContainer config={chartConfigRatios} className="h-[380px] w-full">
-            <LineChart data={data.chartData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" vertical={false} />
-              <XAxis dataKey="label" tickLine={false} axisLine={false} fontSize={12} />
-              <YAxis tickLine={false} axisLine={false} tickFormatter={montantAxe} fontSize={12} />
-              <ChartTooltip
-                content={
-                  <ChartTooltipContent
-                    formatter={(value, name) => [formatCompactOnly(value as number), name as string]}
-                  />
-                }
-              />
-              <Line
-                type="monotone"
-                dataKey={serie.cleN}
-                name={`${serie.label} ${data.yearN}`}
-                stroke={serie.couleur}
-                strokeWidth={2}
-                dot={{ r: 3 }}
-              />
-              <Line
-                type="monotone"
-                dataKey={serie.cleN1}
-                name={`${serie.label} ${data.yearN1}`}
-                stroke={serie.couleurN1}
-                strokeWidth={2}
-                strokeDasharray="6 6"
-                dot={{ r: 3 }}
-              />
-            </LineChart>
-          </ChartContainer>
-        </CardContent>
-      </Card>
+            <Legende
+              items={[
+                { label: data.yearN, color: "#2463eb" },
+                { label: data.yearN1, color: "#81a5f3", dashed: true },
+              ]}
+            />
+          </CardHeader>
+          <CardContent>
+            <ChartContainer config={chartConfigRatios} className="h-[380px] w-full">
+              <LineChart data={data.chartData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                <XAxis dataKey="label" tickLine={false} axisLine={false} fontSize={12} />
+                <YAxis tickLine={false} axisLine={false} tickFormatter={montantAxe} fontSize={12} />
+                <ChartTooltip
+                  content={
+                    <ChartTooltipContent
+                      formatter={(value, name) => [formatCompactOnly(value as number), name as string]}
+                    />
+                  }
+                />
+                <Line
+                  type="monotone"
+                  dataKey="frng"
+                  name={`FRNG ${data.yearN}`}
+                  stroke="#2463eb"
+                  strokeWidth={2}
+                  dot={{ r: 3 }}
+                />
+                <Line
+                  type="monotone"
+                  dataKey="frngN1"
+                  name={`FRNG ${data.yearN1}`}
+                  stroke="#81a5f3"
+                  strokeWidth={2}
+                  strokeDasharray="6 6"
+                  dot={{ r: 3 }}
+                />
+              </LineChart>
+            </ChartContainer>
+          </CardContent>
+        </Card>
+      </Graphe>
+
+      <Graphe etat={graphes} id="bfr">
+        {/* BFR — une composante à la fois, en N et N-1 */}
+        <Card>
+          <CardHeader className="flex flex-row items-start justify-between gap-4">
+            <div>
+              <CardTitle>Évolution du Besoin en Fonds de Roulement</CardTitle>
+              <CardDescription>
+                BFR global = BFR d&apos;exploitation + BFR HAO, cumulé — {data.yearN} vs{" "}
+                {data.yearN1}
+              </CardDescription>
+              <div className="flex items-center gap-2 border border-[#D0E3F5] rounded-lg px-4 h-10 mt-3 w-fit">
+                <span className="text-xs text-[#335890]">Donnée :</span>
+                <Select value={serieBfr} onValueChange={setSerieBfr}>
+                  <SelectTrigger className="border-0 p-0 h-auto shadow-none min-w-[160px] font-semibold text-[#00122E]">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {SERIES_BFR.map((s) => (
+                      <SelectItem key={s.id} value={s.id}>
+                        {s.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <Legende
+              items={[
+                { label: `${serie.label} ${data.yearN}`, color: serie.couleur },
+                { label: `${serie.label} ${data.yearN1}`, color: serie.couleurN1, dashed: true },
+              ]}
+            />
+          </CardHeader>
+          <CardContent>
+            <ChartContainer config={chartConfigRatios} className="h-[380px] w-full">
+              <LineChart data={data.chartData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                <XAxis dataKey="label" tickLine={false} axisLine={false} fontSize={12} />
+                <YAxis tickLine={false} axisLine={false} tickFormatter={montantAxe} fontSize={12} />
+                <ChartTooltip
+                  content={
+                    <ChartTooltipContent
+                      formatter={(value, name) => [formatCompactOnly(value as number), name as string]}
+                    />
+                  }
+                />
+                <Line
+                  type="monotone"
+                  dataKey={serie.cleN}
+                  name={`${serie.label} ${data.yearN}`}
+                  stroke={serie.couleur}
+                  strokeWidth={2}
+                  dot={{ r: 3 }}
+                />
+                <Line
+                  type="monotone"
+                  dataKey={serie.cleN1}
+                  name={`${serie.label} ${data.yearN1}`}
+                  stroke={serie.couleurN1}
+                  strokeWidth={2}
+                  strokeDasharray="6 6"
+                  dot={{ r: 3 }}
+                />
+              </LineChart>
+            </ChartContainer>
+          </CardContent>
+        </Card>
+      </Graphe>
     </div>
   );
 }

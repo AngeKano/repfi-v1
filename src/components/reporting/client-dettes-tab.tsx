@@ -48,6 +48,7 @@ import {
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { DetteTable } from "./dette-table";
+import { Graphe, MenuGraphes, useGraphesMasques, type GrapheDef } from "./graphes-masquables";
 
 // ==================== TYPES ====================
 interface DetteChartPoint {
@@ -246,6 +247,12 @@ function Legende({ items }: { items: { label: string; color: string }[] }) {
   );
 }
 
+// Graphiques masquables de l'onglet (menu « Graphiques »).
+const GRAPHES: GrapheDef[] = [
+  { id: "tauxDecaissement", label: "Évolution du Taux de Décaissement Fournisseurs" },
+  { id: "dettesDecaissements", label: "Dettes Fournisseurs TTC vs Décaissement Fournisseurs TTC" },
+];
+
 export default function ClientDettesTab({
   clientId,
   year,
@@ -279,6 +286,8 @@ export default function ClientDettesTab({
   );
   const [kpiEditMode, setKpiEditMode] = useState(false);
   const [kpiDragId, setKpiDragId] = useState<string | null>(null);
+  // Graphiques masqués de l'onglet, mémorisés par client.
+  const graphes = useGraphesMasques(`dettes-${clientId}`, GRAPHES);
 
   const yearOptions = useMemo(() => {
     const current = new Date().getFullYear();
@@ -503,7 +512,7 @@ export default function ClientDettesTab({
 
       {/* KPIs configurables */}
       <div>
-        <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2 mb-3">
           <Button
             variant="outline"
             size="sm"
@@ -518,6 +527,7 @@ export default function ClientDettesTab({
             <PiGearDuotone className="w-4 h-4" />
             {kpiEditMode ? "Terminer" : "Configurer les KPIs"}
           </Button>
+          <MenuGraphes etat={graphes} />
         </div>
 
         <div className="grid grid-cols-3 gap-4">
@@ -586,172 +596,176 @@ export default function ClientDettesTab({
         </div>
       </div>
 
-      {/* Chart 1 — Évolution du taux de remboursement */}
-      <Card>
-        <CardHeader className="flex flex-row items-start justify-between gap-4">
-          <div>
-            <CardTitle>Évolution du Taux de Décaissement Fournisseurs</CardTitle>
-            <CardDescription>
-              (Remboursements / Dettes ) × 100 — taux cumulé et périodique
-            </CardDescription>
-          </div>
-          <Legende
-            items={[
-              { label: "Taux cumulé", color: "hsl(262, 83%, 58%)" },
-              { label: "Taux périodique", color: "hsl(262, 83%, 78%)" },
-            ]}
-          />
-        </CardHeader>
-        <CardContent>
-          <ChartContainer
-            config={{
-              tauxRemboursementCumule: {
-                label: "Taux cumulé",
-                color: "hsl(262, 83%, 58%)",
-              },
-              tauxRemboursement: {
-                label: "Taux périodique",
-                color: "hsl(262, 83%, 78%)",
-              },
-            }}
-            className="h-[400px] w-full"
-          >
-            <LineChart
-              data={data.chartData}
-              margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
+      <Graphe etat={graphes} id="tauxDecaissement">
+        {/* Chart 1 — Évolution du taux de remboursement */}
+        <Card>
+          <CardHeader className="flex flex-row items-start justify-between gap-4">
+            <div>
+              <CardTitle>Évolution du Taux de Décaissement Fournisseurs</CardTitle>
+              <CardDescription>
+                (Remboursements / Dettes ) × 100 — taux cumulé et périodique
+              </CardDescription>
+            </div>
+            <Legende
+              items={[
+                { label: "Taux cumulé", color: "hsl(262, 83%, 58%)" },
+                { label: "Taux périodique", color: "hsl(262, 83%, 78%)" },
+              ]}
+            />
+          </CardHeader>
+          <CardContent>
+            <ChartContainer
+              config={{
+                tauxRemboursementCumule: {
+                  label: "Taux cumulé",
+                  color: "hsl(262, 83%, 58%)",
+                },
+                tauxRemboursement: {
+                  label: "Taux périodique",
+                  color: "hsl(262, 83%, 78%)",
+                },
+              }}
+              className="h-[400px] w-full"
             >
-              <CartesianGrid strokeDasharray="3 3" vertical={false} />
-              <XAxis
-                dataKey="label"
-                tickLine={false}
-                axisLine={false}
-                fontSize={11}
-                angle={-45}
-                textAnchor="end"
-                height={60}
-              />
-              <YAxis
-                tickLine={false}
-                axisLine={false}
-                tickFormatter={(value) => `${value.toFixed(0)}%`}
-                fontSize={12}
-                domain={[0, "auto"]}
-              />
-              <ChartTooltip
-                content={
-                  <ChartTooltipContent
-                    formatter={(value, name) => [
-                      `${(value as number).toFixed(1)}%`,
-                      name === "Taux cumulé" ? "Taux cumulé" : "Taux périodique",
-                    ]}
-                  />
-                }
-              />
-              <Line
-                type="monotone"
-                dataKey="tauxRemboursementCumule"
-                name="Taux cumulé"
-                stroke="hsl(262, 83%, 58%)"
-                strokeWidth={2}
-                dot={{ r: 4 }}
-              />
-              <Line
-                type="monotone"
-                dataKey="tauxRemboursement"
-                name="Taux périodique"
-                stroke="hsl(262, 83%, 78%)"
-                strokeWidth={2}
-                dot={{ r: 3 }}
-                strokeDasharray="5 5"
-              />
-            </LineChart>
-          </ChartContainer>
-        </CardContent>
-      </Card>
+              <LineChart
+                data={data.chartData}
+                margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
+              >
+                <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                <XAxis
+                  dataKey="label"
+                  tickLine={false}
+                  axisLine={false}
+                  fontSize={11}
+                  angle={-45}
+                  textAnchor="end"
+                  height={60}
+                />
+                <YAxis
+                  tickLine={false}
+                  axisLine={false}
+                  tickFormatter={(value) => `${value.toFixed(0)}%`}
+                  fontSize={12}
+                  domain={[0, "auto"]}
+                />
+                <ChartTooltip
+                  content={
+                    <ChartTooltipContent
+                      formatter={(value, name) => [
+                        `${(value as number).toFixed(1)}%`,
+                        name === "Taux cumulé" ? "Taux cumulé" : "Taux périodique",
+                      ]}
+                    />
+                  }
+                />
+                <Line
+                  type="monotone"
+                  dataKey="tauxRemboursementCumule"
+                  name="Taux cumulé"
+                  stroke="hsl(262, 83%, 58%)"
+                  strokeWidth={2}
+                  dot={{ r: 4 }}
+                />
+                <Line
+                  type="monotone"
+                  dataKey="tauxRemboursement"
+                  name="Taux périodique"
+                  stroke="hsl(262, 83%, 78%)"
+                  strokeWidth={2}
+                  dot={{ r: 3 }}
+                  strokeDasharray="5 5"
+                />
+              </LineChart>
+            </ChartContainer>
+          </CardContent>
+        </Card>
+      </Graphe>
 
-      {/* Chart 2 — Dette fournisseurs vs dettes fournisseurs remboursées */}
-      <Card>
-        <CardHeader className="flex flex-row items-start justify-between gap-4">
-          <div>
-            <CardTitle>
-              Dettes Fournisseurs TTC vs Décaissement Fournisseurs TTC
-            </CardTitle>
-            <CardDescription>
-              Solde DJ hors 408/409 : dettes hors journaux de trésorerie, décaissements sur
-              journaux de trésorerie
-            </CardDescription>
-          </div>
-          <Legende
-            items={[
-              { label: "Dettes Fournisseurs TTC", color: "hsl(221, 83%, 53%)" },
-              { label: "Décaissement Fournisseurs TTC", color: "hsl(221, 83%, 73%)" },
-            ]}
-          />
-        </CardHeader>
-        <CardContent>
-          <ChartContainer
-            config={{
-              detteFournisseurNee: {
-                label: "Dette fournisseurs",
-                color: "hsl(221, 83%, 53%)",
-              },
-              detteFournisseurRemboursee: {
-                label: "Dette remboursée",
-                color: "hsl(221, 83%, 73%)",
-              },
-            }}
-            className="h-[350px] w-full"
-          >
-            <BarChart
-              data={data.chartData}
-              margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
+      <Graphe etat={graphes} id="dettesDecaissements">
+        {/* Chart 2 — Dette fournisseurs vs dettes fournisseurs remboursées */}
+        <Card>
+          <CardHeader className="flex flex-row items-start justify-between gap-4">
+            <div>
+              <CardTitle>
+                Dettes Fournisseurs TTC vs Décaissement Fournisseurs TTC
+              </CardTitle>
+              <CardDescription>
+                Solde DJ hors 408/409 : dettes hors journaux de trésorerie, décaissements sur
+                journaux de trésorerie
+              </CardDescription>
+            </div>
+            <Legende
+              items={[
+                { label: "Dettes Fournisseurs TTC", color: "hsl(221, 83%, 53%)" },
+                { label: "Décaissement Fournisseurs TTC", color: "hsl(221, 83%, 73%)" },
+              ]}
+            />
+          </CardHeader>
+          <CardContent>
+            <ChartContainer
+              config={{
+                detteFournisseurNee: {
+                  label: "Dette fournisseurs",
+                  color: "hsl(221, 83%, 53%)",
+                },
+                detteFournisseurRemboursee: {
+                  label: "Dette remboursée",
+                  color: "hsl(221, 83%, 73%)",
+                },
+              }}
+              className="h-[350px] w-full"
             >
-              <CartesianGrid strokeDasharray="3 3" vertical={false} />
-              <XAxis
-                dataKey="label"
-                tickLine={false}
-                axisLine={false}
-                fontSize={11}
-                angle={-45}
-                textAnchor="end"
-                height={60}
-              />
-              <YAxis
-                tickLine={false}
-                axisLine={false}
-                tickFormatter={(value) => `${(value / 1000000).toFixed(0)}M`}
-                fontSize={12}
-              />
-              <ChartTooltip
-                content={
-                  <ChartTooltipContent
-                    formatter={(value, name) => [
-                      formatCompactOnly(value as number),
-                      name === "detteFournisseurNee"
-                        ? "Dette fournisseurs"
-                        : "Dette remboursée",
-                    ]}
-                  />
-                }
-              />
-              <Bar
-                dataKey="detteFournisseurNee"
-                name="detteFournisseurNee"
-                fill="hsl(221, 83%, 53%)"
-                barSize={24}
-                radius={[4, 4, 0, 0]}
-              />
-              <Bar
-                dataKey="detteFournisseurRemboursee"
-                name="detteFournisseurRemboursee"
-                fill="hsl(221, 83%, 73%)"
-                barSize={24}
-                radius={[4, 4, 0, 0]}
-              />
-            </BarChart>
-          </ChartContainer>
-        </CardContent>
-      </Card>
+              <BarChart
+                data={data.chartData}
+                margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
+              >
+                <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                <XAxis
+                  dataKey="label"
+                  tickLine={false}
+                  axisLine={false}
+                  fontSize={11}
+                  angle={-45}
+                  textAnchor="end"
+                  height={60}
+                />
+                <YAxis
+                  tickLine={false}
+                  axisLine={false}
+                  tickFormatter={(value) => `${(value / 1000000).toFixed(0)}M`}
+                  fontSize={12}
+                />
+                <ChartTooltip
+                  content={
+                    <ChartTooltipContent
+                      formatter={(value, name) => [
+                        formatCompactOnly(value as number),
+                        name === "detteFournisseurNee"
+                          ? "Dette fournisseurs"
+                          : "Dette remboursée",
+                      ]}
+                    />
+                  }
+                />
+                <Bar
+                  dataKey="detteFournisseurNee"
+                  name="detteFournisseurNee"
+                  fill="hsl(221, 83%, 53%)"
+                  barSize={24}
+                  radius={[4, 4, 0, 0]}
+                />
+                <Bar
+                  dataKey="detteFournisseurRemboursee"
+                  name="detteFournisseurRemboursee"
+                  fill="hsl(221, 83%, 73%)"
+                  barSize={24}
+                  radius={[4, 4, 0, 0]}
+                />
+              </BarChart>
+            </ChartContainer>
+          </CardContent>
+        </Card>
+      </Graphe>
 
       {/* Tableau Top — par fournisseur */}
       <DetteTable
