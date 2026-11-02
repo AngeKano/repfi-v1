@@ -358,6 +358,35 @@ Recouvrement Clients, Règlement Fournisseurs, Dettes court terme, Trésorerie,
 Dettes Financières, Ratios bilantiels, Bilan d'activité.
 
 **Comparaison N / N-1** : la **même fenêtre** est appliquée à chaque exercice.
+Sans reporting en N-1, la comparaison est affichée « non disponible » (ni
+montant N-1, ni variation).
+
+**Période disponible = reporting importé** (Synthèse, Chiffre d'affaires,
+Résultats) :
+
+| Filtre | Règle |
+|---|---|
+| Année | Seules les années d'un reporting importé (début de période). Une année sans import n'est jamais calculée : l'écran se cale sur la plus récente |
+| Mois | Seuls les mois couverts par la période saisie à l'import (ex. import janvier → mars : janvier, février, mars). Un mois hors reporting devient le dernier mois couvert |
+| Granularité Année | La fenêtre s'arrête au **dernier mois importé** (« Janvier - Mars 2026 », pas « Janvier - Décembre ») ; les courbes ne montrent que les mois couverts |
+
+**Indicateurs selon le filtre** (Synthèse, Chiffre d'affaires, Résultats) :
+
+| Filtre | Indicateurs de flux (CA, charges, résultats) | Trésorerie |
+|---|---|---|
+| Périodique + Année | janvier → dernier mois importé | solde à la fin de la fenêtre |
+| Cumulé + Année | janvier → dernier mois importé | solde à la fin de la fenêtre |
+| Périodique + Mois M | mois M seul | **solde à la fin de M** (janvier → M) |
+| Cumulé + Mois M | **janvier → M** | solde à la fin de M |
+
+La trésorerie est un solde : sa courbe part toujours du solde de fin du mois
+précédent. En Cumulé + Mois, les autres courbes cumulées (CA, subventions,
+Charges vs Produits) partent du cumul de janvier au mois précédent.
+
+**À-nouveaux** : une écriture des journaux `RAN` / `AN` datée de décembre
+(31/12 de l'exercice précédent, acceptée à l'import) compte en **janvier** :
+c'est le solde d'ouverture (`src/lib/reporting/periode.ts`, Synthèse et
+Trésorerie).
 
 **Filtres partagés** : année, mode, granularité et mois sont communs aux
 onglets. À la première ouverture d'un client, l'année se cale sur l'exercice
@@ -1012,18 +1041,21 @@ Synthèse du reporting (session requise) : KPI N et N-1, courbes, Top 10 clients
 
 | Paramètre | Type | Défaut | Effet |
 |---|---|---|---|
-| `year` | string AAAA | année courante | Exercice N. N-1 vaut `year` − 1 |
+| `year` | string AAAA | année courante | Exercice N, parmi les années d'un reporting importé (sinon la plus récente). N-1 vaut N − 1 |
 | `periodType` | `year` ou `ytd` ou `month` ou `ytd-day` | `year` | `year` : 12 points mensuels. `ytd` : points mensuels de janvier à `month`. `month` : points journaliers du mois, cumuls partant de 0. `ytd-day` : points journaliers du mois, cumuls partant du cumul de janvier à M-1 |
-| `month` | string MM | `null` | Mois de référence, requis pour `month`, `ytd` et `ytd-day`. Sans lui, le comportement est celui de `year` |
+| `month` | string MM | `null` | Mois de référence, requis pour `month`, `ytd` et `ytd-day` ; un mois hors reporting devient le dernier mois couvert. Sans lui, le comportement est celui de `year` |
 
 ```
 {
   client: { id, name, assujettiTVA },
-  year, yearN1,              // strings
+  year, yearN1,              // strings — year : année réellement calculée
   periodType,
-  selectedMonth,             // "MM" ou null
-  availableYears,            // string[] décroissant ([year] si aucune période)
-  chartData: DataPoint[],    // 12 points, ou janvier → month, ou max(jours du mois N, jours du mois N-1)
+  selectedMonth,             // "MM" réellement calculé, ou null
+  availableYears,            // string[] décroissant, années d'un reporting importé ([] si aucune)
+  moisDisponibles,           // "MM"[] couverts par le reporting de l'année
+  anneeN1Disponible,         // false : aucun reporting en N-1
+  baselineFlux,              // { charges, produits } de janvier à M-1 (ytd-day), sinon 0
+  chartData: DataPoint[],    // mois couverts jusqu'à la fin de fenêtre, ou max(jours du mois N, jours du mois N-1)
   periods: Periode[],        // périodes comptables de l'année N
   totals: { totalCharges, totalProduits, totalTransactions, resultat },   // Σ chartData ; resultat = produits − charges
   indicateurs: {
@@ -1032,7 +1064,7 @@ Synthèse du reporting (session requise) : KPI N et N-1, courbes, Top 10 clients
     variations: {
       chiffreAffaires, masseSalariale, ratioMasseSalarialeCA, resultatExploitation, resultatNet,
       soldeTresorerie, margeCommerciale, valeurAjoutee, ebe, resultatFinancier, resultatHAO,
-      subventions, caTA, caTB, caTC, caTD,   // % : (N − N1) / |N1| × 100 (100 si N1 = 0 et N ≠ 0)
+      subventions, caTA, caTB, caTC, caTD,   // % : (N − N1) / |N1| × 100 (N1 = 0 : ±100 selon le signe de N)
       tauxRecouvrement                       // écart en POINTS (N − N1), pas un %
     }
   },
@@ -1670,6 +1702,7 @@ ouvert par défaut, replié d'un clic sur son en-tête), séparateur, **Membres*
 | 29/10/2026 | Charges et rentabilité : colonne des valeurs à droite de la cascade **retirée** — montant (K) et pourcentage se lisent dans la barre ou dans l'infobulle ; la barre occupe la place libérée (§22). |
 | 02/11/2026 | Charges et rentabilité : pourcentage du CA **entre parenthèses** dans les barres et l'infobulle — « −11 766K (55,11 %) » (§22). |
 | 02/11/2026 | **Import d'une période avec le Grand Livre seul** : Plan comptable, Plan des tiers et Codes journaux deviennent facultatifs (écran de création, « Modifier » et fenêtre d'ajout). Airflow **contrôle le Grand Livre avant toute écriture** : un compte (après conversion PCG → SYSCOHADA), un code journal (RAN compris) ou un n° de tiers absent des référentiels — en base ou dans les fichiers du même import — fait échouer l'import sans rien enregistrer, avec le nombre d'éléments manquants et les 20 premiers par catégorie ; on complète les référentiels puis « Relancer le traitement ». Un nouvel envoi remplace entièrement les fichiers de la période ; l'échec du contrôle n'efface pas les données d'une période déjà importée. « Modifier » corrigé (il attendait encore les 5 anciens fichiers) et soumis au droit Charger des fichiers (§3, §25.18 à §25.20). |
+| 02/11/2026 | **Audit des filtres — Synthèse Financière** (et Chiffre d'affaires / Résultats, même API) : années et mois limités au reporting importé (plus d'année ni de mois sans import ; l'écran se cale sur l'année la plus récente et le dernier mois couvert, la fenêtre « Année » s'arrête au dernier mois importé, même fenêtre pour N-1) ; Cumulé + Mois = janvier → mois pour les KPI (ils ne portaient que sur le mois) ; Trésorerie toujours un solde de janvier à la fin de la période (le périodique mensuel n'en donnait que le mouvement) ; courbes cumulées en Cumulé + Mois parties du cumul janvier → mois précédent (Charges vs Produits, subventions) ; à-nouveaux datés du 31/12 précédent comptés en janvier (Synthèse et Trésorerie) ; N-1 sans reporting affiché « non disponible », sans variation (§4, §25.1 ; audit §7). |
 | 02/11/2026 | **Trésorerie — détail par compte aligné sur les indicateurs** : un compte de passif (rubrique D…, solde normal créditeur) ou de dépréciation est lu en **crédit − débit**, soit (débit − crédit) × −1, dans « Trésorerie par comptes » comme dans les indicateurs ; 565000 (DQ, débiteur de 1) vaut −1 dans le tableau comme dans « Autres Trésorerie Passif » (il valait 1 dans le tableau). Ces comptes sont repérés « en moins » et déduits ; la ligne Total Trésorerie reprend l'indicateur. Indicateurs inchangés. **Variations** : quand N-1 = 0, ±100 % selon le signe de N (de 0 à −1 n'affiche plus « +100 % ») — tous les KPI, Produits par Nature, Trésorerie (§11, §24). |
 | 02/11/2026 | Tables de dimension › Mapping : la colonne **Rubrique par défaut** est placée **avant** la colonne Rubrique (Racine, Rubrique par défaut, Rubrique, Type…) (§3). |
 | 02/11/2026 | Comptabilité (grand livre) et Tables de dimension : la pagination indique les lignes affichées, « Lignes 51 à 75 sur 1 636 », au lieu de « 1636 lignes · 25/page » (total sans séparateur de milliers) (§19). |

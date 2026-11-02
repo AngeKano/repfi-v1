@@ -27,6 +27,7 @@ import {
 import { bilanRefExpr } from "@/lib/clickhouse/schema";
 import { journauxTresorerie } from "@/lib/clickhouse/plan-comptable";
 import { RUBRIQUES_TOTAL_TRESORERIE } from "@/lib/reporting/tresorerie";
+import { MOIS_SQL, JOUR_SQL, moisCouverts } from "@/lib/reporting/periode";
 import { planComptesMap, intituleCompte } from "@/lib/clickhouse/plan-comptable";
 
 const clickhouseClient = createClickhouseClient({
@@ -244,7 +245,7 @@ async function recupererRubriquesParMois(
   const data = await clickhouseClient.query({
     query: `
       SELECT
-        substring(date_transaction, 4, 2) as period,
+        ${MOIS_SQL} as period,
         rubrique,
         sum(credit - debit) as solde
       FROM ${dbName}.grand_livre
@@ -288,12 +289,12 @@ async function recupererRubriquesParJour(
   const data = await clickhouseClient.query({
     query: `
       SELECT
-        substring(date_transaction, 1, 2) as period,
+        ${JOUR_SQL} as period,
         rubrique,
         sum(credit - debit) as solde
       FROM ${dbName}.grand_livre
       WHERE batch_id IN ({batchIds:Array(String)})
-        AND substring(date_transaction, 4, 2) = {monthFilter:String}
+        AND ${MOIS_SQL} = {monthFilter:String}
         AND rubrique IN ({rubriques:Array(String)})
       GROUP BY period, rubrique
       ORDER BY period
@@ -337,7 +338,7 @@ async function recupererCAXBParMois(
   const data = await clickhouseClient.query({
     query: `
       SELECT
-        substring(date_transaction, 4, 2) as period,
+        ${MOIS_SQL} as period,
         sum(credit - debit) as caXB
       FROM ${dbName}.grand_livre
       WHERE batch_id IN ({batchIds:Array(String)})
@@ -372,11 +373,11 @@ async function recupererCAXBParJour(
   const data = await clickhouseClient.query({
     query: `
       SELECT
-        substring(date_transaction, 1, 2) as period,
+        ${JOUR_SQL} as period,
         sum(credit - debit) as caXB
       FROM ${dbName}.grand_livre
       WHERE batch_id IN ({batchIds:Array(String)})
-        AND substring(date_transaction, 4, 2) = {monthFilter:String}
+        AND ${MOIS_SQL} = {monthFilter:String}
         AND rubrique IN ({xbRubriques:Array(String)})
       GROUP BY period
       ORDER BY period
@@ -411,7 +412,7 @@ async function recupererTresorerieParMois(
   const data = await clickhouseClient.query({
     query: `
       SELECT
-        substring(date_transaction, 4, 2) as period,
+        ${MOIS_SQL} as period,
         sumIf(debit - credit, ${refExpr} IN ({rubriquesTresorerie:Array(String)})) as solde_tresorerie
       FROM ${dbName}.grand_livre
       WHERE batch_id IN ({batchIds:Array(String)})
@@ -446,11 +447,11 @@ async function recupererTresorerieParJour(
   const data = await clickhouseClient.query({
     query: `
       SELECT
-        substring(date_transaction, 1, 2) as period,
+        ${JOUR_SQL} as period,
         sumIf(debit - credit, ${refExpr} IN ({rubriquesTresorerie:Array(String)})) as solde_tresorerie
       FROM ${dbName}.grand_livre
       WHERE batch_id IN ({batchIds:Array(String)})
-        AND substring(date_transaction, 4, 2) = {monthFilter:String}
+        AND ${MOIS_SQL} = {monthFilter:String}
       GROUP BY period
       ORDER BY period
     `,
@@ -495,7 +496,7 @@ async function recupererRecouvrementParMois(
   const data = await clickhouseClient.query({
     query: `
       SELECT
-        substring(date_transaction, 4, 2) as period,
+        ${MOIS_SQL} as period,
         ${creancesTTCSql(refExpr)} as ca_ttc_total,
         ${encaissementsTTCSql(refExpr)} as ca_encaisse_ttc
       FROM ${dbName}.grand_livre
@@ -541,12 +542,12 @@ async function recupererRecouvrementParJour(
   const data = await clickhouseClient.query({
     query: `
       SELECT
-        substring(date_transaction, 1, 2) as period,
+        ${JOUR_SQL} as period,
         ${creancesTTCSql(refExpr)} as ca_ttc_total,
         ${encaissementsTTCSql(refExpr)} as ca_encaisse_ttc
       FROM ${dbName}.grand_livre
       WHERE batch_id IN ({batchIds:Array(String)})
-        AND substring(date_transaction, 4, 2) = {monthFilter:String}
+        AND ${MOIS_SQL} = {monthFilter:String}
       GROUP BY period
       ORDER BY period
     `,
@@ -594,7 +595,7 @@ async function recupererCAParNature(
   const baseParams: Record<string, unknown> = {};
 
   if (periodType === "month" && selectedMonth) {
-    periodFilter = `AND substring(date_transaction, 4, 2) = {monthFilter:String}`;
+    periodFilter = `AND ${MOIS_SQL} = {monthFilter:String}`;
     baseParams.monthFilter = selectedMonth;
   } else if (
     (periodType === "ytd" || periodType === "ytd-day") &&
@@ -603,7 +604,7 @@ async function recupererCAParNature(
     // "ytd" et "ytd-day" partagent le même filtre Jan → selectedMonth pour
     // les agrégats totaux (Top 10, CA par nature). La différence porte sur
     // la granularité de la chart principale.
-    periodFilter = `AND substring(date_transaction, 4, 2) <= {monthFilter:String}`;
+    periodFilter = `AND ${MOIS_SQL} <= {monthFilter:String}`;
     baseParams.monthFilter = selectedMonth;
   }
 
@@ -721,14 +722,14 @@ async function recupererTop10Clients(
   };
 
   if (periodType === "month" && selectedMonth) {
-    periodFilter = `AND substring(date_transaction, 4, 2) = {monthFilter:String}`;
+    periodFilter = `AND ${MOIS_SQL} = {monthFilter:String}`;
     queryParams.monthFilter = selectedMonth;
   } else if (
     (periodType === "ytd" || periodType === "ytd-day") &&
     selectedMonth
   ) {
     // "ytd-day" agrège comme "ytd" (Jan → mois sélectionné) pour le Top 10.
-    periodFilter = `AND substring(date_transaction, 4, 2) <= {monthFilter:String}`;
+    periodFilter = `AND ${MOIS_SQL} <= {monthFilter:String}`;
     queryParams.monthFilter = selectedMonth;
   }
 
@@ -896,7 +897,7 @@ async function recupererFluxParMois(
   const data = await clickhouseClient.query({
     query: `
       SELECT
-        substring(date_transaction, 4, 2) as period,
+        ${MOIS_SQL} as period,
         ${CHARGES_SQL} as charges,
         ${PRODUITS_SQL} as produits,
         count(*) as nb_transactions
@@ -943,13 +944,13 @@ async function recupererFluxParJour(
   const data = await clickhouseClient.query({
     query: `
       SELECT 
-        substring(date_transaction, 1, 2) as period,
+        ${JOUR_SQL} as period,
         ${CHARGES_SQL} as charges,
         ${PRODUITS_SQL} as produits,
         count(*) as nb_transactions
       FROM ${dbName}.grand_livre
       WHERE batch_id IN ({batchIds:Array(String)})
-        AND substring(date_transaction, 4, 2) = {monthFilter:String}
+        AND ${MOIS_SQL} = {monthFilter:String}
       GROUP BY period
       ORDER BY period
     `,
@@ -1145,10 +1146,10 @@ export async function GET(
 
     const { id } = await params;
     const { searchParams } = new URL(req.url);
-    const year =
+    const anneeDemandee =
       searchParams.get("year") || new Date().getFullYear().toString();
     const periodType = searchParams.get("periodType") || "year";
-    const selectedMonth = searchParams.get("month");
+    const moisDemande = searchParams.get("month");
 
     const client = await prisma.client.findUnique({
       where: { id },
@@ -1167,6 +1168,26 @@ export async function GET(
     }
 
     const dbName = getClickhouseDbName(id);
+
+    // Années disponibles : celles d'un reporting importé (début de période),
+    // jamais une année sans import, même si elle porte des saisies.
+    const availableYearsData = await prisma.comptablePeriod.findMany({
+      where: { clientId: id },
+      select: { periodStart: true },
+      distinct: ["periodStart"],
+    });
+    const availableYears = [
+      ...new Set(
+        availableYearsData.map((p) => p.periodStart.getUTCFullYear().toString()),
+      ),
+    ].sort((a, b) => parseInt(b) - parseInt(a));
+
+    // Année demandée sans reporting : on se cale sur la plus récente ; l'écran
+    // aligne son filtre sur l'année renvoyée.
+    const year =
+      availableYears.length === 0 || availableYears.includes(anneeDemandee)
+        ? anneeDemandee
+        : availableYears[0];
     const yearN = parseInt(year);
     const yearN1 = yearN - 1;
 
@@ -1202,18 +1223,26 @@ export async function GET(
       select: { batchId: true },
     });
 
-    // Années disponibles
-    const availableYearsData = await prisma.comptablePeriod.findMany({
-      where: { clientId: id },
-      select: { periodStart: true },
-      distinct: ["periodStart"],
-    });
+    // N-1 sans reporting : comparaison affichée « non disponible », pas 0.
+    const anneeN1Disponible = postgresPeriodsN1.length > 0;
 
-    const availableYears = [
-      ...new Set(
-        availableYearsData.map((p) => p.periodStart.getFullYear().toString()),
-      ),
-    ].sort((a, b) => parseInt(b) - parseInt(a));
+    // Mois couverts par le reporting de l'année (période saisie à l'import).
+    // Seuls ces mois se choisissent ; un mois demandé hors reporting devient le
+    // dernier mois couvert, et la fenêtre « Année » s'arrête à ce mois.
+    const moisDisponibles = moisCouverts(postgresPeriodsData);
+    const premierMois =
+      moisDisponibles.length > 0 ? parseInt(moisDisponibles[0]) : 1;
+    const dernierMois =
+      moisDisponibles.length > 0
+        ? parseInt(moisDisponibles[moisDisponibles.length - 1])
+        : 12;
+    const moisNormalise = moisDemande ? moisDemande.padStart(2, "0") : null;
+    const selectedMonth =
+      moisNormalise &&
+      moisDisponibles.length > 0 &&
+      !moisDisponibles.includes(moisNormalise)
+        ? String(dernierMois).padStart(2, "0")
+        : moisNormalise;
 
     // Inclut le batch des lignes saisies manuellement (année N / N-1) pour que
     // le reporting les agrège comme les lignes uploadées — sauf si le client a
@@ -1318,34 +1347,52 @@ export async function GET(
       let cumulTGN = 0;
       let cumulTGN1 = 0;
       let cumulativeCaEncaisseN1 = 0;
+      // Charges et produits de janvier au mois précédent (courbe cumulée).
+      const baselineFlux = { charges: 0, produits: 0 };
 
-      // Baseline : en mode "ytd-day", on pré-charge le cumul des mois
-      // précédents (Jan → selectedMonth-1) dans les compteurs cumulatifs
-      // avant d'attaquer la boucle journalière. Ainsi, le premier jour du
-      // mois sélectionné démarre au cumul de fin de mois précédent.
-      if (periodType === "ytd-day" && monthNum > 1) {
-        const [
-          caXBParMoisBaseN,
-          caXBParMoisBaseN1,
-          recouvrementParMoisBaseN,
-          recouvrementParMoisBaseN1,
-          tresorerieParMoisBaseN,
-          tresorerieParMoisBaseN1,
-          fluxParMoisBaseN,
-        ] = await Promise.all([
-          recupererCAXBParMois(dbName, batchIds),
-          recupererCAXBParMois(dbName, batchIdsN1),
-          recupererRecouvrementParMois(dbName, batchIds),
-          recupererRecouvrementParMois(dbName, batchIdsN1),
-          recupererTresorerieParMois(dbName, batchIds),
-          recupererTresorerieParMois(dbName, batchIdsN1),
-          recupererFluxParMois(dbName, batchIds),
-        ]);
+      // Agrégats MENSUELS des deux exercices : point de départ des courbes
+      // cumulées et base des indicateurs, qui portent sur des mois entiers.
+      const [
+        rubriquesParMoisBaseN,
+        rubriquesParMoisBaseN1,
+        caXBParMoisBaseN,
+        caXBParMoisBaseN1,
+        recouvrementParMoisBaseN,
+        recouvrementParMoisBaseN1,
+        tresorerieParMoisBaseN,
+        tresorerieParMoisBaseN1,
+        fluxParMoisBaseN,
+      ] = await Promise.all([
+        recupererRubriquesParMois(dbName, batchIds),
+        recupererRubriquesParMois(dbName, batchIdsN1),
+        recupererCAXBParMois(dbName, batchIds),
+        recupererCAXBParMois(dbName, batchIdsN1),
+        recupererRecouvrementParMois(dbName, batchIds),
+        recupererRecouvrementParMois(dbName, batchIdsN1),
+        recupererTresorerieParMois(dbName, batchIds),
+        recupererTresorerieParMois(dbName, batchIdsN1),
+        recupererFluxParMois(dbName, batchIds),
+      ]);
+      const moisAvant = Array.from({ length: monthNum - 1 }, (_, i) =>
+        String(i + 1).padStart(2, "0"),
+      );
 
-        for (let m = 1; m < monthNum; m++) {
-          const mStr = m.toString().padStart(2, "0");
+      // La trésorerie est un SOLDE : en périodique comme en cumulé, le premier
+      // jour du mois part du solde de fin du mois précédent.
+      for (const mStr of moisAvant) {
+        cumulativeTresoN += tresorerieParMoisBaseN.get(mStr) || 0;
+        cumulativeTresoN1 += tresorerieParMoisBaseN1.get(mStr) || 0;
+      }
+
+      // Cumulé (ytd-day) : les autres courbes partent du cumul de janvier au
+      // mois précédent, pour que le premier jour démarre au cumul de fin de
+      // mois précédent.
+      if (periodType === "ytd-day") {
+        for (const mStr of moisAvant) {
           cumulativeCAXBN += caXBParMoisBaseN.get(mStr) || 0;
           cumulativeCAXBN1 += caXBParMoisBaseN1.get(mStr) || 0;
+          cumulTGN += rubriquesParMoisBaseN.get(mStr)?.TG || 0;
+          cumulTGN1 += rubriquesParMoisBaseN1.get(mStr)?.TG || 0;
           const rN = recouvrementParMoisBaseN.get(mStr);
           if (rN) {
             cumulativeCaTTCN += rN.caTTCTotal;
@@ -1356,10 +1403,12 @@ export async function GET(
             cumulativeCaTTCN1 += rN1.caTTCTotal;
             cumulativeCaEncaisseN1 += rN1.caEncaisseTTC;
           }
-          cumulativeTresoN += tresorerieParMoisBaseN.get(mStr) || 0;
-          cumulativeTresoN1 += tresorerieParMoisBaseN1.get(mStr) || 0;
           const fN = fluxParMoisBaseN.get(mStr);
-          if (fN) cumulativeBalanceN += fN.produits - fN.charges;
+          if (fN) {
+            cumulativeBalanceN += fN.produits - fN.charges;
+            baselineFlux.charges += fN.charges;
+            baselineFlux.produits += fN.produits;
+          }
         }
       }
 
@@ -1449,23 +1498,32 @@ export async function GET(
         });
       }
 
-      periodsToIncludeN = chartData.map((d) => d.periodNumber);
+      // Indicateurs sur des mois entiers, comme l'annonce le filtre : le mois
+      // choisi (périodique) ou janvier → ce mois (cumulé). Même fenêtre pour
+      // N-1. La trésorerie, un solde, va toujours de janvier à la fin du mois.
+      const moisJusquA = [...moisAvant, selectedMonth];
+      periodsToIncludeN =
+        periodType === "ytd-day" ? moisJusquA : [selectedMonth];
       periodsToIncludeN1 = periodsToIncludeN;
 
       const indicateursN = calculerIndicateursPeriode(
-        rubriquesParJourN,
-        tresorerieParJourN,
-        recouvrementParJourN,
+        rubriquesParMoisBaseN,
+        tresorerieParMoisBaseN,
+        recouvrementParMoisBaseN,
         periodsToIncludeN,
         client.assujettiTVA,
       );
       const indicateursN1 = calculerIndicateursPeriode(
-        rubriquesParJourN1,
-        tresorerieParJourN1,
-        recouvrementParJourN1,
+        rubriquesParMoisBaseN1,
+        tresorerieParMoisBaseN1,
+        recouvrementParMoisBaseN1,
         periodsToIncludeN1,
         client.assujettiTVA,
       );
+      const soldeAuMois = (parMois: Map<string, number>) =>
+        moisJusquA.reduce((s, m) => s + (parMois.get(m) || 0), 0);
+      indicateursN.soldeTresorerie = soldeAuMois(tresorerieParMoisBaseN);
+      indicateursN1.soldeTresorerie = soldeAuMois(tresorerieParMoisBaseN1);
 
       // A3 — Harmonisation CA : pour un assujetti TVA, le KPI "Chiffre
       // d'affaires" reprend le CA des rubriques XB (dernier point cumulé de la
@@ -1567,7 +1625,10 @@ export async function GET(
         yearN1: yearN1.toString(),
         periodType,
         selectedMonth,
-        availableYears: availableYears.length > 0 ? availableYears : [year],
+        availableYears,
+        moisDisponibles,
+        anneeN1Disponible,
+        baselineFlux,
         chartData,
         periods,
         totals: {
@@ -1624,8 +1685,12 @@ export async function GET(
     let cumulTGN = 0;
     let cumulTGN1 = 0;
 
-    const endMonth =
-      periodType === "ytd" && selectedMonth ? parseInt(selectedMonth) : 12;
+    // Fin de fenêtre : le mois choisi (cumulé) ou, en granularité Année, le
+    // dernier mois couvert par le reporting — jamais au-delà de l'import.
+    const endMonth = Math.min(
+      periodType === "ytd" && selectedMonth ? parseInt(selectedMonth) : 12,
+      dernierMois,
+    );
 
     for (let m = 1; m <= 12; m++) {
       const monthStr = m.toString().padStart(2, "0");
@@ -1715,13 +1780,18 @@ export async function GET(
       });
     }
 
-    // Filtrage YTD
-    if (periodType === "ytd" && selectedMonth) {
-      chartData = chartData.filter((d) => parseInt(d.periodNumber) <= endMonth);
-    }
-
-    periodsToIncludeN = chartData.map((m) => m.periodNumber);
+    // Indicateurs : janvier → fin de fenêtre, même fenêtre pour N-1.
+    periodsToIncludeN = chartData
+      .filter((d) => parseInt(d.periodNumber) <= endMonth)
+      .map((d) => d.periodNumber);
     periodsToIncludeN1 = periodsToIncludeN;
+
+    // Courbes : seuls les mois couverts par le reporting, jusqu'à la fin de
+    // fenêtre (les cumuls, eux, partent toujours de janvier).
+    chartData = chartData.filter((d) => {
+      const m = parseInt(d.periodNumber);
+      return m >= premierMois && m <= endMonth;
+    });
 
     const indicateursN = calculerIndicateursPeriode(
       rubriquesParMoisN,
@@ -1833,7 +1903,10 @@ export async function GET(
       yearN1: yearN1.toString(),
       periodType,
       selectedMonth,
-      availableYears: availableYears.length > 0 ? availableYears : [year],
+      availableYears,
+      moisDisponibles,
+      anneeN1Disponible,
+      baselineFlux: { charges: 0, produits: 0 },
       chartData,
       periods,
       totals: {
