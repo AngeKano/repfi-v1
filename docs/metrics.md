@@ -79,7 +79,7 @@
 |---|---|
 | `grand_livre` | Toutes les écritures, importées et saisies |
 | `plan_compte` | `compte`, `intitule_compte`, `nature_compte` — **fait autorité sur les intitulés** |
-| `ple` | **Mapping** racine de compte → rubrique (compte de résultat `PL` et bilan `BILAN`) |
+| `ple` | **Mapping** racine de compte → rubrique (compte de résultat `PL` et bilan `BILAN`), avec la rubrique par défaut figée (`rubrique_defaut`) |
 | `plan_tiers` | Référentiel des tiers (`compte_tiers`, `intitule_tiers`, `type`) |
 | `code_journal` | Codes journaux (`code_journal`, `intitule`, **`type`**) |
 
@@ -240,6 +240,26 @@ colonne se recherche, se filtre et se trie ; elle n'est ni modifiable, ni
 saisie à l'ajout d'un tiers, ni exportée au format de dépôt.
 
 > `src/lib/clickhouse/dimensions-table.ts` — `jointureCompteCentralisateur()`
+
+### Mapping — rubrique par défaut
+
+La colonne **Rubrique par défaut** du Mapping garde la rubrique attribuée à la
+**création** de la ligne ; elle ne change **jamais**, même quand la rubrique
+est modifiée. Elle est lue dans la table `ple` (colonne `rubrique_defaut`).
+
+| Cas | Rubrique par défaut |
+|---|---|
+| Nouveau client | Rubrique du mapping par défaut SYSCOHADA chargé par Airflow |
+| Ligne ajoutée (saisie ou fichier) | Rubrique saisie ou lue dans le fichier |
+| Rubrique modifiée (saisie ou fichier) | Inchangée |
+| Table antérieure à la colonne | Renseignée par Airflow au prochain traitement du client (import, mise à jour d'un référentiel, « Réappliquer le mapping ») : rubrique du mapping par défaut pour une ligne qui en vient, sinon rubrique actuelle ; en attendant, la rubrique actuelle est affichée et figée à la première modification |
+
+Lecture seule : ni modifiable, ni saisie à l'ajout (« Calculé »), ni exportée
+au format de dépôt ; recherchable, filtrable et triable. Elle ne sert à aucun
+calcul : le classement des écritures suit toujours la colonne **Rubrique**.
+
+> Airflow : `plugins/clickhouse/ple.py`, `plugins/clickhouse/dimensions.py` ·
+> Web : `src/lib/clickhouse/dimensions-table.ts`
 
 ### Intitulés
 
@@ -1614,6 +1634,7 @@ sous le titre de la page et recharge les données de l'onglet affiché.
 | 29/10/2026 | Charges et rentabilité : colonne des valeurs à droite de la cascade **retirée** — montant (K) et pourcentage se lisent dans la barre ou dans l'infobulle ; la barre occupe la place libérée (§22). |
 | 02/11/2026 | Charges et rentabilité : pourcentage du CA **entre parenthèses** dans les barres et l'infobulle — « −11 766K (55,11 %) » (§22). |
 | 02/11/2026 | **Import d'une période avec le Grand Livre seul** : Plan comptable, Plan des tiers et Codes journaux deviennent facultatifs (écran de création, « Modifier » et fenêtre d'ajout). Airflow **contrôle le Grand Livre avant toute écriture** : un compte (après conversion PCG → SYSCOHADA), un code journal (RAN compris) ou un n° de tiers absent des référentiels — en base ou dans les fichiers du même import — fait échouer l'import sans rien enregistrer, avec le nombre d'éléments manquants et les 20 premiers par catégorie ; on complète les référentiels puis « Relancer le traitement ». Un nouvel envoi remplace entièrement les fichiers de la période ; l'échec du contrôle n'efface pas les données d'une période déjà importée. « Modifier » corrigé (il attendait encore les 5 anciens fichiers) et soumis au droit Charger des fichiers (§3, §25.18 à §25.20). |
+| 02/11/2026 | Tables de dimension › Mapping : nouvelle colonne **Rubrique par défaut**, en lecture seule — rubrique attribuée à la **création** de la ligne (mapping par défaut SYSCOHADA pour un nouveau client, rubrique saisie ou du fichier pour une ligne ajoutée), **jamais modifiée** ensuite, même quand la rubrique change (saisie ou fichier). Colonne `ple.rubrique_defaut` ajoutée par Airflow aux tables existantes et renseignée depuis le mapping par défaut (sinon rubrique actuelle) ; recherchable, filtrable, triable, absente du fichier exporté (§3). |
 | 02/11/2026 | **Filtres partagés — correction** : en mode Périodique, le choix de granularité (Mois / Année) était aussitôt annulé par le garde-fou du 27/10, qui alignait le calcul sur l'ancienne granularité ; les filtres restaient bloqués (sur l'année le plus souvent). Tout changement de mode ou de granularité met désormais à jour les deux ensemble, dans tous les onglets (§4). |
 
 ---

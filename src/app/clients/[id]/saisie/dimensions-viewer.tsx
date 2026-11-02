@@ -341,7 +341,8 @@ export default function DimensionsViewer({
 
   /** Champ de saisie d'une nouvelle ligne, selon le type de la colonne. */
   const champAjout = (c: ColonneDimension) => {
-    // Champ calculé : rien à saisir, il se déduit du grand livre.
+    // Champ calculé : rien à saisir (déduit du grand livre, ou recopié de la
+    // rubrique saisie pour la rubrique par défaut du mapping).
     if (c.calculee) return <span className="text-xs text-muted-foreground italic">Calculé</span>;
     const valeur = ajout?.[c.nom] ?? "";
     const maj = (v: string) => setAjout((a) => (a ? { ...a, [c.nom]: v } : a));
