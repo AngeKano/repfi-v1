@@ -934,6 +934,8 @@ export default function ClientReportingChart({
     valeur: number;
     detail: { creancesTTC: number; caTTC: number };
     chartData: Array<{ label: string; dso: number; dsoN1: number }>;
+    /** false : aucun reporting en N-1 (pas de courbe N-1). */
+    n1Disponible: boolean;
   } | null>(null);
 
   // États spécifiques au recouvrement
@@ -1066,6 +1068,7 @@ export default function ClientReportingChart({
         kpis: Record<string, { valeurN: number; valeurN1: number; variation: number }>;
         dsoDetail: { creancesTTC: number; caTTC: number };
         chartData: Array<{ label: string; dso: number; dsoN1: number }>;
+        anneeN1Disponible?: boolean;
       };
       setDsoData({
         yearN: json.yearN,
@@ -1078,6 +1081,7 @@ export default function ClientReportingChart({
           dso: d.dso,
           dsoN1: d.dsoN1,
         })),
+        n1Disponible: json.anneeN1Disponible !== false,
       });
     } catch (error) {
       console.error("Fetch DSO error:", error);
@@ -2857,12 +2861,15 @@ export default function ClientReportingChart({
                       <CardDescription>
                         (Créances clients moyennes TTC / CA TTC) × nombre de jours
                         écoulés depuis le 1er janvier ({dsoData.jours} j à la fin de
-                        la période) — {dsoData.yearN} vs {dsoData.yearN1}
+                        la période) — {dsoData.yearN}
+                        {dsoData.n1Disponible
+                          ? ` vs ${dsoData.yearN1}`
+                          : ` (${dsoData.yearN1} non disponible)`}
                       </CardDescription>
                     </div>
                     <ChartLegend
                       labelN={dsoData.yearN}
-                      labelN1={dsoData.yearN1}
+                      labelN1={dsoData.n1Disponible ? dsoData.yearN1 : undefined}
                       colorN="#059669"
                       colorN1="#6ee7b7"
                     />
@@ -2910,15 +2917,17 @@ export default function ClientReportingChart({
                           strokeWidth={2}
                           dot={{ r: 3 }}
                         />
-                        <Line
-                          type="monotone"
-                          dataKey="dsoN1"
-                          name={`DSO ${dsoData.yearN1}`}
-                          stroke="#6ee7b7"
-                          strokeWidth={2}
-                          strokeDasharray="6 6"
-                          dot={{ r: 3 }}
-                        />
+                        {dsoData.n1Disponible && (
+                          <Line
+                            type="monotone"
+                            dataKey="dsoN1"
+                            name={`DSO ${dsoData.yearN1}`}
+                            stroke="#6ee7b7"
+                            strokeWidth={2}
+                            strokeDasharray="6 6"
+                            dot={{ r: 3 }}
+                          />
+                        )}
                       </LineChart>
                     </ChartContainer>
 

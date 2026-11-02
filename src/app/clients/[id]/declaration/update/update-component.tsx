@@ -40,9 +40,9 @@ import {
 import { FileType } from "../../../../../../prisma/generated/prisma/enums";
 
 // Grand Livre obligatoire ; Plan comptable, Plan des tiers et Codes journaux
-// facultatifs. Sans eux, chaque compte, code journal et tiers du Grand Livre
-// doit déjà exister dans les référentiels du client, sinon Airflow refuse
-// l'import (rien n'est écrit).
+// facultatifs. Un référentiel non joint est pris dans Click Insight : chaque
+// compte, code journal ou tiers du Grand Livre doit alors y exister, sinon
+// Airflow refuse l'import (rien n'est écrit). Un référentiel joint fait foi.
 const IMPORT_FILE_TYPES = [
   { type: "GRAND_LIVRE", label: "Grand Livre Comptable", obligatoire: true },
   { type: "PLAN_COMPTES", label: "Plan Comptable", obligatoire: false },

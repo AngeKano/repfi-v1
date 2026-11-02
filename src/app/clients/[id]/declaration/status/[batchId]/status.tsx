@@ -18,12 +18,13 @@ import {
 import { toast } from "sonner";
 
 // Messages par étape : Grand Livre obligatoire, référentiels facultatifs ; le
-// Grand Livre est contrôlé contre les référentiels avant toute écriture.
+// Grand Livre est contrôlé, avant toute écriture, contre les référentiels non
+// joints à l'import (pris dans Click Insight).
 const STEP_MESSAGES = {
   PENDING: ["Début du traitement..."],
   VALIDATING: [
     "Validation des formats de fichiers...",
-    "Contrôle des comptes, codes journaux et tiers du grand livre...",
+    "Contrôle du grand livre contre les référentiels non joints...",
     "Traitement du plan comptable...",
     "Traitement du code journal...",
     "Traitement du plan tiers...",

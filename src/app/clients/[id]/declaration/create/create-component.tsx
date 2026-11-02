@@ -40,9 +40,10 @@ import { FileType } from "../../../../../../prisma/generated/prisma/enums";
 // ============================================================
 // FICHIERS D'UN IMPORT
 // - GRAND_LIVRE  : obligatoire (fichier unifié comptes + tiers + factures)
-// - PLAN_COMPTES, PLAN_TIERS, CODE_JOURNAL : facultatifs. Sans eux, chaque
-//   compte, code journal et tiers du Grand Livre doit déjà exister dans les
-//   référentiels du client, sinon Airflow refuse l'import (rien n'est écrit).
+// - PLAN_COMPTES, PLAN_TIERS, CODE_JOURNAL : facultatifs. Un référentiel non
+//   joint est pris dans Click Insight : chaque compte, code journal ou tiers
+//   du Grand Livre doit alors y exister, sinon Airflow refuse l'import (rien
+//   n'est écrit). Un référentiel joint fait foi et n'est pas contrôlé.
 // ============================================================
 
 const IMPORT_FILE_TYPES = [
@@ -608,11 +609,12 @@ export default function DeclarationComptable({
             Codes journaux facultatifs
           </p>
           <p className="text-xs text-blue-600 mt-1">
-            Chaque compte, code journal et tiers du Grand Livre doit exister
-            dans les référentiels de Click Insight (Comptabilité › Tables de
-            dimension) ou dans les fichiers joints à cet import. Sinon, l&apos;import
-            est refusé et rien n&apos;est enregistré : la liste des éléments
-            manquants s&apos;affiche sur la page de suivi.
+            Les référentiels joints à l&apos;import sont enregistrés tels quels.
+            Pour un référentiel non joint, Click Insight utilise celui déjà
+            enregistré (Comptabilité › Tables de dimension) : chaque compte, code
+            journal ou tiers du Grand Livre doit alors y exister, sinon
+            l&apos;import est refusé et rien n&apos;est enregistré (la liste des
+            éléments manquants s&apos;affiche sur la page de suivi).
           </p>
         </div>
 

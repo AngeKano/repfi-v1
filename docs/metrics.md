@@ -311,27 +311,37 @@ Onglet Import › nouvelle période (ou « Modifier » une période existante) :
 | Grand Livre | **Obligatoire** |
 | Plan comptable, Plan des tiers, Codes journaux | **Facultatifs** — un fichier par type au plus |
 
-Avant toute écriture, Airflow (tâche `controle_referentiels` du DAG
-`etl_comptable_clickhouse`) vérifie chaque ligne du Grand Livre contre les
-référentiels **connus** : ceux déjà en base **plus** ceux joints au même import
-(lus sans être écrits).
+Un référentiel **joint** à l'import fait foi : il est enregistré tel quel, sans
+contrôle (comme avant le contrôle) — un **import complet** (4 fichiers) n'est
+jamais bloqué ici. Pour un référentiel **non joint**, Click Insight utilise
+celui déjà enregistré : avant toute écriture, Airflow (tâche
+`controle_referentiels` du DAG `etl_comptable_clickhouse`) vérifie alors
+chaque ligne du Grand Livre contre lui.
 
-| Élément du Grand Livre | Doit exister dans | Précision |
+| Élément du Grand Livre | Doit exister dans (si non joint) | Précision |
 |---|---|---|
 | Compte | `plan_compte` | Égalité exacte, sur le compte SYSCOHADA (un Grand Livre PCG est d'abord converti) |
 | Code journal | `code_journal` | Sans exception : les journaux d'à-nouveaux (RAN) aussi |
 | N° de tiers | `plan_tiers` | Une ligne sans tiers n'est pas une erreur ; un tiers ajouté dans Tables de dimension compte |
 
-**Tout ou rien** : un seul élément inconnu fait échouer l'import et **rien
-n'est enregistré** — ni Grand Livre, ni référentiel joint. Le message de la
+**Tout ou rien** : un seul élément inconnu d'un référentiel non joint fait
+échouer l'import et **rien n'est enregistré** — ni Grand Livre, ni référentiel
+joint. Le message de la
 page de suivi donne, par catégorie, le nombre d'éléments manquants et les 20
 premiers avec leur nombre de lignes. On complète alors les référentiels
 (Tables de dimension, ou mise à jour d'un référentiel par fichier) puis
 **« Relancer le traitement »**.
 
-Le même contrôle refuse aussi, avant écriture, une période hors bornes, un
-Grand Livre déséquilibré et un Plan comptable joint dans un autre plan que le
-Grand Livre (PCG / SYSCOHADA).
+Le même contrôle refuse aussi, avant écriture et que les référentiels soient
+joints ou non, une période hors bornes, un Grand Livre déséquilibré et un Plan
+comptable joint dans un autre plan que le Grand Livre (PCG / SYSCOHADA).
+
+**Codes journaux Sage** : le Grand Livre Sage (`.pnm`) porte le code
+journal sur **3 caractères** (`CAI`, `BQU`…). Si le fichier de codes
+journaux en contient de plus longs (`CAIS`, `BQUE`…), les écritures ne
+retrouvent pas leur journal : le type « Trésorerie » ne s'applique pas à
+elles, ce qui fausse les encaissements et décaissements (Recouvrement,
+Règlement Fournisseurs).
 
 Un nouvel envoi sur une période **remplace** tous ses fichiers : les anciens
 sont sauvegardés (`backup/`) puis retirés, pour qu'un référentiel d'un envoi
@@ -791,6 +801,12 @@ Encours cumulés au mois sélectionné, N vs N-1. Actif en solde net
 Le résultat net de l'exercice (`XI`) alimente `CJ`, donc `DF`. Grille de KPI
 2 × 2. Graphiques : *Évolution du FRNG* et *Évolution du BFR* (une donnée au
 choix : global, exploitation ou HAO, en N et N-1).
+
+**Filtres et fenêtre** : encours à la fin du mois choisi (ou du dernier mois
+importé en granularité Année), cumulés depuis janvier, à-nouveaux compris ;
+courbes du premier au dernier mois couvert ; années et mois limités au
+reporting importé (§4). Sans reporting en N-1 : KPI N-1 « non disponible »,
+sans variation, et pas de courbe N-1 (FRNG, BFR, DSO du Recouvrement).
 
 > `src/lib/reporting/ratios-bilantiels.ts`
 
@@ -1764,6 +1780,8 @@ ouvert par défaut, replié d'un clic sur son en-tête), séparateur, **Membres*
 | 29/10/2026 | Charges et rentabilité : colonne des valeurs à droite de la cascade **retirée** — montant (K) et pourcentage se lisent dans la barre ou dans l'infobulle ; la barre occupe la place libérée (§22). |
 | 02/11/2026 | Charges et rentabilité : pourcentage du CA **entre parenthèses** dans les barres et l'infobulle — « −11 766K (55,11 %) » (§22). |
 | 02/11/2026 | **Import d'une période avec le Grand Livre seul** : Plan comptable, Plan des tiers et Codes journaux deviennent facultatifs (écran de création, « Modifier » et fenêtre d'ajout). Airflow **contrôle le Grand Livre avant toute écriture** : un compte (après conversion PCG → SYSCOHADA), un code journal (RAN compris) ou un n° de tiers absent des référentiels — en base ou dans les fichiers du même import — fait échouer l'import sans rien enregistrer, avec le nombre d'éléments manquants et les 20 premiers par catégorie ; on complète les référentiels puis « Relancer le traitement ». Un nouvel envoi remplace entièrement les fichiers de la période ; l'échec du contrôle n'efface pas les données d'une période déjà importée. « Modifier » corrigé (il attendait encore les 5 anciens fichiers) et soumis au droit Charger des fichiers (§3, §25.18 à §25.20). |
+| 02/11/2026 | **Import — contrôle des référentiels limité aux référentiels non joints** : un référentiel joint à l'import (plan comptable, codes journaux, plan tiers) fait foi et n'est plus contrôlé, comme avant ; un import complet (4 fichiers) n'est jamais bloqué par le contrôle. Seuls les référentiels absents de l'import, pris dans Click Insight, sont contrôlés (Grand Livre seul, ou incomplet). Cause : un import complet refusé pour « 4 codes journaux inconnus : CAI, BQU, PAI, VTE » alors qu'un fichier de codes journaux était joint — le format Sage .pnm porte le code journal sur 3 caractères (§3). |
+| 02/11/2026 | **Audit des filtres — Ratios bilantiels** : écran aligné sur la période calculée (l'API remplaçait en silence une année sans reporting), flèches et mois limités à l'import, libellé et sous-titre « encours à fin <mois> » ; courbes et légendes N-1 (FRNG, BFR, DSO du Recouvrement) masquées sans reporting N-1, au lieu d'une courbe plate à 0 ; corrections de l'API (à-nouveaux, variation signée) héritées de l'audit Dettes Financières (§16 ; audit §7.7). |
 | 02/11/2026 | **Audit des filtres — Dettes Financières** (API des ratios, partagée avec Ratios bilantiels et le DSO du Recouvrement) : à-nouveau daté du 31/12 précédent désormais compté dans les encours (il était exclu de la fenêtre janvier → décembre : soldes d'ouverture manquants pour FRNG, BFR, dettes financières, DSO) ; créances d'ouverture du DSO lues sur les journaux d'à-nouveaux (et plus seulement à la date du 01/01) ; année sans reporting : le filtre se cale sur l'année calculée (l'API la remplaçait en silence) ; flèches et mois limités à l'import, fenêtre « Année » arrêtée au dernier mois importé ; variation signée quand N-1 = 0 ; N-1 sans reporting « non disponible » (§15, §16, §25.5 ; audit §7.6). |
 | 02/11/2026 | **Audit des filtres — Trésorerie** : l'API remplaçait en silence une année sans reporting par la plus récente pendant que l'écran affichait l'année demandée (« 2026 » au-dessus des chiffres 2025) : le filtre se cale désormais sur l'année calculée ; flèches d'année bornées aux années importées, mois limités à l'import, fenêtre « Année » arrêtée au dernier mois importé ; exercice d'un lot = année de début de période (comme les autres onglets) ; N-1 sans reporting : « non disponible », sans variation (cartes et tableau) (§11, §25.4 ; audit §7.5). |
 | 02/11/2026 | **Audit des filtres — Dettes court terme** : flèches d'année limitées aux années d'un reporting importé (elles allaient à n'importe quelle année), mois limités à l'import, calage du filtre sur la période calculée, libellé arrêté au dernier mois importé (« Janvier - Décembre » codé en dur), sous-titre « encours à fin <mois> » ; à-nouveaux de décembre comptés en janvier (API partagée avec Règlement Fournisseurs) (§14 ; audit §7.4). |
