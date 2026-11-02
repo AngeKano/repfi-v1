@@ -27,7 +27,8 @@ const s3Client = new S3Client({
 });
 
 // Mêmes fichiers qu'à l'import : Grand Livre obligatoire, référentiels
-// facultatifs (le Grand Livre est alors contrôlé contre ceux enregistrés).
+// facultatifs (un référentiel non joint : Grand Livre contrôlé contre celui
+// de Click Insight ; un référentiel joint fait foi).
 const IMPORT_FILE_TYPES = [
   FileType.GRAND_LIVRE,
   FileType.PLAN_COMPTES,

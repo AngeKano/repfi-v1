@@ -58,8 +58,9 @@ interface UploadFileDialogProps {
 }
 
 // Grand Livre obligatoire ; Plan comptable, Plan des tiers et Codes journaux
-// facultatifs (le Grand Livre est alors contrôlé contre les référentiels déjà
-// enregistrés : un élément inconnu fait refuser l'import).
+// facultatifs (un référentiel non joint est pris dans Click Insight et le
+// Grand Livre est contrôlé contre lui : un élément inconnu fait refuser
+// l'import ; un référentiel joint fait foi).
 const REQUIRED_FILE_TYPES = [
   { type: FileType.GRAND_LIVRE, label: "Grand Livre Comptable", obligatoire: true },
   { type: FileType.PLAN_COMPTES, label: "Plan Comptable", obligatoire: false },

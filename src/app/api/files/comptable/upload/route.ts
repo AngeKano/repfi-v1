@@ -38,9 +38,10 @@ const uploadComptableSchema = z.object({
 // ============================================================
 // FICHIERS D'UN IMPORT
 // - GRAND_LIVRE : obligatoire (fichier unifié comptes + tiers)
-// - PLAN_COMPTES, PLAN_TIERS, CODE_JOURNAL : facultatifs. Airflow contrôle
-//   le Grand Livre contre les référentiels (base + fichiers joints) avant
-//   toute écriture et refuse l'import si un élément manque.
+// - PLAN_COMPTES, PLAN_TIERS, CODE_JOURNAL : facultatifs. Pour un référentiel
+//   NON joint, Airflow contrôle le Grand Livre contre celui de Click Insight
+//   avant toute écriture et refuse l'import si un élément manque. Un
+//   référentiel joint fait foi (import complet : aucun contrôle).
 // ============================================================
 const IMPORT_FILE_TYPES = [
   FileType.GRAND_LIVRE,
