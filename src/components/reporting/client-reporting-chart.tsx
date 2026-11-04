@@ -77,6 +77,7 @@ import {
 } from "react-icons/pi";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { formatAxeMontant, formatCompactOnly, formatMillions, formatNombre } from "@/lib/nombres";
 import ClientAnalyseCharges from "./client-analyse-charges";
 import { KpiGrid, type KpiDef, type KpiValue } from "./kpi-grid";
 import { Graphe, MenuGraphes, useGraphesMasques, type GrapheDef } from "./graphes-masquables";
@@ -1223,20 +1224,6 @@ export default function ClientReportingChart({
     return value.toFixed(0);
   };
 
-  const formatCompactOnly = (value: number): string => {
-    const absValue = Math.abs(value);
-
-    if (absValue >= 1000) {
-      // Ajoute des espaces pour les milliers avant d'ajouter le "K"
-      const formatted = Math.round(value / 1000)
-        .toLocaleString("fr-FR")
-        .replace(/\u00A0/g, " ");
-      return `${formatted}K`;
-    }
-    // Ajoute simplement l'espace pour les milliers si nécessaire
-    return value.toLocaleString("fr-FR").replace(/\u00A0/g, " ");
-  };
-
   const formatVariation = (value: number): string => {
     const sign = value >= 0 ? "+" : "";
     return `${sign}${value.toFixed(1)}%`;
@@ -1449,7 +1436,7 @@ export default function ClientReportingChart({
               <YAxis
                 tickLine={false}
                 axisLine={false}
-                tickFormatter={(value) => `${(value / 1000000).toFixed(0)}M`}
+                tickFormatter={formatMillions}
                 fontSize={12}
               />
               <ChartTooltip
@@ -1742,7 +1729,7 @@ export default function ClientReportingChart({
               <YAxis
                 tickLine={false}
                 axisLine={false}
-                tickFormatter={(value) => `${(value / 1000000).toFixed(0)}M`}
+                tickFormatter={formatMillions}
                 fontSize={12}
               />
               <ChartTooltip
@@ -1814,6 +1801,7 @@ export default function ClientReportingChart({
               <YAxis
                 tickLine={false}
                 axisLine={false}
+                width={72}
                 tickFormatter={(value) => formatCompactOnly(value as number)}
                 fontSize={12}
               />
@@ -1893,13 +1881,7 @@ export default function ClientReportingChart({
                 tickLine={false}
                 axisLine={false}
                 fontSize={12}
-                tickFormatter={(value) => {
-                  const absVal = Math.abs(value);
-                  if (absVal >= 1000000)
-                    return `${(value / 1000000).toFixed(0)}M`;
-                  if (absVal >= 1000) return `${(value / 1000).toFixed(0)}K`;
-                  return value.toString();
-                }}
+                tickFormatter={formatAxeMontant}
               />
               <YAxis
                 type="category"
@@ -2044,7 +2026,7 @@ export default function ClientReportingChart({
             <YAxis
               tickLine={false}
               axisLine={false}
-              tickFormatter={(value) => `${(value / 1000000).toFixed(0)}M`}
+              tickFormatter={formatMillions}
               fontSize={12}
             />
             <ChartTooltip
@@ -2654,7 +2636,7 @@ export default function ClientReportingChart({
                                   {kpi.percent
                                     ? `${value.toFixed(1)}%`
                                     : kpi.jours
-                                      ? `${Math.round(value).toLocaleString("fr-FR")} j`
+                                      ? `${formatNombre(Math.round(value))} j`
                                       : formatCompactOnly(value)}
                                 </div>
                                 <p className="text-xs text-muted-foreground mt-1">
@@ -2812,9 +2794,7 @@ export default function ClientReportingChart({
                       <YAxis
                         tickLine={false}
                         axisLine={false}
-                        tickFormatter={(value) =>
-                          `${(value / 1000000).toFixed(0)}M`
-                        }
+                        tickFormatter={formatMillions}
                         fontSize={12}
                       />
                       <ChartTooltip
@@ -2896,14 +2876,14 @@ export default function ClientReportingChart({
                         <YAxis
                           tickLine={false}
                           axisLine={false}
-                          tickFormatter={(v) => `${Math.round(v as number)} j`}
+                          tickFormatter={(v) => `${formatNombre(Math.round(v as number))} j`}
                           fontSize={12}
                         />
                         <ChartTooltip
                           content={
                             <ChartTooltipContent
                               formatter={(value, name) => [
-                                `${Math.round(value as number).toLocaleString("fr-FR")} j`,
+                                `${formatNombre(Math.round(value as number))} j`,
                                 name as string,
                               ]}
                             />
@@ -2963,7 +2943,7 @@ export default function ClientReportingChart({
                           <tr className="border-t-2 font-bold">
                             <td className="py-2.5">DSO</td>
                             <td className="text-right py-2.5 text-blue-600">
-                              {Math.round(dsoData.valeur).toLocaleString("fr-FR")} j
+                              {formatNombre(Math.round(dsoData.valeur))} j
                             </td>
                           </tr>
                         </tbody>

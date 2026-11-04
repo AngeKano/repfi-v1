@@ -56,6 +56,7 @@ import {
 } from "react-icons/pi";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { formatNombre } from "@/lib/nombres";
 import {
   REFERENTIELS,
   colonneCle,
@@ -601,7 +602,7 @@ export default function DimensionsViewer({
                 <Loader2 className="w-3 h-3 animate-spin" /> Chargement…
               </span>
             ) : (
-              `${(data?.total ?? 0).toLocaleString("fr-FR")} ligne(s)`
+              `${formatNombre(data?.total ?? 0)} ligne(s)`
             )}
           </span>
         </div>
@@ -831,9 +832,9 @@ export default function DimensionsViewer({
           <div className="flex items-center justify-between mt-4 gap-3 flex-wrap">
             <span className="text-xs text-muted-foreground">
               {/* « Lignes 51 à 100 sur 1 636 » : lignes de la page affichée. */}
-              Lignes {((data.page - 1) * data.pageSize + 1).toLocaleString("fr-FR")} à{" "}
-              {Math.min(data.page * data.pageSize, data.total).toLocaleString("fr-FR")} sur{" "}
-              {data.total.toLocaleString("fr-FR")}
+              Lignes {formatNombre((data.page - 1) * data.pageSize + 1)} à{" "}
+              {formatNombre(Math.min(data.page * data.pageSize, data.total))} sur{" "}
+              {formatNombre(data.total)}
             </span>
             <div className="flex items-center gap-1">
               <Button

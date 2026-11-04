@@ -37,6 +37,7 @@ import {
 } from "react-icons/pi";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { formatNombre } from "@/lib/nombres";
 import { FileType } from "../../../../../../prisma/generated/prisma/enums";
 import {
   acceptedExtensionsAttribute,
@@ -192,8 +193,8 @@ export default function DimensionsSection({ clientId }: { clientId: string }) {
         const label = dimensionParType(u.fileType)?.label ?? u.fileType;
         if (u.status === "COMPLETED")
           toast.success(
-            `${label} mis à jour : ${u.rowsInserted ?? 0} ligne(s) ajoutée(s), ` +
-              `${u.rowsUpdated ?? 0} modifiée(s).`,
+            `${label} mis à jour : ${formatNombre(u.rowsInserted ?? 0)} ligne(s) ajoutée(s), ` +
+              `${formatNombre(u.rowsUpdated ?? 0)} modifiée(s).`,
           );
         else toast.error(`${label} : échec de la mise à jour.`);
       }
@@ -245,7 +246,7 @@ export default function DimensionsSection({ clientId }: { clientId: string }) {
                     <p className="text-xs text-[#335890]">
                       {etat?.lignes == null
                         ? "Aucune donnée"
-                        : `${etat.lignes.toLocaleString("fr-FR")} ligne(s)`}
+                        : `${formatNombre(etat.lignes)} ligne(s)`}
                     </p>
                   </div>
                 </div>
@@ -319,18 +320,18 @@ export default function DimensionsSection({ clientId }: { clientId: string }) {
                       {u.status === "COMPLETED" && u.reclassement ? (
                         <span className="text-[#00122E]">
                           <span className="text-[#0077C3] font-medium">
-                            {(u.rowsUpdated ?? 0).toLocaleString("fr-FR")}
+                            {formatNombre(u.rowsUpdated ?? 0)}
                           </span>{" "}
                           écriture(s) reclassée(s)
                         </span>
                       ) : u.status === "COMPLETED" ? (
                         <span className="text-[#00122E]">
                           <span className="text-green-700 font-medium">
-                            +{(u.rowsInserted ?? 0).toLocaleString("fr-FR")}
+                            +{formatNombre(u.rowsInserted ?? 0)}
                           </span>{" "}
                           ajoutée(s),{" "}
                           <span className="text-[#0077C3] font-medium">
-                            {(u.rowsUpdated ?? 0).toLocaleString("fr-FR")}
+                            {formatNombre(u.rowsUpdated ?? 0)}
                           </span>{" "}
                           modifiée(s)
                         </span>
@@ -584,7 +585,7 @@ function DimensionUploadDialog({
               </div>
               <div className="min-w-0 flex-1">
                 <p className="text-sm font-medium text-[#00122E] truncate">{file.name}</p>
-                <p className="text-xs text-[#335890]">{(file.size / 1024).toFixed(0)} Ko</p>
+                <p className="text-xs text-[#335890]">{formatNombre(Math.round(file.size / 1024))} Ko</p>
               </div>
               <button
                 onClick={() => choisir(null)}

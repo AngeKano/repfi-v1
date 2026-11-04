@@ -614,11 +614,11 @@ détail par compte appliquent la même convention.
 
 Histogramme et tableau par compte sur **toutes les rubriques du Total**, dans
 la **convention des indicateurs** : compte d'actif en `débit − crédit`,
-compte de passif ou de dépréciation en `crédit − débit` (repéré « en moins »).
+compte de passif ou de dépréciation en `crédit − débit`.
 Un indicateur vaut donc la somme de ses comptes (ex. 565000, rubrique `DQ`,
 débiteur de 1 : −1 dans le tableau comme dans « Autres Trésorerie Passif »).
 La ligne **Total Trésorerie** reprend l'indicateur : comptes d'actif moins
-comptes « en moins ».
+comptes de passif et de dépréciation.
 
 ### Filtres et fenêtre
 
@@ -1107,6 +1107,23 @@ variation = (N − N-1) / |N-1| × 100        (N-1 = 0 : +100 % si N > 0, −100
 
 **Devise** : FCFA, définie en un seul endroit et reprise par l'application et
 les exports (`src/lib/devise.ts`). Tableaux de bord en **K FCFA**.
+
+**Format des nombres** : milliers toujours séparés par une espace, en un seul
+endroit (`src/lib/nombres.ts`).
+
+| Affichage | Format | Exemple |
+|---|---|---|
+| KPI, tableaux, infobulles | Milliers (K) ; en dessous de 1 000, le montant | `12 222K`, `850` |
+| Axes des graphiques | Millions (M), milliers (K) selon l'ordre de grandeur | `1 234M`, `850K` |
+| États financiers, Charges et rentabilité | Montant complet | `2 218 101` |
+| Comptabilité (écritures, totaux, écarts) | Montant à 2 décimales | `1 234 567,50` |
+| Champs Débit / Crédit | Milliers séparés hors frappe, valeur brute pendant la frappe | `1 234 567` |
+| Compteurs, tailles de fichier | Milliers séparés | `1 636 lignes` |
+| Export Excel | `#,##0` (états financiers), `#,##0.00` (grand livre) : la valeur reste exacte | |
+
+Le séparateur est une espace insécable (U+00A0) : `toLocaleString("fr-FR")` utilise
+une espace fine (U+202F), presque invisible, et l'export PDF garde une espace
+simple (ses polices ne dessinent pas les autres).
 
 ---
 
@@ -1817,6 +1834,8 @@ ouvert par défaut, replié d'un clic sur son en-tête), séparateur, **Membres*
 | 02/11/2026 | **Graphiques masquables** : chaque graphique des onglets de reporting (hors KPI) s'affiche ou se masque depuis le menu **« Graphiques »**, à côté de « Configurer les KPIs » (Bilan d'activité : au bout de la barre de filtres) — une case par graphique, « Tout afficher », nombre de graphiques masqués sur le bouton ; mémorisé par onglet et par client dans le navigateur (§23). |
 | 02/11/2026 | Tables de dimension › Mapping : nouvelle colonne **Rubrique par défaut**, en lecture seule — rubrique attribuée à la **création** de la ligne (mapping par défaut SYSCOHADA pour un nouveau client, rubrique saisie ou du fichier pour une ligne ajoutée), **jamais modifiée** ensuite, même quand la rubrique change (saisie ou fichier). Colonne `ple.rubrique_defaut` ajoutée par Airflow aux tables existantes et renseignée depuis le mapping par défaut (sinon rubrique actuelle) ; recherchable, filtrable, triable, absente du fichier exporté (§3). |
 | 02/11/2026 | **Filtres partagés — correction** : en mode Périodique, le choix de granularité (Mois / Année) était aussitôt annulé par le garde-fou du 27/10, qui alignait le calcul sur l'ancienne granularité ; les filtres restaient bloqués (sur l'année le plus souvent). Tout changement de mode ou de granularité met désormais à jour les deux ensemble, dans tous les onglets (§4). |
+| 04/11/2026 | **Séparateur de milliers visible partout** : les formats **K et M sont conservés** (« 12 222K », « 1 234M »), seul le séparateur change. `toLocaleString("fr-FR")` séparait par une espace fine (U+202F), presque invisible, et les axes des graphiques n'en avaient aucun (« 12222K ») : tous les affichages passent par `src/lib/nombres.ts` (espace insécable U+00A0) — KPI, tableaux, infobulles, axes, Bilan d'activité, Charges et rentabilité, États financiers, Comptabilité (y compris les champs Débit / Crédit hors frappe), compteurs de lignes, tailles de fichier, présentation, messages d'erreur de l'import. Export Excel du grand livre : Débit, Crédit et Solde au format `#,##0.00`, valeurs inchangées (§24). |
+| 04/11/2026 | Trésorerie › Trésorerie par comptes : badge **« en moins »** retiré, ainsi que la mention « (comptes « en moins » déduits) » de la ligne Total. Le calcul ne change pas (§11). |
 
 ---
 

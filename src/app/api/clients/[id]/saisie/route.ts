@@ -4,6 +4,7 @@ import { z } from "zod";
 import { createClient as createClickhouseClient } from "@clickhouse/client";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import { prisma } from "@/lib/prisma";
+import { formatDeuxDecimales } from "@/lib/nombres";
 import { requirePermission } from "@/lib/permissions";
 import { SAISIE_ACTIONS } from "@/lib/permissions/actions";
 import {
@@ -618,7 +619,7 @@ async function prepareEcritureRows(opts: {
   if (Math.abs(sumD - sumC) > BALANCE_TOLERANCE)
     return {
       error: NextResponse.json(
-        { error: `Écriture déséquilibrée : débit ${sumD.toFixed(2)} ≠ crédit ${sumC.toFixed(2)}.` },
+        { error: `Écriture déséquilibrée : débit ${formatDeuxDecimales(sumD)} ≠ crédit ${formatDeuxDecimales(sumC)}.` },
         { status: 400 },
       ),
     };

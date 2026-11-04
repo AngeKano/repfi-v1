@@ -23,6 +23,7 @@ import {
   getRoleLabel,
   getRoleBadgeVariant,
 } from "@/lib/permissions/role-utils";
+import { formatNombre } from "@/lib/nombres";
 import { ClientDetailsDialog } from "./client-details-dialog";
 import {
   ReportingParamsDialog,
@@ -256,7 +257,7 @@ export default function ClientsListClient({
                 : "text-[#335890] hover:text-[#0077C3]"
             }`}
           >
-            Clients actifs ({pagination.total})
+            Clients actifs ({formatNombre(pagination.total)})
             {activeTab === "active" && (
               <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#0077C3]" />
             )}

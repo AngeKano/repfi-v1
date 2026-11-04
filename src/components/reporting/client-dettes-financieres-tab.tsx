@@ -36,7 +36,8 @@ import {
 } from "lucide-react";
 import { PiBankDuotone, PiHandCoinsDuotone, PiKeyDuotone } from "react-icons/pi";
 import { toast } from "sonner";
-import { KpiGrid, formatCompactOnly, type KpiDef, type KpiValue } from "./kpi-grid";
+import { KpiGrid, type KpiDef, type KpiValue } from "./kpi-grid";
+import { formatAxeMontant, formatCompactOnly } from "@/lib/nombres";
 import { Graphe, MenuGraphes, useGraphesMasques, type GrapheDef } from "./graphes-masquables";
 import { RATIOS_FORMULES } from "@/lib/reporting/ratios-bilantiels";
 
@@ -304,13 +305,6 @@ export default function ClientDettesFinancieresTab({
     }),
   );
 
-  const montantAxe = (value: number) => {
-    const abs = Math.abs(value);
-    if (abs >= 1000000) return `${(value / 1000000).toFixed(0)}M`;
-    if (abs >= 1000) return `${(value / 1000).toFixed(0)}K`;
-    return value.toString();
-  };
-
   return (
     <div className="space-y-6">
       {filtres}
@@ -367,7 +361,7 @@ export default function ClientDettesFinancieresTab({
               >
                 <CartesianGrid strokeDasharray="3 3" vertical={false} />
                 <XAxis dataKey="label" tickLine={false} axisLine={false} fontSize={12} />
-                <YAxis tickLine={false} axisLine={false} tickFormatter={montantAxe} fontSize={12} />
+                <YAxis tickLine={false} axisLine={false} tickFormatter={formatAxeMontant} fontSize={12} />
                 <ChartTooltip
                   content={
                     <ChartTooltipContent

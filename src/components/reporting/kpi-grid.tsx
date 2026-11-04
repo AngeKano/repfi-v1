@@ -16,6 +16,7 @@ import { Button } from "@/components/ui/button";
 import { TrendingUp, TrendingDown, Minus, Eye, EyeOffIcon } from "lucide-react";
 import { PiGearDuotone } from "react-icons/pi";
 import { cn } from "@/lib/utils";
+import { formatCompactOnly, formatNombre } from "@/lib/nombres";
 
 /** Définition d'un indicateur : ce qui ne dépend pas des données. */
 export interface KpiDef {
@@ -51,20 +52,12 @@ interface KpiConfigItem {
   order: number;
 }
 
-export function formatCompactOnly(value: number): string {
-  const abs = Math.abs(value);
-  if (abs >= 1000) {
-    return `${Math.round(value / 1000).toLocaleString("fr-FR").replace(/ /g, " ")}K`;
-  }
-  return value.toLocaleString("fr-FR").replace(/ /g, " ");
-}
-
 export function formatPourcent(value: number): string {
   return `${value.toFixed(1)}%`;
 }
 
 export function formatJours(value: number): string {
-  return `${Math.round(value).toLocaleString("fr-FR")} j`;
+  return `${formatNombre(Math.round(value))} j`;
 }
 
 export function VariationBadge({ value }: { value: number }) {

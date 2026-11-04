@@ -14,6 +14,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { AlertTriangle } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { formatCompactOnly } from "@/lib/nombres";
 
 export interface TopDette {
   label: string;
@@ -26,19 +27,6 @@ export interface TopDette {
 export interface TopDetteFournisseur extends TopDette {
   numeroFournisseur: string;
 }
-
-function formatCompactOnly(value: number): string {
-  const absValue = Math.abs(value);
-  if (absValue >= 1000) {
-    const formatted = Math.round(value / 1000)
-      .toLocaleString("fr-FR")
-      .replace(/ /g, " ");
-    return `${formatted}K`;
-  }
-  return value.toLocaleString("fr-FR").replace(/ /g, " ");
-}
-
-export { formatCompactOnly };
 
 // ==================== TABLEAU GÉNÉRIQUE TOP DETTES ====================
 export function DetteTable({

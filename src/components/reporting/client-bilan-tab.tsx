@@ -42,6 +42,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { formatCompactOnly, formatNombre } from "@/lib/nombres";
 import { Graphe, MenuGraphes, useGraphesMasques, type GrapheDef } from "./graphes-masquables";
 
 // ============================================================================
@@ -154,12 +155,12 @@ const MONTHS = [
 // ---- Helpers de formatage --------------------------------------------------
 // Les montants API sont en FCFA ; le rapport s'exprime en "K FCFA" (milliers).
 function fmtK(value: number): string {
-  return Math.round(value / 1000).toLocaleString("fr-FR");
+  return formatNombre(Math.round(value / 1000));
 }
 
 function fmtMillions(value: number): string {
   const v = value / 1_000_000;
-  return `${v.toLocaleString("fr-FR", { maximumFractionDigits: 1 })}M`;
+  return `${formatNombre(v, { maximumFractionDigits: 1 })}M`;
 }
 
 function fmtPct(value: number): string {
@@ -970,15 +971,6 @@ export default function ClientBilanTab({
       )}
     </div>
   );
-}
-
-// ==================== FORMAT COMPACT (réplique reporting-chart) ====================
-function formatCompactOnly(value: number): string {
-  const absValue = Math.abs(value);
-  if (absValue >= 1000) {
-    return `${Math.round(value / 1000).toLocaleString("fr-FR")}K`;
-  }
-  return value.toLocaleString("fr-FR");
 }
 
 // ==================== TUNNEL DE RENTABILITÉ (réplique) ====================

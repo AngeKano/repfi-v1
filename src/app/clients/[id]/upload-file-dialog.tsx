@@ -42,6 +42,7 @@ import {
   MAX_COMPTABLE_FILE_SIZE,
   validateComptableFormat,
 } from "@/lib/comptable-formats";
+import { formatDeuxDecimales } from "@/lib/nombres";
 
 interface ClientOption {
   id: string;
@@ -333,8 +334,8 @@ export function UploadFileDialog({
     );
 
   const formatSize = (size: number) => {
-    if (size >= 1024 * 1024) return `${(size / (1024 * 1024)).toFixed(2)} MB`;
-    return `${(size / 1024).toFixed(2)} KB`;
+    if (size >= 1024 * 1024) return `${formatDeuxDecimales(size / (1024 * 1024))} MB`;
+    return `${formatDeuxDecimales(size / 1024)} KB`;
   };
 
   const usedTypes = (excludeId?: string) =>

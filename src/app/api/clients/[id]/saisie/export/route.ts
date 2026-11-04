@@ -272,6 +272,13 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     }
 
     const ws = XLSX.utils.aoa_to_sheet([HEADERS, ...rows]);
+    // Milliers séparés dans Excel : seul l'affichage change, la valeur reste exacte.
+    for (const c of ["Débit", "Crédit", "Solde"].map((h) => HEADERS.indexOf(h))) {
+      for (let r = 1; r <= rows.length; r++) {
+        const cell = ws[XLSX.utils.encode_cell({ r, c })];
+        if (cell?.t === "n") cell.z = "#,##0.00";
+      }
+    }
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Grand Livre");
     const buf = XLSX.write(wb, { type: "buffer", bookType: "xlsx" }) as Buffer;

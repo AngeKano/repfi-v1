@@ -31,6 +31,7 @@ import {
 } from "lucide-react";
 import { PiScalesDuotone, PiChartDonutDuotone, PiTableDuotone } from "react-icons/pi";
 import { cn } from "@/lib/utils";
+import { formatNombre } from "@/lib/nombres";
 import { toast } from "sonner";
 import {
   exporterEtatsExcel,
@@ -141,7 +142,7 @@ const TD = "border border-[#9AA9BC] px-3 py-1.5 align-middle";
 
 const fmt = (n: number, showZero: boolean) => {
   if (!n) return showZero ? "0" : "";
-  return Math.round(n).toLocaleString("fr-FR");
+  return formatNombre(Math.round(n));
 };
 
 function Amount({ value, total }: { value: number; total: boolean }) {

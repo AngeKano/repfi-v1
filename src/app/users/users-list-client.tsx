@@ -23,6 +23,7 @@ import {
   getRoleLabel,
   getRoleBadgeVariant,
 } from "@/lib/permissions/role-utils";
+import { formatNombre } from "@/lib/nombres";
 import { DashboardLayout } from "@/components/dashboard-layout";
 
 interface UsersListClientProps {
@@ -180,7 +181,7 @@ export default function UsersListClient({
                 : "text-[#335890] hover:text-[#0077C3]"
             }`}
           >
-            Membres actifs / inactifs ({pagination.total})
+            Membres actifs / inactifs ({formatNombre(pagination.total)})
             {activeTab === "active" && (
               <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#0077C3]" />
             )}
