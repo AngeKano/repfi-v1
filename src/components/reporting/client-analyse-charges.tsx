@@ -19,6 +19,7 @@ import { Fragment, useCallback, useEffect, useMemo, useState, type ReactNode } f
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { AlertTriangle, ChevronDown, ChevronRight, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { formatDeuxDecimales, formatNombre } from "@/lib/nombres";
 import { DEVISE } from "@/lib/devise";
 import { COMPTE_RESULTAT } from "@/lib/reporting/etats-financiers";
 import {
@@ -90,8 +91,8 @@ const COULEURS = {
 const LIBELLE_RUBRIQUE = new Map(COMPTE_RESULTAT.map((l) => [l.ref, l.libelle]));
 
 // ---- Formats (arrondi uniquement à l'affichage) ----------------------------
-const nf0 = new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 0 });
-const nf2 = new Intl.NumberFormat("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const nf0 = { format: (n: number) => formatNombre(n, { maximumFractionDigits: 0 }) };
+const nf2 = { format: formatDeuxDecimales };
 const MOINS = "−";
 
 const montant = (n: number) =>

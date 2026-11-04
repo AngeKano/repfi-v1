@@ -43,7 +43,8 @@ import {
   PiPackageDuotone,
 } from "react-icons/pi";
 import { toast } from "sonner";
-import { KpiGrid, formatCompactOnly, type KpiDef, type KpiValue } from "./kpi-grid";
+import { KpiGrid, type KpiDef, type KpiValue } from "./kpi-grid";
+import { formatAxeMontant, formatCompactOnly } from "@/lib/nombres";
 import { Graphe, MenuGraphes, useGraphesMasques, type GrapheDef } from "./graphes-masquables";
 import { RATIOS_FORMULES } from "@/lib/reporting/ratios-bilantiels";
 
@@ -352,13 +353,6 @@ export default function ClientRatiosTab({
     }),
   );
 
-  const montantAxe = (value: number) => {
-    const abs = Math.abs(value);
-    if (abs >= 1000000) return `${(value / 1000000).toFixed(0)}M`;
-    if (abs >= 1000) return `${(value / 1000).toFixed(0)}K`;
-    return value.toString();
-  };
-
   const serie = SERIES_BFR.find((s) => s.id === serieBfr) ?? SERIES_BFR[0];
 
   return (
@@ -407,7 +401,7 @@ export default function ClientRatiosTab({
               <LineChart data={data.chartData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} />
                 <XAxis dataKey="label" tickLine={false} axisLine={false} fontSize={12} />
-                <YAxis tickLine={false} axisLine={false} tickFormatter={montantAxe} fontSize={12} />
+                <YAxis tickLine={false} axisLine={false} tickFormatter={formatAxeMontant} fontSize={12} />
                 <ChartTooltip
                   content={
                     <ChartTooltipContent
@@ -480,7 +474,7 @@ export default function ClientRatiosTab({
               <LineChart data={data.chartData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} />
                 <XAxis dataKey="label" tickLine={false} axisLine={false} fontSize={12} />
-                <YAxis tickLine={false} axisLine={false} tickFormatter={montantAxe} fontSize={12} />
+                <YAxis tickLine={false} axisLine={false} tickFormatter={formatAxeMontant} fontSize={12} />
                 <ChartTooltip
                   content={
                     <ChartTooltipContent

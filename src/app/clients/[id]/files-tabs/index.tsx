@@ -24,6 +24,7 @@ import {
 import { Input } from "@/components/ui/input";
 import UploadFilesDialog from "@/components/files/upload-files-dialog";
 import { useRouter } from "next/navigation";
+import { formatDeuxDecimales } from "@/lib/nombres";
 
 // Helper function for download — l'API streame le fichier directement
 const handleDownload = (id: string, _fileName: string) => {
@@ -222,7 +223,7 @@ const FilesTabs: React.FC<FilesTabsProps> = ({ clientId }) => {
                       <div className="flex-1">
                         <p className="font-medium">{file.fileName}</p>
                         <p className="text-sm text-gray-500">
-                          {(file.fileSize / 1024).toFixed(2)} KB •{" "}
+                          {formatDeuxDecimales(file.fileSize / 1024)} KB •{" "}
                           {new Date(file.uploadedAt).toLocaleDateString(
                             "fr-FR",
                           )}

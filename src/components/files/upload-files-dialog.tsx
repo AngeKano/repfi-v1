@@ -17,6 +17,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Upload, X, FileSpreadsheet, AlertCircle } from "lucide-react";
 import { isValidFile } from "@/utils/validate-files";
 import { FileType } from "../../../prisma/generated/prisma/enums";
+import { formatDeuxDecimales } from "@/lib/nombres";
 
 interface UploadFile {
   file: File;
@@ -217,7 +218,7 @@ export default function UploadFilesDialog({
                       {uploadFile.file.name}
                     </p>
                     <p className="text-sm text-gray-500">
-                      {(uploadFile.file.size / 1024).toFixed(2)} KB
+                      {formatDeuxDecimales(uploadFile.file.size / 1024)} KB
                     </p>
                     {uploadFile.error && (
                       <p className="text-sm text-red-500">{uploadFile.error}</p>

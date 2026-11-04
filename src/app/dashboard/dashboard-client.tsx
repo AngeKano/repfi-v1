@@ -12,6 +12,7 @@ import {
   getRoleLabel,
   getRoleBadgeVariant,
 } from "@/lib/permissions/role-utils";
+import { formatNombre } from "@/lib/nombres";
 import { DashboardLayout } from "@/components/dashboard-layout";
 import Image from "next/image";
 
@@ -46,7 +47,7 @@ export default function DashboardClient({
   const roleLabel = getRoleLabel(session.user.role);
   const roleBadgeVariant = getRoleBadgeVariant(session.user.role);
 
-  const formatNumber = (n: number) => String(n).padStart(2, "0");
+  const formatNumber = (n: number) => (n < 10 ? String(n).padStart(2, "0") : formatNombre(n));
 
   const formatPeriod = (start: string | Date, end: string | Date) => {
     const s = new Date(start);

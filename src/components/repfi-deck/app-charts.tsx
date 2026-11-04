@@ -26,6 +26,7 @@ import {
   ChevronLeft,
   ChevronRight,
 } from "lucide-react";
+import { formatCompactOnly, formatMillions } from "@/lib/nombres";
 
 /* ---------- palette app (extraite de l'app réelle) ---------- */
 export const APP = {
@@ -49,18 +50,6 @@ export const APP = {
   violetSoft: "#B79DF5", // taux périodique (pointillés)
   orange: "#F97316",
 } as const;
-
-/* ---------- format nombres (comme formatCompactOnly) ---------- */
-function fmtK(v: number): string {
-  const abs = Math.abs(v);
-  if (abs >= 1000) {
-    const f = Math.round(v / 1000)
-      .toLocaleString("fr-FR")
-      .replace(/ /g, " ");
-    return `${f}K`;
-  }
-  return v.toLocaleString("fr-FR").replace(/ /g, " ");
-}
 
 const MONTHS = [
   "Jan",
@@ -393,7 +382,7 @@ function Tunnel({ rows }: { rows: TunnelRow[] }) {
                     transition={{ duration: 0.5, delay: 0.15 + i * 0.07 }}
                   >
                     <span className="text-[10px] font-semibold text-white">
-                      {fmtK(r.value)}
+                      {formatCompactOnly(r.value)}
                     </span>
                   </motion.div>
                 )}
@@ -408,7 +397,7 @@ function Tunnel({ rows }: { rows: TunnelRow[] }) {
                     transition={{ duration: 0.5, delay: 0.15 + i * 0.07 }}
                   >
                     <span className="text-[10px] font-semibold text-white">
-                      {fmtK(r.value)}
+                      {formatCompactOnly(r.value)}
                     </span>
                   </motion.div>
                 )}
@@ -482,7 +471,6 @@ const tunnelRows: TunnelRow[] = [
   { name: "Résultat net", value: 1_720_000, pct: 6.8 },
 ];
 
-const fmtM = (v: number) => `${(v / 1e6).toFixed(0)}M`;
 const fmtPct = (v: number) => `${v.toFixed(0)}%`;
 
 /* ============================================================
@@ -503,7 +491,7 @@ export function ChartCA() {
       <GroupedBars
         labels={MONTHS}
         max={3e6}
-        fmtY={fmtM}
+        fmtY={formatMillions}
         series={[
           { name: "2025", color: APP.blueN, data: ca2025 },
           { name: "2024", color: APP.blueN1, data: ca2024 },
@@ -528,7 +516,7 @@ export function ChartTresorerie() {
       <MultiLine
         labels={MONTHS}
         max={6e6}
-        fmtY={fmtM}
+        fmtY={formatMillions}
         series={[
           {
             name: "Trésorerie 2024",
@@ -618,7 +606,7 @@ export function ChartCreances() {
       <GroupedBars
         labels={MONTHS}
         max={2.6e6}
-        fmtY={fmtM}
+        fmtY={formatMillions}
         series={[
           { name: "Créances", color: APP.blueN, data: creances },
           { name: "Encaissements", color: APP.blueN1, data: encaiss },
@@ -643,7 +631,7 @@ export function ChartDettes() {
       <GroupedBars
         labels={MONTHS}
         max={1.8e6}
-        fmtY={fmtM}
+        fmtY={formatMillions}
         series={[
           { name: "Dettes", color: APP.blueN, data: detteNee },
           { name: "Remboursées", color: APP.blueN1, data: detteRemb },

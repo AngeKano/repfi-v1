@@ -47,6 +47,7 @@ import {
 } from "react-icons/pi";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { formatCompactOnly, formatMillions } from "@/lib/nombres";
 import { DetteTable } from "./dette-table";
 import { Graphe, MenuGraphes, useGraphesMasques, type GrapheDef } from "./graphes-masquables";
 
@@ -186,17 +187,6 @@ function saveDetteKpiConfig(clientId: string, items: DetteKpiItem[]) {
 }
 
 // ==================== HELPERS ====================
-function formatCompactOnly(value: number): string {
-  const absValue = Math.abs(value);
-  if (absValue >= 1000) {
-    const formatted = Math.round(value / 1000)
-      .toLocaleString("fr-FR")
-      .replace(/ /g, " ");
-    return `${formatted}K`;
-  }
-  return value.toLocaleString("fr-FR").replace(/ /g, " ");
-}
-
 const MONTHS = [
   { value: "01", label: "Janvier" },
   { value: "02", label: "Février" },
@@ -744,7 +734,7 @@ export default function ClientDettesTab({
                 <YAxis
                   tickLine={false}
                   axisLine={false}
-                  tickFormatter={(value) => `${(value / 1000000).toFixed(0)}M`}
+                  tickFormatter={formatMillions}
                   fontSize={12}
                 />
                 <ChartTooltip

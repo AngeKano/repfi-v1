@@ -35,6 +35,7 @@ import {
   MAX_COMPTABLE_FILE_SIZE,
   validateComptableFormat,
 } from "@/lib/comptable-formats";
+import { formatDeuxDecimales } from "@/lib/nombres";
 import { FileType } from "../../../../../../prisma/generated/prisma/enums";
 
 // ============================================================
@@ -736,7 +737,7 @@ export default function DeclarationComptable({
                 <div className="flex-1 min-w-0">
                   <p className="font-medium truncate">{uploadFile.file.name}</p>
                   <p className="text-sm text-gray-500">
-                    {(uploadFile.file.size / 1024).toFixed(2)} KB
+                    {formatDeuxDecimales(uploadFile.file.size / 1024)} KB
                   </p>
                   {uploadFile.error && (
                     <p className="text-sm text-red-500">{uploadFile.error}</p>

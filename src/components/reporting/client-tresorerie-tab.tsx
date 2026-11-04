@@ -49,10 +49,10 @@ import { toast } from "sonner";
 import {
   KpiGrid,
   VariationBadge,
-  formatCompactOnly,
   type KpiDef,
   type KpiValue,
 } from "./kpi-grid";
+import { formatAxeMontant, formatCompactOnly } from "@/lib/nombres";
 import {
   TRESORERIE_KPIS,
   RUBRIQUES_TOTAL_TRESORERIE,
@@ -426,12 +426,7 @@ export default function ClientTresorerieTab({
                     tickLine={false}
                     axisLine={false}
                     fontSize={12}
-                    tickFormatter={(value) => {
-                      const absVal = Math.abs(value);
-                      if (absVal >= 1000000) return `${(value / 1000000).toFixed(0)}M`;
-                      if (absVal >= 1000) return `${(value / 1000).toFixed(0)}K`;
-                      return value.toString();
-                    }}
+                    tickFormatter={formatAxeMontant}
                   />
                   <YAxis
                     type="category"
@@ -498,14 +493,6 @@ export default function ClientTresorerieTab({
                               {c.compte}
                             </span>
                             <span className="font-medium">{c.intituleCompte}</span>
-                            {c.deduit && (
-                              <span
-                                className="text-[10px] px-1.5 py-0.5 rounded border border-[#D0E3F5] text-muted-foreground"
-                                title="Compte de passif ou de dépréciation : solde crédit − débit, déduit du Total Trésorerie"
-                              >
-                                en moins
-                              </span>
-                            )}
                           </div>
                         </td>
                         <td className="text-right py-2.5 font-semibold">
@@ -520,12 +507,7 @@ export default function ClientTresorerieTab({
                       </tr>
                     ))}
                     <tr className="border-t-2 font-bold">
-                      <td className="py-2.5">
-                        Total Trésorerie
-                        <span className="ml-2 text-xs font-normal text-muted-foreground">
-                          (comptes « en moins » déduits)
-                        </span>
-                      </td>
+                      <td className="py-2.5">Total Trésorerie</td>
                       <td className="text-right py-2.5 text-blue-600">
                         {formatCompactOnly(totalN)}
                       </td>

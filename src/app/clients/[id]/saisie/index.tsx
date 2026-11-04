@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type ComponentProps } from "react";
 import {
   Card,
   CardContent,
@@ -58,6 +58,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { formatDeuxDecimales, formatNombre, grouperSaisie, lireMontant } from "@/lib/nombres";
 import {
   CODES_JOURNAUX,
   FLAG_SAISIE,
@@ -157,17 +158,36 @@ interface Ecriture {
 }
 
 // ==================== Helpers ====================
-const fmt = (n: number) =>
-  n ? n.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "";
+const fmt = (n: number) => (n ? formatDeuxDecimales(n) : "");
 const isoToInput = (iso: string) => (iso ? iso.slice(0, 10) : "");
 // Rubrique unique : un compte relève SOIT d'une rubrique de gestion (compte de
 // résultat), SOIT d'une rubrique de bilan — jamais des deux. On expose donc une
 // seule colonne, alimentée par celle qui s'applique.
 const rubriqueUnique = (gestion?: string, bilan?: string) => gestion || bilan || "";
-const num = (s: string) => {
-  const v = parseFloat((s || "").replace(",", "."));
-  return isNaN(v) ? 0 : v;
-};
+const num = lireMontant;
+
+// Montant saisi : milliers séparés à l'affichage, valeur brute pendant la frappe
+// (le curseur ne saute pas).
+function MontantInput({
+  value,
+  onValeur,
+  ...props
+}: Omit<ComponentProps<typeof Input>, "value" | "onChange"> & {
+  value: string;
+  onValeur: (v: string) => void;
+}) {
+  const [enEdition, setEnEdition] = useState(false);
+  return (
+    <Input
+      {...props}
+      inputMode="decimal"
+      value={enEdition ? value : grouperSaisie(value)}
+      onFocus={() => setEnEdition(true)}
+      onBlur={() => setEnEdition(false)}
+      onChange={(e) => onValeur(e.target.value)}
+    />
+  );
+}
 
 // Cellule "auto" : valeur dérivée du numéro de compte / tiers (référentiel
 // existant, même logique qu'Airflow). Grisée, verrouillée, non modifiable.
@@ -728,7 +748,7 @@ function GrandLivreSaisie({ clientId }: { clientId: string }) {
         >
           {balanced ? <CheckCircle2 className="w-4 h-4" /> : <AlertTriangle className="w-4 h-4" />}
           Saisies — D {fmt(data.balance.debit) || "0"} / C {fmt(data.balance.credit) || "0"}
-          {!balanced && <span className="font-bold">· Δ {data.balance.delta.toFixed(2)}</span>}
+          {!balanced && <span className="font-bold">· Δ {formatDeuxDecimales(data.balance.delta)}</span>}
         </div>
         <Button
           variant="outline"
@@ -919,34 +939,32 @@ function GrandLivreSaisie({ clientId }: { clientId: string }) {
                             <AutoCell value={rubriqueUnique(info?.rubrique, info?.bilan)} className="w-20" />
                           </td>
                           <td className="p-1">
-                            <Input
-                              inputMode="decimal"
+                            <MontantInput
                               value={l.debit}
                               disabled={debitBloque}
-                              onChange={(e) => setLine(i, { debit: e.target.value })}
+                              onValeur={(debit) => setLine(i, { debit })}
                               aria-invalid={montantsEnErreur}
                               title={debitBloque ? "Ligne au crédit : videz le crédit pour saisir un débit" : undefined}
                               placeholder={debitBloque ? "—" : ""}
                               className={cn(
                                 cellInput,
-                                "w-24 text-right",
+                                "w-28 text-right",
                                 debitBloque && "opacity-40",
                                 montantsEnErreur && "border-red-500 ring-1 ring-red-500/30",
                               )}
                             />
                           </td>
                           <td className="p-1">
-                            <Input
-                              inputMode="decimal"
+                            <MontantInput
                               value={l.credit}
                               disabled={creditBloque}
-                              onChange={(e) => setLine(i, { credit: e.target.value })}
+                              onValeur={(credit) => setLine(i, { credit })}
                               aria-invalid={montantsEnErreur}
                               title={creditBloque ? "Ligne au débit : videz le débit pour saisir un crédit" : undefined}
                               placeholder={creditBloque ? "—" : ""}
                               className={cn(
                                 cellInput,
-                                "w-24 text-right",
+                                "w-28 text-right",
                                 creditBloque && "opacity-40",
                                 montantsEnErreur && "border-red-500 ring-1 ring-red-500/30",
                               )}
@@ -985,7 +1003,7 @@ function GrandLivreSaisie({ clientId }: { clientId: string }) {
                   <Plus className="w-3.5 h-3.5" /> Ligne
                 </Button>
                 <div className={cn("text-sm font-semibold", Math.abs(formDelta.delta) < 0.01 ? "text-green-700" : "text-amber-700")}>
-                  Δ {formDelta.delta.toFixed(2)}
+                  Δ {formatDeuxDecimales(formDelta.delta)}
                   {Math.abs(formDelta.delta) >= 0.01 && " — non équilibré"}
                 </div>
                 <div className="flex items-center gap-2">
@@ -1031,7 +1049,7 @@ function GrandLivreSaisie({ clientId }: { clientId: string }) {
                         {e.libelle && <span className="text-muted-foreground">· {e.libelle}</span>}
                         {!ecrBalanced && (
                           <span className="inline-flex items-center gap-1 text-amber-700 font-medium">
-                            <AlertTriangle className="w-3 h-3" /> Δ {(d - c).toFixed(2)}
+                            <AlertTriangle className="w-3 h-3" /> Δ {formatDeuxDecimales(d - c)}
                           </span>
                         )}
                       </div>
@@ -1103,7 +1121,7 @@ function GrandLivreSaisie({ clientId }: { clientId: string }) {
               <div>
                 <CardTitle>Grand livre</CardTitle>
                 <CardDescription>
-                  Lignes importées et saisies — lecture seule ({data.uploaded.total}{" "}
+                  Lignes importées et saisies — lecture seule ({formatNombre(data.uploaded.total)}{" "}
                   ligne{data.uploaded.total > 1 ? "s" : ""}). L&apos;origine de chaque
                   ligne est indiquée par la colonne Flags.
                 </CardDescription>
@@ -1233,7 +1251,7 @@ function GrandLivreSaisie({ clientId }: { clientId: string }) {
                 <tfoot>
                   <tr className="border-t-2 bg-muted/40 font-semibold">
                     <td className="p-2" colSpan={4}>
-                      Total ({data.uploaded.total} ligne
+                      Total ({formatNombre(data.uploaded.total)} ligne
                       {data.uploaded.total > 1 ? "s" : ""})
                     </td>
                     <td className="p-2 text-right tabular-nums text-blue-700">
@@ -1263,9 +1281,9 @@ function GrandLivreSaisie({ clientId }: { clientId: string }) {
             <div className="flex items-center justify-between mt-4 gap-3 flex-wrap">
               <span className="text-xs text-muted-foreground">
                 {/* « Lignes 51 à 75 sur 1 636 » : lignes de la page affichée. */}
-                Lignes {((data.uploaded.page - 1) * data.uploaded.pageSize + 1).toLocaleString("fr-FR")} à{" "}
-                {Math.min(data.uploaded.page * data.uploaded.pageSize, data.uploaded.total).toLocaleString("fr-FR")} sur{" "}
-                {data.uploaded.total.toLocaleString("fr-FR")}
+                Lignes {formatNombre((data.uploaded.page - 1) * data.uploaded.pageSize + 1)} à{" "}
+                {formatNombre(Math.min(data.uploaded.page * data.uploaded.pageSize, data.uploaded.total))} sur{" "}
+                {formatNombre(data.uploaded.total)}
               </span>
               <div className="flex items-center gap-1">
                 <Button variant="outline" size="sm" onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={data.uploaded.page <= 1 || loading} className="h-8 w-8 p-0" title="Page précédente">

@@ -6,6 +6,7 @@
 // réutilisées par l'endpoint /api/clients/[id]/reporting/qc qui leur fournit
 // des agrégats calculés INDÉPENDAMMENT (vérification croisée).
 // ============================================================================
+import { formatNombre } from "@/lib/nombres";
 
 export type QcSeverity = "critique" | "moyen" | "mineur";
 export type QcStatus = "pass" | "warn" | "fail";
@@ -22,7 +23,7 @@ export interface QcCheck {
 }
 
 const fmt = (n: number): string =>
-  Number.isFinite(n) ? Math.round(n).toLocaleString("fr-FR") : String(n);
+  Number.isFinite(n) ? formatNombre(Math.round(n)) : String(n);
 
 const pct = (n: number): string =>
   Number.isFinite(n) ? `${n.toFixed(1)}%` : String(n);
