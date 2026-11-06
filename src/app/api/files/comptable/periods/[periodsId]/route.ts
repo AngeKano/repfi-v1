@@ -1,7 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-
-import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import { createClient as createClickhouseClient } from "@clickhouse/client";
 import {
   S3Client,
@@ -10,6 +7,11 @@ import {
 } from "@aws-sdk/client-s3";
 
 import { prisma } from "@/lib/prisma";
+import {
+  requirePermission,
+  requireClientAccess,
+  FICHIERS_ACTIONS,
+} from "@/lib/permissions";
 
 const s3Client = new S3Client({
   region: process.env.AWS_REGION!,
@@ -37,10 +39,9 @@ export async function DELETE(
   { params }: { params: Promise<{ periodsId: string }> },
 ) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user) {
-      return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
-    }
+    const permission = await requirePermission(FICHIERS_ACTIONS.SUPPRIMER);
+    if (permission instanceof NextResponse) return permission;
+    const { user } = permission;
 
     const { periodsId } = await params;
     const periodId = periodsId;
@@ -67,12 +68,15 @@ export async function DELETE(
       );
     }
 
-    if (period.client.companyId !== session.user.companyId) {
+    if (period.client.companyId !== user.companyId) {
       return NextResponse.json(
         { error: "Accès non autorisé" },
         { status: 403 },
       );
     }
+
+    const refusDossier = await requireClientAccess(period.client.id, user);
+    if (refusDossier) return refusDossier;
 
     // Marquer la période comme annulée pour que le worker ETL arrête le pipeline
     // avant que ses ressources soient supprimées (soft-cancel via status).

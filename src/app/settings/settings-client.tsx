@@ -14,6 +14,7 @@ import { DashboardLayout } from "@/components/dashboard-layout";
 
 interface SettingsClientProps {
   session: any;
+  canViewCompany: boolean;
 }
 
 type SettingsTab = "comptes" | "profil";
@@ -23,9 +24,16 @@ const TABS: { id: SettingsTab; label: string; icon: any }[] = [
   { id: "profil", label: "Profil", icon: UserCircle },
 ];
 
-export default function SettingsClient({ session }: SettingsClientProps) {
+export default function SettingsClient({
+  session,
+  canViewCompany,
+}: SettingsClientProps) {
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<SettingsTab>("comptes");
+  // « Comptes » présente les informations de l'entreprise.
+  const onglets = canViewCompany
+    ? TABS
+    : TABS.filter((tab) => tab.id !== "comptes");
+  const [activeTab, setActiveTab] = useState<SettingsTab>(onglets[0].id);
 
   const roleLabel = getRoleLabel(session.user.role);
   const roleBadgeVariant = getRoleBadgeVariant(session.user.role);
@@ -72,7 +80,7 @@ export default function SettingsClient({ session }: SettingsClientProps) {
 
         {/* Sub Tabs */}
         <div className="flex items-center gap-6 mb-6 border-b border-[#D0E3F5]">
-          {TABS.map((tab) => {
+          {onglets.map((tab) => {
             const active = activeTab === tab.id;
             return (
               <button

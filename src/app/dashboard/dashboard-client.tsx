@@ -25,6 +25,7 @@ interface DashboardClientProps {
   };
   recentReportings: any[];
   canViewMembers: boolean;
+  canViewCompany: boolean;
   canCreateClient: boolean;
 }
 
@@ -41,6 +42,7 @@ export default function DashboardClient({
   stats,
   recentReportings,
   canViewMembers,
+  canViewCompany,
 }: DashboardClientProps) {
   const router = useRouter();
 
@@ -100,34 +102,36 @@ export default function DashboardClient({
         <h1 className="text-3xl font-bold text-[#00122E] mb-6">Overview</h1>
 
         {/* Company Card */}
-        <div className="flex items-center gap-4 mb-6">
-          <Card className="flex flex-row items-center justify-between gap-8 px-8 py-4 w-fit">
-            <div className="w-12 h-12 rounded-xl bg-[#EBF5FF] flex items-center justify-center">
-              <Image
-                src="/logo-click-insight-unit.png"
-                alt=""
-                width={32}
-                height={32}
-                className="object-contain"
-              />
-            </div>
-            <div className="flex flex-col items-center justify-center">
-              <div>
-                <p className="text-xs text-[#0077C3] font-medium">Entreprise</p>
-                <p className="text-base font-bold text-[#00122E]">
-                  {session.user.companyName}
-                </p>
+        {canViewCompany && (
+          <div className="flex items-center gap-4 mb-6">
+            <Card className="flex flex-row items-center justify-between gap-8 px-8 py-4 w-fit">
+              <div className="w-12 h-12 rounded-xl bg-[#EBF5FF] flex items-center justify-center">
+                <Image
+                  src="/logo-click-insight-unit.png"
+                  alt=""
+                  width={32}
+                  height={32}
+                  className="object-contain"
+                />
               </div>
-              <Badge variant="outline" className="text-xs mt-1">
-                {session.user.companyPackType === "ENTREPRISE"
-                  ? "Entreprise"
-                  : session.user.companyPackType === "SIMPLE"
-                    ? "Simple"
-                    : session.user.companyPackType}
-              </Badge>
-            </div>
-          </Card>
-        </div>
+              <div className="flex flex-col items-center justify-center">
+                <div>
+                  <p className="text-xs text-[#0077C3] font-medium">Entreprise</p>
+                  <p className="text-base font-bold text-[#00122E]">
+                    {session.user.companyName}
+                  </p>
+                </div>
+                <Badge variant="outline" className="text-xs mt-1">
+                  {session.user.companyPackType === "ENTREPRISE"
+                    ? "Entreprise"
+                    : session.user.companyPackType === "SIMPLE"
+                      ? "Simple"
+                      : session.user.companyPackType}
+                </Badge>
+              </div>
+            </Card>
+          </div>
+        )}
 
         {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">

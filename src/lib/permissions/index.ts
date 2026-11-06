@@ -50,6 +50,7 @@ export {
 export {
   checkPermission,
   requirePermission,
+  requireClientAccess,
   requireAnyPermission,
   requireAllPermissions,
   withPermission,

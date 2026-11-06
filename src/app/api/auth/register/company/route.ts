@@ -1,8 +1,14 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { requirePermission, ENTREPRISE_ACTIONS } from "@/lib/permissions";
 
+// Route sans appelant dans l'application (l'inscription passe par /api/auth/signup)
+// et qui était ouverte à tous.
 export async function POST(request: Request) {
   try {
+    const permission = await requirePermission(ENTREPRISE_ACTIONS.CREER_COMPTE);
+    if (permission instanceof NextResponse) return permission;
+
     const body = await request.json();
     const {
       email,

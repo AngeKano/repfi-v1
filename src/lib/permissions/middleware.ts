@@ -7,7 +7,8 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import { RoleIdType, RoleId } from "./roles";
-import { PermissionAction, ACTION_LABELS } from "./actions";
+import { prisma } from "@/lib/prisma";
+import { PermissionAction, ACTION_LABELS, CLIENTS_ACTIONS } from "./actions";
 import { hasPermission } from "./matrix";
 
 /**
@@ -123,6 +124,31 @@ export async function requirePermission(
   }
 
   return { user: result.user! };
+}
+
+/**
+ * Un droit de la matrice ne vaut que sur les dossiers accessibles : un rôle sans
+ * « Voir tous les clients » n'agit que sur ceux où il est assigné. À appeler après
+ * requirePermission. L'appartenance du dossier à l'entreprise reste contrôlée par
+ * chaque route.
+ * @returns la réponse d'erreur à renvoyer, ou null si le dossier est accessible
+ */
+export async function requireClientAccess(
+  clientId: string,
+  user: Pick<SessionUser, "id" | "role">
+): Promise<NextResponse | null> {
+  if (hasPermission(mapLegacyRole(user.role), CLIENTS_ACTIONS.VOIR_TOUS)) {
+    return null;
+  }
+
+  const assignation = await prisma.clientAssignment.findFirst({
+    where: { clientId, userId: user.id },
+    select: { id: true },
+  });
+
+  return assignation
+    ? null
+    : NextResponse.json({ error: "Accès non autorisé" }, { status: 403 });
 }
 
 /**

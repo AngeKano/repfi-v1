@@ -78,6 +78,7 @@ interface MiseAJour {
 
 interface Reponse {
   canUpload: boolean;
+  canViewHistory: boolean;
   tables: EtatTable[];
   updates: MiseAJour[];
 }
@@ -279,8 +280,10 @@ export default function DimensionsSection({ clientId }: { clientId: string }) {
         </div>
 
         {/* Historique */}
-        <h3 className="text-sm font-semibold text-[#00122E] mb-2">Historique des mises à jour</h3>
-        {data && data.updates.length > 0 ? (
+        {data?.canViewHistory !== false && (
+          <h3 className="text-sm font-semibold text-[#00122E] mb-2">Historique des mises à jour</h3>
+        )}
+        {data?.canViewHistory === false ? null : data && data.updates.length > 0 ? (
           <div className="border border-[#D0E3F5] rounded-xl overflow-hidden bg-white">
             <table className="w-full">
               <thead>

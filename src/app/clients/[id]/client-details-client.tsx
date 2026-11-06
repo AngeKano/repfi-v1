@@ -78,6 +78,7 @@ interface ClientDetailsClientProps {
   canEdit: boolean;
   canDelete: boolean;
   canViewFiles: boolean;
+  canDeleteFiles: boolean;
   canViewMembers: boolean;
   canViewReporting: boolean;
   canExportReporting: boolean;
@@ -150,6 +151,7 @@ export default function ClientDetailsClient({
   canEdit,
   canDelete,
   canViewFiles,
+  canDeleteFiles,
   canViewMembers,
   canViewReporting,
   canExportReporting,
@@ -847,7 +849,7 @@ export default function ClientDetailsClient({
               {/* Reporting Financier */}
               {activeTab === "declaration" && (
                 <Tabs value="declaration">
-                  <DeclarationTabs clientId={client.id} />
+                  <DeclarationTabs clientId={client.id} canDeleteFiles={canDeleteFiles} />
                 </Tabs>
               )}
 
@@ -878,7 +880,9 @@ export default function ClientDetailsClient({
                 ))}
 
               {/* Files */}
-              {activeTab === "files" && <FilesTabs clientId={client.id} />}
+              {activeTab === "files" && (
+                <FilesTabs clientId={client.id} canDeleteFiles={canDeleteFiles} />
+              )}
             </div>
             </VisibiliteProvider>
           </div>

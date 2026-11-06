@@ -8,6 +8,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "../[...nextauth]/route";
 import { prisma } from "@/lib/prisma";
+import { checkPermissionSync, ENTREPRISE_ACTIONS } from "@/lib/permissions";
 
 export async function GET(req: NextRequest) {
   try {
@@ -86,7 +87,12 @@ export async function GET(req: NextRequest) {
           lastLoginAt: user.lastLoginAt,
           createdAt: user.createdAt,
         },
-        company: user.company,
+        // Pas de requirePermission ici : un refus couperait toute la session, dont
+        // dépend le SessionProvider. Seules les informations de l'entreprise sont
+        // soumises au droit.
+        company: checkPermissionSync(user.role, ENTREPRISE_ACTIONS.VOIR_INFOS)
+          ? user.company
+          : null,
         stats: {
           accessibleClientsCount,
         },

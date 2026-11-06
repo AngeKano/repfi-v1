@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { checkPermissionSync } from "@/lib/permissions/middleware";
 import {
   CLIENTS_ACTIONS,
+  ENTREPRISE_ACTIONS,
   MEMBRES_ACTIONS,
   FICHIERS_ACTIONS,
 } from "@/lib/permissions/actions";
@@ -31,6 +32,10 @@ export default async function DashboardPage() {
   const canViewFiles = checkPermissionSync(
     session.user.role,
     FICHIERS_ACTIONS.VOIR,
+  );
+  const canViewCompany = checkPermissionSync(
+    session.user.role,
+    ENTREPRISE_ACTIONS.VOIR_INFOS,
   );
   const canCreateClient =
     checkPermissionSync(session.user.role, CLIENTS_ACTIONS.CREER) &&
@@ -125,6 +130,7 @@ export default async function DashboardPage() {
       stats={stats}
       recentReportings={recentReportings}
       canViewMembers={canViewMembers}
+      canViewCompany={canViewCompany}
       canCreateClient={canCreateClient}
     />
   );
