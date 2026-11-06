@@ -26,9 +26,13 @@ interface RoleOption {
 
 interface NewUserFormProps {
   availableRoles: RoleOption[];
+  canActivate: boolean;
 }
 
-export default function NewUserForm({ availableRoles }: NewUserFormProps) {
+export default function NewUserForm({
+  availableRoles,
+  canActivate,
+}: NewUserFormProps) {
   const router = useRouter();
 
   const [loading, setLoading] = useState(false);
@@ -107,6 +111,12 @@ export default function NewUserForm({ availableRoles }: NewUserFormProps) {
           <h2 className="text-2xl font-bold text-gray-900 mb-2">
             Membre ajoute !
           </h2>
+          {!canActivate && (
+            <p className="text-gray-600 mb-2">
+              Il reste inactif jusqu&apos;à son activation par un administrateur
+              autorisé.
+            </p>
+          )}
           <p className="text-gray-600">Redirection en cours...</p>
         </Card>
       </div>
@@ -147,6 +157,15 @@ export default function NewUserForm({ availableRoles }: NewUserFormProps) {
           {error && (
             <Alert variant="destructive" className="mb-6">
               <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          )}
+
+          {!canActivate && (
+            <Alert className="mb-6">
+              <AlertDescription>
+                Ce membre sera créé inactif : il ne pourra se connecter
+                qu&apos;après son activation par un administrateur autorisé.
+              </AlertDescription>
             </Alert>
           )}
 

@@ -5,6 +5,11 @@ import { z } from "zod";
 import { authOptions } from "../../auth/[...nextauth]/route";
 
 import { prisma } from "@/lib/prisma";
+import {
+  requirePermission,
+  requireClientAccess,
+  FICHIERS_ACTIONS,
+} from "@/lib/permissions";
 
 const updateFolderSchema = z.object({
   name: z.string().min(1).max(255),
@@ -78,17 +83,16 @@ export async function DELETE(
   { params }: { params: Promise<{ folderId: string }> },
 ) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user) {
-      return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
-    }
+    const permission = await requirePermission(FICHIERS_ACTIONS.SUPPRIMER);
+    if (permission instanceof NextResponse) return permission;
+    const { user } = permission;
 
     const { folderId } = await params;
     const folder = await prisma.folder.findFirst({
       where: {
         id: folderId,
         client: {
-          companyId: session.user.companyId,
+          companyId: user.companyId,
         },
       },
       include: {
@@ -107,6 +111,9 @@ export async function DELETE(
         { status: 404 },
       );
     }
+
+    const refusDossier = await requireClientAccess(folder.clientId, user);
+    if (refusDossier) return refusDossier;
 
     if (folder._count.children > 0 || folder._count.files > 0) {
       return NextResponse.json(

@@ -1,9 +1,21 @@
 import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
+import {
+  requirePermission,
+  getMappedRole,
+  canManageRole,
+  ENTREPRISE_ACTIONS,
+} from "@/lib/permissions";
 
+// Route sans appelant dans l'application (les membres se créent par POST /api/users)
+// et qui était ouverte à tous, pour n'importe quelle entreprise et n'importe quel rôle.
 export async function POST(request: Request) {
   try {
+    const permission = await requirePermission(ENTREPRISE_ACTIONS.CREER_COMPTE);
+    if (permission instanceof NextResponse) return permission;
+    const { user: sessionUser } = permission;
+
     const body = await request.json();
     const { email, password, name, companyId, role = "user" } = body;
 
@@ -12,6 +24,17 @@ export async function POST(request: Request) {
       return NextResponse.json(
         { error: "Tous les champs obligatoires doivent être remplis" },
         { status: 400 },
+      );
+    }
+
+    // Uniquement dans sa propre entreprise, pour un rôle inférieur au sien.
+    if (
+      companyId !== sessionUser.companyId ||
+      !canManageRole(getMappedRole(sessionUser.role), getMappedRole(role))
+    ) {
+      return NextResponse.json(
+        { error: "Entreprise ou rôle non autorisé" },
+        { status: 403 },
       );
     }
 

@@ -33,9 +33,10 @@ const handleDownload = (id: string, _fileName: string) => {
 
 interface FilesTabsProps {
   clientId: string;
+  canDeleteFiles: boolean;
 }
 
-const FilesTabs: React.FC<FilesTabsProps> = ({ clientId }) => {
+const FilesTabs: React.FC<FilesTabsProps> = ({ clientId, canDeleteFiles }) => {
   // States
   const [folders, setFolders] = useState<any[]>([]);
   const [files, setFiles] = useState<any[]>([]);
@@ -189,16 +190,18 @@ const FilesTabs: React.FC<FilesTabsProps> = ({ clientId }) => {
                       >
                         <Edit className="w-4 h-4" />
                       </Button>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={(e: React.MouseEvent) => {
-                          e.stopPropagation();
-                          handleDeleteFolder(folder.id);
-                        }}
-                      >
-                        <Trash className="w-4 h-4 text-red-500" />
-                      </Button>
+                      {canDeleteFiles && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={(e: React.MouseEvent) => {
+                            e.stopPropagation();
+                            handleDeleteFolder(folder.id);
+                          }}
+                        >
+                          <Trash className="w-4 h-4 text-red-500" />
+                        </Button>
+                      )}
                     </div>
                   </div>
                 ))}
@@ -249,14 +252,16 @@ const FilesTabs: React.FC<FilesTabsProps> = ({ clientId }) => {
                       >
                         <Download className="w-4 h-4" />
                       </Button>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        className="opacity-0 group-hover:opacity-100"
-                        onClick={() => handleDeleteFile(file.id)}
-                      >
-                        <Trash className="w-4 h-4 text-red-500" />
-                      </Button>
+                      {canDeleteFiles && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="opacity-0 group-hover:opacity-100"
+                          onClick={() => handleDeleteFile(file.id)}
+                        >
+                          <Trash className="w-4 h-4 text-red-500" />
+                        </Button>
+                      )}
                     </div>
                   </div>
                 ))}

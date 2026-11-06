@@ -37,5 +37,12 @@ export default async function NewUserPage() {
       description: role.description,
     }));
 
-  return <NewUserForm availableRoles={availableRoles} />;
+  const canActivate = checkPermissionSync(
+    session.user.role,
+    MEMBRES_ACTIONS.ACTIVER,
+  );
+
+  return (
+    <NewUserForm availableRoles={availableRoles} canActivate={canActivate} />
+  );
 }

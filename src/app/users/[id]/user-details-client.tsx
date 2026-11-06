@@ -58,6 +58,7 @@ interface UserDetailsClientProps {
   session: any;
   user: any;
   canEdit: boolean;
+  canActivate: boolean;
   canDeactivate: boolean;
   canChangeRole: boolean;
   availableRoles: RoleOption[];
@@ -68,6 +69,7 @@ export default function UserDetailsClient({
   session,
   user,
   canEdit,
+  canActivate,
   canDeactivate,
   canChangeRole,
   availableRoles,
@@ -431,7 +433,8 @@ export default function UserDetailsClient({
                     </div>
                   )}
 
-                  {canEdit && !isSelf && (
+                  {/* Réactiver un membre demande le droit d'activer. */}
+                  {canEdit && !isSelf && (user.isActive || canActivate) && (
                     <div className="flex items-center gap-2">
                       <input
                         title="Checkbox"

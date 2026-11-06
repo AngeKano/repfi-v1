@@ -257,6 +257,14 @@ export async function PATCH(
       }
     }
 
+    // Activer un membre est un droit distinct de le modifier (Administrateur
+    // Partenaire : modifier oui, activer non). Seul le passage d'inactif à actif
+    // compte : le formulaire renvoie le statut à chaque enregistrement.
+    if (data.isActive === true && targetUser && !targetUser.isActive) {
+      const permission = await requirePermission(MEMBRES_ACTIONS.ACTIVER);
+      if (permission instanceof NextResponse) return permission;
+    }
+
     // Vérifier si l'email existe déjà
     if (data.email && data.email !== targetUser?.email) {
       const existingUser = await prisma.user.findUnique({

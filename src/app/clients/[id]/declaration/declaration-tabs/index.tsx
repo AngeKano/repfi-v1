@@ -49,9 +49,10 @@ const MONTHS = [
 
 type DeclarationTabsProps = {
   clientId: string;
+  canDeleteFiles: boolean;
 };
 
-const DeclarationTabs: React.FC<DeclarationTabsProps> = ({ clientId }) => {
+const DeclarationTabs: React.FC<DeclarationTabsProps> = ({ clientId, canDeleteFiles }) => {
   const router = useRouter();
   const [periods, setPeriods] = useState<any[]>([]);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -363,15 +364,17 @@ const DeclarationTabs: React.FC<DeclarationTabsProps> = ({ clientId }) => {
                                 <Download className="w-4 h-4" />
                               </Button>
                             )}
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="text-red-400 hover:text-red-600 hover:bg-red-50 h-8 w-8 p-0"
-                            onClick={() => handleDeleteClick(period)}
-                            title="Supprimer"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
+                          {canDeleteFiles && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="text-red-400 hover:text-red-600 hover:bg-red-50 h-8 w-8 p-0"
+                              onClick={() => handleDeleteClick(period)}
+                              title="Supprimer"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          )}
                         </div>
                       </td>
                     </tr>

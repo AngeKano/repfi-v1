@@ -135,6 +135,10 @@ export default async function ClientDetailsPage({
     session.user.role,
     FICHIERS_ACTIONS.VOIR,
   );
+  const canDeleteFiles = checkPermissionSync(
+    session.user.role,
+    FICHIERS_ACTIONS.SUPPRIMER,
+  );
   const canViewMembers = checkPermissionSync(
     session.user.role,
     MEMBRES_ACTIONS.VOIR,
@@ -195,6 +199,7 @@ export default async function ClientDetailsPage({
       canEdit={canEdit}
       canDelete={canDelete}
       canViewFiles={canViewFiles}
+      canDeleteFiles={canDeleteFiles}
       canViewMembers={canViewMembers}
       canViewReporting={canViewReporting}
       canExportReporting={canExportReporting}

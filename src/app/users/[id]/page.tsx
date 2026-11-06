@@ -36,6 +36,10 @@ export default async function UserDetailsPage({
     session.user.role,
     MEMBRES_ACTIONS.MODIFIER,
   );
+  const canActivateMembers = checkPermissionSync(
+    session.user.role,
+    MEMBRES_ACTIONS.ACTIVER,
+  );
   const canDeactivateMembers = checkPermissionSync(
     session.user.role,
     MEMBRES_ACTIONS.DESACTIVER,
@@ -129,6 +133,7 @@ export default async function UserDetailsPage({
         })),
       }}
       canEdit={canEdit}
+      canActivate={canActivateMembers}
       canDeactivate={canDeactivate}
       canChangeRole={canChangeRole}
       availableRoles={availableRoles}

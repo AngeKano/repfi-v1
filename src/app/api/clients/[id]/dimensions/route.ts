@@ -117,8 +117,11 @@ export async function GET(
       }),
     );
 
+    const canViewHistory = checkPermissionSync(user.role, FICHIERS_ACTIONS.VOIR_HISTORIQUE);
+
     return NextResponse.json({
       canUpload: checkPermissionSync(user.role, FICHIERS_ACTIONS.CHARGER),
+      canViewHistory,
       tables: DIMENSIONS.map((d, i) => {
         const derniere = updates.find(
           (u) => u.fileType === d.fileType && u.status === ProcessingStatus.COMPLETED,
@@ -133,7 +136,9 @@ export async function GET(
           ),
         };
       }),
-      updates: updates.map((u) => ({
+      // L'état des tables ci-dessus reste calculé pour tous ; seule la liste des
+      // mises à jour relève du droit de voir l'historique.
+      updates: (canViewHistory ? updates : []).map((u) => ({
         id: u.id,
         fileType: u.fileType,
         fileName: u.fileName,

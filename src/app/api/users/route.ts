@@ -11,6 +11,7 @@ import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 import {
   requirePermission,
+  checkPermissionSync,
   getMappedRole,
   canManageRole,
   RoleId,
@@ -193,7 +194,10 @@ export async function POST(req: NextRequest) {
         lastName: data.lastName,
         role: data.role,
         companyId: user.companyId,
-        isActive: true,
+        // Créer n'est pas activer : sans le droit d'activer (Administrateur
+        // Partenaire), le membre reste inactif jusqu'à l'activation par un rôle
+        // autorisé.
+        isActive: checkPermissionSync(user.role, MEMBRES_ACTIONS.ACTIVER),
       },
       select: {
         id: true,
