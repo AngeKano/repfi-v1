@@ -70,6 +70,9 @@ export interface EtatsExportData {
   resultat: LigneResultatExport[];
   /** Compte d'exploitation de l'exercice, s'il a été chargé. */
   exploitation?: ExploitationExport | null;
+  /** Faux : l'état est masqué à ce membre et n'est pas exporté. */
+  avecBilan?: boolean;
+  avecResultat?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -311,9 +314,15 @@ function tableauExploitation(e: ExploitationExport): Tableau {
 /** Les états à exporter, dans l'ordre, avec leur nom d'onglet Excel. */
 function tableauxNommes(d: EtatsExportData): Array<[Tableau, string]> {
   return [
-    [tableauActif(d), "Bilan Actif"],
-    [tableauPassif(d), "Bilan Passif"],
-    [tableauResultat(d), "Compte de Résultat"],
+    ...(d.avecBilan === false
+      ? []
+      : ([
+          [tableauActif(d), "Bilan Actif"],
+          [tableauPassif(d), "Bilan Passif"],
+        ] as Array<[Tableau, string]>)),
+    ...(d.avecResultat === false
+      ? []
+      : ([[tableauResultat(d), "Compte de Résultat"]] as Array<[Tableau, string]>)),
     ...(d.exploitation
       ? ([[tableauExploitation(d.exploitation), "Compte d'exploitation"]] as Array<[Tableau, string]>)
       : []),

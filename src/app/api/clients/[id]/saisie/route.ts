@@ -6,7 +6,7 @@ import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import { prisma } from "@/lib/prisma";
 import { formatDeuxDecimales } from "@/lib/nombres";
 import { requirePermission } from "@/lib/permissions";
-import { SAISIE_ACTIONS } from "@/lib/permissions/actions";
+import { FICHIERS_ACTIONS, SAISIE_ACTIONS } from "@/lib/permissions/actions";
 import {
   getClickhouseDbName,
   syncManualBatch,
@@ -177,6 +177,9 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user) return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
+    // Le grand livre contient tous les montants : droit « Voir fichiers chargés ».
+    const perm = await requirePermission(FICHIERS_ACTIONS.VOIR);
+    if (perm instanceof NextResponse) return perm;
 
     const { id } = await params;
     const check = await requireClient(id, session.user.companyId);

@@ -177,7 +177,7 @@ export default function ClientTresorerieTab({
   const [data, setData] = useState<TresorerieData | null>(null);
   const [loading, setLoading] = useState(true);
   // Graphiques masqués de l'onglet, mémorisés par client.
-  const graphes = useGraphesMasques(`tresorerie-${clientId}`, GRAPHES);
+  const graphes = useGraphesMasques(`tresorerie-${clientId}`, GRAPHES, "tresorerie");
 
   // Les soldes de trésorerie sont des encours : toujours cumulés depuis
   // janvier, jusqu'au mois sélectionné (ou décembre en granularité annuelle).
@@ -374,6 +374,7 @@ export default function ClientTresorerieTab({
 
       <KpiGrid
         storageKey={`tresorerie-${clientId}`}
+        onglet="tresorerie"
         defs={KPI_DEFS}
         values={kpiValues}
         actions={<MenuGraphes etat={graphes} />}

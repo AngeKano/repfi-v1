@@ -10,6 +10,8 @@ import { getServerSession } from "next-auth";
 import { createClient as createClickhouseClient } from "@clickhouse/client";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import { prisma } from "@/lib/prisma";
+import { accesReporting } from "@/lib/reporting/acces";
+import { filtrerReponse, CHAMPS_RATIOS } from "@/lib/reporting/champs-proteges";
 import { getClickhouseDbName, manualBatchId } from "@/lib/clickhouse/manual-sync";
 import { bilanRefExpr } from "@/lib/clickhouse/schema";
 import { bilanRefSql, bilanIncludeSql } from "@/lib/reporting/creances";
@@ -97,6 +99,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     if (!client) return NextResponse.json({ error: "Client non trouvé" }, { status: 404 });
     if (client.companyId !== session.user.companyId)
       return NextResponse.json({ error: "Accès non autorisé" }, { status: 403 });
+    const acces = await accesReporting(id, session.user);
+    if (acces instanceof NextResponse) return acces;
 
     const { searchParams } = new URL(req.url);
     // Mois de fin demandé ; ramené plus bas sur un mois couvert par le reporting.
@@ -342,7 +346,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
           : Math.sign(finN[k]) * 100,
     });
 
-    return NextResponse.json({
+    const reponse = {
       client: { id: client.id, name: client.name },
       yearN,
       yearN1,
@@ -367,7 +371,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
         caTTC: finN.caTTC,
       },
       chartData,
-    });
+    };
+    return NextResponse.json(filtrerReponse(reponse, CHAMPS_RATIOS, acces.masques));
   } catch (error) {
     console.error("Ratios bilantiels error:", error);
     return NextResponse.json({ error: "Erreur lors du calcul des ratios" }, { status: 500 });

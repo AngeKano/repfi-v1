@@ -281,6 +281,7 @@ export type ClientWhereInput = {
   socialNetworks?: Prisma.SocialNetworkListRelationFilter
   manualEntries?: Prisma.ManualLedgerEntryListRelationFilter
   dimensionUpdates?: Prisma.DimensionUpdateListRelationFilter
+  memberReportingAccess?: Prisma.MemberReportingAccessListRelationFilter
 }
 
 export type ClientOrderByWithRelationInput = {
@@ -311,6 +312,7 @@ export type ClientOrderByWithRelationInput = {
   socialNetworks?: Prisma.SocialNetworkOrderByRelationAggregateInput
   manualEntries?: Prisma.ManualLedgerEntryOrderByRelationAggregateInput
   dimensionUpdates?: Prisma.DimensionUpdateOrderByRelationAggregateInput
+  memberReportingAccess?: Prisma.MemberReportingAccessOrderByRelationAggregateInput
 }
 
 export type ClientWhereUniqueInput = Prisma.AtLeast<{
@@ -344,6 +346,7 @@ export type ClientWhereUniqueInput = Prisma.AtLeast<{
   socialNetworks?: Prisma.SocialNetworkListRelationFilter
   manualEntries?: Prisma.ManualLedgerEntryListRelationFilter
   dimensionUpdates?: Prisma.DimensionUpdateListRelationFilter
+  memberReportingAccess?: Prisma.MemberReportingAccessListRelationFilter
 }, "id">
 
 export type ClientOrderByWithAggregationInput = {
@@ -415,6 +418,7 @@ export type ClientCreateInput = {
   socialNetworks?: Prisma.SocialNetworkCreateNestedManyWithoutClientInput
   manualEntries?: Prisma.ManualLedgerEntryCreateNestedManyWithoutClientInput
   dimensionUpdates?: Prisma.DimensionUpdateCreateNestedManyWithoutClientInput
+  memberReportingAccess?: Prisma.MemberReportingAccessCreateNestedManyWithoutClientInput
 }
 
 export type ClientUncheckedCreateInput = {
@@ -442,6 +446,7 @@ export type ClientUncheckedCreateInput = {
   socialNetworks?: Prisma.SocialNetworkUncheckedCreateNestedManyWithoutClientInput
   manualEntries?: Prisma.ManualLedgerEntryUncheckedCreateNestedManyWithoutClientInput
   dimensionUpdates?: Prisma.DimensionUpdateUncheckedCreateNestedManyWithoutClientInput
+  memberReportingAccess?: Prisma.MemberReportingAccessUncheckedCreateNestedManyWithoutClientInput
 }
 
 export type ClientUpdateInput = {
@@ -469,6 +474,7 @@ export type ClientUpdateInput = {
   socialNetworks?: Prisma.SocialNetworkUpdateManyWithoutClientNestedInput
   manualEntries?: Prisma.ManualLedgerEntryUpdateManyWithoutClientNestedInput
   dimensionUpdates?: Prisma.DimensionUpdateUpdateManyWithoutClientNestedInput
+  memberReportingAccess?: Prisma.MemberReportingAccessUpdateManyWithoutClientNestedInput
 }
 
 export type ClientUncheckedUpdateInput = {
@@ -496,6 +502,7 @@ export type ClientUncheckedUpdateInput = {
   socialNetworks?: Prisma.SocialNetworkUncheckedUpdateManyWithoutClientNestedInput
   manualEntries?: Prisma.ManualLedgerEntryUncheckedUpdateManyWithoutClientNestedInput
   dimensionUpdates?: Prisma.DimensionUpdateUncheckedUpdateManyWithoutClientNestedInput
+  memberReportingAccess?: Prisma.MemberReportingAccessUncheckedUpdateManyWithoutClientNestedInput
 }
 
 export type ClientCreateManyInput = {
@@ -769,6 +776,20 @@ export type ClientUpdateOneRequiredWithoutAssignmentsNestedInput = {
   update?: Prisma.XOR<Prisma.XOR<Prisma.ClientUpdateToOneWithWhereWithoutAssignmentsInput, Prisma.ClientUpdateWithoutAssignmentsInput>, Prisma.ClientUncheckedUpdateWithoutAssignmentsInput>
 }
 
+export type ClientCreateNestedOneWithoutMemberReportingAccessInput = {
+  create?: Prisma.XOR<Prisma.ClientCreateWithoutMemberReportingAccessInput, Prisma.ClientUncheckedCreateWithoutMemberReportingAccessInput>
+  connectOrCreate?: Prisma.ClientCreateOrConnectWithoutMemberReportingAccessInput
+  connect?: Prisma.ClientWhereUniqueInput
+}
+
+export type ClientUpdateOneRequiredWithoutMemberReportingAccessNestedInput = {
+  create?: Prisma.XOR<Prisma.ClientCreateWithoutMemberReportingAccessInput, Prisma.ClientUncheckedCreateWithoutMemberReportingAccessInput>
+  connectOrCreate?: Prisma.ClientCreateOrConnectWithoutMemberReportingAccessInput
+  upsert?: Prisma.ClientUpsertWithoutMemberReportingAccessInput
+  connect?: Prisma.ClientWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.ClientUpdateToOneWithWhereWithoutMemberReportingAccessInput, Prisma.ClientUpdateWithoutMemberReportingAccessInput>, Prisma.ClientUncheckedUpdateWithoutMemberReportingAccessInput>
+}
+
 export type ClientCreateNestedOneWithoutFoldersInput = {
   create?: Prisma.XOR<Prisma.ClientCreateWithoutFoldersInput, Prisma.ClientUncheckedCreateWithoutFoldersInput>
   connectOrCreate?: Prisma.ClientCreateOrConnectWithoutFoldersInput
@@ -893,6 +914,7 @@ export type ClientCreateWithoutCompanyInput = {
   socialNetworks?: Prisma.SocialNetworkCreateNestedManyWithoutClientInput
   manualEntries?: Prisma.ManualLedgerEntryCreateNestedManyWithoutClientInput
   dimensionUpdates?: Prisma.DimensionUpdateCreateNestedManyWithoutClientInput
+  memberReportingAccess?: Prisma.MemberReportingAccessCreateNestedManyWithoutClientInput
 }
 
 export type ClientUncheckedCreateWithoutCompanyInput = {
@@ -919,6 +941,7 @@ export type ClientUncheckedCreateWithoutCompanyInput = {
   socialNetworks?: Prisma.SocialNetworkUncheckedCreateNestedManyWithoutClientInput
   manualEntries?: Prisma.ManualLedgerEntryUncheckedCreateNestedManyWithoutClientInput
   dimensionUpdates?: Prisma.DimensionUpdateUncheckedCreateNestedManyWithoutClientInput
+  memberReportingAccess?: Prisma.MemberReportingAccessUncheckedCreateNestedManyWithoutClientInput
 }
 
 export type ClientCreateOrConnectWithoutCompanyInput = {
@@ -993,6 +1016,7 @@ export type ClientCreateWithoutCreatedByInput = {
   socialNetworks?: Prisma.SocialNetworkCreateNestedManyWithoutClientInput
   manualEntries?: Prisma.ManualLedgerEntryCreateNestedManyWithoutClientInput
   dimensionUpdates?: Prisma.DimensionUpdateCreateNestedManyWithoutClientInput
+  memberReportingAccess?: Prisma.MemberReportingAccessCreateNestedManyWithoutClientInput
 }
 
 export type ClientUncheckedCreateWithoutCreatedByInput = {
@@ -1019,6 +1043,7 @@ export type ClientUncheckedCreateWithoutCreatedByInput = {
   socialNetworks?: Prisma.SocialNetworkUncheckedCreateNestedManyWithoutClientInput
   manualEntries?: Prisma.ManualLedgerEntryUncheckedCreateNestedManyWithoutClientInput
   dimensionUpdates?: Prisma.DimensionUpdateUncheckedCreateNestedManyWithoutClientInput
+  memberReportingAccess?: Prisma.MemberReportingAccessUncheckedCreateNestedManyWithoutClientInput
 }
 
 export type ClientCreateOrConnectWithoutCreatedByInput = {
@@ -1055,6 +1080,7 @@ export type ClientCreateWithoutModifiedByInput = {
   socialNetworks?: Prisma.SocialNetworkCreateNestedManyWithoutClientInput
   manualEntries?: Prisma.ManualLedgerEntryCreateNestedManyWithoutClientInput
   dimensionUpdates?: Prisma.DimensionUpdateCreateNestedManyWithoutClientInput
+  memberReportingAccess?: Prisma.MemberReportingAccessCreateNestedManyWithoutClientInput
 }
 
 export type ClientUncheckedCreateWithoutModifiedByInput = {
@@ -1081,6 +1107,7 @@ export type ClientUncheckedCreateWithoutModifiedByInput = {
   socialNetworks?: Prisma.SocialNetworkUncheckedCreateNestedManyWithoutClientInput
   manualEntries?: Prisma.ManualLedgerEntryUncheckedCreateNestedManyWithoutClientInput
   dimensionUpdates?: Prisma.DimensionUpdateUncheckedCreateNestedManyWithoutClientInput
+  memberReportingAccess?: Prisma.MemberReportingAccessUncheckedCreateNestedManyWithoutClientInput
 }
 
 export type ClientCreateOrConnectWithoutModifiedByInput = {
@@ -1149,6 +1176,7 @@ export type ClientCreateWithoutAssignmentsInput = {
   socialNetworks?: Prisma.SocialNetworkCreateNestedManyWithoutClientInput
   manualEntries?: Prisma.ManualLedgerEntryCreateNestedManyWithoutClientInput
   dimensionUpdates?: Prisma.DimensionUpdateCreateNestedManyWithoutClientInput
+  memberReportingAccess?: Prisma.MemberReportingAccessCreateNestedManyWithoutClientInput
 }
 
 export type ClientUncheckedCreateWithoutAssignmentsInput = {
@@ -1175,6 +1203,7 @@ export type ClientUncheckedCreateWithoutAssignmentsInput = {
   socialNetworks?: Prisma.SocialNetworkUncheckedCreateNestedManyWithoutClientInput
   manualEntries?: Prisma.ManualLedgerEntryUncheckedCreateNestedManyWithoutClientInput
   dimensionUpdates?: Prisma.DimensionUpdateUncheckedCreateNestedManyWithoutClientInput
+  memberReportingAccess?: Prisma.MemberReportingAccessUncheckedCreateNestedManyWithoutClientInput
 }
 
 export type ClientCreateOrConnectWithoutAssignmentsInput = {
@@ -1217,6 +1246,7 @@ export type ClientUpdateWithoutAssignmentsInput = {
   socialNetworks?: Prisma.SocialNetworkUpdateManyWithoutClientNestedInput
   manualEntries?: Prisma.ManualLedgerEntryUpdateManyWithoutClientNestedInput
   dimensionUpdates?: Prisma.DimensionUpdateUpdateManyWithoutClientNestedInput
+  memberReportingAccess?: Prisma.MemberReportingAccessUpdateManyWithoutClientNestedInput
 }
 
 export type ClientUncheckedUpdateWithoutAssignmentsInput = {
@@ -1236,6 +1266,131 @@ export type ClientUncheckedUpdateWithoutAssignmentsInput = {
   modifiedById?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  comptableFiles?: Prisma.ComptableFileUncheckedUpdateManyWithoutClientNestedInput
+  comptablePeriods?: Prisma.ComptablePeriodUncheckedUpdateManyWithoutClientNestedInput
+  folders?: Prisma.FolderUncheckedUpdateManyWithoutClientNestedInput
+  normalFiles?: Prisma.NormalFileUncheckedUpdateManyWithoutClientNestedInput
+  socialNetworks?: Prisma.SocialNetworkUncheckedUpdateManyWithoutClientNestedInput
+  manualEntries?: Prisma.ManualLedgerEntryUncheckedUpdateManyWithoutClientNestedInput
+  dimensionUpdates?: Prisma.DimensionUpdateUncheckedUpdateManyWithoutClientNestedInput
+  memberReportingAccess?: Prisma.MemberReportingAccessUncheckedUpdateManyWithoutClientNestedInput
+}
+
+export type ClientCreateWithoutMemberReportingAccessInput = {
+  id?: string
+  name: string
+  denomination?: string | null
+  description?: string | null
+  companyType: $Enums.CompanyType
+  email: string
+  phone?: string | null
+  website?: string | null
+  isSelfEntity?: boolean
+  assujettiTVA?: boolean
+  excludeManualEntries?: boolean
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  assignments?: Prisma.ClientAssignmentCreateNestedManyWithoutClientInput
+  company: Prisma.CompanyCreateNestedOneWithoutClientsInput
+  createdBy: Prisma.UserCreateNestedOneWithoutCreatedClientsInput
+  modifiedBy?: Prisma.UserCreateNestedOneWithoutModifiedClientsInput
+  comptableFiles?: Prisma.ComptableFileCreateNestedManyWithoutClientInput
+  comptablePeriods?: Prisma.ComptablePeriodCreateNestedManyWithoutClientInput
+  folders?: Prisma.FolderCreateNestedManyWithoutClientInput
+  normalFiles?: Prisma.NormalFileCreateNestedManyWithoutClientInput
+  socialNetworks?: Prisma.SocialNetworkCreateNestedManyWithoutClientInput
+  manualEntries?: Prisma.ManualLedgerEntryCreateNestedManyWithoutClientInput
+  dimensionUpdates?: Prisma.DimensionUpdateCreateNestedManyWithoutClientInput
+}
+
+export type ClientUncheckedCreateWithoutMemberReportingAccessInput = {
+  id?: string
+  name: string
+  denomination?: string | null
+  description?: string | null
+  companyType: $Enums.CompanyType
+  email: string
+  phone?: string | null
+  website?: string | null
+  companyId: string
+  isSelfEntity?: boolean
+  assujettiTVA?: boolean
+  excludeManualEntries?: boolean
+  createdById: string
+  modifiedById?: string | null
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  assignments?: Prisma.ClientAssignmentUncheckedCreateNestedManyWithoutClientInput
+  comptableFiles?: Prisma.ComptableFileUncheckedCreateNestedManyWithoutClientInput
+  comptablePeriods?: Prisma.ComptablePeriodUncheckedCreateNestedManyWithoutClientInput
+  folders?: Prisma.FolderUncheckedCreateNestedManyWithoutClientInput
+  normalFiles?: Prisma.NormalFileUncheckedCreateNestedManyWithoutClientInput
+  socialNetworks?: Prisma.SocialNetworkUncheckedCreateNestedManyWithoutClientInput
+  manualEntries?: Prisma.ManualLedgerEntryUncheckedCreateNestedManyWithoutClientInput
+  dimensionUpdates?: Prisma.DimensionUpdateUncheckedCreateNestedManyWithoutClientInput
+}
+
+export type ClientCreateOrConnectWithoutMemberReportingAccessInput = {
+  where: Prisma.ClientWhereUniqueInput
+  create: Prisma.XOR<Prisma.ClientCreateWithoutMemberReportingAccessInput, Prisma.ClientUncheckedCreateWithoutMemberReportingAccessInput>
+}
+
+export type ClientUpsertWithoutMemberReportingAccessInput = {
+  update: Prisma.XOR<Prisma.ClientUpdateWithoutMemberReportingAccessInput, Prisma.ClientUncheckedUpdateWithoutMemberReportingAccessInput>
+  create: Prisma.XOR<Prisma.ClientCreateWithoutMemberReportingAccessInput, Prisma.ClientUncheckedCreateWithoutMemberReportingAccessInput>
+  where?: Prisma.ClientWhereInput
+}
+
+export type ClientUpdateToOneWithWhereWithoutMemberReportingAccessInput = {
+  where?: Prisma.ClientWhereInput
+  data: Prisma.XOR<Prisma.ClientUpdateWithoutMemberReportingAccessInput, Prisma.ClientUncheckedUpdateWithoutMemberReportingAccessInput>
+}
+
+export type ClientUpdateWithoutMemberReportingAccessInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  name?: Prisma.StringFieldUpdateOperationsInput | string
+  denomination?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  companyType?: Prisma.EnumCompanyTypeFieldUpdateOperationsInput | $Enums.CompanyType
+  email?: Prisma.StringFieldUpdateOperationsInput | string
+  phone?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  website?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  isSelfEntity?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  assujettiTVA?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  excludeManualEntries?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  assignments?: Prisma.ClientAssignmentUpdateManyWithoutClientNestedInput
+  company?: Prisma.CompanyUpdateOneRequiredWithoutClientsNestedInput
+  createdBy?: Prisma.UserUpdateOneRequiredWithoutCreatedClientsNestedInput
+  modifiedBy?: Prisma.UserUpdateOneWithoutModifiedClientsNestedInput
+  comptableFiles?: Prisma.ComptableFileUpdateManyWithoutClientNestedInput
+  comptablePeriods?: Prisma.ComptablePeriodUpdateManyWithoutClientNestedInput
+  folders?: Prisma.FolderUpdateManyWithoutClientNestedInput
+  normalFiles?: Prisma.NormalFileUpdateManyWithoutClientNestedInput
+  socialNetworks?: Prisma.SocialNetworkUpdateManyWithoutClientNestedInput
+  manualEntries?: Prisma.ManualLedgerEntryUpdateManyWithoutClientNestedInput
+  dimensionUpdates?: Prisma.DimensionUpdateUpdateManyWithoutClientNestedInput
+}
+
+export type ClientUncheckedUpdateWithoutMemberReportingAccessInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  name?: Prisma.StringFieldUpdateOperationsInput | string
+  denomination?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  companyType?: Prisma.EnumCompanyTypeFieldUpdateOperationsInput | $Enums.CompanyType
+  email?: Prisma.StringFieldUpdateOperationsInput | string
+  phone?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  website?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  companyId?: Prisma.StringFieldUpdateOperationsInput | string
+  isSelfEntity?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  assujettiTVA?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  excludeManualEntries?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  createdById?: Prisma.StringFieldUpdateOperationsInput | string
+  modifiedById?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  assignments?: Prisma.ClientAssignmentUncheckedUpdateManyWithoutClientNestedInput
   comptableFiles?: Prisma.ComptableFileUncheckedUpdateManyWithoutClientNestedInput
   comptablePeriods?: Prisma.ComptablePeriodUncheckedUpdateManyWithoutClientNestedInput
   folders?: Prisma.FolderUncheckedUpdateManyWithoutClientNestedInput
@@ -1269,6 +1424,7 @@ export type ClientCreateWithoutFoldersInput = {
   socialNetworks?: Prisma.SocialNetworkCreateNestedManyWithoutClientInput
   manualEntries?: Prisma.ManualLedgerEntryCreateNestedManyWithoutClientInput
   dimensionUpdates?: Prisma.DimensionUpdateCreateNestedManyWithoutClientInput
+  memberReportingAccess?: Prisma.MemberReportingAccessCreateNestedManyWithoutClientInput
 }
 
 export type ClientUncheckedCreateWithoutFoldersInput = {
@@ -1295,6 +1451,7 @@ export type ClientUncheckedCreateWithoutFoldersInput = {
   socialNetworks?: Prisma.SocialNetworkUncheckedCreateNestedManyWithoutClientInput
   manualEntries?: Prisma.ManualLedgerEntryUncheckedCreateNestedManyWithoutClientInput
   dimensionUpdates?: Prisma.DimensionUpdateUncheckedCreateNestedManyWithoutClientInput
+  memberReportingAccess?: Prisma.MemberReportingAccessUncheckedCreateNestedManyWithoutClientInput
 }
 
 export type ClientCreateOrConnectWithoutFoldersInput = {
@@ -1337,6 +1494,7 @@ export type ClientUpdateWithoutFoldersInput = {
   socialNetworks?: Prisma.SocialNetworkUpdateManyWithoutClientNestedInput
   manualEntries?: Prisma.ManualLedgerEntryUpdateManyWithoutClientNestedInput
   dimensionUpdates?: Prisma.DimensionUpdateUpdateManyWithoutClientNestedInput
+  memberReportingAccess?: Prisma.MemberReportingAccessUpdateManyWithoutClientNestedInput
 }
 
 export type ClientUncheckedUpdateWithoutFoldersInput = {
@@ -1363,6 +1521,7 @@ export type ClientUncheckedUpdateWithoutFoldersInput = {
   socialNetworks?: Prisma.SocialNetworkUncheckedUpdateManyWithoutClientNestedInput
   manualEntries?: Prisma.ManualLedgerEntryUncheckedUpdateManyWithoutClientNestedInput
   dimensionUpdates?: Prisma.DimensionUpdateUncheckedUpdateManyWithoutClientNestedInput
+  memberReportingAccess?: Prisma.MemberReportingAccessUncheckedUpdateManyWithoutClientNestedInput
 }
 
 export type ClientCreateWithoutSocialNetworksInput = {
@@ -1389,6 +1548,7 @@ export type ClientCreateWithoutSocialNetworksInput = {
   normalFiles?: Prisma.NormalFileCreateNestedManyWithoutClientInput
   manualEntries?: Prisma.ManualLedgerEntryCreateNestedManyWithoutClientInput
   dimensionUpdates?: Prisma.DimensionUpdateCreateNestedManyWithoutClientInput
+  memberReportingAccess?: Prisma.MemberReportingAccessCreateNestedManyWithoutClientInput
 }
 
 export type ClientUncheckedCreateWithoutSocialNetworksInput = {
@@ -1415,6 +1575,7 @@ export type ClientUncheckedCreateWithoutSocialNetworksInput = {
   normalFiles?: Prisma.NormalFileUncheckedCreateNestedManyWithoutClientInput
   manualEntries?: Prisma.ManualLedgerEntryUncheckedCreateNestedManyWithoutClientInput
   dimensionUpdates?: Prisma.DimensionUpdateUncheckedCreateNestedManyWithoutClientInput
+  memberReportingAccess?: Prisma.MemberReportingAccessUncheckedCreateNestedManyWithoutClientInput
 }
 
 export type ClientCreateOrConnectWithoutSocialNetworksInput = {
@@ -1457,6 +1618,7 @@ export type ClientUpdateWithoutSocialNetworksInput = {
   normalFiles?: Prisma.NormalFileUpdateManyWithoutClientNestedInput
   manualEntries?: Prisma.ManualLedgerEntryUpdateManyWithoutClientNestedInput
   dimensionUpdates?: Prisma.DimensionUpdateUpdateManyWithoutClientNestedInput
+  memberReportingAccess?: Prisma.MemberReportingAccessUpdateManyWithoutClientNestedInput
 }
 
 export type ClientUncheckedUpdateWithoutSocialNetworksInput = {
@@ -1483,6 +1645,7 @@ export type ClientUncheckedUpdateWithoutSocialNetworksInput = {
   normalFiles?: Prisma.NormalFileUncheckedUpdateManyWithoutClientNestedInput
   manualEntries?: Prisma.ManualLedgerEntryUncheckedUpdateManyWithoutClientNestedInput
   dimensionUpdates?: Prisma.DimensionUpdateUncheckedUpdateManyWithoutClientNestedInput
+  memberReportingAccess?: Prisma.MemberReportingAccessUncheckedUpdateManyWithoutClientNestedInput
 }
 
 export type ClientCreateWithoutNormalFilesInput = {
@@ -1509,6 +1672,7 @@ export type ClientCreateWithoutNormalFilesInput = {
   socialNetworks?: Prisma.SocialNetworkCreateNestedManyWithoutClientInput
   manualEntries?: Prisma.ManualLedgerEntryCreateNestedManyWithoutClientInput
   dimensionUpdates?: Prisma.DimensionUpdateCreateNestedManyWithoutClientInput
+  memberReportingAccess?: Prisma.MemberReportingAccessCreateNestedManyWithoutClientInput
 }
 
 export type ClientUncheckedCreateWithoutNormalFilesInput = {
@@ -1535,6 +1699,7 @@ export type ClientUncheckedCreateWithoutNormalFilesInput = {
   socialNetworks?: Prisma.SocialNetworkUncheckedCreateNestedManyWithoutClientInput
   manualEntries?: Prisma.ManualLedgerEntryUncheckedCreateNestedManyWithoutClientInput
   dimensionUpdates?: Prisma.DimensionUpdateUncheckedCreateNestedManyWithoutClientInput
+  memberReportingAccess?: Prisma.MemberReportingAccessUncheckedCreateNestedManyWithoutClientInput
 }
 
 export type ClientCreateOrConnectWithoutNormalFilesInput = {
@@ -1577,6 +1742,7 @@ export type ClientUpdateWithoutNormalFilesInput = {
   socialNetworks?: Prisma.SocialNetworkUpdateManyWithoutClientNestedInput
   manualEntries?: Prisma.ManualLedgerEntryUpdateManyWithoutClientNestedInput
   dimensionUpdates?: Prisma.DimensionUpdateUpdateManyWithoutClientNestedInput
+  memberReportingAccess?: Prisma.MemberReportingAccessUpdateManyWithoutClientNestedInput
 }
 
 export type ClientUncheckedUpdateWithoutNormalFilesInput = {
@@ -1603,6 +1769,7 @@ export type ClientUncheckedUpdateWithoutNormalFilesInput = {
   socialNetworks?: Prisma.SocialNetworkUncheckedUpdateManyWithoutClientNestedInput
   manualEntries?: Prisma.ManualLedgerEntryUncheckedUpdateManyWithoutClientNestedInput
   dimensionUpdates?: Prisma.DimensionUpdateUncheckedUpdateManyWithoutClientNestedInput
+  memberReportingAccess?: Prisma.MemberReportingAccessUncheckedUpdateManyWithoutClientNestedInput
 }
 
 export type ClientCreateWithoutComptableFilesInput = {
@@ -1629,6 +1796,7 @@ export type ClientCreateWithoutComptableFilesInput = {
   socialNetworks?: Prisma.SocialNetworkCreateNestedManyWithoutClientInput
   manualEntries?: Prisma.ManualLedgerEntryCreateNestedManyWithoutClientInput
   dimensionUpdates?: Prisma.DimensionUpdateCreateNestedManyWithoutClientInput
+  memberReportingAccess?: Prisma.MemberReportingAccessCreateNestedManyWithoutClientInput
 }
 
 export type ClientUncheckedCreateWithoutComptableFilesInput = {
@@ -1655,6 +1823,7 @@ export type ClientUncheckedCreateWithoutComptableFilesInput = {
   socialNetworks?: Prisma.SocialNetworkUncheckedCreateNestedManyWithoutClientInput
   manualEntries?: Prisma.ManualLedgerEntryUncheckedCreateNestedManyWithoutClientInput
   dimensionUpdates?: Prisma.DimensionUpdateUncheckedCreateNestedManyWithoutClientInput
+  memberReportingAccess?: Prisma.MemberReportingAccessUncheckedCreateNestedManyWithoutClientInput
 }
 
 export type ClientCreateOrConnectWithoutComptableFilesInput = {
@@ -1697,6 +1866,7 @@ export type ClientUpdateWithoutComptableFilesInput = {
   socialNetworks?: Prisma.SocialNetworkUpdateManyWithoutClientNestedInput
   manualEntries?: Prisma.ManualLedgerEntryUpdateManyWithoutClientNestedInput
   dimensionUpdates?: Prisma.DimensionUpdateUpdateManyWithoutClientNestedInput
+  memberReportingAccess?: Prisma.MemberReportingAccessUpdateManyWithoutClientNestedInput
 }
 
 export type ClientUncheckedUpdateWithoutComptableFilesInput = {
@@ -1723,6 +1893,7 @@ export type ClientUncheckedUpdateWithoutComptableFilesInput = {
   socialNetworks?: Prisma.SocialNetworkUncheckedUpdateManyWithoutClientNestedInput
   manualEntries?: Prisma.ManualLedgerEntryUncheckedUpdateManyWithoutClientNestedInput
   dimensionUpdates?: Prisma.DimensionUpdateUncheckedUpdateManyWithoutClientNestedInput
+  memberReportingAccess?: Prisma.MemberReportingAccessUncheckedUpdateManyWithoutClientNestedInput
 }
 
 export type ClientCreateWithoutDimensionUpdatesInput = {
@@ -1749,6 +1920,7 @@ export type ClientCreateWithoutDimensionUpdatesInput = {
   normalFiles?: Prisma.NormalFileCreateNestedManyWithoutClientInput
   socialNetworks?: Prisma.SocialNetworkCreateNestedManyWithoutClientInput
   manualEntries?: Prisma.ManualLedgerEntryCreateNestedManyWithoutClientInput
+  memberReportingAccess?: Prisma.MemberReportingAccessCreateNestedManyWithoutClientInput
 }
 
 export type ClientUncheckedCreateWithoutDimensionUpdatesInput = {
@@ -1775,6 +1947,7 @@ export type ClientUncheckedCreateWithoutDimensionUpdatesInput = {
   normalFiles?: Prisma.NormalFileUncheckedCreateNestedManyWithoutClientInput
   socialNetworks?: Prisma.SocialNetworkUncheckedCreateNestedManyWithoutClientInput
   manualEntries?: Prisma.ManualLedgerEntryUncheckedCreateNestedManyWithoutClientInput
+  memberReportingAccess?: Prisma.MemberReportingAccessUncheckedCreateNestedManyWithoutClientInput
 }
 
 export type ClientCreateOrConnectWithoutDimensionUpdatesInput = {
@@ -1817,6 +1990,7 @@ export type ClientUpdateWithoutDimensionUpdatesInput = {
   normalFiles?: Prisma.NormalFileUpdateManyWithoutClientNestedInput
   socialNetworks?: Prisma.SocialNetworkUpdateManyWithoutClientNestedInput
   manualEntries?: Prisma.ManualLedgerEntryUpdateManyWithoutClientNestedInput
+  memberReportingAccess?: Prisma.MemberReportingAccessUpdateManyWithoutClientNestedInput
 }
 
 export type ClientUncheckedUpdateWithoutDimensionUpdatesInput = {
@@ -1843,6 +2017,7 @@ export type ClientUncheckedUpdateWithoutDimensionUpdatesInput = {
   normalFiles?: Prisma.NormalFileUncheckedUpdateManyWithoutClientNestedInput
   socialNetworks?: Prisma.SocialNetworkUncheckedUpdateManyWithoutClientNestedInput
   manualEntries?: Prisma.ManualLedgerEntryUncheckedUpdateManyWithoutClientNestedInput
+  memberReportingAccess?: Prisma.MemberReportingAccessUncheckedUpdateManyWithoutClientNestedInput
 }
 
 export type ClientCreateWithoutComptablePeriodsInput = {
@@ -1869,6 +2044,7 @@ export type ClientCreateWithoutComptablePeriodsInput = {
   socialNetworks?: Prisma.SocialNetworkCreateNestedManyWithoutClientInput
   manualEntries?: Prisma.ManualLedgerEntryCreateNestedManyWithoutClientInput
   dimensionUpdates?: Prisma.DimensionUpdateCreateNestedManyWithoutClientInput
+  memberReportingAccess?: Prisma.MemberReportingAccessCreateNestedManyWithoutClientInput
 }
 
 export type ClientUncheckedCreateWithoutComptablePeriodsInput = {
@@ -1895,6 +2071,7 @@ export type ClientUncheckedCreateWithoutComptablePeriodsInput = {
   socialNetworks?: Prisma.SocialNetworkUncheckedCreateNestedManyWithoutClientInput
   manualEntries?: Prisma.ManualLedgerEntryUncheckedCreateNestedManyWithoutClientInput
   dimensionUpdates?: Prisma.DimensionUpdateUncheckedCreateNestedManyWithoutClientInput
+  memberReportingAccess?: Prisma.MemberReportingAccessUncheckedCreateNestedManyWithoutClientInput
 }
 
 export type ClientCreateOrConnectWithoutComptablePeriodsInput = {
@@ -1937,6 +2114,7 @@ export type ClientUpdateWithoutComptablePeriodsInput = {
   socialNetworks?: Prisma.SocialNetworkUpdateManyWithoutClientNestedInput
   manualEntries?: Prisma.ManualLedgerEntryUpdateManyWithoutClientNestedInput
   dimensionUpdates?: Prisma.DimensionUpdateUpdateManyWithoutClientNestedInput
+  memberReportingAccess?: Prisma.MemberReportingAccessUpdateManyWithoutClientNestedInput
 }
 
 export type ClientUncheckedUpdateWithoutComptablePeriodsInput = {
@@ -1963,6 +2141,7 @@ export type ClientUncheckedUpdateWithoutComptablePeriodsInput = {
   socialNetworks?: Prisma.SocialNetworkUncheckedUpdateManyWithoutClientNestedInput
   manualEntries?: Prisma.ManualLedgerEntryUncheckedUpdateManyWithoutClientNestedInput
   dimensionUpdates?: Prisma.DimensionUpdateUncheckedUpdateManyWithoutClientNestedInput
+  memberReportingAccess?: Prisma.MemberReportingAccessUncheckedUpdateManyWithoutClientNestedInput
 }
 
 export type ClientCreateWithoutManualEntriesInput = {
@@ -1989,6 +2168,7 @@ export type ClientCreateWithoutManualEntriesInput = {
   normalFiles?: Prisma.NormalFileCreateNestedManyWithoutClientInput
   socialNetworks?: Prisma.SocialNetworkCreateNestedManyWithoutClientInput
   dimensionUpdates?: Prisma.DimensionUpdateCreateNestedManyWithoutClientInput
+  memberReportingAccess?: Prisma.MemberReportingAccessCreateNestedManyWithoutClientInput
 }
 
 export type ClientUncheckedCreateWithoutManualEntriesInput = {
@@ -2015,6 +2195,7 @@ export type ClientUncheckedCreateWithoutManualEntriesInput = {
   normalFiles?: Prisma.NormalFileUncheckedCreateNestedManyWithoutClientInput
   socialNetworks?: Prisma.SocialNetworkUncheckedCreateNestedManyWithoutClientInput
   dimensionUpdates?: Prisma.DimensionUpdateUncheckedCreateNestedManyWithoutClientInput
+  memberReportingAccess?: Prisma.MemberReportingAccessUncheckedCreateNestedManyWithoutClientInput
 }
 
 export type ClientCreateOrConnectWithoutManualEntriesInput = {
@@ -2057,6 +2238,7 @@ export type ClientUpdateWithoutManualEntriesInput = {
   normalFiles?: Prisma.NormalFileUpdateManyWithoutClientNestedInput
   socialNetworks?: Prisma.SocialNetworkUpdateManyWithoutClientNestedInput
   dimensionUpdates?: Prisma.DimensionUpdateUpdateManyWithoutClientNestedInput
+  memberReportingAccess?: Prisma.MemberReportingAccessUpdateManyWithoutClientNestedInput
 }
 
 export type ClientUncheckedUpdateWithoutManualEntriesInput = {
@@ -2083,6 +2265,7 @@ export type ClientUncheckedUpdateWithoutManualEntriesInput = {
   normalFiles?: Prisma.NormalFileUncheckedUpdateManyWithoutClientNestedInput
   socialNetworks?: Prisma.SocialNetworkUncheckedUpdateManyWithoutClientNestedInput
   dimensionUpdates?: Prisma.DimensionUpdateUncheckedUpdateManyWithoutClientNestedInput
+  memberReportingAccess?: Prisma.MemberReportingAccessUncheckedUpdateManyWithoutClientNestedInput
 }
 
 export type ClientCreateManyCompanyInput = {
@@ -2127,6 +2310,7 @@ export type ClientUpdateWithoutCompanyInput = {
   socialNetworks?: Prisma.SocialNetworkUpdateManyWithoutClientNestedInput
   manualEntries?: Prisma.ManualLedgerEntryUpdateManyWithoutClientNestedInput
   dimensionUpdates?: Prisma.DimensionUpdateUpdateManyWithoutClientNestedInput
+  memberReportingAccess?: Prisma.MemberReportingAccessUpdateManyWithoutClientNestedInput
 }
 
 export type ClientUncheckedUpdateWithoutCompanyInput = {
@@ -2153,6 +2337,7 @@ export type ClientUncheckedUpdateWithoutCompanyInput = {
   socialNetworks?: Prisma.SocialNetworkUncheckedUpdateManyWithoutClientNestedInput
   manualEntries?: Prisma.ManualLedgerEntryUncheckedUpdateManyWithoutClientNestedInput
   dimensionUpdates?: Prisma.DimensionUpdateUncheckedUpdateManyWithoutClientNestedInput
+  memberReportingAccess?: Prisma.MemberReportingAccessUncheckedUpdateManyWithoutClientNestedInput
 }
 
 export type ClientUncheckedUpdateManyWithoutCompanyInput = {
@@ -2233,6 +2418,7 @@ export type ClientUpdateWithoutCreatedByInput = {
   socialNetworks?: Prisma.SocialNetworkUpdateManyWithoutClientNestedInput
   manualEntries?: Prisma.ManualLedgerEntryUpdateManyWithoutClientNestedInput
   dimensionUpdates?: Prisma.DimensionUpdateUpdateManyWithoutClientNestedInput
+  memberReportingAccess?: Prisma.MemberReportingAccessUpdateManyWithoutClientNestedInput
 }
 
 export type ClientUncheckedUpdateWithoutCreatedByInput = {
@@ -2259,6 +2445,7 @@ export type ClientUncheckedUpdateWithoutCreatedByInput = {
   socialNetworks?: Prisma.SocialNetworkUncheckedUpdateManyWithoutClientNestedInput
   manualEntries?: Prisma.ManualLedgerEntryUncheckedUpdateManyWithoutClientNestedInput
   dimensionUpdates?: Prisma.DimensionUpdateUncheckedUpdateManyWithoutClientNestedInput
+  memberReportingAccess?: Prisma.MemberReportingAccessUncheckedUpdateManyWithoutClientNestedInput
 }
 
 export type ClientUncheckedUpdateManyWithoutCreatedByInput = {
@@ -2303,6 +2490,7 @@ export type ClientUpdateWithoutModifiedByInput = {
   socialNetworks?: Prisma.SocialNetworkUpdateManyWithoutClientNestedInput
   manualEntries?: Prisma.ManualLedgerEntryUpdateManyWithoutClientNestedInput
   dimensionUpdates?: Prisma.DimensionUpdateUpdateManyWithoutClientNestedInput
+  memberReportingAccess?: Prisma.MemberReportingAccessUpdateManyWithoutClientNestedInput
 }
 
 export type ClientUncheckedUpdateWithoutModifiedByInput = {
@@ -2329,6 +2517,7 @@ export type ClientUncheckedUpdateWithoutModifiedByInput = {
   socialNetworks?: Prisma.SocialNetworkUncheckedUpdateManyWithoutClientNestedInput
   manualEntries?: Prisma.ManualLedgerEntryUncheckedUpdateManyWithoutClientNestedInput
   dimensionUpdates?: Prisma.DimensionUpdateUncheckedUpdateManyWithoutClientNestedInput
+  memberReportingAccess?: Prisma.MemberReportingAccessUncheckedUpdateManyWithoutClientNestedInput
 }
 
 export type ClientUncheckedUpdateManyWithoutModifiedByInput = {
@@ -2363,6 +2552,7 @@ export type ClientCountOutputType = {
   socialNetworks: number
   manualEntries: number
   dimensionUpdates: number
+  memberReportingAccess: number
 }
 
 export type ClientCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
@@ -2374,6 +2564,7 @@ export type ClientCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensions
   socialNetworks?: boolean | ClientCountOutputTypeCountSocialNetworksArgs
   manualEntries?: boolean | ClientCountOutputTypeCountManualEntriesArgs
   dimensionUpdates?: boolean | ClientCountOutputTypeCountDimensionUpdatesArgs
+  memberReportingAccess?: boolean | ClientCountOutputTypeCountMemberReportingAccessArgs
 }
 
 /**
@@ -2442,6 +2633,13 @@ export type ClientCountOutputTypeCountDimensionUpdatesArgs<ExtArgs extends runti
   where?: Prisma.DimensionUpdateWhereInput
 }
 
+/**
+ * ClientCountOutputType without action
+ */
+export type ClientCountOutputTypeCountMemberReportingAccessArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.MemberReportingAccessWhereInput
+}
+
 
 export type ClientSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
@@ -2471,6 +2669,7 @@ export type ClientSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs =
   socialNetworks?: boolean | Prisma.Client$socialNetworksArgs<ExtArgs>
   manualEntries?: boolean | Prisma.Client$manualEntriesArgs<ExtArgs>
   dimensionUpdates?: boolean | Prisma.Client$dimensionUpdatesArgs<ExtArgs>
+  memberReportingAccess?: boolean | Prisma.Client$memberReportingAccessArgs<ExtArgs>
   _count?: boolean | Prisma.ClientCountOutputTypeDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["client"]>
 
@@ -2550,6 +2749,7 @@ export type ClientInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs 
   socialNetworks?: boolean | Prisma.Client$socialNetworksArgs<ExtArgs>
   manualEntries?: boolean | Prisma.Client$manualEntriesArgs<ExtArgs>
   dimensionUpdates?: boolean | Prisma.Client$dimensionUpdatesArgs<ExtArgs>
+  memberReportingAccess?: boolean | Prisma.Client$memberReportingAccessArgs<ExtArgs>
   _count?: boolean | Prisma.ClientCountOutputTypeDefaultArgs<ExtArgs>
 }
 export type ClientIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
@@ -2577,6 +2777,7 @@ export type $ClientPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs
     socialNetworks: Prisma.$SocialNetworkPayload<ExtArgs>[]
     manualEntries: Prisma.$ManualLedgerEntryPayload<ExtArgs>[]
     dimensionUpdates: Prisma.$DimensionUpdatePayload<ExtArgs>[]
+    memberReportingAccess: Prisma.$MemberReportingAccessPayload<ExtArgs>[]
   }
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     id: string
@@ -3000,6 +3201,7 @@ export interface Prisma__ClientClient<T, Null = never, ExtArgs extends runtime.T
   socialNetworks<T extends Prisma.Client$socialNetworksArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Client$socialNetworksArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$SocialNetworkPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   manualEntries<T extends Prisma.Client$manualEntriesArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Client$manualEntriesArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$ManualLedgerEntryPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   dimensionUpdates<T extends Prisma.Client$dimensionUpdatesArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Client$dimensionUpdatesArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$DimensionUpdatePayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  memberReportingAccess<T extends Prisma.Client$memberReportingAccessArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Client$memberReportingAccessArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$MemberReportingAccessPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   /**
    * Attaches callbacks for the resolution and/or rejection of the Promise.
    * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -3649,6 +3851,30 @@ export type Client$dimensionUpdatesArgs<ExtArgs extends runtime.Types.Extensions
   take?: number
   skip?: number
   distinct?: Prisma.DimensionUpdateScalarFieldEnum | Prisma.DimensionUpdateScalarFieldEnum[]
+}
+
+/**
+ * Client.memberReportingAccess
+ */
+export type Client$memberReportingAccessArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the MemberReportingAccess
+   */
+  select?: Prisma.MemberReportingAccessSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the MemberReportingAccess
+   */
+  omit?: Prisma.MemberReportingAccessOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.MemberReportingAccessInclude<ExtArgs> | null
+  where?: Prisma.MemberReportingAccessWhereInput
+  orderBy?: Prisma.MemberReportingAccessOrderByWithRelationInput | Prisma.MemberReportingAccessOrderByWithRelationInput[]
+  cursor?: Prisma.MemberReportingAccessWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.MemberReportingAccessScalarFieldEnum | Prisma.MemberReportingAccessScalarFieldEnum[]
 }
 
 /**

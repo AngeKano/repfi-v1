@@ -70,6 +70,7 @@ export const PERMISSION_MATRIX: Record<
     [REPORTING_ACTIONS.MODIFIER]: true,
     [REPORTING_ACTIONS.SUPPRIMER]: true,
     [REPORTING_ACTIONS.EXPORTER]: true,
+    [REPORTING_ACTIONS.GERER_VISIBILITE]: true,
   },
 
   // ============================================
@@ -119,6 +120,7 @@ export const PERMISSION_MATRIX: Record<
     [REPORTING_ACTIONS.MODIFIER]: false,
     [REPORTING_ACTIONS.SUPPRIMER]: false,
     [REPORTING_ACTIONS.EXPORTER]: false,
+    [REPORTING_ACTIONS.GERER_VISIBILITE]: true,
   },
 
   // ============================================
@@ -168,6 +170,7 @@ export const PERMISSION_MATRIX: Record<
     [REPORTING_ACTIONS.MODIFIER]: false,
     [REPORTING_ACTIONS.SUPPRIMER]: false,
     [REPORTING_ACTIONS.EXPORTER]: true,
+    [REPORTING_ACTIONS.GERER_VISIBILITE]: true,
   },
 
   // ============================================
@@ -218,6 +221,7 @@ export const PERMISSION_MATRIX: Record<
     [REPORTING_ACTIONS.MODIFIER]: false,
     [REPORTING_ACTIONS.SUPPRIMER]: false,
     [REPORTING_ACTIONS.EXPORTER]: false,
+    [REPORTING_ACTIONS.GERER_VISIBILITE]: false,
   },
 
   // ============================================
@@ -267,6 +271,7 @@ export const PERMISSION_MATRIX: Record<
     [REPORTING_ACTIONS.MODIFIER]: false,
     [REPORTING_ACTIONS.SUPPRIMER]: false,
     [REPORTING_ACTIONS.EXPORTER]: false,
+    [REPORTING_ACTIONS.GERER_VISIBILITE]: false,
   },
 
   // ============================================
@@ -316,6 +321,7 @@ export const PERMISSION_MATRIX: Record<
     [REPORTING_ACTIONS.MODIFIER]: false,
     [REPORTING_ACTIONS.SUPPRIMER]: false,
     [REPORTING_ACTIONS.EXPORTER]: false,
+    [REPORTING_ACTIONS.GERER_VISIBILITE]: false,
   },
 };
 

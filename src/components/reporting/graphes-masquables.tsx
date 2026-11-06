@@ -9,6 +9,9 @@
 // ou masque chaque graphique ; le choix est mémorisé par onglet et par client
 // dans le navigateur, comme la configuration des KPI. On mémorise les
 // graphiques MASQUÉS : un graphique ajouté plus tard s'affiche par défaut.
+//
+// Avec l'onglet du catalogue, un graphique masqué à ce membre par un
+// administrateur (onglet Membres) n'est ni affiché ni proposé dans le menu.
 // ============================================================================
 import { useState } from "react";
 import type { ReactNode } from "react";
@@ -24,6 +27,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
+import type { OngletReportingId } from "@/lib/reporting/elements";
+import { useVisibilite } from "./visibilite";
 
 /** Graphique d'un onglet. */
 export interface GrapheDef {
@@ -63,8 +68,15 @@ function sauver(storageKey: string, masques: string[]) {
 /**
  * Graphiques masqués d'un onglet.
  * @param storageKey identifiant de persistance, unique par onglet et par client
+ * @param onglet onglet du catalogue des éléments de reporting
  */
-export function useGraphesMasques(storageKey: string, defs: GrapheDef[]): EtatGraphes {
+export function useGraphesMasques(
+  storageKey: string,
+  defs: GrapheDef[],
+  onglet?: OngletReportingId,
+): EtatGraphes {
+  const { estVisible } = useVisibilite();
+  const permis = (id: string) => !onglet || estVisible(onglet, "graphe", id);
   // État indexé par clé : un même composant sert plusieurs onglets (la clé
   // change avec l'onglet affiché, le composant reste monté).
   const [parCle, setParCle] = useState<Record<string, string[]>>({});
@@ -76,8 +88,8 @@ export function useGraphesMasques(storageKey: string, defs: GrapheDef[]): EtatGr
   };
 
   return {
-    defs,
-    masques,
+    defs: defs.filter((d) => permis(d.id)),
+    masques: [...masques, ...defs.filter((d) => !permis(d.id)).map((d) => d.id)],
     basculer: (id) =>
       enregistrer(masques.includes(id) ? masques.filter((x) => x !== id) : [...masques, id]),
     toutAfficher: () => enregistrer([]),

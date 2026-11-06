@@ -188,7 +188,7 @@ export default function ClientRatiosTab({
   const [loading, setLoading] = useState(true);
   const [serieBfr, setSerieBfr] = useState<string>("bfrGlobal");
   // Graphiques masqués de l'onglet, mémorisés par client.
-  const graphes = useGraphesMasques(`ratios-${clientId}`, GRAPHES);
+  const graphes = useGraphesMasques(`ratios-${clientId}`, GRAPHES, "ratios");
 
   // Les ratios bilantiels sont des encours : toujours cumulés depuis janvier.
   const moisFin = cumulGranularity === "annee" ? "12" : selectedMonth;
@@ -371,6 +371,7 @@ export default function ClientRatiosTab({
 
       <KpiGrid
         storageKey={`ratios-${clientId}`}
+        onglet="ratios"
         defs={KPI_DEFS}
         values={kpiValues}
         columns={2}

@@ -45,6 +45,8 @@ model User {
   modifiedClients   Client[]           @relation("ClientModifier")
   comptableFiles    ComptableFile[]    @relation("ComptableFileUploader")
   dimensionUpdates  DimensionUpdate[]  @relation("DimensionUpdateUploader")
+  reportingAccess        MemberReportingAccess[] @relation("ReportingAccessMember")
+  reportingAccessUpdates MemberReportingAccess[] @relation("ReportingAccessUpdater")
   folders           Folder[]           @relation("FolderCreator")
   normalFiles       NormalFile[]       @relation("NormalFileUploader")
   company           Company            @relation(fields: [companyId], references: [id], onDelete: Cascade)
@@ -86,6 +88,7 @@ model Client {
   socialNetworks   SocialNetwork[]
   manualEntries    ManualLedgerEntry[]
   dimensionUpdates DimensionUpdate[]
+  memberReportingAccess MemberReportingAccess[]
 
   @@index([companyId])
   @@index([isSelfEntity])
@@ -107,6 +110,27 @@ model ClientAssignment {
   @@index([clientId])
   @@index([role])
   @@map("client_assignments")
+}
+
+// Éléments du reporting masqués à un membre sur un dossier (identifiants du
+// catalogue src/lib/reporting/elements.ts). Sans ligne, le membre voit tout ce
+// que son rôle autorise. Indépendant de l'assignation : les rôles qui voient tous
+// les dossiers y restent soumis, même sans être assignés.
+model MemberReportingAccess {
+  id             String   @id @default(cuid())
+  clientId       String
+  userId         String
+  hiddenElements String[]
+  updatedById    String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  client         Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  user           User     @relation("ReportingAccessMember", fields: [userId], references: [id], onDelete: Cascade)
+  updatedBy      User?    @relation("ReportingAccessUpdater", fields: [updatedById], references: [id], onDelete: SetNull)
+
+  @@unique([clientId, userId])
+  @@index([userId])
+  @@map("member_reporting_access")
 }
 
 model Folder {

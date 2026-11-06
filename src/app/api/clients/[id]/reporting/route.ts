@@ -3,6 +3,8 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import { createClient as createClickhouseClient } from "@clickhouse/client";
 import { prisma } from "@/lib/prisma";
+import { accesReporting } from "@/lib/reporting/acces";
+import { filtrerReponse, CHAMPS_REPORTING } from "@/lib/reporting/champs-proteges";
 import { manualBatchId } from "@/lib/clickhouse/manual-sync";
 import {
   CA_RUBRIQUES,
@@ -1166,6 +1168,8 @@ export async function GET(
         { status: 403 },
       );
     }
+    const acces = await accesReporting(id, session.user);
+    if (acces instanceof NextResponse) return acces;
 
     const dbName = getClickhouseDbName(id);
 
@@ -1619,7 +1623,7 @@ export async function GET(
       // CA par Nature — détail des comptes TC
       const caParNature = await recupererCAParNature(dbName, batchIds, batchIdsN1, periodType, selectedMonth ?? undefined);
 
-      return NextResponse.json({
+      return NextResponse.json(filtrerReponse({
         client: { id: client.id, name: client.name, assujettiTVA: client.assujettiTVA },
         year,
         yearN1: yearN1.toString(),
@@ -1642,7 +1646,7 @@ export async function GET(
         },
         topClients,
         caParNature,
-      });
+      }, CHAMPS_REPORTING, acces.masques));
     }
 
     // ========================================================================
@@ -1897,7 +1901,7 @@ export async function GET(
     // CA par Nature — détail des comptes TC
     const caParNature = await recupererCAParNature(dbName, batchIds, batchIdsN1, periodType, selectedMonth ?? undefined);
 
-    return NextResponse.json({
+    return NextResponse.json(filtrerReponse({
       client: { id: client.id, name: client.name, assujettiTVA: client.assujettiTVA },
       year,
       yearN1: yearN1.toString(),
@@ -1916,7 +1920,7 @@ export async function GET(
       indicateurs: { anneeN: indicateursN, anneeN1: indicateursN1, variations },
       topClients,
       caParNature,
-    });
+    }, CHAMPS_REPORTING, acces.masques));
   } catch (error) {
     console.error("Reporting API error:", error);
     return NextResponse.json(

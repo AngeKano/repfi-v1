@@ -1097,6 +1097,31 @@ tableau Top 10 Clients n'ont pas de graphique à masquer.
 
 > `src/components/reporting/graphes-masquables.tsx`
 
+### Visibilité par membre
+
+« Configurer les KPIs » et « Graphiques » sont des **préférences d'affichage**, dans
+le navigateur. La **visibilité par membre** est un **droit**, défini par un
+administrateur et appliqué par le serveur.
+
+| Règle | Détail |
+|---|---|
+| Par défaut | Un membre qui a accès au dossier voit tout ce que son rôle autorise. Seul ce qui lui est **masqué** est enregistré : un élément ajouté plus tard est visible |
+| Qui décide | Droit `reporting:gerer_visibilite` : ADMIN_ROOT, ADMIN_CF, ADMIN_PARTENAIRE, sur un rôle de **niveau inférieur** au sien (ni soi-même, ni un pair, ni un supérieur). L'Administrateur Principal n'est jamais restreint |
+| Portée | Un membre, un dossier. Retirer un membre du dossier ne supprime pas ses restrictions ; elles s'appliquent aussi aux rôles qui voient tous les dossiers sans y être assignés |
+| Granularité | 80 éléments sur 11 onglets : KPI, graphiques, tableaux, commentaires du Bilan d'activité. Un onglet sans élément visible disparaît de la navigation |
+| À l'écran | L'élément masqué n'est ni affiché, ni proposé dans « Configurer les KPIs » ou « Graphiques », ni exporté. Le membre voit une mention : des éléments lui sont masqués |
+| Côté serveur | Un champ de réponse d'API est **neutralisé** (nombre → 0, texte → vide, liste → vide) dès que **tous** les éléments qui l'affichent sont masqués. Il reste envoyé si un autre élément visible l'utilise. La forme de la réponse ne change pas |
+| Cas particuliers | `/reporting/charges` : 403 si « Charges et rentabilité » est masqué. `/reporting/qc` : 403 dès qu'un élément est masqué. Le total des Dettes court terme garde ses composantes tant qu'il est visible |
+| Limite | Le grand livre n'est pas concerné : un rôle qui a accès à la Comptabilité peut y lire les écritures et en déduire un montant masqué. VIEWER n'y a pas accès |
+
+Tout KPI, graphique ou tableau ajouté se déclare dans le catalogue, et ses champs
+d'API dans les règles de protection.
+
+> `src/lib/reporting/elements.ts` (catalogue), `src/lib/reporting/champs-proteges.ts`
+> (champs des API), `src/lib/reporting/acces.ts` (contrôle serveur),
+> `src/components/reporting/visibilite.tsx` (écrans),
+> `src/app/clients/[id]/membres/` (onglet Membres)
+
 ---
 
 ## 24. Variations N vs N-1 & devise
@@ -1130,6 +1155,10 @@ simple (ses polices ne dessinent pas les autres).
 ## 25. Endpoints API & schémas de réponse
 
 Toutes les routes sont préfixées par `/api/clients/[id]`. En cas d'échec, elles renvoient `{ error }` avec le statut 400, 401, 403, 404, 409, 413, 500 ou 502 selon le cas.
+
+Toutes les routes `/reporting*` exigent le droit **Voir un rapport** et, pour un rôle
+qui ne voit pas tous les dossiers, une assignation au dossier (403 sinon). Leurs réponses
+tiennent compte des éléments masqués au membre (§23).
 
 ### 25.1 `GET /reporting`
 Synthèse du reporting (session requise) : KPI N et N-1, courbes, Top 10 clients et CA par nature.
@@ -1655,6 +1684,8 @@ DELETE → { ok, deleted, warning? }     // deleted = 1
 ```
 
 ### 25.15 `GET /saisie/export`
+Droit requis : Exporter fichiers finaux (`GET /saisie` : Voir fichiers chargés).
+
 Export Excel du grand livre de l'exercice (lignes importées et saisies), avec les mêmes filtres que la vue Saisie.
 
 | Paramètre | Type | Défaut | Effet |
@@ -1734,6 +1765,34 @@ Corps `{ batchId }`. Refuse (400) un lot sans Grand Livre, de plus de 4 fichiers
 { message, batchId, dagRunId, status: "PROCESSING", s3Prefix }
 ```
 
+### 25.21 `GET /membres`
+Onglet Membres du dossier. Droit requis : Voir les membres.
+
+```
+{
+  moi,                                       // id de l'utilisateur connecté
+  peutAssigner, peutRetirer, peutGerer,      // droits de l'utilisateur connecté
+  membres: [{
+    id, nom, email, role, actif,
+    assigne, assigneLe,                      // sinon : accès par son rôle (voit tous les dossiers)
+    voitReporting, peutFiltrer, peutExporter,  // matrice, pour le rôle de ce membre
+    peutRestreindre,                         // l'utilisateur connecté peut régler sa visibilité
+    masques,                                 // identifiants masqués ; null si l'utilisateur connecté n'est ni administrateur ni ce membre
+    modification: { le, par } | null
+  }],
+  disponibles: [{ id, nom, email, role, accesParRole }]   // membres actifs non assignés
+}
+```
+
+### 25.22 `PUT /membres/[userId]`
+Remplace les éléments masqués d'un membre. Droit requis : Définir les KPI et métriques
+visibles par membre, sur un rôle de niveau inférieur au sien (403 sinon).
+
+```
+Corps : { masques: string[] }     // identifiants du catalogue ; inconnu → 400 ; [] → tout redevient visible
+Réponse : { masques: string[] }
+```
+
 ---
 
 ## 26. Composition par onglet UI
@@ -1743,7 +1802,8 @@ les données de l'onglet affiché), identité du client, puis les onglets :
 **accordéon « Reporting financier »** (Synthèse financière → Bilan d'activité ;
 ouvert par défaut, replié d'un clic sur son en-tête), séparateur, **Membres**,
 **Import**, **Comptabilité**, **Autres fichiers**. Sous le titre de la page :
-**Retour aux clients** et la **devise** (FCFA, unité K FCFA).
+**Retour aux clients** et la **devise** (FCFA, unité K FCFA). Chaque membre ne voit
+que les onglets autorisés par son rôle et ceux dont il lui reste un élément visible (§23).
 
 | Onglet | Contenu principal |
 |---|---|
@@ -1758,6 +1818,7 @@ ouvert par défaut, replié d'un clic sur son en-tête), séparateur, **Membres*
 | Ratios bilantiels | FRNG, BFR (global, exploitation, HAO) |
 | États Financiers | Bilan et Compte de résultat (exercices comparés), Compte d'exploitation (mois importés jusqu'au mois du filtre + total), export PDF / Excel |
 | Bilan d'activité | Lecture narrative de l'exercice |
+| Membres | Membres du dossier et accès : assignation, visibilité du reporting par membre, droits par rôle, le tout dans des fenêtres (§23) |
 | Import | Fichiers comptables, mise à jour des référentiels et historique |
 | Comptabilité | Grand livre (saisie) et Tables de dimension |
 
@@ -1836,6 +1897,7 @@ ouvert par défaut, replié d'un clic sur son en-tête), séparateur, **Membres*
 | 02/11/2026 | **Filtres partagés — correction** : en mode Périodique, le choix de granularité (Mois / Année) était aussitôt annulé par le garde-fou du 27/10, qui alignait le calcul sur l'ancienne granularité ; les filtres restaient bloqués (sur l'année le plus souvent). Tout changement de mode ou de granularité met désormais à jour les deux ensemble, dans tous les onglets (§4). |
 | 04/11/2026 | **Séparateur de milliers visible partout** : les formats **K et M sont conservés** (« 12 222K », « 1 234M »), seul le séparateur change. `toLocaleString("fr-FR")` séparait par une espace fine (U+202F), presque invisible, et les axes des graphiques n'en avaient aucun (« 12222K ») : tous les affichages passent par `src/lib/nombres.ts` (espace insécable U+00A0) — KPI, tableaux, infobulles, axes, Bilan d'activité, Charges et rentabilité, États financiers, Comptabilité (y compris les champs Débit / Crédit hors frappe), compteurs de lignes, tailles de fichier, présentation, messages d'erreur de l'import. Export Excel du grand livre : Débit, Crédit et Solde au format `#,##0.00`, valeurs inchangées (§24). |
 | 04/11/2026 | Trésorerie › Trésorerie par comptes : badge **« en moins »** retiré, ainsi que la mention « (comptes « en moins » déduits) » de la ligne Total. Le calcul ne change pas (§11). |
+| 06/11/2026 | **Accès au reporting par membre** : dans l'onglet **Membres** du dossier, un administrateur définit quels KPI, graphiques, tableaux et commentaires (80 éléments, 11 onglets) un collaborateur ne voit pas, dans une fenêtre, sans changer de page. Par défaut tout est visible. Un élément masqué disparaît de l'écran, des menus de configuration et des exports, et son montant n'est plus envoyé par l'API (§23). L'**ancienne page d'assignation est supprimée** : assigner et retirer se font dans le même onglet. **Matrice des droits** : nouveau droit « Définir les KPI et métriques visibles par membre » (administrateurs) ; les droits existants ne changent pas, mais plusieurs n'étaient pas appliqués et le sont désormais : Voir le reporting (LOADER n'y a plus accès, écran et API), Exporter un rapport (Télécharger des États financiers réservé à ADMIN_ROOT et ADMIN_PARTENAIRE), Voir les fichiers et Exporter les fichiers finaux (VIEWER ne lit plus le grand livre), Voir les membres. Document **« Accès »** : `docs/acces.pdf`, généré depuis le code par `npm run docs:acces`. Nouvelle table `member_reporting_access` (§25.21, §25.22). |
 
 ---
 

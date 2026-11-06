@@ -60,6 +60,11 @@ export type Client = Prisma.ClientModel
  */
 export type ClientAssignment = Prisma.ClientAssignmentModel
 /**
+ * Model MemberReportingAccess
+ * 
+ */
+export type MemberReportingAccess = Prisma.MemberReportingAccessModel
+/**
  * Model Folder
  * 
  */

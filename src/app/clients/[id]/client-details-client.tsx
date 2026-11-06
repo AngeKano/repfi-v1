@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   ReportingParamsDialog,
@@ -17,8 +17,8 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Edit,
   Trash2,
+  EyeOff,
   Users,
-  UserPlus,
   Plus,
   RefreshCw,
   ChevronLeft,
@@ -54,6 +54,9 @@ import ClientRatiosTab from "@/components/reporting/client-ratios-tab";
 import ClientDettesFinancieresTab from "@/components/reporting/client-dettes-financieres-tab";
 import ClientBilanTab from "@/components/reporting/client-bilan-tab";
 import ClientEtatsFinanciersTab from "@/components/reporting/client-etats-financiers-tab";
+import { VisibiliteProvider } from "@/components/reporting/visibilite";
+import { ongletVisible } from "@/lib/reporting/elements";
+import { MembresTab } from "./membres";
 import { UploadFileDialog } from "./upload-file-dialog";
 import { ClientDetailsDialog } from "@/app/clients/client-details-dialog";
 import { DeleteClientDialog } from "@/app/clients/delete-client-dialog";
@@ -74,7 +77,12 @@ interface ClientDetailsClientProps {
   initialClient: any;
   canEdit: boolean;
   canDelete: boolean;
-  canAssignMembers: boolean;
+  canViewFiles: boolean;
+  canViewMembers: boolean;
+  canViewReporting: boolean;
+  canExportReporting: boolean;
+  /** Éléments du reporting masqués à ce membre sur ce dossier. */
+  masquesReporting: string[];
   hasReporting: boolean;
 }
 
@@ -141,7 +149,11 @@ export default function ClientDetailsClient({
   initialClient,
   canEdit,
   canDelete,
-  canAssignMembers,
+  canViewFiles,
+  canViewMembers,
+  canViewReporting,
+  canExportReporting,
+  masquesReporting,
   hasReporting,
 }: ClientDetailsClientProps) {
   const router = useRouter();
@@ -149,7 +161,24 @@ export default function ClientDetailsClient({
   const [client, setClient] = useState(initialClient);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [activeTab, setActiveTab] = useState("overview");
+  // Onglets proposés à ce membre : matrice des droits (reporting, membres), puis
+  // éléments masqués (un onglet sans aucun élément visible disparaît).
+  const ongletsPermis = useMemo(() => {
+    const masques = new Set(masquesReporting);
+    return CLIENT_TABS.filter((t) => {
+      if (GROUPE_REPORTING.has(t.id)) return canViewReporting && ongletVisible(t.id, masques);
+      if (t.id === "members") return canViewMembers;
+      return canViewFiles; // Import, Comptabilité, Autres fichiers
+    });
+  }, [masquesReporting, canViewReporting, canViewMembers, canViewFiles]);
+  // Premier onglet utilisable : celui qui s'ouvre, et le repli d'un onglet interdit.
+  const ongletParDefaut = (
+    ongletsPermis.find(
+      (t) =>
+        !DISABLED_TAB_IDS.has(t.id) && (hasReporting || !REPORTING_TAB_IDS.has(t.id)),
+    ) ?? CLIENT_TABS[0]
+  ).id;
+  const [activeTab, setActiveTab] = useState(ongletParDefaut);
   // Accordéon « Reporting financier » de la navigation : ouvert par défaut.
   const [reportingOuvert, setReportingOuvert] = useState(true);
   const [showUploadDialog, setShowUploadDialog] = useState(false);
@@ -261,7 +290,7 @@ export default function ClientDetailsClient({
   // on les ré-applique silencieusement à l'URL. Sinon, on ouvre la dialog.
   useEffect(() => {
     if (initialPeriodType) return;
-    if (!hasReporting) return;
+    if (!hasReporting || !canViewReporting) return;
     const stored = getStoredReportingParams(client.id);
     if (stored) {
       router.replace(`/clients/${client.id}?${stored}`);
@@ -271,7 +300,7 @@ export default function ClientDetailsClient({
     // On ne dépend pas de router/searchParams pour éviter de boucler
     // après le router.replace qui modifiera initialPeriodType au refresh.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [client.id, hasReporting, initialPeriodType]);
+  }, [client.id, hasReporting, canViewReporting, initialPeriodType]);
 
   const roleLabel = getRoleLabel(session.user.role);
   const roleBadgeVariant = getRoleBadgeVariant(session.user.role);
@@ -294,17 +323,17 @@ export default function ClientDetailsClient({
     }
   }, [activeTab, periodType, cumulGranularity]);
 
-  // Si l'utilisateur tente d'accéder à un onglet grisé (par exemple via
-  // l'URL), on le ramène automatiquement sur la Synthèse Financière.
+  // Si l'utilisateur tente d'accéder à un onglet grisé ou interdit (par exemple
+  // via l'URL), on le ramène automatiquement sur le premier onglet utilisable.
   useEffect(() => {
-    if (DISABLED_TAB_IDS.has(activeTab)) {
-      setActiveTab("overview");
-      return;
+    if (
+      DISABLED_TAB_IDS.has(activeTab) ||
+      (!hasReporting && REPORTING_TAB_IDS.has(activeTab)) ||
+      !ongletsPermis.some((t) => t.id === activeTab)
+    ) {
+      setActiveTab(ongletParDefaut);
     }
-    if (!hasReporting && REPORTING_TAB_IDS.has(activeTab)) {
-      setActiveTab("overview");
-    }
-  }, [hasReporting, activeTab]);
+  }, [hasReporting, activeTab, ongletsPermis, ongletParDefaut]);
 
   return (
     <DashboardLayout>
@@ -387,45 +416,49 @@ export default function ClientDetailsClient({
                 );
               };
 
-              const ongletsReporting = CLIENT_TABS.filter((t) => GROUPE_REPORTING.has(t.id));
-              const autresOnglets = CLIENT_TABS.filter((t) => !GROUPE_REPORTING.has(t.id));
+              const ongletsReporting = ongletsPermis.filter((t) => GROUPE_REPORTING.has(t.id));
+              const autresOnglets = ongletsPermis.filter((t) => !GROUPE_REPORTING.has(t.id));
               // Replié, l'en-tête signale qu'un onglet du groupe est affiché.
               const groupeActif = GROUPE_REPORTING.has(activeTab);
 
               return (
                 <>
-                  {/* Accordéon « Reporting financier » */}
-                  <button
-                    type="button"
-                    onClick={() => setReportingOuvert((o) => !o)}
-                    aria-expanded={reportingOuvert}
-                    aria-controls="nav-reporting-financier"
-                    className={`flex items-center gap-3 w-full px-4 py-3 rounded-lg text-left text-sm font-semibold transition-colors ${
-                      !reportingOuvert && groupeActif
-                        ? "bg-[#EBF5FF] text-[#0077C3]"
-                        : "text-[#00122E] hover:bg-[#EBF5FF] hover:text-[#0077C3]"
-                    }`}
-                  >
-                    <PiPresentationChartDuotone className="w-5 h-5 shrink-0" />
-                    <span className="flex-1">Reporting financier</span>
-                    <ChevronDown
-                      className={`w-4 h-4 shrink-0 transition-transform duration-200 ${reportingOuvert ? "rotate-180" : ""}`}
-                    />
-                  </button>
-                  <div
-                    id="nav-reporting-financier"
-                    className={`grid transition-[grid-template-rows] duration-200 ease-out ${
-                      reportingOuvert ? "grid-rows-[1fr]" : "grid-rows-[0fr]"
-                    }`}
-                  >
-                    <div className="overflow-hidden">
-                      <div className="ml-4 space-y-1 border-l border-[#D0E3F5] pl-2 py-1">
-                        {ongletsReporting.map((tab) => onglet(tab, true))}
+                  {ongletsReporting.length > 0 && (
+                    <>
+                    {/* Accordéon « Reporting financier » */}
+                    <button
+                      type="button"
+                      onClick={() => setReportingOuvert((o) => !o)}
+                      aria-expanded={reportingOuvert}
+                      aria-controls="nav-reporting-financier"
+                      className={`flex items-center gap-3 w-full px-4 py-3 rounded-lg text-left text-sm font-semibold transition-colors ${
+                        !reportingOuvert && groupeActif
+                          ? "bg-[#EBF5FF] text-[#0077C3]"
+                          : "text-[#00122E] hover:bg-[#EBF5FF] hover:text-[#0077C3]"
+                      }`}
+                    >
+                      <PiPresentationChartDuotone className="w-5 h-5 shrink-0" />
+                      <span className="flex-1">Reporting financier</span>
+                      <ChevronDown
+                        className={`w-4 h-4 shrink-0 transition-transform duration-200 ${reportingOuvert ? "rotate-180" : ""}`}
+                      />
+                    </button>
+                    <div
+                      id="nav-reporting-financier"
+                      className={`grid transition-[grid-template-rows] duration-200 ease-out ${
+                        reportingOuvert ? "grid-rows-[1fr]" : "grid-rows-[0fr]"
+                      }`}
+                    >
+                      <div className="overflow-hidden">
+                        <div className="ml-4 space-y-1 border-l border-[#D0E3F5] pl-2 py-1">
+                          {ongletsReporting.map((tab) => onglet(tab, true))}
+                        </div>
                       </div>
                     </div>
-                  </div>
 
-                  <div className="h-px bg-[#D0E3F5] my-2" />
+                    <div className="h-px bg-[#D0E3F5] my-2" />
+                    </>
+                  )}
 
                   {autresOnglets.map((tab) => onglet(tab, false))}
                 </>
@@ -489,7 +522,7 @@ export default function ClientDetailsClient({
 
             {/* Action buttons */}
             <div className="flex items-center justify-end gap-2 mb-6">
-              {hasReporting && (
+              {hasReporting && canViewReporting && (
                 <div
                   className="flex items-center gap-2 rounded-full border border-[#D0E3F5] px-4 h-9"
                   title="Inclure les écritures saisies de l'utilisateur dans tous les calculs du reporting (désactivé = masquées)"
@@ -537,6 +570,15 @@ export default function ClientDetailsClient({
               </Button>
             </div>
 
+            {/* Le membre sait que son administrateur a restreint son accès. */}
+            {GROUPE_REPORTING.has(activeTab) && masquesReporting.length > 0 && (
+              <p className="flex items-center gap-2 mb-4 text-xs text-[#335890]">
+                <EyeOff className="w-3.5 h-3.5 shrink-0" />
+                Certains éléments de ce dossier sont masqués pour votre profil par un administrateur.
+              </p>
+            )}
+
+            <VisibiliteProvider masques={masquesReporting} peutExporter={canExportReporting}>
             <div className="min-w-0" key={versionDonnees}>
               {/* Onglets financiers — instance unique pour préserver les filtres
                 entre Synthèse / Chiffres / Résultats. Recouvrement a ses
@@ -799,97 +841,7 @@ export default function ClientDetailsClient({
 
               {/* Members */}
               {activeTab === "members" && (
-                <Card className="p-6">
-                  <div className="flex items-center justify-between mb-4">
-                    <h2 className="text-lg font-semibold text-[#00122E]">
-                      Membres assignés
-                    </h2>
-                    {canAssignMembers && (
-                      <Link href={`/clients/${client.id}/assign`}>
-                        <Button size="sm" className="gap-2">
-                          <UserPlus className="w-4 h-4" />
-                          Gérer les membres
-                        </Button>
-                      </Link>
-                    )}
-                  </div>
-
-                  {client.assignedMembers &&
-                  client.assignedMembers.length > 0 ? (
-                    <div className="border border-[#D0E3F5] rounded-xl overflow-hidden">
-                      <table className="w-full">
-                        <thead>
-                          <tr className="border-b border-[#D0E3F5] bg-[#F5F9FF]">
-                            <th className="text-left px-4 py-3 text-xs font-semibold text-[#335890] uppercase">
-                              Membre
-                            </th>
-                            <th className="text-left px-4 py-3 text-xs font-semibold text-[#335890] uppercase">
-                              Email
-                            </th>
-                            <th className="text-left px-4 py-3 text-xs font-semibold text-[#335890] uppercase">
-                              Rôle
-                            </th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {client.assignedMembers.map(
-                            (member: any, idx: number) => (
-                              <tr
-                                key={member.id}
-                                className={`border-b border-[#D0E3F5] last:border-b-0 ${
-                                  idx % 2 === 0 ? "bg-white" : "bg-[#FAFCFF]"
-                                }`}
-                              >
-                                <td className="px-4 py-3">
-                                  <div className="flex items-center gap-3">
-                                    <div className="w-8 h-8 rounded-full bg-[#EBF5FF] flex items-center justify-center text-sm font-semibold text-[#0077C3]">
-                                      {member.firstName
-                                        ? member.firstName
-                                            .charAt(0)
-                                            .toUpperCase()
-                                        : member.email.charAt(0).toUpperCase()}
-                                    </div>
-                                    <span className="text-sm font-medium text-[#00122E]">
-                                      {member.firstName && member.lastName
-                                        ? `${member.firstName} ${member.lastName}`
-                                        : member.email}
-                                    </span>
-                                  </div>
-                                </td>
-                                <td className="px-4 py-3 text-sm text-[#335890]">
-                                  {member.email}
-                                </td>
-                                <td className="px-4 py-3">
-                                  <Badge
-                                    variant={
-                                      getRoleBadgeVariant(member.role) as any
-                                    }
-                                    className="text-xs"
-                                  >
-                                    {getRoleLabel(member.role)}
-                                  </Badge>
-                                </td>
-                              </tr>
-                            ),
-                          )}
-                        </tbody>
-                      </table>
-                    </div>
-                  ) : (
-                    <div className="text-center py-12">
-                      <Users className="w-12 h-12 text-[#D0E3F5] mx-auto mb-3" />
-                      <p className="text-[#335890]">Aucun membre assigné</p>
-                      {canAssignMembers && (
-                        <Link href={`/clients/${client.id}/assign`}>
-                          <Button variant="outline" className="mt-4 gap-2">
-                            <UserPlus className="w-4 h-4" />
-                            Assigner des membres
-                          </Button>
-                        </Link>
-                      )}
-                    </div>
-                  )}
-                </Card>
+                <MembresTab clientId={client.id} clientName={client.name} />
               )}
 
               {/* Reporting Financier */}
@@ -928,6 +880,7 @@ export default function ClientDetailsClient({
               {/* Files */}
               {activeTab === "files" && <FilesTabs clientId={client.id} />}
             </div>
+            </VisibiliteProvider>
           </div>
         </main>
       </div>

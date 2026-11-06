@@ -3,6 +3,8 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import { createClient as createClickhouseClient } from "@clickhouse/client";
 import { prisma } from "@/lib/prisma";
+import { accesReporting } from "@/lib/reporting/acces";
+import { filtrerReponse, CHAMPS_RECOUVREMENT } from "@/lib/reporting/champs-proteges";
 import { manualBatchIdsForYears } from "@/lib/clickhouse/manual-sync";
 import {
   creancesTTCSql,
@@ -289,6 +291,8 @@ export async function GET(
         { status: 403 },
       );
     }
+    const acces = await accesReporting(id, session.user);
+    if (acces instanceof NextResponse) return acces;
 
     const dbName = getClickhouseDbName(id);
 
@@ -423,7 +427,7 @@ export async function GET(
     );
     const partTop10 = topCreances.reduce((s, c) => s + c.pourcentageTotal, 0);
 
-    return NextResponse.json({
+    const reponse = {
       client: { id: client.id, name: client.name },
       endPeriod: `${endYear}-${endMonth.toString().padStart(2, "0")}`,
       endYear,
@@ -439,7 +443,8 @@ export async function GET(
       topCreances,
       totalCreances,
       partTop10,
-    });
+    };
+    return NextResponse.json(filtrerReponse(reponse, CHAMPS_RECOUVREMENT, acces.masques));
   } catch (error) {
     console.error("Recouvrement API error:", error);
     return NextResponse.json(

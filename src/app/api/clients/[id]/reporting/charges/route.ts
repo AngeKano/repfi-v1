@@ -13,6 +13,8 @@ import { getServerSession } from "next-auth";
 import { createClient as createClickhouseClient } from "@clickhouse/client";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import { prisma } from "@/lib/prisma";
+import { accesReporting } from "@/lib/reporting/acces";
+import { idElement } from "@/lib/reporting/elements";
 import { getClickhouseDbName, manualBatchId } from "@/lib/clickhouse/manual-sync";
 import { planComptesMap, intituleCompte } from "@/lib/clickhouse/plan-comptable";
 import { normalizeRef } from "@/lib/reporting/etats-financiers";
@@ -98,6 +100,10 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     if (!client) return NextResponse.json({ error: "Client non trouvé" }, { status: 404 });
     if (client.companyId !== session.user.companyId)
       return NextResponse.json({ error: "Accès non autorisé" }, { status: 403 });
+    const acces = await accesReporting(id, session.user);
+    if (acces instanceof NextResponse) return acces;
+    if (acces.masques.has(idElement("resultats", "graphe", "chargesRentabilite")))
+      return NextResponse.json({ error: "Élément masqué pour votre profil" }, { status: 403 });
 
     const { searchParams } = new URL(req.url);
     // Mêmes conventions que les autres onglets : « month » = le seul mois,

@@ -3,7 +3,13 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "../../api/auth/[...nextauth]/route";
 import { redirect } from "next/navigation";
 import { checkPermissionSync } from "@/lib/permissions/middleware";
-import { CLIENTS_ACTIONS } from "@/lib/permissions/actions";
+import {
+  CLIENTS_ACTIONS,
+  FICHIERS_ACTIONS,
+  MEMBRES_ACTIONS,
+  REPORTING_ACTIONS,
+} from "@/lib/permissions/actions";
+import { elementsMasques } from "@/lib/reporting/acces";
 
 import ClientDetailsClient from "./client-details-client";
 
@@ -125,9 +131,21 @@ export default async function ClientDetailsPage({
     session.user.role,
     CLIENTS_ACTIONS.DESACTIVER,
   );
-  const canAssignMembers = checkPermissionSync(
+  const canViewFiles = checkPermissionSync(
     session.user.role,
-    CLIENTS_ACTIONS.ASSIGNER_MEMBRE,
+    FICHIERS_ACTIONS.VOIR,
+  );
+  const canViewMembers = checkPermissionSync(
+    session.user.role,
+    MEMBRES_ACTIONS.VOIR,
+  );
+  const canViewReporting = checkPermissionSync(
+    session.user.role,
+    REPORTING_ACTIONS.VOIR,
+  );
+  const canExportReporting = checkPermissionSync(
+    session.user.role,
+    REPORTING_ACTIONS.EXPORTER,
   );
 
   // Si l'utilisateur ne peut pas voir tous les clients, verifier qu'il est assigne
@@ -151,10 +169,17 @@ export default async function ClientDetailsPage({
     where: { clientId: id, status: "COMPLETED" },
   });
 
-  // Formater les données pour le composant client
+  // Éléments du reporting masqués à ce membre sur ce dossier (onglet Membres).
+  const masquesReporting = canViewReporting
+    ? await elementsMasques(id, session.user)
+    : [];
+
+  // Formater les données pour le composant client. La liste des membres n'est
+  // transmise qu'aux rôles autorisés à la voir.
   const clientData = {
     ...client,
-    assignedMembers: client.assignments.map((a) => a.user),
+    assignments: canViewMembers ? client.assignments : [],
+    assignedMembers: canViewMembers ? client.assignments.map((a) => a.user) : [],
     recentFiles: client.normalFiles,
     stats: {
       totalFiles: client._count.normalFiles || 0,
@@ -169,7 +194,11 @@ export default async function ClientDetailsPage({
       initialClient={clientData}
       canEdit={canEdit}
       canDelete={canDelete}
-      canAssignMembers={canAssignMembers}
+      canViewFiles={canViewFiles}
+      canViewMembers={canViewMembers}
+      canViewReporting={canViewReporting}
+      canExportReporting={canExportReporting}
+      masquesReporting={masquesReporting}
       hasReporting={completedReportingCount > 0}
     />
   );

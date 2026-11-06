@@ -68,6 +68,7 @@ export const REPORTING_ACTIONS = {
   MODIFIER: "reporting:modifier",
   SUPPRIMER: "reporting:supprimer",
   EXPORTER: "reporting:exporter",
+  GERER_VISIBILITE: "reporting:gerer_visibilite",
 } as const;
 
 // ============================================
@@ -204,6 +205,7 @@ export const ACTION_LABELS: Record<PermissionAction, string> = {
   [REPORTING_ACTIONS.MODIFIER]: "Modifier un rapport/dashboard",
   [REPORTING_ACTIONS.SUPPRIMER]: "Supprimer un rapport/dashboard",
   [REPORTING_ACTIONS.EXPORTER]: "Exporter un rapport/dashboard",
+  [REPORTING_ACTIONS.GERER_VISIBILITE]: "Définir les KPI et métriques visibles par membre",
 
   // Saisie
   [SAISIE_ACTIONS.GERER]: "Saisir/éditer des lignes comptables",

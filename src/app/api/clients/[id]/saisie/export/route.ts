@@ -4,6 +4,8 @@ import * as XLSX from "xlsx";
 import { createClient as createClickhouseClient } from "@clickhouse/client";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import { prisma } from "@/lib/prisma";
+import { requirePermission } from "@/lib/permissions";
+import { FICHIERS_ACTIONS } from "@/lib/permissions/actions";
 import { getClickhouseDbName, manualBatchId } from "@/lib/clickhouse/manual-sync";
 import { FLAG_IMPORT, FLAG_SAISIE } from "@/lib/comptable/saisie-refs";
 import { bilanRefExpr } from "@/lib/clickhouse/schema";
@@ -60,6 +62,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user) return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
+    const perm = await requirePermission(FICHIERS_ACTIONS.EXPORTER_FINAUX);
+    if (perm instanceof NextResponse) return perm;
 
     const { id } = await params;
     const client = await prisma.client.findUnique({

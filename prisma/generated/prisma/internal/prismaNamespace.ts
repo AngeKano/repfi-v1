@@ -388,6 +388,7 @@ export const ModelName = {
   User: 'User',
   Client: 'Client',
   ClientAssignment: 'ClientAssignment',
+  MemberReportingAccess: 'MemberReportingAccess',
   Folder: 'Folder',
   SocialNetwork: 'SocialNetwork',
   NormalFile: 'NormalFile',
@@ -413,7 +414,7 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
     omit: GlobalOmitOptions
   }
   meta: {
-    modelProps: "company" | "user" | "client" | "clientAssignment" | "folder" | "socialNetwork" | "normalFile" | "comptableFile" | "normalFileHistory" | "comptableFileHistory" | "dimensionUpdate" | "fileTypePattern" | "comptablePeriod" | "manualLedgerEntry"
+    modelProps: "company" | "user" | "client" | "clientAssignment" | "memberReportingAccess" | "folder" | "socialNetwork" | "normalFile" | "comptableFile" | "normalFileHistory" | "comptableFileHistory" | "dimensionUpdate" | "fileTypePattern" | "comptablePeriod" | "manualLedgerEntry"
     txIsolationLevel: TransactionIsolationLevel
   }
   model: {
@@ -710,6 +711,80 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
         count: {
           args: Prisma.ClientAssignmentCountArgs<ExtArgs>
           result: runtime.Types.Utils.Optional<Prisma.ClientAssignmentCountAggregateOutputType> | number
+        }
+      }
+    }
+    MemberReportingAccess: {
+      payload: Prisma.$MemberReportingAccessPayload<ExtArgs>
+      fields: Prisma.MemberReportingAccessFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.MemberReportingAccessFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$MemberReportingAccessPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.MemberReportingAccessFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$MemberReportingAccessPayload>
+        }
+        findFirst: {
+          args: Prisma.MemberReportingAccessFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$MemberReportingAccessPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.MemberReportingAccessFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$MemberReportingAccessPayload>
+        }
+        findMany: {
+          args: Prisma.MemberReportingAccessFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$MemberReportingAccessPayload>[]
+        }
+        create: {
+          args: Prisma.MemberReportingAccessCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$MemberReportingAccessPayload>
+        }
+        createMany: {
+          args: Prisma.MemberReportingAccessCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.MemberReportingAccessCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$MemberReportingAccessPayload>[]
+        }
+        delete: {
+          args: Prisma.MemberReportingAccessDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$MemberReportingAccessPayload>
+        }
+        update: {
+          args: Prisma.MemberReportingAccessUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$MemberReportingAccessPayload>
+        }
+        deleteMany: {
+          args: Prisma.MemberReportingAccessDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.MemberReportingAccessUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.MemberReportingAccessUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$MemberReportingAccessPayload>[]
+        }
+        upsert: {
+          args: Prisma.MemberReportingAccessUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$MemberReportingAccessPayload>
+        }
+        aggregate: {
+          args: Prisma.MemberReportingAccessAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateMemberReportingAccess>
+        }
+        groupBy: {
+          args: Prisma.MemberReportingAccessGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.MemberReportingAccessGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.MemberReportingAccessCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.MemberReportingAccessCountAggregateOutputType> | number
         }
       }
     }
@@ -1559,6 +1634,19 @@ export const ClientAssignmentScalarFieldEnum = {
 export type ClientAssignmentScalarFieldEnum = (typeof ClientAssignmentScalarFieldEnum)[keyof typeof ClientAssignmentScalarFieldEnum]
 
 
+export const MemberReportingAccessScalarFieldEnum = {
+  id: 'id',
+  clientId: 'clientId',
+  userId: 'userId',
+  hiddenElements: 'hiddenElements',
+  updatedById: 'updatedById',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type MemberReportingAccessScalarFieldEnum = (typeof MemberReportingAccessScalarFieldEnum)[keyof typeof MemberReportingAccessScalarFieldEnum]
+
+
 export const FolderScalarFieldEnum = {
   id: 'id',
   name: 'name',
@@ -2020,6 +2108,7 @@ export type GlobalOmitConfig = {
   user?: Prisma.UserOmit
   client?: Prisma.ClientOmit
   clientAssignment?: Prisma.ClientAssignmentOmit
+  memberReportingAccess?: Prisma.MemberReportingAccessOmit
   folder?: Prisma.FolderOmit
   socialNetwork?: Prisma.SocialNetworkOmit
   normalFile?: Prisma.NormalFileOmit
