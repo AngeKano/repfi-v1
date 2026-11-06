@@ -141,7 +141,7 @@ export default function ClientDettesFinancieresTab({
   const [data, setData] = useState<RatiosData | null>(null);
   const [loading, setLoading] = useState(true);
   // Graphiques masqués de l'onglet, mémorisés par client.
-  const graphes = useGraphesMasques(`dettes-financieres-${clientId}`, GRAPHES);
+  const graphes = useGraphesMasques(`dettes-financieres-${clientId}`, GRAPHES, "dettes-fi");
 
   // Encours : toujours cumulé depuis janvier.
   const moisFin = cumulGranularity === "annee" ? "12" : selectedMonth;
@@ -321,6 +321,7 @@ export default function ClientDettesFinancieresTab({
 
       <KpiGrid
         storageKey={`dettes-financieres-${clientId}`}
+        onglet="dettes-fi"
         defs={KPI_DEFS}
         values={kpiValues}
         actions={<MenuGraphes etat={graphes} />}

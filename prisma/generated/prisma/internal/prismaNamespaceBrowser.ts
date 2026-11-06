@@ -55,6 +55,7 @@ export const ModelName = {
   User: 'User',
   Client: 'Client',
   ClientAssignment: 'ClientAssignment',
+  MemberReportingAccess: 'MemberReportingAccess',
   Folder: 'Folder',
   SocialNetwork: 'SocialNetwork',
   NormalFile: 'NormalFile',
@@ -148,6 +149,19 @@ export const ClientAssignmentScalarFieldEnum = {
 } as const
 
 export type ClientAssignmentScalarFieldEnum = (typeof ClientAssignmentScalarFieldEnum)[keyof typeof ClientAssignmentScalarFieldEnum]
+
+
+export const MemberReportingAccessScalarFieldEnum = {
+  id: 'id',
+  clientId: 'clientId',
+  userId: 'userId',
+  hiddenElements: 'hiddenElements',
+  updatedById: 'updatedById',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type MemberReportingAccessScalarFieldEnum = (typeof MemberReportingAccessScalarFieldEnum)[keyof typeof MemberReportingAccessScalarFieldEnum]
 
 
 export const FolderScalarFieldEnum = {

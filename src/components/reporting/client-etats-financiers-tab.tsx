@@ -32,6 +32,7 @@ import {
 import { PiScalesDuotone, PiChartDonutDuotone, PiTableDuotone } from "react-icons/pi";
 import { cn } from "@/lib/utils";
 import { formatNombre } from "@/lib/nombres";
+import { useVisibilite } from "./visibilite";
 import { toast } from "sonner";
 import {
   exporterEtatsExcel,
@@ -251,7 +252,14 @@ export default function ClientEtatsFinanciersTab({
   const [data, setData] = useState<EtatsData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [subTab, setSubTab] = useState<"bilan" | "resultat" | "exploitation">("bilan");
+  // Sous-onglets : ceux que l'administrateur n'a pas masqués à ce membre. Le
+  // téléchargement suit le droit d'export de la matrice et ces mêmes sous-onglets.
+  const { estVisible, peutExporter } = useVisibilite();
+  const voir = (id: string) => estVisible("etats", "tableau", id);
+  const sousOnglets = SUB_TABS.filter((t) => voir(t.id));
+  const [subTab, setSubTab] = useState<"bilan" | "resultat" | "exploitation">(
+    sousOnglets[0]?.id ?? "bilan",
+  );
   // Index de départ de la fenêtre de comparaison (2 exercices maximum).
   const [exOffset, setExOffset] = useState(0);
   const [showExport, setShowExport] = useState(false);
@@ -509,8 +517,10 @@ export default function ClientEtatsFinanciersTab({
     setExporting(true);
     try {
       // Le compte d'exploitation fait partie de l'export : on le charge s'il
-      // ne l'a pas encore été.
-      const exploitationExport = exploitationCourante?.data ?? (await chargerExploitation());
+      // ne l'a pas encore été. Un état masqué à ce membre n'est pas exporté.
+      const exploitationExport = voir("exploitation")
+        ? (exploitationCourante?.data ?? (await chargerExploitation()))
+        : null;
       const charge: EtatsExportData = {
         clientName: data.client.name,
         periodeLabel: periodLabel,
@@ -520,6 +530,8 @@ export default function ClientEtatsFinanciersTab({
         passif: data.passif,
         resultat: data.resultat,
         exploitation: exploitationExport,
+        avecBilan: voir("bilan"),
+        avecResultat: voir("resultat"),
       };
       // Les deux formats cochés produisent deux fichiers, l'un après l'autre.
       if (formats.includes("xlsx")) await exporterEtatsExcel(charge);
@@ -571,7 +583,7 @@ export default function ClientEtatsFinanciersTab({
 
       {/* Sous-onglets (même présentation que la section Paramètres) */}
       <div className="flex items-center gap-6 border-b border-[#D0E3F5]">
-        {SUB_TABS.map((tab) => {
+        {sousOnglets.map((tab) => {
           const active = subTab === tab.id;
           return (
             <button
@@ -597,16 +609,18 @@ export default function ClientEtatsFinanciersTab({
           <Badge variant="outline" className="text-xs">
             {data.manualIncluded ? "Saisies incluses" : "Saisies masquées"}
           </Badge>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setShowExport(true)}
-            className="gap-2 h-9 rounded-lg border-[#D0E3F5] text-[#335890] hover:bg-[#EBF5FF]"
-            title="Télécharger les états financiers"
-          >
-            <Download className="w-4 h-4" />
-            Télécharger
-          </Button>
+          {peutExporter && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowExport(true)}
+              className="gap-2 h-9 rounded-lg border-[#D0E3F5] text-[#335890] hover:bg-[#EBF5FF]"
+              title="Télécharger les états financiers"
+            >
+              <Download className="w-4 h-4" />
+              Télécharger
+            </Button>
+          )}
         </div>
       </div>
 
@@ -617,9 +631,15 @@ export default function ClientEtatsFinanciersTab({
           <DialogHeader>
             <DialogTitle>Télécharger les états financiers</DialogTitle>
             <DialogDescription>
-              Bilan (actif et passif) et compte de résultat, pour{" "}
-              {visibles.map((e) => e.label).join(" et ")} — période : {periodLabel} ; compte
-              d&apos;exploitation {year} ({libelleMoisDebut.toLowerCase()} → {libelleMoisFin.toLowerCase()} et total).
+              {[
+                voir("bilan") && "Bilan (actif et passif)",
+                voir("resultat") && "Compte de résultat",
+                voir("exploitation") &&
+                  `Compte d'exploitation ${year} (${libelleMoisDebut.toLowerCase()} → ${libelleMoisFin.toLowerCase()} et total)`,
+              ]
+                .filter(Boolean)
+                .join(", ")}{" "}
+              — exercices {visibles.map((e) => e.label).join(" et ")}, période : {periodLabel}.
             </DialogDescription>
           </DialogHeader>
           <div className="grid grid-cols-2 gap-3 pt-2">
@@ -627,7 +647,7 @@ export default function ClientEtatsFinanciersTab({
               {
                 id: "xlsx" as const,
                 label: "Excel",
-                detail: "4 onglets (.xlsx)",
+                detail: `${(voir("bilan") ? 2 : 0) + (voir("resultat") ? 1 : 0) + (voir("exploitation") ? 1 : 0)} onglet(s) (.xlsx)`,
                 icon: FileSpreadsheet,
                 color: "text-green-600",
               },

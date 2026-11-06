@@ -15,7 +15,7 @@
 const fs = require("fs");
 const os = require("os");
 const path = require("path");
-const { execFileSync } = require("child_process");
+const { imprimerPdf } = require("./chrome-pdf");
 
 const racine = path.resolve(__dirname, "..", "..");
 const entree = path.join(racine, "docs", "metrics.md");
@@ -190,39 +190,8 @@ ${out.join("\n")}
 }
 
 // ---------------------------------------------------------------------------
-// HTML → PDF (Chrome / Edge headless)
+// HTML → PDF
 // ---------------------------------------------------------------------------
-function trouverNavigateur() {
-  const candidats = [
-    process.env.CHROME_PATH,
-    "C:/Program Files/Google/Chrome/Application/chrome.exe",
-    "C:/Program Files (x86)/Google/Chrome/Application/chrome.exe",
-    process.env.LOCALAPPDATA && path.join(process.env.LOCALAPPDATA, "Google/Chrome/Application/chrome.exe"),
-    "C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe",
-    "C:/Program Files/Microsoft/Edge/Application/msedge.exe",
-    "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
-    "/usr/bin/google-chrome",
-    "/usr/bin/chromium",
-    "/usr/bin/chromium-browser",
-  ].filter(Boolean);
-  const trouve = candidats.find((c) => fs.existsSync(c));
-  if (!trouve) {
-    throw new Error("Chrome ou Edge introuvable : renseignez la variable CHROME_PATH.");
-  }
-  return trouve;
-}
-
 fs.writeFileSync(sortieHtml, versHtml(fs.readFileSync(entree, "utf8")), "utf8");
-execFileSync(
-  trouverNavigateur(),
-  [
-    "--headless=new",
-    "--disable-gpu",
-    "--no-pdf-header-footer",
-    "--virtual-time-budget=5000",
-    `--print-to-pdf=${sortiePdf}`,
-    `file:///${sortieHtml.replace(/\\/g, "/")}`,
-  ],
-  { stdio: "ignore" },
-);
+imprimerPdf(sortieHtml, sortiePdf);
 console.log(`PDF généré : ${path.relative(racine, sortiePdf)}`);

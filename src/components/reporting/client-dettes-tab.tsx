@@ -48,6 +48,7 @@ import {
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { formatCompactOnly, formatMillions } from "@/lib/nombres";
+import { useVisibilite } from "./visibilite";
 import { DetteTable } from "./dette-table";
 import { Graphe, MenuGraphes, useGraphesMasques, type GrapheDef } from "./graphes-masquables";
 
@@ -284,7 +285,8 @@ export default function ClientDettesTab({
   const [kpiEditMode, setKpiEditMode] = useState(false);
   const [kpiDragId, setKpiDragId] = useState<string | null>(null);
   // Graphiques masqués de l'onglet, mémorisés par client.
-  const graphes = useGraphesMasques(`dettes-${clientId}`, GRAPHES);
+  const graphes = useGraphesMasques(`dettes-${clientId}`, GRAPHES, "dettes");
+  const { estVisible } = useVisibilite();
 
   // Années proposées : celles d'un reporting importé (renvoyées par l'API).
   const yearOptions = useMemo(() => data?.availableYears ?? [year], [data, year]);
@@ -515,26 +517,28 @@ export default function ClientDettesTab({
       {/* KPIs configurables */}
       <div>
         <div className="flex items-center gap-2 mb-3">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setKpiEditMode(!kpiEditMode)}
-            className={cn(
-              "gap-2 h-9 rounded-lg transition-colors",
-              kpiEditMode
-                ? "bg-[#0077C3] text-white border-[#0077C3] hover:bg-[#005992]"
-                : "border-[#D0E3F5] text-[#335890] hover:bg-[#EBF5FF]",
-            )}
-          >
-            <PiGearDuotone className="w-4 h-4" />
-            {kpiEditMode ? "Terminer" : "Configurer les KPIs"}
-          </Button>
+          {kpiItems.some((k) => estVisible("dettes", "kpi", k.id)) && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setKpiEditMode(!kpiEditMode)}
+              className={cn(
+                "gap-2 h-9 rounded-lg transition-colors",
+                kpiEditMode
+                  ? "bg-[#0077C3] text-white border-[#0077C3] hover:bg-[#005992]"
+                  : "border-[#D0E3F5] text-[#335890] hover:bg-[#EBF5FF]",
+              )}
+            >
+              <PiGearDuotone className="w-4 h-4" />
+              {kpiEditMode ? "Terminer" : "Configurer les KPIs"}
+            </Button>
+          )}
           <MenuGraphes etat={graphes} />
         </div>
 
         <div className="grid grid-cols-3 gap-4">
           {kpiItems
-            .filter((k) => kpiEditMode || k.visible)
+            .filter((k) => estVisible("dettes", "kpi", k.id) && (kpiEditMode || k.visible))
             .map((kpi) => {
               const Icon = kpi.icon;
               const value = data.kpis[kpi.key];
@@ -770,16 +774,18 @@ export default function ClientDettesTab({
       </Graphe>
 
       {/* Tableau Top — par fournisseur */}
-      <DetteTable
-        title="Analyse des Dettes par Fournisseur — Top 10"
-        description="Fournisseurs avec les dettes les plus élevées — solde DJ hors 408/409 (dettes hors journaux de trésorerie − décaissements) ; % = part de toutes les dettes fournisseurs"
-        firstColLabel="Fournisseur"
-        icon={<PiWarningDuotone className="w-5 h-5 text-orange-500" />}
-        rows={data.topByFournisseur}
-        getSubLabel={(r) =>
-          (r as TopDetteFournisseur).numeroFournisseur ?? undefined
-        }
-      />
+      {estVisible("dettes", "tableau", "topFournisseurs") && (
+        <DetteTable
+          title="Analyse des Dettes par Fournisseur — Top 10"
+          description="Fournisseurs avec les dettes les plus élevées — solde DJ hors 408/409 (dettes hors journaux de trésorerie − décaissements) ; % = part de toutes les dettes fournisseurs"
+          firstColLabel="Fournisseur"
+          icon={<PiWarningDuotone className="w-5 h-5 text-orange-500" />}
+          rows={data.topByFournisseur}
+          getSubLabel={(r) =>
+            (r as TopDetteFournisseur).numeroFournisseur ?? undefined
+          }
+        />
+      )}
     </div>
   );
 }

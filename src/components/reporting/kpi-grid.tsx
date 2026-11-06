@@ -17,6 +17,8 @@ import { TrendingUp, TrendingDown, Minus, Eye, EyeOffIcon } from "lucide-react";
 import { PiGearDuotone } from "react-icons/pi";
 import { cn } from "@/lib/utils";
 import { formatCompactOnly, formatNombre } from "@/lib/nombres";
+import type { OngletReportingId } from "@/lib/reporting/elements";
+import { useVisibilite } from "./visibilite";
 
 /** Définition d'un indicateur : ce qui ne dépend pas des données. */
 export interface KpiDef {
@@ -124,6 +126,7 @@ export function KpiGrid({
   values,
   columns = 3,
   actions,
+  onglet,
 }: {
   /** Identifiant de persistance, unique par onglet et par client. */
   storageKey: string;
@@ -133,10 +136,14 @@ export function KpiGrid({
   columns?: 2 | 3 | 4;
   /** Boutons placés à côté de « Configurer les KPIs » (ex. menu Graphiques). */
   actions?: ReactNode;
+  /** Onglet du catalogue : les KPI masqués à ce membre ne sont jamais proposés. */
+  onglet?: OngletReportingId;
 }) {
   const [config, setConfig] = useState<KpiConfigItem[]>(() => loadConfig(storageKey, defs));
   const [editMode, setEditMode] = useState(false);
   const [dragId, setDragId] = useState<string | null>(null);
+  const { estVisible } = useVisibilite();
+  const permis = (id: string) => !onglet || estVisible(onglet, "kpi", id);
 
   const update = (items: KpiConfigItem[]) => {
     const reordonne = items.map((k, i) => ({ ...k, order: i }));
@@ -165,25 +172,27 @@ export function KpiGrid({
       return def ? { def, visible: c.visible } : null;
     })
     .filter((x): x is { def: KpiDef; visible: boolean } => x !== null)
-    .filter((x) => editMode || x.visible);
+    .filter((x) => permis(x.def.id) && (editMode || x.visible));
 
   return (
     <div>
       <div className="flex items-center gap-2 mb-3">
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => setEditMode(!editMode)}
-          className={cn(
-            "gap-2 h-9 rounded-lg transition-colors",
-            editMode
-              ? "bg-[#0077C3] text-white border-[#0077C3] hover:bg-[#005992]"
-              : "border-[#D0E3F5] text-[#335890] hover:bg-[#EBF5FF]",
-          )}
-        >
-          <PiGearDuotone className="w-4 h-4" />
-          {editMode ? "Terminer" : "Configurer les KPIs"}
-        </Button>
+        {defs.some((d) => permis(d.id)) && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setEditMode(!editMode)}
+            className={cn(
+              "gap-2 h-9 rounded-lg transition-colors",
+              editMode
+                ? "bg-[#0077C3] text-white border-[#0077C3] hover:bg-[#005992]"
+                : "border-[#D0E3F5] text-[#335890] hover:bg-[#EBF5FF]",
+            )}
+          >
+            <PiGearDuotone className="w-4 h-4" />
+            {editMode ? "Terminer" : "Configurer les KPIs"}
+          </Button>
+        )}
         {actions}
       </div>
 

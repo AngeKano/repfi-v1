@@ -3,6 +3,8 @@ import { getServerSession } from "next-auth";
 import { S3Client, GetObjectCommand } from "@aws-sdk/client-s3";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import { prisma } from "@/lib/prisma";
+import { requirePermission } from "@/lib/permissions";
+import { FICHIERS_ACTIONS } from "@/lib/permissions/actions";
 
 const s3Client = new S3Client({
   region: process.env.AWS_REGION!,
@@ -23,6 +25,8 @@ export async function GET(
     if (!session?.user) {
       return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
     }
+    const perm = await requirePermission(FICHIERS_ACTIONS.EXPORTER_FINAUX);
+    if (perm instanceof NextResponse) return perm;
 
     const period = await prisma.comptablePeriod.findFirst({
       where: {

@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import { createClient as createClickhouseClient } from "@clickhouse/client";
 import { prisma } from "@/lib/prisma";
+import { accesReporting } from "@/lib/reporting/acces";
 import { manualBatchId } from "@/lib/clickhouse/manual-sync";
 import {
   creancesTTCSql,
@@ -77,6 +78,12 @@ export async function GET(
     }
     if (client.companyId !== session.user.companyId) {
       return NextResponse.json({ error: "Accès non autorisé" }, { status: 403 });
+    }
+    const acces = await accesReporting(id, session.user);
+    if (acces instanceof NextResponse) return acces;
+    // Le contrôle porte sur tous les montants : aucun élément ne doit être masqué.
+    if (acces.masques.size > 0) {
+      return NextResponse.json({ error: "Éléments masqués pour votre profil" }, { status: 403 });
     }
 
     const dbName = getClickhouseDbName(id);

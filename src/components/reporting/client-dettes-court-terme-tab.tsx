@@ -19,6 +19,7 @@ import {
 } from "react-icons/pi";
 import { toast } from "sonner";
 import { DetteTable, type TopDette } from "./dette-table";
+import { useVisibilite } from "./visibilite";
 import { KpiGrid, type KpiDef, type KpiValue } from "./kpi-grid";
 
 type PeriodType = "year" | "month" | "ytd" | "ytd-day";
@@ -112,6 +113,7 @@ export default function ClientDettesCourtTermeTab({
 }: ClientDettesCourtTermeTabProps) {
   const [data, setData] = useState<DetteData | null>(null);
   const [loading, setLoading] = useState(true);
+  const { estVisible } = useVisibilite();
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -285,18 +287,21 @@ export default function ClientDettesCourtTermeTab({
       {/* KPI — grille partagée : 3 cartes par ligne, configurables. */}
       <KpiGrid
         storageKey={`dettes-ct-${clientId}`}
+        onglet="dettes-ct"
         defs={KPI_DEFS}
         values={kpiValues}
       />
 
       {/* Top 10 par type (déplacé depuis l'onglet Dettes) */}
-      <DetteTable
-        title="Analyse des Dettes par Type — Top 10"
-        description="Dettes regroupées par type (Solde = Dette − Remboursé)"
-        firstColLabel="Type de dette"
-        icon={<PiScalesDuotone className="w-5 h-5 text-orange-500" />}
-        rows={data.topByType}
-      />
+      {estVisible("dettes-ct", "tableau", "topTypes") && (
+        <DetteTable
+          title="Analyse des Dettes par Type — Top 10"
+          description="Dettes regroupées par type (Solde = Dette − Remboursé)"
+          firstColLabel="Type de dette"
+          icon={<PiScalesDuotone className="w-5 h-5 text-orange-500" />}
+          rows={data.topByType}
+        />
+      )}
     </div>
   );
 }

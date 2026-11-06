@@ -3,6 +3,8 @@ import { getServerSession } from "next-auth";
 import { createClient as createClickhouseClient } from "@clickhouse/client";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import { prisma } from "@/lib/prisma";
+import { accesReporting } from "@/lib/reporting/acces";
+import { filtrerReponse, CHAMPS_ETATS } from "@/lib/reporting/champs-proteges";
 import { getClickhouseDbName, manualBatchId } from "@/lib/clickhouse/manual-sync";
 import { bilanRefSql, bilanIncludeSql } from "@/lib/reporting/creances";
 import { bilanRefExpr } from "@/lib/clickhouse/schema";
@@ -60,6 +62,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     if (!client) return NextResponse.json({ error: "Client non trouvé" }, { status: 404 });
     if (client.companyId !== session.user.companyId)
       return NextResponse.json({ error: "Accès non autorisé" }, { status: 403 });
+    const acces = await accesReporting(id, session.user);
+    if (acces instanceof NextResponse) return acces;
 
     const { searchParams } = new URL(req.url);
     // Filtres partagés avec les autres onglets de reporting.
@@ -298,7 +302,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 
     const at = (arr: Record<string, number>[], ref: string) => arr.map((v) => v[ref] || 0);
 
-    return NextResponse.json({
+    const reponse = {
       client: { id: client.id, name: client.name },
       exercices,
       availableYears,
@@ -332,7 +336,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
         repere: l.repere ?? null,
         montants: at(resultatVals, l.ref),
       })),
-    });
+    };
+    return NextResponse.json(filtrerReponse(reponse, CHAMPS_ETATS, acces.masques));
   } catch (error) {
     console.error("États financiers error:", error);
     return NextResponse.json({ error: "Erreur lors du calcul des états financiers" }, { status: 500 });

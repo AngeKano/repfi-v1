@@ -3,6 +3,8 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import { createClient as createClickhouseClient } from "@clickhouse/client";
 import { prisma } from "@/lib/prisma";
+import { accesReporting } from "@/lib/reporting/acces";
+import { filtrerReponse, CHAMPS_DETTES } from "@/lib/reporting/champs-proteges";
 import { manualBatchIdsForYears } from "@/lib/clickhouse/manual-sync";
 import { bilanRefExpr } from "@/lib/clickhouse/schema";
 import { journauxTresorerie } from "@/lib/clickhouse/plan-comptable";
@@ -471,6 +473,8 @@ export async function GET(
     if (client.companyId !== session.user.companyId) {
       return NextResponse.json({ error: "Accès non autorisé" }, { status: 403 });
     }
+    const acces = await accesReporting(id, session.user);
+    if (acces instanceof NextResponse) return acces;
 
     const dbName = getClickhouseDbName(id);
     // Schéma fusionné (une seule colonne `rubrique`) ou schéma d'origine.
@@ -663,7 +667,7 @@ export async function GET(
       recupererTopParFournisseur(dbName, allBatchIds, startYM, endYM, refExpr, journaux),
     ]);
 
-    return NextResponse.json({
+    const reponse = {
       client: { id: client.id, name: client.name },
       endPeriod: `${endYear}-${endMonth.toString().padStart(2, "0")}`,
       endYear,
@@ -683,7 +687,8 @@ export async function GET(
       chartData: chartAffiche,
       topByType,
       topByFournisseur,
-    });
+    };
+    return NextResponse.json(filtrerReponse(reponse, CHAMPS_DETTES, acces.masques));
   } catch (error) {
     console.error("Dettes API error:", error);
     return NextResponse.json(

@@ -78,6 +78,8 @@ import {
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { formatAxeMontant, formatCompactOnly, formatMillions, formatNombre } from "@/lib/nombres";
+import type { OngletReportingId } from "@/lib/reporting/elements";
+import { useVisibilite } from "./visibilite";
 import ClientAnalyseCharges from "./client-analyse-charges";
 import { KpiGrid, type KpiDef, type KpiValue } from "./kpi-grid";
 import { Graphe, MenuGraphes, useGraphesMasques, type GrapheDef } from "./graphes-masquables";
@@ -264,6 +266,14 @@ const NAV_ITEMS: NavItem[] = [
   },
 ];
 
+
+// Onglet du catalogue des éléments de reporting, pour chaque onglet interne.
+const ONGLET_CATALOGUE: Record<string, OngletReportingId> = {
+  synthese: "overview",
+  "chiffre-affaires": "chiffres",
+  resultat: "resultats",
+  recouvrement: "recouvrement",
+};
 
 // Graphiques masquables de chaque onglet (menu « Graphiques »).
 const GRAPHES_PAR_ONGLET: Record<string, GrapheDef[]> = {
@@ -889,7 +899,9 @@ export default function ClientReportingChart({
   const graphes = useGraphesMasques(
     `${activeTab}-${clientId}`,
     GRAPHES_PAR_ONGLET[activeTab] ?? [],
+    ONGLET_CATALOGUE[activeTab],
   );
+  const { estVisible } = useVisibilite();
   const [resultatKpiDragId, setResultatKpiDragId] = useState<string | null>(
     null,
   );
@@ -2073,26 +2085,28 @@ export default function ClientReportingChart({
             {/* KPIs — configurable grid */}
             <div>
               <div className="flex items-center gap-2 mb-3">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setKpiEditMode(!kpiEditMode)}
-                  className={cn(
-                    "gap-2 h-9 rounded-lg transition-colors",
-                    kpiEditMode
-                      ? "bg-[#0077C3] text-white border-[#0077C3] hover:bg-[#005992]"
-                      : "border-[#D0E3F5] text-[#335890] hover:bg-[#EBF5FF]",
-                  )}
-                >
-                  <PiGearDuotone className="w-4 h-4" />
-                  {kpiEditMode ? "Terminer" : "Configurer les KPIs"}
-                </Button>
+                {kpiItems.some((k) => estVisible("overview", "kpi", k.id)) && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setKpiEditMode(!kpiEditMode)}
+                    className={cn(
+                      "gap-2 h-9 rounded-lg transition-colors",
+                      kpiEditMode
+                        ? "bg-[#0077C3] text-white border-[#0077C3] hover:bg-[#005992]"
+                        : "border-[#D0E3F5] text-[#335890] hover:bg-[#EBF5FF]",
+                    )}
+                  >
+                    <PiGearDuotone className="w-4 h-4" />
+                    {kpiEditMode ? "Terminer" : "Configurer les KPIs"}
+                  </Button>
+                )}
                 <MenuGraphes etat={graphes} />
               </div>
 
               <div className="grid grid-cols-3 gap-4">
                 {kpiItems
-                  .filter((k) => kpiEditMode || k.visible)
+                  .filter((k) => estVisible("overview", "kpi", k.id) && (kpiEditMode || k.visible))
                   .map((kpi) => {
                     const Icon = kpi.icon;
                     const valueN = data.indicateurs.anneeN[kpi.key] as number;
@@ -2294,6 +2308,7 @@ export default function ClientReportingChart({
                 couple Subventions d'exploitation (rubrique TG). */}
             <KpiGrid
               storageKey={`chiffre-affaires-${clientId}`}
+              onglet="chiffres"
               defs={caKpiDefs}
               values={caKpiValues}
               actions={<MenuGraphes etat={graphes} />}
@@ -2315,85 +2330,87 @@ export default function ClientReportingChart({
             </Graphe>
 
             {/* Top 10 Clients par CA */}
-            <Card>
-              <CardHeader>
-                <div className="flex items-center gap-2">
-                  <Trophy className="w-5 h-5 text-amber-500" />
-                  <div>
-                    <CardTitle>Top 10 Clients</CardTitle>
-                    <CardDescription>
-                      Clients avec le plus fort impact sur le chiffre
-                      d&apos;affaires
-                    </CardDescription>
+            {estVisible("chiffres", "tableau", "topClients") && (
+              <Card>
+                <CardHeader>
+                  <div className="flex items-center gap-2">
+                    <Trophy className="w-5 h-5 text-amber-500" />
+                    <div>
+                      <CardTitle>Top 10 Clients</CardTitle>
+                      <CardDescription>
+                        Clients avec le plus fort impact sur le chiffre
+                        d&apos;affaires
+                      </CardDescription>
+                    </div>
                   </div>
-                </div>
-              </CardHeader>
-              <CardContent>
-                {data.topClients && data.topClients.length > 0 ? (
-                  <div className="space-y-3">
-                    {data.topClients.map((client, index) => (
-                      <div
-                        key={client.numeroClient}
-                        className="flex items-center gap-4 p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors"
-                      >
-                        {/* Rang */}
+                </CardHeader>
+                <CardContent>
+                  {data.topClients && data.topClients.length > 0 ? (
+                    <div className="space-y-3">
+                      {data.topClients.map((client, index) => (
                         <div
-                          className={cn(
-                            "flex items-center justify-center w-8 h-8 rounded-full font-bold text-sm",
-                            index === 0 && "bg-amber-100 text-amber-700",
-                            index === 1 && "bg-gray-100 text-gray-600",
-                            index === 2 && "bg-orange-100 text-orange-700",
-                            index > 2 && "bg-blue-50 text-blue-600",
-                          )}
+                          key={client.numeroClient}
+                          className="flex items-center gap-4 p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors"
                         >
-                          {index + 1}
-                        </div>
+                          {/* Rang */}
+                          <div
+                            className={cn(
+                              "flex items-center justify-center w-8 h-8 rounded-full font-bold text-sm",
+                              index === 0 && "bg-amber-100 text-amber-700",
+                              index === 1 && "bg-gray-100 text-gray-600",
+                              index === 2 && "bg-orange-100 text-orange-700",
+                              index > 2 && "bg-blue-50 text-blue-600",
+                            )}
+                          >
+                            {index + 1}
+                          </div>
 
-                        {/* Icône entreprise et nom */}
-                        <div className="flex items-center gap-3 flex-1 min-w-0">
-                          <Building2 className="w-5 h-5 text-muted-foreground shrink-0" />
-                          <div className="min-w-0">
-                            <p className="font-medium truncate">
-                              {client.nomClient}
+                          {/* Icône entreprise et nom */}
+                          <div className="flex items-center gap-3 flex-1 min-w-0">
+                            <Building2 className="w-5 h-5 text-muted-foreground shrink-0" />
+                            <div className="min-w-0">
+                              <p className="font-medium truncate">
+                                {client.nomClient}
+                              </p>
+                              <p className="text-xs text-muted-foreground">
+                                {client.numeroClient}
+                              </p>
+                            </div>
+                          </div>
+
+                          {/* Montant et pourcentage */}
+                          <div className="text-right shrink-0">
+                            <p className="font-semibold text-blue-600">
+                              {formatCompactOnly(client.montantCA)}
                             </p>
                             <p className="text-xs text-muted-foreground">
-                              {client.numeroClient}
+                              {client.pourcentageCA.toFixed(1)}% du CA
                             </p>
                           </div>
-                        </div>
 
-                        {/* Montant et pourcentage */}
-                        <div className="text-right shrink-0">
-                          <p className="font-semibold text-blue-600">
-                            {formatCompactOnly(client.montantCA)}
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            {client.pourcentageCA.toFixed(1)}% du CA
-                          </p>
-                        </div>
-
-                        {/* Barre de progression */}
-                        <div className="w-24 shrink-0">
-                          <div className="h-2 bg-muted rounded-full overflow-hidden">
-                            <div
-                              className="h-full bg-blue-500 rounded-full transition-all"
-                              style={{
-                                width: `${Math.min(client.pourcentageCA, 100)}%`,
-                              }}
-                            />
+                          {/* Barre de progression */}
+                          <div className="w-24 shrink-0">
+                            <div className="h-2 bg-muted rounded-full overflow-hidden">
+                              <div
+                                className="h-full bg-blue-500 rounded-full transition-all"
+                                style={{
+                                  width: `${Math.min(client.pourcentageCA, 100)}%`,
+                                }}
+                              />
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
-                    <Building2 className="w-12 h-12 mb-2 opacity-20" />
-                    <p>Aucune donnée client disponible</p>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
+                      <Building2 className="w-12 h-12 mb-2 opacity-20" />
+                      <p>Aucune donnée client disponible</p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )}
           </div>
         );
       }
@@ -2404,26 +2421,28 @@ export default function ClientReportingChart({
             {/* KPIs Résultat — grille configurable */}
             <div>
               <div className="flex items-center gap-2 mb-3">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setResultatKpiEditMode(!resultatKpiEditMode)}
-                  className={cn(
-                    "gap-2 h-9 rounded-lg transition-colors",
-                    resultatKpiEditMode
-                      ? "bg-[#0077C3] text-white border-[#0077C3] hover:bg-[#005992]"
-                      : "border-[#D0E3F5] text-[#335890] hover:bg-[#EBF5FF]",
-                  )}
-                >
-                  <PiGearDuotone className="w-4 h-4" />
-                  {resultatKpiEditMode ? "Terminer" : "Configurer les KPIs"}
-                </Button>
+                {resultatKpiItems.some((k) => estVisible("resultats", "kpi", k.id)) && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setResultatKpiEditMode(!resultatKpiEditMode)}
+                    className={cn(
+                      "gap-2 h-9 rounded-lg transition-colors",
+                      resultatKpiEditMode
+                        ? "bg-[#0077C3] text-white border-[#0077C3] hover:bg-[#005992]"
+                        : "border-[#D0E3F5] text-[#335890] hover:bg-[#EBF5FF]",
+                    )}
+                  >
+                    <PiGearDuotone className="w-4 h-4" />
+                    {resultatKpiEditMode ? "Terminer" : "Configurer les KPIs"}
+                  </Button>
+                )}
                 <MenuGraphes etat={graphes} />
               </div>
 
               <div className="grid grid-cols-3 gap-4">
                 {resultatKpiItems
-                  .filter((k) => resultatKpiEditMode || k.visible)
+                  .filter((k) => estVisible("resultats", "kpi", k.id) && (resultatKpiEditMode || k.visible))
                   .map((kpi) => {
                     const Icon = kpi.icon;
                     const valueN = data.indicateurs.anneeN[kpi.key] as number;
@@ -2546,30 +2565,32 @@ export default function ClientReportingChart({
             {/* KPIs Recouvrement — grille configurable */}
             <div>
               <div className="flex items-center gap-2 mb-3">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() =>
-                    setRecouvrementKpiEditMode(!recouvrementKpiEditMode)
-                  }
-                  className={cn(
-                    "gap-2 h-9 rounded-lg transition-colors",
-                    recouvrementKpiEditMode
-                      ? "bg-[#0077C3] text-white border-[#0077C3] hover:bg-[#005992]"
-                      : "border-[#D0E3F5] text-[#335890] hover:bg-[#EBF5FF]",
-                  )}
-                >
-                  <PiGearDuotone className="w-4 h-4" />
-                  {recouvrementKpiEditMode
-                    ? "Terminer"
-                    : "Configurer les KPIs"}
-                </Button>
+                {recouvrementKpiItems.some((k) => estVisible("recouvrement", "kpi", k.id)) && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() =>
+                      setRecouvrementKpiEditMode(!recouvrementKpiEditMode)
+                    }
+                    className={cn(
+                      "gap-2 h-9 rounded-lg transition-colors",
+                      recouvrementKpiEditMode
+                        ? "bg-[#0077C3] text-white border-[#0077C3] hover:bg-[#005992]"
+                        : "border-[#D0E3F5] text-[#335890] hover:bg-[#EBF5FF]",
+                    )}
+                  >
+                    <PiGearDuotone className="w-4 h-4" />
+                    {recouvrementKpiEditMode
+                      ? "Terminer"
+                      : "Configurer les KPIs"}
+                  </Button>
+                )}
                 <MenuGraphes etat={graphes} />
               </div>
 
               <div className="grid grid-cols-3 gap-4">
                 {recouvrementKpiItems
-                  .filter((k) => recouvrementKpiEditMode || k.visible)
+                  .filter((k) => estVisible("recouvrement", "kpi", k.id) && (recouvrementKpiEditMode || k.visible))
                   .map((kpi) => {
                     const Icon = kpi.icon;
                     // Le DSO ne vient pas des totaux du recouvrement.
