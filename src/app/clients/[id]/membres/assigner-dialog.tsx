@@ -71,8 +71,9 @@ export function AssignerDialog({
         <DialogHeader>
           <DialogTitle>Assigner des membres</DialogTitle>
           <DialogDescription>
-            Sélectionnez les membres à assigner au dossier {clientName}. Ils voient tout le reporting
-            que leur rôle autorise, sauf ce qu&apos;un administrateur leur masque.
+            Sélectionnez les membres à assigner au dossier {clientName}. Les administrateurs y ont
+            accès d&apos;office ; LOADER, LOADER_PLUS et VIEWER ne voient que les dossiers qui leur
+            sont attribués.
           </DialogDescription>
         </DialogHeader>
 
@@ -90,7 +91,7 @@ export function AssignerDialog({
         <div className="space-y-2 max-h-80 overflow-y-auto">
           {liste.length === 0 ? (
             <p className="text-sm text-[#335890] text-center py-8">
-              {disponibles.length === 0 ? "Tous les membres sont déjà assignés." : "Aucun membre trouvé."}
+              {disponibles.length === 0 ? "Tous les membres à attribuer sont déjà assignés." : "Aucun membre trouvé."}
             </p>
           ) : (
             liste.map((m) => (

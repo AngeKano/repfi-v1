@@ -1,7 +1,8 @@
 // app/api/clients/[id]/membres/route.ts
 /**
- * Onglet Membres d'un dossier : qui y accède (assigné, ou par son rôle), et ce
- * que chacun voit du reporting.
+ * Onglet Membres d'un dossier : qui y accède et ce que chacun voit du reporting.
+ * Les administrateurs y figurent d'office (leur rôle voit tous les dossiers) ;
+ * LOADER, LOADER_PLUS et VIEWER seulement s'ils y sont assignés.
  * GET /api/clients/:id/membres
  */
 
@@ -72,12 +73,13 @@ export async function GET(
     for (const u of utilisateurs) {
       const roleMembre = getMappedRole(u.role);
       const assigneLe = assignes.get(u.id) ?? null;
-      const accesParRole = u.isActive && hasPermission(roleMembre, CLIENTS_ACTIONS.VOIR_TOUS);
+      const dOffice = hasPermission(roleMembre, CLIENTS_ACTIONS.VOIR_TOUS);
 
-      if (u.isActive && !assigneLe) {
-        disponibles.push({ id: u.id, nom: nomDe(u), email: u.email, role: u.role, accesParRole });
+      // Seuls les rôles qui ne voient pas tous les dossiers s'assignent.
+      if (u.isActive && !dOffice && !assigneLe) {
+        disponibles.push({ id: u.id, nom: nomDe(u), email: u.email, role: u.role });
       }
-      if (!assigneLe && !accesParRole) continue;
+      if (dOffice ? !u.isActive : !assigneLe) continue;
 
       const voitReporting = hasPermission(roleMembre, REPORTING_ACTIONS.VOIR);
       const a = accesParMembre.get(u.id);
@@ -89,7 +91,8 @@ export async function GET(
         email: u.email,
         role: u.role,
         actif: u.isActive,
-        assigne: !!assigneLe,
+        dOffice,
+        assigne: !dOffice && !!assigneLe,
         assigneLe: assigneLe ? assigneLe.toISOString() : null,
         voitReporting,
         peutFiltrer: hasPermission(roleMembre, REPORTING_ACTIONS.FILTRER),
@@ -105,8 +108,8 @@ export async function GET(
       });
     }
 
-    // Les membres assignés d'abord.
-    membres.sort((x, y) => Number(y.assigne) - Number(x.assigne));
+    // Les administrateurs (d'office) d'abord, puis les membres assignés.
+    membres.sort((x, y) => Number(y.dOffice) - Number(x.dOffice));
 
     const donnees: DonneesMembres = {
       moi: user.id,
