@@ -106,8 +106,9 @@ export const RUBRIQUES_TRESORERIE: string[] = [
  * Rubriques du Total Trésorerie. Sur ces rubriques, la somme des
  * (débit − crédit) de toutes les lignes est EXACTEMENT le Total Trésorerie :
  * dépréciations et concours bancaires y sont créditeurs, donc déjà en moins.
- * Sert au périmètre du détail par compte (chaque compte en débit − crédit, sa
- * contribution au Total) et à la trésorerie de la Synthèse.
+ * Sert au périmètre du détail par compte (dans la convention des indicateurs :
+ * actif en débit − crédit, passif en crédit − débit ; Total = actif − passif)
+ * et à la trésorerie de la Synthèse.
  */
 export const RUBRIQUES_TOTAL_TRESORERIE: string[] = TRESORERIE_KPIS[0].termes.map((t) => t.code);
 

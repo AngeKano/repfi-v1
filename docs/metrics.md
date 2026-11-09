@@ -613,15 +613,28 @@ détail par compte appliquent la même convention.
 ### Trésorerie par comptes
 
 Histogramme et tableau par compte sur **toutes les rubriques du Total**, chaque
-compte en `débit − crédit`, soit **sa contribution au Total** : un compte
-d'actif débiteur est positif, un découvert (passif) ou une dépréciation est
-négatif. La **somme de la colonne est le Total Trésorerie**, que reprend la
-ligne Total.
+compte dans la **convention des indicateurs**, pour que le tableau et les
+cartes se rejoignent :
 
-Les indicateurs gardent leur convention (§ Convention des soldes) : un compte
-de passif y est lu en `crédit − débit`. Exemple : 565000 (`DQ`), débiteur de
-1, vaut **+1** dans le tableau (il augmente la trésorerie) et **−1** dans
-« Autres Trésorerie Passif ».
+| Section | Rubriques | Solde d'un compte | Sous-total |
+|---|---|---|---|
+| Trésorerie actif | BS… (dépréciations BSB1, BSD1, BSE1 comprises) | `débit − crédit` : une dépréciation ou un compte créditeur est négatif | Total trésorerie actif |
+| Trésorerie passif | DRA, DRB, DRC, DQ | `crédit − débit`, comme « Autres Trésorerie Passif » : un compte débiteur est négatif | Total trésorerie passif |
+
+**Total Trésorerie (actif − passif)** = sous-total actif − sous-total passif,
+exactement l'indicateur, que la ligne reprend. Le sous-total passif égale
+« Autres Trésorerie Passif » quand les comptes de passif sont en DRC et DQ.
+Exemple : 565000 (`DQ`), débiteur de 1, vaut **−1** dans le tableau comme sur
+la carte, et le Total vaut l'actif + 1.
+
+Un compte qui a des lignes dans les deux sections y figure deux fois. Sans
+compte de passif, le tableau n'a pas de sections : les comptes, puis le Total,
+leur somme. L'histogramme montre les mêmes valeurs, comptes de passif en
+dernier, marqués « (passif) ».
+
+Un montant **négatif est en rouge** : barre rouge (foncée en N, claire en N-1)
+à gauche du zéro, marqué par une ligne verticale, avec une entrée « Négatif »
+dans la légende ; dans le tableau, montant N, N-1 ou Total en rouge.
 
 ### Filtres et fenêtre
 
@@ -1381,9 +1394,10 @@ Onglet Trésorerie : indicateurs calculés par rubrique et détail par compte, N
       // total = BSA + BSB − BSB1 + BSC + BSD − BSD1 + BSE − BSE1 + BSF + BSG − DRA − DRB − DRC − DQ
       // banque = BSB − BSB1 − DRA − DRB ; autresTresoreriePassif = DRC + DQ (montant positif)
   },
-  comptes: [{ compte, intituleCompte, montantN, montantN1, variation }]
-      // comptes des rubriques du Total Trésorerie, en débit − crédit (contribution au Total :
-      // découvert et dépréciation négatifs) ; Σ montantN = kpis.total.valeurN ;
+  comptes: [{ compte, intituleCompte, passif, montantN, montantN1, variation }]
+      // comptes des rubriques du Total Trésorerie ; passif = lignes en rubrique D… :
+      // actif en débit − crédit, passif en crédit − débit ;
+      // Σ actif − Σ passif = kpis.total.valeurN ; actif puis passif, chacun
       // tri par |montantN| décroissant ; comptes nuls sur N et N-1 exclus
 }
 ```
@@ -1932,6 +1946,8 @@ que les onglets autorisés par son rôle et ceux dont il lui reste un élément 
 | 09/11/2026 | **Droits de la matrice sur les fichiers et dossiers de « Autres fichiers », et attribution sur les pages d'import**, matrice inchangée. Six routes ne vérifiaient que la connexion : un VIEWER, qui n'a pas accès aux fichiers, listait, créait et renommait des sous-dossiers, suivait un import et téléchargeait un fichier importé sur ses dossiers attribués. Elles appliquent désormais le droit de la matrice (403 « Permission refusée » sinon) : **« Voir fichiers chargés »** pour lister les sous-dossiers, suivre l'état d'un import et télécharger un fichier importé ; **« Charger des fichiers »** pour créer ou renommer un sous-dossier. **Changement pour ADMIN_CF et ADMIN_PARTENAIRE**, qui voient les fichiers sans pouvoir en charger : ils ne créent ni ne renomment plus de sous-dossier (ils en suppriment toujours) ; l'écran concerné, l'onglet « Autres fichiers », est aujourd'hui désactivé. Les pages **Ajouter des documents**, **Modifier une période** et **Traitement du reporting** renvoient à la liste des clients un membre dont le dossier n'est pas attribué, comme la fiche du dossier. |
 | 09/11/2026 | **Membres : un administrateur ne modifie plus un pair de même rôle**, matrice inchangée. `PATCH /api/users/[id]` laissait passer toute cible du même rôle que l'utilisateur connecté : un ADMIN_CF remplaçait le mot de passe d'un autre ADMIN_CF de son entreprise, et de même entre deux ADMIN_ROOT ou deux ADMIN_PARTENAIRE. Un pair est désormais refusé (403), comme un rôle supérieur ; chacun garde la modification de **son propre profil**, quel que soit son rôle. Page Membres : le bouton « Modifier » n'apparaît plus sur la ligne d'un pair. Dans une entreprise qui a deux administrateurs de même rôle, seul un rôle supérieur modifie le profil de l'un ou de l'autre (§25.23). |
 | 09/11/2026 | Page Membres : la fenêtre **Nouveau membre / Modifier** passe **en trois étapes**, comme la création d'un client : **Identité** (email, nom, mot de passe), **Rôle**, **Dossiers** (avec récapitulatif). Indicateur d'étapes cliquable pour revenir à une étape remplie ; en modification, « Enregistrer » reste disponible à chaque étape (§25.23). |
+| 09/11/2026 | Trésorerie › Trésorerie par comptes : **montants négatifs en rouge**. Barre rouge pour un solde négatif (rouge foncé en N, clair en N-1, bleu sinon), ligne verticale au zéro et entrée « Négatif » dans la légende quand un compte est négatif ; dans le tableau, montants N, N-1 et Total négatifs en rouge. Calcul inchangé (§11). |
+| 09/11/2026 | Trésorerie › Trésorerie par comptes : **chaque compte dans la convention des indicateurs**, pour que tableau et cartes se rejoignent. Tableau en deux sections : **Trésorerie actif** (débit − crédit, dépréciation négative) avec son sous-total, **Trésorerie passif** (crédit − débit, comme « Autres Trésorerie Passif ») avec son sous-total, puis **Total Trésorerie (actif − passif)**, exactement l'indicateur. 565000 (`DQ`, débiteur de 1) vaut désormais **−1** dans le tableau comme sur la carte (il valait +1) ; le sous-total passif égale « Autres Trésorerie Passif » quand il n'y a que des rubriques DRC et DQ. Sans compte de passif, tableau inchangé (comptes puis Total). Histogramme : mêmes valeurs, comptes de passif en dernier, marqués « (passif) ». API : champ `passif` sur chaque compte (§11, §25.4). |
 
 ---
 

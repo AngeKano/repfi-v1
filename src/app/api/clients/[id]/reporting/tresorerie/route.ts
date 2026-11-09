@@ -6,9 +6,11 @@
 //
 // Indicateurs (soldeRubriqueSql) : actif en débit − crédit, dépréciations
 // (suffixe « 1 ») et passif en crédit − débit, retranchés dans les formules.
-// Détail par compte : débit − crédit pour tous, soit la contribution de chaque
-// compte au Total Trésorerie (un découvert ou une dépréciation est négatif) ;
-// la somme des comptes est exactement le Total.
+// Détail par compte, dans la convention des indicateurs : un compte de
+// trésorerie actif (BS…) en débit − crédit (une dépréciation est négative),
+// un compte de trésorerie passif (D…) en crédit − débit, comme « Autres
+// Trésorerie Passif ». Total Trésorerie = Σ comptes actif − Σ comptes passif,
+// exactement l'indicateur.
 // ============================================================================
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
@@ -55,9 +57,14 @@ interface RubriqueRow {
 }
 interface CompteRow {
   compte: string;
+  /** 1 : lignes en rubrique de trésorerie passif (D…). */
+  passif: number | string;
   intitule: string;
   solde: string;
 }
+
+/** Clé d'un compte du détail : un compte peut avoir des lignes actif et passif. */
+type CompteDetail = { compte: string; passif: boolean; intitule: string; solde: number };
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -139,7 +146,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       const batchIds = [...(batchsParAnnee.get(y) ?? [])];
       if (!client.excludeManualEntries) batchIds.push(manualBatchId(id, y));
       const rubriques: Record<string, number> = {};
-      const comptes = new Map<string, { intitule: string; solde: number }>();
+      const comptes = new Map<string, CompteDetail>();
       if (batchIds.length === 0) return { rubriques, comptes };
 
       const { start, end } = fenetre(y);
@@ -171,13 +178,14 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
           clickhouse.query({
             query: `
               SELECT compte,
+                     startsWith(${REF_EXPR}, 'D') AS passif,
                      anyIf(intitule_compte, intitule_compte != '') AS intitule,
-                     sum(debit - credit) AS solde
+                     if(passif, sum(credit - debit), sum(debit - credit)) AS solde
               FROM ${dbName}.grand_livre
               WHERE batch_id IN ({batchIds:Array(String)})
                 AND ${REF_EXPR} IN ({rubriques:Array(String)})
                 AND ${YM} >= {startYM:String} AND ${YM} <= {endYM:String}
-              GROUP BY compte
+              GROUP BY compte, passif
             `,
             query_params: qp,
             format: "JSONEachRow",
@@ -187,11 +195,15 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
           const code = (row.ref || "").trim().toUpperCase();
           rubriques[code] = (rubriques[code] || 0) + (parseFloat(row.solde) || 0);
         }
-        for (const row of (await cRes.json()) as CompteRow[])
-          comptes.set(row.compte, {
+        for (const row of (await cRes.json()) as CompteRow[]) {
+          const passif = Number(row.passif) === 1;
+          comptes.set(`${row.compte}|${passif ? "P" : "A"}`, {
+            compte: row.compte,
+            passif,
             intitule: intituleCompte(plan, row.compte, row.intitule),
             solde: parseFloat(row.solde) || 0,
           });
+        }
       } catch (e) {
         console.error(`[tresorerie] ClickHouse indisponible (exercice ${y}):`, e);
       }
@@ -208,25 +220,31 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       }),
     );
 
-    // Détail par compte : union des deux exercices, du plus gros solde au plus
-    // petit (un compte soldé à zéro sur les deux exercices est écarté).
+    // Détail par compte : union des deux exercices ; comptes actif puis
+    // comptes passif, chacun du plus gros solde au plus petit (un compte soldé
+    // à zéro sur les deux exercices est écarté).
     const tousComptes = new Set([...n.comptes.keys(), ...n1.comptes.keys()]);
     const comptes = [...tousComptes]
-      .map((compte) => {
-        const a = n.comptes.get(compte);
-        const b = n1.comptes.get(compte);
+      .map((cle) => {
+        const a = n.comptes.get(cle);
+        const b = n1.comptes.get(cle);
+        const { compte, passif } = (a ?? b)!;
         const montantN = a?.solde ?? 0;
         const montantN1 = b?.solde ?? 0;
         return {
           compte,
           intituleCompte: a?.intitule || b?.intitule || intituleCompte(plan, compte, ""),
+          passif,
           montantN,
           montantN1,
           variation: variation(montantN, montantN1),
         };
       })
       .filter((c) => c.montantN !== 0 || c.montantN1 !== 0)
-      .sort((x, y) => Math.abs(y.montantN) - Math.abs(x.montantN));
+      .sort(
+        (x, y) =>
+          Number(x.passif) - Number(y.passif) || Math.abs(y.montantN) - Math.abs(x.montantN),
+      );
 
     const reponse = {
       client: { id: client.id, name: client.name },
