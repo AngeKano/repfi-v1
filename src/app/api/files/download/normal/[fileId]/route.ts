@@ -1,8 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
 import { S3Client, GetObjectCommand } from "@aws-sdk/client-s3";
-import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import { prisma } from "@/lib/prisma";
+import {
+  requirePermission,
+  requireClientAccess,
+  FICHIERS_ACTIONS,
+} from "@/lib/permissions";
 
 const s3Client = new S3Client({
   region: process.env.AWS_REGION!,
@@ -17,17 +20,17 @@ export async function GET(
   { params }: { params: Promise<{ fileId: string }> },
 ) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user) {
-      return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
-    }
+    // Télécharger un fichier importé, c'est le consulter (page /files, même droit).
+    const permission = await requirePermission(FICHIERS_ACTIONS.VOIR);
+    if (permission instanceof NextResponse) return permission;
+    const { user } = permission;
 
     const { fileId } = await params;
 
     const file = await prisma.normalFile.findFirst({
       where: {
         id: fileId,
-        client: { companyId: session.user.companyId },
+        client: { companyId: user.companyId },
         deletedAt: null,
       },
     });
@@ -38,6 +41,9 @@ export async function GET(
         { status: 404 },
       );
     }
+
+    const refusDossier = await requireClientAccess(file.clientId, user);
+    if (refusDossier) return refusDossier;
 
     if (!file.s3Key) {
       return NextResponse.json(

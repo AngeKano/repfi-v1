@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requirePermission, FICHIERS_ACTIONS } from "@/lib/permissions";
+import {
+  requirePermission,
+  requireClientAccess,
+  filtreDossiersAccessibles,
+  FICHIERS_ACTIONS,
+} from "@/lib/permissions";
 
 export async function GET(req: NextRequest) {
   try {
@@ -13,10 +18,17 @@ export async function GET(req: NextRequest) {
 
     const { searchParams } = new URL(req.url);
     const clientId = searchParams.get("clientId");
+
+    if (clientId) {
+      const refusDossier = await requireClientAccess(clientId, user);
+      if (refusDossier) return refusDossier;
+    }
+
     const periods = await prisma.comptablePeriod.findMany({
       where: {
         client: {
           companyId: user.companyId,
+          ...filtreDossiersAccessibles(user),
         },
         ...(clientId && { clientId }),
       },

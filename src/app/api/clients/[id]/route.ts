@@ -68,16 +68,18 @@ const updateClientSchema = z.object({
 });
 
 /**
- * Vérifier l'accès au client
+ * Vérifier l'accès au client. Un dossier d'une autre entreprise est traité comme
+ * inexistant : la réponse ne doit pas révéler qu'il existe.
  */
 
 async function checkClientAccess(
   clientId: string,
   userId: string,
   role: string,
+  companyId: string,
 ) {
-  const client = await prisma.client.findUnique({
-    where: { id: clientId },
+  const client = await prisma.client.findFirst({
+    where: { id: clientId, companyId },
     include: {
       company: {
         select: {
@@ -239,6 +241,7 @@ export async function GET(
       id,
       session.user.id,
       session.user.role,
+      session.user.companyId,
     );
 
     if (!hasAccess) {
@@ -348,6 +351,7 @@ export async function PATCH(
       id,
       user.id,
       user.role,
+      user.companyId,
     );
 
     if (!hasAccess) {
@@ -487,6 +491,7 @@ export async function DELETE(
       clientId,
       user.id,
       user.role,
+      user.companyId,
     );
 
     if (!hasAccess) {

@@ -132,7 +132,8 @@ export default async function UsersPage({
       ...u,
       voitTousLesDossiers: hasPermission(roleMembre, CLIENTS_ACTIONS.VOIR_TOUS),
       estMoi,
-      peutModifier: estMoi || (peutModifierMembres && (hierarchie || roleMembre === acteur)),
+      // Un pair de même rôle n'est pas modifiable : seulement soi-même ou un rôle inférieur.
+      peutModifier: estMoi || (peutModifierMembres && hierarchie),
       peutChangerRole: !estMoi && droits.peutCreer && hierarchie,
       peutChangerStatut: !estMoi && peutModifierMembres && hierarchie,
       peutDesactiver:

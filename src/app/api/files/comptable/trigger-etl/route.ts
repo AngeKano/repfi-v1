@@ -1,7 +1,11 @@
 // app/api/files/comptable/trigger-etl/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { requirePermission } from "@/lib/permissions/middleware";
+import {
+  requirePermission,
+  requireClientAccess,
+  filtreDossiersAccessibles,
+} from "@/lib/permissions/middleware";
 import { FICHIERS_ACTIONS } from "@/lib/permissions/actions";
 
 import { prisma } from "@/lib/prisma";
@@ -60,6 +64,9 @@ export async function POST(req: NextRequest) {
         { status: 403 },
       );
     }
+
+    const refusDossier = await requireClientAccess(comptablePeriod.client.id, user);
+    if (refusDossier) return refusDossier;
 
     if (comptablePeriod.status === ProcessingStatus.PROCESSING) {
       return NextResponse.json(
@@ -201,9 +208,14 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const clientId = searchParams.get("clientId");
 
+    if (clientId) {
+      const refusDossier = await requireClientAccess(clientId, user);
+      if (refusDossier) return refusDossier;
+    }
+
     const processingPeriods = await prisma.comptablePeriod.findMany({
       where: {
-        client: { companyId: user.companyId },
+        client: { companyId: user.companyId, ...filtreDossiersAccessibles(user) },
         ...(clientId && { clientId }),
         status: {
           in: [

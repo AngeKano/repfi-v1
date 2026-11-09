@@ -25,8 +25,10 @@ import { prisma } from "@/lib/prisma";
 import { ProcessingStatus } from "../../../../../../../../prisma/generated/prisma/enums";
 import {
   requirePermission,
+  requireClientAccess,
   checkPermissionSync,
   FICHIERS_ACTIONS,
+  type SessionUser,
 } from "@/lib/permissions";
 import { getClickhouseDbName } from "@/lib/clickhouse/manual-sync";
 import { invaliderReferentiels } from "@/lib/clickhouse/plan-comptable";
@@ -53,12 +55,14 @@ const clickhouse = createClickhouseClient({
 
 const LONGUEUR_MAX = 255;
 
-async function contexte(id: string, referentiel: string, companyId: string) {
+async function contexte(id: string, referentiel: string, user: SessionUser) {
   const client = await prisma.client.findFirst({
-    where: { id, companyId },
+    where: { id, companyId: user.companyId },
     select: { id: true },
   });
   if (!client) return { erreur: NextResponse.json({ error: "Client non trouvé" }, { status: 404 }) };
+  const refusDossier = await requireClientAccess(client.id, user);
+  if (refusDossier) return { erreur: refusDossier };
   const def = referentielParId(referentiel);
   if (!def) return { erreur: NextResponse.json({ error: "Référentiel inconnu" }, { status: 400 }) };
   return { def };
@@ -121,7 +125,7 @@ export async function GET(
     const { user } = perm;
 
     const { id, referentiel } = await params;
-    const ctx = await contexte(id, referentiel, user.companyId);
+    const ctx = await contexte(id, referentiel, user);
     if (ctx.erreur) return ctx.erreur;
     const def = ctx.def;
 
@@ -176,7 +180,7 @@ export async function PATCH(
     const { user } = perm;
 
     const { id, referentiel } = await params;
-    const ctx = await contexte(id, referentiel, user.companyId);
+    const ctx = await contexte(id, referentiel, user);
     if (ctx.erreur) return ctx.erreur;
     const def = ctx.def;
 
@@ -267,7 +271,7 @@ export async function POST(
     const { user } = perm;
 
     const { id, referentiel } = await params;
-    const ctx = await contexte(id, referentiel, user.companyId);
+    const ctx = await contexte(id, referentiel, user);
     if (ctx.erreur) return ctx.erreur;
     const def = ctx.def;
 

@@ -14,7 +14,11 @@ import {
   FileType,
   ProcessingStatus,
 } from "../../../../../../../prisma/generated/prisma/enums";
-import { requirePermission, FICHIERS_ACTIONS } from "@/lib/permissions";
+import {
+  requirePermission,
+  requireClientAccess,
+  FICHIERS_ACTIONS,
+} from "@/lib/permissions";
 import { DIMENSION_EN_COURS } from "@/lib/comptable/dimensions";
 import {
   LIBELLE_RECLASSEMENT,
@@ -36,6 +40,9 @@ export async function POST(
       select: { id: true },
     });
     if (!client) return NextResponse.json({ error: "Client non trouvé" }, { status: 404 });
+
+    const refusDossier = await requireClientAccess(client.id, user);
+    if (refusDossier) return refusDossier;
 
     // Un seul traitement du mapping à la fois (dépôt de fichier ou reclassement).
     const enCours = await prisma.dimensionUpdate.findFirst({

@@ -230,11 +230,10 @@ export async function PATCH(
     // Vérifier la hiérarchie des rôles
     const targetRole = getMappedRole(targetUser?.role || "");
 
-    // On ne peut pas modifier un utilisateur de niveau supérieur ou égal
-    if (
-      targetRole !== sessionRole &&
-      !canManageRole(sessionRole, targetRole)
-    ) {
+    // On ne peut pas modifier un utilisateur de niveau supérieur ou égal, pas même
+    // un pair de même rôle (son mot de passe compris). Seule exception : son
+    // propre profil, quel que soit le rôle.
+    if (!isSelf && !canManageRole(sessionRole, targetRole)) {
       return NextResponse.json(
         {
           error:

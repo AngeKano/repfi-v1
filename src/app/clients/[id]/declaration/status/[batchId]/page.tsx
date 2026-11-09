@@ -5,7 +5,10 @@ import StatusComponents from "./status";
 import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
-import { checkPermissionSync } from "@/lib/permissions/middleware";
+import {
+  checkPermissionSync,
+  filtreDossiersAccessibles,
+} from "@/lib/permissions/middleware";
 import { FICHIERS_ACTIONS } from "@/lib/permissions/actions";
 import { prisma } from "@/lib/prisma";
 import { DashboardLayout } from "@/components/dashboard-layout";
@@ -32,11 +35,13 @@ export default async function StatusPage({
 
   const { id, batchId } = await params;
 
-  // Récupérer le client
+  // Récupérer le client : dossier de l'entreprise, et attribué à ce membre si son
+  // rôle ne voit pas tous les dossiers (comme la page du dossier).
   const client = await prisma.client.findFirst({
     where: {
       id,
       companyId: session.user.companyId,
+      ...filtreDossiersAccessibles(session.user),
     },
     select: {
       id: true,
