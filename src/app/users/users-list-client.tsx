@@ -3,6 +3,17 @@
 
 import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { toast } from "sonner";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -16,19 +27,26 @@ import {
   Trash2,
   Edit,
   RefreshCw,
-  Download,
 } from "lucide-react";
-import Link from "next/link";
 import {
   getRoleLabel,
   getRoleBadgeVariant,
 } from "@/lib/permissions/role-utils";
 import { formatNombre } from "@/lib/nombres";
 import { DashboardLayout } from "@/components/dashboard-layout";
+import { MembreDetailsDialog } from "./membre-details-dialog";
+import { MembreFormDialog } from "./membre-form-dialog";
+import {
+  nomMembre,
+  type DossierOption,
+  type DroitsMembres,
+  type InfoRole,
+  type MembreLigne,
+} from "./types";
 
 interface UsersListClientProps {
   session: any;
-  initialUsers: any[];
+  initialUsers: MembreLigne[];
   pagination: {
     page: number;
     limit: number;
@@ -37,7 +55,10 @@ interface UsersListClientProps {
   };
   initialSearch: string;
   initialRole: string;
-  canAddMember: boolean;
+  droits: DroitsMembres;
+  infosRoles: Record<string, InfoRole>;
+  rolesAttribuables: string[];
+  dossiers: DossierOption[];
 }
 
 export default function UsersListClient({
@@ -46,8 +67,35 @@ export default function UsersListClient({
   pagination,
   initialSearch,
   initialRole,
-  canAddMember,
+  droits,
+  infosRoles,
+  rolesAttribuables,
+  dossiers,
 }: UsersListClientProps) {
+  const canAddMember = droits.peutCreer;
+  // Fenêtres : création, consultation, modification, désactivation.
+  const [creation, setCreation] = useState(false);
+  const [consulte, setConsulte] = useState<MembreLigne | null>(null);
+  const [modifie, setModifie] = useState<MembreLigne | null>(null);
+  const [aDesactiver, setADesactiver] = useState<MembreLigne | null>(null);
+  const [desactivation, setDesactivation] = useState(false);
+
+  const desactiver = async () => {
+    if (!aDesactiver) return;
+    setDesactivation(true);
+    try {
+      const res = await fetch(`/api/users/${aDesactiver.id}`, { method: "DELETE" });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "Désactivation impossible");
+      toast.success(`${nomMembre(aDesactiver)} désactivé`);
+      setADesactiver(null);
+      router.refresh();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Désactivation impossible");
+    } finally {
+      setDesactivation(false);
+    }
+  };
   const router = useRouter();
   const searchParams = useSearchParams();
   const [search, setSearch] = useState(initialSearch);
@@ -161,12 +209,13 @@ export default function UsersListClient({
             </Button> */}
 
             {canAddMember && (
-              <Link href="/users/new">
-                <Button className="h-10 bg-gradient-to-r from-[#0077C3] to-[#0095F4] hover:from-[#005992] hover:to-[#0077C3]">
-                  <Plus className="w-4 h-4 mr-2" />
-                  Nouveau membre
-                </Button>
-              </Link>
+              <Button
+                onClick={() => setCreation(true)}
+                className="h-10 bg-gradient-to-r from-[#0077C3] to-[#0095F4] hover:from-[#005992] hover:to-[#0077C3]"
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                Nouveau membre
+              </Button>
             )}
           </div>
         </div>
@@ -214,12 +263,10 @@ export default function UsersListClient({
                 : "Commencez par ajouter votre premier membre"}
             </p>
             {canAddMember && (
-              <Link href="/users/new">
-                <Button>
-                  <Plus className="w-4 h-4 mr-2" />
-                  Ajouter un membre
-                </Button>
-              </Link>
+              <Button onClick={() => setCreation(true)}>
+                <Plus className="w-4 h-4 mr-2" />
+                Ajouter un membre
+              </Button>
             )}
           </div>
         ) : (
@@ -293,7 +340,20 @@ export default function UsersListClient({
                       </Badge>
                     </td>
                     <td className="px-4 py-4 text-center text-sm font-medium text-[#00122E]">
-                      {user._count.clientAssignments}
+                      {user.voitTousLesDossiers ? (
+                        <span
+                          className="text-xs font-semibold text-emerald-700"
+                          title="Administrateur : attribué d'office à tous les dossiers"
+                        >
+                          Tous
+                        </span>
+                      ) : user._count.clientAssignments === 0 ? (
+                        <span className="text-amber-600" title="Aucun dossier attribué : ce membre ne voit aucun dossier">
+                          0
+                        </span>
+                      ) : (
+                        user._count.clientAssignments
+                      )}
                     </td>
                     <td className="px-4 py-4 text-center text-sm font-medium text-[#00122E]">
                       {user._count.normalFiles}
@@ -336,34 +396,38 @@ export default function UsersListClient({
                     </td>
                     <td className="px-4 py-4">
                       <div className="flex items-center justify-center gap-1">
-                        <Link href={`/users/${user.id}`}>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="text-[#0077C3] hover:text-[#005992] hover:bg-[#EBF5FF] h-8 w-8 p-0"
-                            title="Modifier"
-                          >
-                            <Edit className="w-4 h-4" />
-                          </Button>
-                        </Link>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="text-[#0077C3] hover:text-[#005992] hover:bg-[#EBF5FF] h-8 w-8 p-0"
+                          title="Modifier"
+                          aria-label={`Modifier ${nomMembre(user)}`}
+                          disabled={!user.peutModifier}
+                          onClick={() => setModifie(user)}
+                        >
+                          <Edit className="w-4 h-4" />
+                        </Button>
                         <Button
                           variant="ghost"
                           size="sm"
                           className="text-red-400 hover:text-red-600 hover:bg-red-50 h-8 w-8 p-0"
-                          title="Supprimer"
+                          title="Désactiver"
+                          aria-label={`Désactiver ${nomMembre(user)}`}
+                          disabled={!user.peutDesactiver || !user.isActive}
+                          onClick={() => setADesactiver(user)}
                         >
                           <Trash2 className="w-4 h-4" />
                         </Button>
-                        <Link href={`/users/${user.id}`}>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="text-[#0077C3] hover:text-[#005992] hover:bg-[#EBF5FF] h-8 w-8 p-0"
-                            title="Voir"
-                          >
-                            <Eye className="w-4 h-4" />
-                          </Button>
-                        </Link>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="text-[#0077C3] hover:text-[#005992] hover:bg-[#EBF5FF] h-8 w-8 p-0"
+                          title="Voir"
+                          aria-label={`Voir ${nomMembre(user)}`}
+                          onClick={() => setConsulte(user)}
+                        >
+                          <Eye className="w-4 h-4" />
+                        </Button>
                       </div>
                     </td>
                   </tr>
@@ -429,6 +493,76 @@ export default function UsersListClient({
           </div>
         )}
       </div>
+
+      {creation && (
+        <MembreFormDialog
+          rolesAttribuables={rolesAttribuables}
+          infosRoles={infosRoles}
+          dossiers={dossiers}
+          droits={droits}
+          onClose={() => setCreation(false)}
+          onEnregistre={() => {
+            setCreation(false);
+            router.refresh();
+          }}
+        />
+      )}
+
+      {modifie && (
+        <MembreFormDialog
+          membre={modifie}
+          rolesAttribuables={rolesAttribuables}
+          infosRoles={infosRoles}
+          dossiers={dossiers}
+          droits={droits}
+          onClose={() => setModifie(null)}
+          onEnregistre={() => {
+            setModifie(null);
+            router.refresh();
+          }}
+        />
+      )}
+
+      {consulte && (
+        <MembreDetailsDialog
+          membre={consulte}
+          nbDossiersEntreprise={dossiers.length}
+          onClose={() => setConsulte(null)}
+          onModifier={() => {
+            setModifie(consulte);
+            setConsulte(null);
+          }}
+          onDesactiver={() => {
+            setADesactiver(consulte);
+            setConsulte(null);
+          }}
+        />
+      )}
+
+      <AlertDialog open={!!aDesactiver} onOpenChange={(o) => !o && !desactivation && setADesactiver(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Désactiver {aDesactiver ? nomMembre(aDesactiver) : ""} ?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Ce membre ne pourra plus se connecter. Ses dossiers attribués et ses accès sont
+              conservés : il les retrouvera s&apos;il est réactivé.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={desactivation}>Annuler</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={desactivation}
+              className="bg-red-600 hover:bg-red-700"
+              onClick={(e) => {
+                e.preventDefault();
+                desactiver();
+              }}
+            >
+              Désactiver
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </DashboardLayout>
   );
 }

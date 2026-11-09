@@ -6,7 +6,9 @@ export interface MembreDossier {
   email: string;
   role: string;
   actif: boolean;
-  /** Assigné au dossier ; sinon, il le voit grâce à son rôle (tous les dossiers). */
+  /** Administrateur : accès d'office à tous les dossiers, ne peut pas être retiré. */
+  dOffice: boolean;
+  /** Attribué explicitement à ce dossier (LOADER, LOADER_PLUS, VIEWER). */
   assigne: boolean;
   assigneLe: string | null;
   /** La matrice des droits autorise son rôle à voir le reporting. */
@@ -26,8 +28,6 @@ export interface MembreDisponible {
   nom: string;
   email: string;
   role: string;
-  /** Son rôle lui donne déjà accès au dossier, sans assignation. */
-  accesParRole: boolean;
 }
 
 export interface DonneesMembres {

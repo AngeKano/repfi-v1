@@ -19,7 +19,9 @@ import {
   canManageRole,
   RoleId,
   MEMBRES_ACTIONS,
+  CLIENTS_ACTIONS,
 } from "@/lib/permissions";
+import { dossiersAAttribuer, voitTousLesDossiers } from "@/lib/permissions/dossiers";
 
 // Liste des rôles disponibles pour la mise à jour
 const availableRoles = [
@@ -41,6 +43,9 @@ const updateUserSchema = z.object({
   lastName: z.string().min(2).max(100).optional().nullable(),
   role: z.enum(availableRoles).optional(),
   isActive: z.boolean().optional(),
+  // Dossiers attribués : remplace la liste actuelle (rôles qui ne voient pas tous
+  // les dossiers). Absent : les attributions ne changent pas.
+  clientIds: z.array(z.string().min(1)).optional(),
 });
 
 /**
@@ -49,7 +54,8 @@ const updateUserSchema = z.object({
 async function checkUserAccess(
   userId: string,
   sessionUserId: string,
-  role: string
+  role: string,
+  companyId: string
 ) {
   const user = await prisma.user.findUnique({
     where: { id: userId },
@@ -69,7 +75,8 @@ async function checkUserAccess(
     },
   });
 
-  if (!user) {
+  // Un membre d'une autre entreprise n'existe pas pour l'utilisateur connecté.
+  if (!user || user.companyId !== companyId) {
     return { hasAccess: false, user: null, error: "Utilisateur non trouvé" };
   }
 
@@ -112,7 +119,8 @@ export async function GET(
     const { hasAccess, user, error } = await checkUserAccess(
       id,
       session.user.id,
-      session.user.role
+      session.user.role,
+      session.user.companyId
     );
 
     if (!hasAccess) {
@@ -195,7 +203,8 @@ export async function PATCH(
     const { hasAccess, user: targetUser, error } = await checkUserAccess(
       id,
       sessionUser.id,
-      sessionUser.role
+      sessionUser.role,
+      sessionUser.companyId
     );
 
     if (!hasAccess) {
@@ -298,8 +307,47 @@ export async function PATCH(
       updateData.password = await bcrypt.hash(data.password, 10);
     }
 
-    // Mettre à jour l'utilisateur
-    const updatedUser = await prisma.user.update({
+    // Dossiers attribués : ajouts et retraits par rapport à la liste actuelle.
+    // Un rôle qui voit tous les dossiers n'en a pas : ses attributions éventuelles
+    // restent telles quelles.
+    let dossiersAjoutes: string[] = [];
+    let dossiersRetires: string[] = [];
+    const roleFinal = (canModifyMembers && data.role) || targetUser!.role;
+    if (data.clientIds !== undefined && !voitTousLesDossiers(roleFinal)) {
+      const voulus = await dossiersAAttribuer(data.clientIds, roleFinal, sessionUser);
+      if (voulus instanceof NextResponse) return voulus;
+      const actuels = (
+        await prisma.clientAssignment.findMany({
+          where: { userId: id, client: { companyId: sessionUser.companyId } },
+          select: { clientId: true },
+        })
+      ).map((a) => a.clientId);
+      dossiersAjoutes = voulus.filter((c) => !actuels.includes(c));
+      dossiersRetires = actuels.filter((c) => !voulus.includes(c));
+      if (
+        dossiersRetires.length > 0 &&
+        !checkPermissionSync(sessionRole, CLIENTS_ACTIONS.RETIRER_MEMBRE)
+      ) {
+        return NextResponse.json(
+          { error: "Permission refusée : retirer un membre d'un dossier" },
+          { status: 403 }
+        );
+      }
+    }
+
+    // Mettre à jour l'utilisateur et ses attributions en une fois.
+    const updatedUser = await prisma.$transaction(async (tx) => {
+      if (dossiersAjoutes.length > 0) {
+        await tx.clientAssignment.createMany({
+          data: dossiersAjoutes.map((clientId) => ({ clientId, userId: id })),
+        });
+      }
+      if (dossiersRetires.length > 0) {
+        await tx.clientAssignment.deleteMany({
+          where: { userId: id, clientId: { in: dossiersRetires } },
+        });
+      }
+      return tx.user.update({
       where: { id: id },
       data: updateData,
       select: {
@@ -312,6 +360,7 @@ export async function PATCH(
         createdAt: true,
         updatedAt: true,
       },
+      });
     });
 
     return NextResponse.json({
@@ -356,7 +405,8 @@ export async function DELETE(
     const { hasAccess, user: targetUser, error } = await checkUserAccess(
       id,
       sessionUser.id,
-      sessionUser.role
+      sessionUser.role,
+      sessionUser.companyId
     );
 
     if (!hasAccess) {

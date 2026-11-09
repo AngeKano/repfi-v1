@@ -14,6 +14,7 @@ import path from "node:path";
 import {
   ACTION_CATEGORIES,
   ACTION_LABELS,
+  CLIENTS_ACTIONS,
   REPORTING_ACTIONS,
   type PermissionAction,
 } from "../../src/lib/permissions/actions";
@@ -48,6 +49,7 @@ const lignesTypes = roles
       <td class="fort">${r.id}</td>
       <td>${INTITULES[r.id]}</td>
       <td>${echappe(r.description)}</td>
+      <td class="centre">${hasPermission(r.id, CLIENTS_ACTIONS.VOIR_TOUS) ? "Tous, d'office" : "Attribués"}</td>
       <td class="centre">${hasPermission(r.id, REPORTING_ACTIONS.VOIR) ? OUI : NON}</td>
       <td class="centre">${hasPermission(r.id, REPORTING_ACTIONS.GERER_VISIBILITE) ? OUI : NON}</td>
     </tr>`,
@@ -69,6 +71,12 @@ const lignesMatrice = Object.values(ACTION_CATEGORIES)
     </tbody>`,
   )
   .join("");
+
+// Qui attribue les dossiers : droits de la matrice.
+const rolesQui = (action: PermissionAction) =>
+  roles.filter((r) => hasPermission(r.id, action)).map((r) => r.id).join(", ");
+const sansAttribution = roles.filter((r) => !hasPermission(r.id, CLIENTS_ACTIONS.VOIR_TOUS)).map((r) => r.id).join(", ");
+const avecTout = roles.filter((r) => hasPermission(r.id, CLIENTS_ACTIONS.VOIR_TOUS)).map((r) => r.id).join(", ");
 
 // Qui peut restreindre qui : un administrateur, sur un rôle de niveau inférieur
 // qui a accès au reporting.
@@ -149,11 +157,19 @@ const html = `<!doctype html>
 
 <h2>1. Les types d'utilisateurs</h2>
 <table>
-  <thead><tr><th style="width:110pt">Rôle</th><th style="width:150pt">Intitulé</th><th>Description</th><th style="width:66pt;text-align:center">Voit le reporting</th><th style="width:76pt;text-align:center">Définit la visibilité</th></tr></thead>
+  <thead><tr><th style="width:110pt">Rôle</th><th style="width:150pt">Intitulé</th><th>Description</th><th style="width:74pt;text-align:center">Dossiers</th><th style="width:66pt;text-align:center">Voit le reporting</th><th style="width:76pt;text-align:center">Définit la visibilité</th></tr></thead>
   <tbody>${lignesTypes}</tbody>
 </table>
 
-<h2>2. Visibilité des KPI et métriques</h2>
+<h2>2. Attribution des dossiers</h2>
+<ul>
+  <li><strong>Administrateurs (${avecTout}) :</strong> ils voient tous les dossiers de l'entreprise d'office. Ils figurent dans l'onglet <strong>Membres</strong> de chaque dossier, marqués « D'office », sans pouvoir en être retirés.</li>
+  <li><strong>${sansAttribution} :</strong> ils ne voient que les dossiers qui leur sont attribués, <strong>aucun par défaut</strong>. Un dossier non attribué n'apparaît ni dans leur liste de clients, ni dans le tableau de bord, et son adresse les renvoie à la liste.</li>
+  <li><strong>Où attribuer :</strong> à la création du membre ou en le modifiant (page <strong>Membres</strong>, dans une fenêtre), ou depuis l'onglet <strong>Membres</strong> du dossier (« Assigner des membres »).</li>
+  <li><strong>Qui attribue :</strong> ${rolesQui(CLIENTS_ACTIONS.ASSIGNER_MEMBRE)}. <strong>Qui retire :</strong> ${rolesQui(CLIENTS_ACTIONS.RETIRER_MEMBRE)}.</li>
+</ul>
+
+<h2>3. Visibilité des KPI et métriques</h2>
 <ul>
   <li><strong>Par défaut, tout est visible.</strong> Un membre qui a accès à un dossier voit tous les KPI, métriques, graphiques et tableaux que son rôle autorise.</li>
   <li><strong>Seuls les administrateurs</strong> peuvent masquer des éléments à un collaborateur, un par un ou par onglet entier, depuis l'onglet <strong>Membres</strong> du dossier (bouton « Visibilité »).</li>
@@ -167,14 +183,14 @@ const html = `<!doctype html>
 </table>
 <p class="note"><strong>Limite :</strong> la visibilité porte sur le reporting. Un membre dont le rôle a accès à la Comptabilité ou aux fichiers importés peut y lire les écritures et en déduire un montant masqué. Pour une confidentialité stricte, attribuez-lui le rôle VIEWER, qui n'y a pas accès.</p>
 
-<h2>3. Droits par rôle</h2>
+<h2>4. Droits par rôle</h2>
 <p class="note">${OUI} autorisé &nbsp;&nbsp; ${NON} non autorisé. Ces droits s'appliquent à tous les dossiers ; un rôle sans le droit « Voir tous les clients » n'accède qu'aux dossiers où il est assigné.</p>
 <table>
   <thead><tr><th>Droit</th>${enTetesRoles}</tr></thead>
   ${lignesMatrice}
 </table>
 
-<h2 class="saut">4. Éléments dont la visibilité se définit (${NB_ELEMENTS})</h2>
+<h2 class="saut">5. Éléments dont la visibilité se définit (${NB_ELEMENTS})</h2>
 <table>
   <thead><tr><th style="width:120pt">Onglet</th>${TYPES.map((t) => `<th>${LIBELLES_TYPES[t]}</th>`).join("")}</tr></thead>
   <tbody>${lignesCatalogue}</tbody>

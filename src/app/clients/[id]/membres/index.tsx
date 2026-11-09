@@ -5,7 +5,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import type { ComponentProps } from "react";
-import { Eye, Loader2, ShieldCheck, UserMinus, UserPlus, Users } from "lucide-react";
+import { Eye, Loader2, Lock, ShieldCheck, UserMinus, UserPlus, Users } from "lucide-react";
 import { toast } from "sonner";
 import {
   AlertDialog,
@@ -111,17 +111,17 @@ export function MembresTab({ clientId, clientName }: { clientId: string; clientN
     charger();
   }, [charger]);
 
-  const modifierAssignation = async (membre: MembreDossier, methode: "POST" | "DELETE") => {
+  const retirer = async (membre: MembreDossier) => {
     setEnCours(membre.id);
     try {
       const res = await fetch(`/api/clients/${clientId}/assign`, {
-        method: methode,
+        method: "DELETE",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ userIds: [membre.id] }),
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || "Opération impossible");
-      toast.success(`${membre.nom} ${methode === "POST" ? "assigné au" : "retiré du"} dossier`);
+      toast.success(`${membre.nom} retiré du dossier`);
       await charger();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Opération impossible");
@@ -147,7 +147,7 @@ export function MembresTab({ clientId, clientName }: { clientId: string; clientN
   }
 
   const { membres, disponibles, moi, peutAssigner, peutRetirer, peutGerer } = donnees;
-  const nbAssignes = membres.filter((m) => m.assigne).length;
+  const nbOffice = membres.filter((m) => m.dOffice).length;
   const nbRestreints = membres.filter((m) => (m.masques?.length ?? 0) > 0).length;
 
   return (
@@ -174,11 +174,15 @@ export function MembresTab({ clientId, clientName }: { clientId: string; clientN
       </div>
 
       <div className={cn("grid gap-3", peutGerer ? "grid-cols-3" : "grid-cols-2")}>
-        <Chiffre valeur={nbAssignes} label="Membres assignés" detail="Affectés à ce dossier" />
         <Chiffre
-          valeur={membres.length - nbAssignes}
-          label="Accès par rôle"
-          detail="Leur rôle voit tous les dossiers"
+          valeur={nbOffice}
+          label="Attribués d'office"
+          detail="Administrateurs : tous les dossiers"
+        />
+        <Chiffre
+          valeur={membres.length - nbOffice}
+          label="Membres assignés"
+          detail="LOADER, LOADER_PLUS et VIEWER"
         />
         {peutGerer && (
           <Chiffre valeur={nbRestreints} label="Accès restreints" detail="Au moins un élément masqué" />
@@ -228,13 +232,19 @@ export function MembresTab({ clientId, clientName }: { clientId: string; clientN
                     </Badge>
                   </td>
                   <td className="px-4 py-3 text-sm text-[#335890] whitespace-nowrap">
-                    {m.assigne ? (
+                    {m.dOffice ? (
+                      <span
+                        className="inline-flex items-center gap-1.5"
+                        title="Son rôle donne accès à tous les dossiers de l'entreprise"
+                      >
+                        <Lock className="w-3.5 h-3.5 text-[#94A3B8]" />
+                        D&apos;office
+                      </span>
+                    ) : (
                       <>
                         Assigné
                         {m.assigneLe && <span className="block text-xs text-[#94A3B8]">le {dateCourte(m.assigneLe)}</span>}
                       </>
-                    ) : (
-                      <span title="Ce rôle voit tous les dossiers, sans assignation">Par son rôle</span>
                     )}
                     {!m.actif && (
                       <Badge variant="destructive" className="block w-fit mt-1 text-xs">
@@ -253,29 +263,27 @@ export function MembresTab({ clientId, clientName }: { clientId: string; clientN
                           Visibilité
                         </Button>
                       )}
-                      {m.assigne && peutRetirer && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="gap-2 text-red-500 hover:text-red-600 hover:bg-red-50"
-                          onClick={() => setARetirer(m)}
-                        >
-                          <UserMinus className="w-4 h-4" />
-                          Retirer
-                        </Button>
-                      )}
-                      {!m.assigne && m.actif && peutAssigner && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="gap-2"
-                          disabled={enCours === m.id}
-                          onClick={() => modifierAssignation(m, "POST")}
-                        >
-                          <UserPlus className="w-4 h-4" />
-                          Assigner
-                        </Button>
-                      )}
+                      {peutRetirer &&
+                        (m.dOffice ? (
+                          // Attribué d'office par son rôle : il ne se retire pas.
+                          <span title="Attribué d'office : un administrateur ne se retire pas d'un dossier">
+                            <Button variant="ghost" size="sm" className="gap-2" disabled>
+                              <UserMinus className="w-4 h-4" />
+                              Retirer
+                            </Button>
+                          </span>
+                        ) : (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="gap-2 text-red-500 hover:text-red-600 hover:bg-red-50"
+                            disabled={enCours === m.id}
+                            onClick={() => setARetirer(m)}
+                          >
+                            <UserMinus className="w-4 h-4" />
+                            Retirer
+                          </Button>
+                        ))}
                     </div>
                   </td>
                 </tr>
@@ -333,8 +341,8 @@ export function MembresTab({ clientId, clientName }: { clientId: string; clientN
           <AlertDialogHeader>
             <AlertDialogTitle>Retirer {aRetirer?.nom} de ce dossier ?</AlertDialogTitle>
             <AlertDialogDescription>
-              Si son rôle voit tous les dossiers, ce membre gardera l&apos;accès à celui-ci, avec les
-              mêmes éléments masqués. Sinon, il n&apos;y aura plus accès.
+              Il n&apos;aura plus accès à ce dossier. S&apos;il y est réassigné, il retrouvera les mêmes
+              éléments masqués.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -343,7 +351,7 @@ export function MembresTab({ clientId, clientName }: { clientId: string; clientN
               disabled={!!enCours}
               onClick={(e) => {
                 e.preventDefault();
-                if (aRetirer) modifierAssignation(aRetirer, "DELETE");
+                if (aRetirer) retirer(aRetirer);
               }}
             >
               Retirer

@@ -17,6 +17,7 @@ import {
   RoleId,
   MEMBRES_ACTIONS,
 } from "@/lib/permissions";
+import { dossiersAAttribuer } from "@/lib/permissions/dossiers";
 
 // Liste des rôles disponibles pour la création
 const availableRoles = [
@@ -39,6 +40,9 @@ const createUserSchema = z.object({
   firstName: z.string().min(2).max(100).optional(),
   lastName: z.string().min(2).max(100).optional(),
   role: z.enum(availableRoles).default("LOADER"),
+  // Dossiers attribués : seuls les rôles qui ne voient pas tous les dossiers en
+  // reçoivent. Sans attribution, ils n'en voient aucun.
+  clientIds: z.array(z.string().min(1)).default([]),
 });
 
 /**
@@ -182,11 +186,15 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    const dossiers = await dossiersAAttribuer(data.clientIds, data.role, user);
+    if (dossiers instanceof NextResponse) return dossiers;
+
     // Hasher le mot de passe
     const hashedPassword = await bcrypt.hash(data.password, 10);
 
-    // Créer l'utilisateur
-    const newUser = await prisma.user.create({
+    // Créer l'utilisateur et ses attributions en une fois.
+    const newUser = await prisma.$transaction(async (tx) => {
+      const cree = await tx.user.create({
       data: {
         email: data.email,
         password: hashedPassword,
@@ -208,6 +216,13 @@ export async function POST(req: NextRequest) {
         isActive: true,
         createdAt: true,
       },
+      });
+      if (dossiers.length > 0) {
+        await tx.clientAssignment.createMany({
+          data: dossiers.map((clientId) => ({ clientId, userId: cree.id })),
+        });
+      }
+      return cree;
     });
 
     return NextResponse.json(

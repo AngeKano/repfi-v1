@@ -1107,7 +1107,8 @@ administrateur et appliqué par le serveur.
 |---|---|
 | Par défaut | Un membre qui a accès au dossier voit tout ce que son rôle autorise. Seul ce qui lui est **masqué** est enregistré : un élément ajouté plus tard est visible |
 | Qui décide | Droit `reporting:gerer_visibilite` : ADMIN_ROOT, ADMIN_CF, ADMIN_PARTENAIRE, sur un rôle de **niveau inférieur** au sien (ni soi-même, ni un pair, ni un supérieur). L'Administrateur Principal n'est jamais restreint |
-| Portée | Un membre, un dossier. Retirer un membre du dossier ne supprime pas ses restrictions ; elles s'appliquent aussi aux rôles qui voient tous les dossiers sans y être assignés |
+| Portée | Un membre, un dossier. Retirer un membre du dossier ne supprime pas ses restrictions ; elles s'appliquent aussi aux administrateurs, qui voient tous les dossiers d'office sans y être assignés |
+| Dossiers | Administrateurs : tous les dossiers, **d'office** (onglet Membres : « D'office », jamais retirés). LOADER, LOADER_PLUS, VIEWER : seulement les dossiers **attribués**, aucun par défaut ; attribution à la création ou à la modification du membre (page Membres) ou depuis l'onglet Membres du dossier |
 | Granularité | 80 éléments sur 11 onglets : KPI, graphiques, tableaux, commentaires du Bilan d'activité. Un onglet sans élément visible disparaît de la navigation |
 | À l'écran | L'élément masqué n'est ni affiché, ni proposé dans « Configurer les KPIs » ou « Graphiques », ni exporté. Le membre voit une mention : des éléments lui sont masqués |
 | Côté serveur | Un champ de réponse d'API est **neutralisé** (nombre → 0, texte → vide, liste → vide) dès que **tous** les éléments qui l'affichent sont masqués. Il reste envoyé si un autre élément visible l'utilise. La forme de la réponse ne change pas |
@@ -1775,13 +1776,14 @@ Onglet Membres du dossier. Droit requis : Voir les membres.
   peutAssigner, peutRetirer, peutGerer,      // droits de l'utilisateur connecté
   membres: [{
     id, nom, email, role, actif,
-    assigne, assigneLe,                      // sinon : accès par son rôle (voit tous les dossiers)
+    dOffice,                                 // administrateur : tous les dossiers, ne se retire pas
+    assigne, assigneLe,                      // LOADER, LOADER_PLUS, VIEWER : attribué à ce dossier
     voitReporting, peutFiltrer, peutExporter,  // matrice, pour le rôle de ce membre
     peutRestreindre,                         // l'utilisateur connecté peut régler sa visibilité
     masques,                                 // identifiants masqués ; null si l'utilisateur connecté n'est ni administrateur ni ce membre
     modification: { le, par } | null
   }],
-  disponibles: [{ id, nom, email, role, accesParRole }]   // membres actifs non assignés
+  disponibles: [{ id, nom, email, role }]   // LOADER, LOADER_PLUS, VIEWER actifs non assignés
 }
 ```
 
@@ -1792,6 +1794,18 @@ visibles par membre, sur un rôle de niveau inférieur au sien (403 sinon).
 ```
 Corps : { masques: string[] }     // identifiants du catalogue ; inconnu → 400 ; [] → tout redevient visible
 Réponse : { masques: string[] }
+```
+
+### 25.23 `POST /users` et `PATCH /users/[id]`
+Page Membres (fenêtres de création et de modification). Droits : Créer un membre,
+Modifier un membre (ou son propre profil), sur un rôle de niveau inférieur au sien.
+
+```
+Corps : { email, password, firstName?, lastName?, role,
+          clientIds?: string[] }   // dossiers attribués ; ignorés pour un administrateur (d'office)
+POST : clientIds attribués à la création (droit Assigner un membre)
+PATCH : clientIds remplace la liste ; ajout → Assigner un membre, retrait → Retirer un membre ;
+        absent : attributions inchangées. Membre d'une autre entreprise : 404
 ```
 
 ---
@@ -1900,6 +1914,7 @@ que les onglets autorisés par son rôle et ceux dont il lui reste un élément 
 | 04/11/2026 | Trésorerie › Trésorerie par comptes : badge **« en moins »** retiré, ainsi que la mention « (comptes « en moins » déduits) » de la ligne Total. Le calcul ne change pas (§11). |
 | 06/11/2026 | **Accès au reporting par membre** : dans l'onglet **Membres** du dossier, un administrateur définit quels KPI, graphiques, tableaux et commentaires (80 éléments, 11 onglets) un collaborateur ne voit pas, dans une fenêtre, sans changer de page. Par défaut tout est visible. Un élément masqué disparaît de l'écran, des menus de configuration et des exports, et son montant n'est plus envoyé par l'API (§23). L'**ancienne page d'assignation est supprimée** : assigner et retirer se font dans le même onglet. **Matrice des droits** : nouveau droit « Définir les KPI et métriques visibles par membre » (administrateurs) ; les droits existants ne changent pas, mais plusieurs n'étaient pas appliqués et le sont désormais : Voir le reporting (LOADER n'y a plus accès, écran et API), Exporter un rapport (Télécharger des États financiers réservé à ADMIN_ROOT et ADMIN_PARTENAIRE), Voir les fichiers et Exporter les fichiers finaux (VIEWER ne lit plus le grand livre), Voir les membres. Document **« Accès »** : `docs/acces.pdf`, généré depuis le code par `npm run docs:acces`. Nouvelle table `member_reporting_access` (§25.21, §25.22). |
 | 06/11/2026 | **Droits de la matrice appliqués (suite)**, matrice inchangée. **Supprimer fichiers chargés** : contrôlé par le serveur sur la suppression d'une période, d'un fichier et d'un dossier, assignation au dossier comprise pour les rôles sans « Voir tous les clients » ; boutons masqués sans ce droit. **Activer un membre** : le passage d'inactif à actif demande ce droit (serveur et case « Compte actif ») ; un membre créé par un rôle sans ce droit (Administrateur Partenaire) reste **inactif** jusqu'à son activation. **Voir historique fichiers** : liste « Historique des mises à jour » de l'onglet Import (§25.9). **Voir infos entreprise** : Paramètres › Comptes, carte du tableau de bord, bloc `company` de `GET /api/auth/session`. **Créer un compte** : `POST /api/auth/register/company` et `/register/user`, ouvertes à tous et sans appelant dans l'application, sont réservées à ce droit ; l'inscription `POST /api/auth/signup` reste publique, faute de session à ce stade. **Droits sans fonctionnalité, donc sans contrôle** : les 5 droits d'abonnement (seul le choix du pack à l'inscription existe), Activer un client (un client n'a pas de statut ; « Désactiver » le supprime définitivement), Modifier infos entreprise (Paramètres en lecture seule, aucune route), Créer / Modifier / Supprimer un rapport (aucun rapport enregistré ; « Configurer les KPIs » et « Graphiques » restent des préférences du navigateur, §23). |
+| 09/11/2026 | **Attribution des dossiers et page Membres en fenêtres** : « Voir tous les clients » est réservé aux administrateurs (ADMIN_ROOT, ADMIN_CF, ADMIN_PARTENAIRE) ; **LOADER_PLUS et VIEWER** ne voient plus, comme LOADER, que les dossiers qui leur sont **attribués, aucun par défaut**. Dans l'onglet Membres d'un dossier, les administrateurs figurent **d'office** (« Retirer » grisé) ; un administrateur ne s'assigne pas (400). Page **Membres** : création, consultation, modification et désactivation dans des **fenêtres**, avec le choix du rôle et des dossiers attribués ; les pages `/users/new` et `/users/[id]` sont supprimées ; la page est réservée au droit « Voir les membres ». API `/users` : `clientIds` à la création et en modification (remplace la liste ; ajout : Assigner un membre, retrait : Retirer un membre) ; un membre d'une autre entreprise est désormais introuvable. Document « Accès » : nouvelle section « Attribution des dossiers » (§23, §25.21, §25.23). |
 
 ---
 

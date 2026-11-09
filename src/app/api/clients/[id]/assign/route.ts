@@ -18,6 +18,7 @@ import {
   CLIENTS_ACTIONS,
   MEMBRES_ACTIONS,
 } from "@/lib/permissions";
+import { voitTousLesDossiers } from "@/lib/permissions/dossiers";
 
 const assignMembersSchema = z.object({
   userIds: z.array(z.string().min(1)).min(1, "Au moins un membre requis"),
@@ -72,6 +73,14 @@ export async function POST(
     if (users.length !== userIds.length) {
       return NextResponse.json(
         { error: "Certains utilisateurs sont invalides" },
+        { status: 400 },
+      );
+    }
+
+    // Les administrateurs voient tous les dossiers d'office : ils ne s'assignent pas.
+    if (users.some((u) => voitTousLesDossiers(u.role))) {
+      return NextResponse.json(
+        { error: "Un administrateur accède d'office à tous les dossiers : il ne s'assigne pas" },
         { status: 400 },
       );
     }

@@ -2,8 +2,11 @@
 import { getServerSession } from "next-auth";
 import { authOptions } from "../api/auth/[...nextauth]/route";
 import { redirect } from "next/navigation";
-import { checkPermissionSync } from "@/lib/permissions/middleware";
-import { MEMBRES_ACTIONS } from "@/lib/permissions/actions";
+import { checkPermissionSync, getMappedRole } from "@/lib/permissions/middleware";
+import { CLIENTS_ACTIONS, MEMBRES_ACTIONS } from "@/lib/permissions/actions";
+import { hasPermission } from "@/lib/permissions/matrix";
+import { ROLES, RoleId, canManageRole } from "@/lib/permissions/roles";
+import type { InfoRole, MembreLigne } from "./types";
 
 import UsersListClient from "./users-list-client";
 
@@ -18,6 +21,13 @@ export default async function UsersPage({
 
   if (!session) {
     redirect("/auth/signin");
+  }
+
+  // La liste des membres suit le droit « Voir les membres » de la matrice.
+  const can = (action: Parameters<typeof checkPermissionSync>[1]) =>
+    checkPermissionSync(session.user.role, action);
+  if (!can(MEMBRES_ACTIONS.VOIR)) {
+    redirect("/dashboard");
   }
 
   const params = await searchParams;
@@ -45,8 +55,15 @@ export default async function UsersPage({
     whereClause.role = role;
   }
 
+  const droits = {
+    peutCreer: can(MEMBRES_ACTIONS.CREER),
+    peutActiver: can(MEMBRES_ACTIONS.ACTIVER),
+    peutAssigner: can(CLIENTS_ACTIONS.ASSIGNER_MEMBRE),
+    peutRetirer: can(CLIENTS_ACTIONS.RETIRER_MEMBRE),
+  };
+
   // Récupérer les données
-  const [total, users] = await Promise.all([
+  const [total, users, dossiers] = await Promise.all([
     prisma.user.count({ where: whereClause }),
     prisma.user.findMany({
       where: whereClause,
@@ -71,6 +88,12 @@ export default async function UsersPage({
         },
       },
     }),
+    // Dossiers attribuables depuis les fenêtres de création et de modification.
+    prisma.client.findMany({
+      where: { companyId: session.user.companyId },
+      select: { id: true, name: true, denomination: true, isSelfEntity: true },
+      orderBy: { name: "asc" },
+    }),
   ]);
 
   const pagination = {
@@ -80,20 +103,57 @@ export default async function UsersPage({
     totalPages: Math.ceil(total / limit),
   };
 
-  // Calculer les permissions
-  const canAddMember = checkPermissionSync(
-    session.user.role,
-    MEMBRES_ACTIONS.CREER,
+  // Rôles : description et accès aux dossiers (d'office pour les administrateurs).
+  const infosRoles: Record<string, InfoRole> = Object.fromEntries(
+    Object.values(ROLES).map((r) => [
+      r.id,
+      {
+        id: r.id,
+        description: r.description,
+        voitTousLesDossiers: hasPermission(r.id, CLIENTS_ACTIONS.VOIR_TOUS),
+      },
+    ]),
   );
+  // On ne donne qu'un rôle de niveau inférieur au sien, jamais Administrateur Principal.
+  const acteur = getMappedRole(session.user.role);
+  const rolesAttribuables = Object.values(ROLES)
+    .filter((r) => r.id !== RoleId.ADMIN_ROOT && canManageRole(acteur, r.id))
+    .sort((a, b) => a.level - b.level)
+    .map((r) => r.id);
+
+  // Ce que l'utilisateur connecté peut faire sur chaque membre (mêmes règles que
+  // l'API /api/users/:id).
+  const peutModifierMembres = can(MEMBRES_ACTIONS.MODIFIER);
+  const membres: MembreLigne[] = users.map((u) => {
+    const roleMembre = getMappedRole(u.role);
+    const estMoi = u.id === session.user.id;
+    const hierarchie = canManageRole(acteur, roleMembre);
+    return {
+      ...u,
+      voitTousLesDossiers: hasPermission(roleMembre, CLIENTS_ACTIONS.VOIR_TOUS),
+      estMoi,
+      peutModifier: estMoi || (peutModifierMembres && (hierarchie || roleMembre === acteur)),
+      peutChangerRole: !estMoi && droits.peutCreer && hierarchie,
+      peutChangerStatut: !estMoi && peutModifierMembres && hierarchie,
+      peutDesactiver:
+        !estMoi &&
+        can(MEMBRES_ACTIONS.DESACTIVER) &&
+        hierarchie &&
+        roleMembre !== RoleId.ADMIN_ROOT,
+    };
+  });
 
   return (
     <UsersListClient
       session={session}
-      initialUsers={users}
+      initialUsers={membres}
       pagination={pagination}
       initialSearch={search}
       initialRole={role}
-      canAddMember={canAddMember}
+      droits={droits}
+      infosRoles={infosRoles}
+      rolesAttribuables={rolesAttribuables}
+      dossiers={dossiers}
     />
   );
 }
