@@ -44,7 +44,7 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { formatCompactOnly, formatNombre } from "@/lib/nombres";
 import { useVisibilite } from "./visibilite";
-import { Graphe, MenuGraphes, useGraphesMasques, type GrapheDef } from "./graphes-masquables";
+import { Graphe, BoutonConfiguration, nbGraphesMasques, useGraphesMasques, type GrapheDef } from "./graphes-masquables";
 
 // ============================================================================
 // Onglet "Bilan" — Bilan d'activité périodique (rapport narratif)
@@ -475,7 +475,12 @@ export default function ClientBilanTab({
           <CalendarRange className="w-3.5 h-3.5 text-[#0077C3]" />
           <span>{getPeriodLabel()}</span>
         </div>
-        <MenuGraphes etat={graphes} className="ml-auto" />
+        <BoutonConfiguration
+          className="ml-auto"
+          edition={graphes.edition}
+          onClick={() => graphes.setEdition(!graphes.edition)}
+          nbMasques={nbGraphesMasques(graphes)}
+        />
       </div>
 
       <h1 className="text-3xl font-bold text-[#00122E]">

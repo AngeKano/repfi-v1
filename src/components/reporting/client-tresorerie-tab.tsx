@@ -58,7 +58,7 @@ import {
   RUBRIQUES_TOTAL_TRESORERIE,
   formuleTresorerie,
 } from "@/lib/reporting/tresorerie";
-import { Graphe, MenuGraphes, useGraphesMasques, type GrapheDef } from "./graphes-masquables";
+import { Graphe, useGraphesMasques, type GrapheDef } from "./graphes-masquables";
 
 type PeriodType = "year" | "month" | "ytd" | "ytd-day";
 
@@ -83,8 +83,6 @@ interface CompteTreso {
   intituleCompte: string;
   montantN: number;
   montantN1: number;
-  /** Passif ou dépréciation : solde crédit − débit, en moins du Total. */
-  deduit?: boolean;
   variation: number;
 }
 interface TresorerieData {
@@ -130,7 +128,7 @@ const HABILLAGE: Record<string, { icon: React.ElementType; color: string }> = {
 };
 
 // Les rubriques résiduelles (monnaie électronique, accréditifs) sont masquées
-// par défaut, mais restent accessibles via « Configurer les KPIs ».
+// par défaut, mais restent accessibles via « Configurer l'affichage ».
 const KPI_DEFS: KpiDef[] = TRESORERIE_KPIS.map((k) => ({
   id: k.id,
   label: k.label,
@@ -351,15 +349,11 @@ export default function ClientTresorerieTab({
   }));
   // Hauteur dynamique : 70px par compte, comme l'histogramme « Produits par Nature ».
   const chartHeight = Math.max(data.comptes.length * 70 + 40, 200);
-  // Total Trésorerie : comptes d'actif moins comptes de passif et de
-  // dépréciation (lus en crédit − débit). On reprend l'indicateur, qui fait
-  // foi même si un compte change de rubrique en cours d'exercice ; le calcul
-  // par les comptes ne sert qu'à défaut.
-  const signe = (c: CompteTreso) => (c.deduit ? -1 : 1);
-  const totalN =
-    data.kpis.total?.valeurN ?? data.comptes.reduce((s, c) => s + signe(c) * c.montantN, 0);
-  const totalN1 =
-    data.kpis.total?.valeurN1 ?? data.comptes.reduce((s, c) => s + signe(c) * c.montantN1, 0);
+  // Total Trésorerie : la somme des comptes (chacun en débit − crédit). On
+  // reprend l'indicateur, qui fait foi même si un compte change de rubrique en
+  // cours d'exercice ; la somme des comptes ne sert qu'à défaut.
+  const totalN = data.kpis.total?.valeurN ?? data.comptes.reduce((s, c) => s + c.montantN, 0);
+  const totalN1 = data.kpis.total?.valeurN1 ?? data.comptes.reduce((s, c) => s + c.montantN1, 0);
 
   return (
     <div className="space-y-6">
@@ -377,7 +371,7 @@ export default function ClientTresorerieTab({
         onglet="tresorerie"
         defs={KPI_DEFS}
         values={kpiValues}
-        actions={<MenuGraphes etat={graphes} />}
+        graphes={graphes}
       />
 
       <Graphe etat={graphes} id="comptes">
@@ -389,8 +383,9 @@ export default function ClientTresorerieTab({
                 <CardTitle>Trésorerie par comptes</CardTitle>
                 <CardDescription>
                   Soldes des comptes des rubriques du Total Trésorerie (
-                  {RUBRIQUES_TOTAL_TRESORERIE.join(", ")}) — comptes de passif et de dépréciation
-                  en crédit − débit, déduits du total — {data.yearN} vs {data.yearN1}
+                  {RUBRIQUES_TOTAL_TRESORERIE.join(", ")}) en débit − crédit : un découvert ou une
+                  dépréciation est négatif, et la somme des comptes donne le Total —{" "}
+                  {data.yearN} vs {data.yearN1}
                 </CardDescription>
               </div>
               <div className="flex flex-col gap-1 shrink-0">

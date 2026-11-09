@@ -4,10 +4,11 @@
 // instruments de trésorerie, monnaie électronique, accréditifs) et trésorerie
 // passif (DRA, DRB, DRC, DQ : concours bancaires), comparées à l'exercice N-1.
 //
-// Conventions de solde (soldeRubriqueSql, soldeCompteSql) : actif en
-// débit − crédit, dépréciations (suffixe « 1 ») et passif en crédit − débit,
-// pour pouvoir être retranchés dans les formules. Le détail par compte suit la
-// même convention : un indicateur vaut la somme de ses comptes.
+// Indicateurs (soldeRubriqueSql) : actif en débit − crédit, dépréciations
+// (suffixe « 1 ») et passif en crédit − débit, retranchés dans les formules.
+// Détail par compte : débit − crédit pour tous, soit la contribution de chaque
+// compte au Total Trésorerie (un découvert ou une dépréciation est négatif) ;
+// la somme des comptes est exactement le Total.
 // ============================================================================
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
@@ -26,8 +27,6 @@ import {
   RUBRIQUES_TRESORERIE,
   RUBRIQUES_TOTAL_TRESORERIE,
   soldeRubriqueSql,
-  soldeCompteSql,
-  ligneDeduiteSql,
   valeurTresorerie,
 } from "@/lib/reporting/tresorerie";
 
@@ -58,8 +57,6 @@ interface CompteRow {
   compte: string;
   intitule: string;
   solde: string;
-  /** 1 si le compte est lu en crédit − débit (passif ou dépréciation). */
-  deduit: number | string;
 }
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -142,7 +139,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       const batchIds = [...(batchsParAnnee.get(y) ?? [])];
       if (!client.excludeManualEntries) batchIds.push(manualBatchId(id, y));
       const rubriques: Record<string, number> = {};
-      const comptes = new Map<string, { intitule: string; solde: number; deduit: boolean }>();
+      const comptes = new Map<string, { intitule: string; solde: number }>();
       if (batchIds.length === 0) return { rubriques, comptes };
 
       const { start, end } = fenetre(y);
@@ -175,8 +172,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
             query: `
               SELECT compte,
                      anyIf(intitule_compte, intitule_compte != '') AS intitule,
-                     ${soldeCompteSql(REF_EXPR, estAmortSql(REF_EXPR))} AS solde,
-                     max(${ligneDeduiteSql(REF_EXPR, estAmortSql(REF_EXPR))}) AS deduit
+                     sum(debit - credit) AS solde
               FROM ${dbName}.grand_livre
               WHERE batch_id IN ({batchIds:Array(String)})
                 AND ${REF_EXPR} IN ({rubriques:Array(String)})
@@ -195,7 +191,6 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
           comptes.set(row.compte, {
             intitule: intituleCompte(plan, row.compte, row.intitule),
             solde: parseFloat(row.solde) || 0,
-            deduit: Number(row.deduit) === 1,
           });
       } catch (e) {
         console.error(`[tresorerie] ClickHouse indisponible (exercice ${y}):`, e);
@@ -215,7 +210,6 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 
     // Détail par compte : union des deux exercices, du plus gros solde au plus
     // petit (un compte soldé à zéro sur les deux exercices est écarté).
-    // `deduit` : compte de passif ou de dépréciation, en moins du Total.
     const tousComptes = new Set([...n.comptes.keys(), ...n1.comptes.keys()]);
     const comptes = [...tousComptes]
       .map((compte) => {
@@ -228,7 +222,6 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
           intituleCompte: a?.intitule || b?.intitule || intituleCompte(plan, compte, ""),
           montantN,
           montantN1,
-          deduit: !!(a?.deduit || b?.deduit),
           variation: variation(montantN, montantN1),
         };
       })
