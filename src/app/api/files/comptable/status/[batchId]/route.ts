@@ -1,19 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-
-import { authOptions } from "../../../../auth/[...nextauth]/route";
 
 import { prisma } from "@/lib/prisma";
+import {
+  requirePermission,
+  requireClientAccess,
+  FICHIERS_ACTIONS,
+} from "@/lib/permissions";
 
+// Suivi d'un import : même droit que la page de statut qui l'appelle.
 export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ batchId: string }> },
 ) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user) {
-      return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
-    }
+    const permission = await requirePermission(FICHIERS_ACTIONS.VOIR);
+    if (permission instanceof NextResponse) return permission;
+    const { user } = permission;
 
     const { batchId } = await params;
 
@@ -47,12 +49,15 @@ export async function GET(
       );
     }
 
-    if (period.client.companyId !== session.user.companyId) {
+    if (period.client.companyId !== user.companyId) {
       return NextResponse.json(
         { error: "Accès non autorisé" },
         { status: 403 },
       );
     }
+
+    const refusDossier = await requireClientAccess(period.client.id, user);
+    if (refusDossier) return refusDossier;
 
     const totalFiles = period.files.length;
     const processedFiles = period.files.filter(

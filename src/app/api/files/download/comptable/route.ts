@@ -3,7 +3,7 @@ import { getServerSession } from "next-auth";
 import { S3Client, GetObjectCommand } from "@aws-sdk/client-s3";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import { prisma } from "@/lib/prisma";
-import { requirePermission } from "@/lib/permissions";
+import { requirePermission, requireClientAccess } from "@/lib/permissions";
 import { FICHIERS_ACTIONS } from "@/lib/permissions/actions";
 
 const s3Client = new S3Client({
@@ -50,6 +50,9 @@ export async function GET(req: NextRequest) {
         { status: 404 },
       );
     }
+
+    const refusDossier = await requireClientAccess(file.clientId, session.user);
+    if (refusDossier) return refusDossier;
 
     // Utiliser s3Key directement (plus fiable que de parser s3Url)
     const bucket = process.env.AWS_S3_BUCKET_NAME;

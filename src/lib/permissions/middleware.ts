@@ -152,6 +152,19 @@ export async function requireClientAccess(
 }
 
 /**
+ * Pendant de requireClientAccess pour une liste qui ne désigne pas de dossier : à
+ * ajouter au filtre `client` de la requête, à côté de l'entreprise, pour ne garder
+ * que les dossiers accessibles.
+ */
+export function filtreDossiersAccessibles(
+  user: Pick<SessionUser, "id" | "role">
+) {
+  return hasPermission(mapLegacyRole(user.role), CLIENTS_ACTIONS.VOIR_TOUS)
+    ? {}
+    : { assignments: { some: { userId: user.id } } };
+}
+
+/**
  * Vérifie si l'utilisateur a AU MOINS UNE des permissions spécifiées
  */
 export async function requireAnyPermission(

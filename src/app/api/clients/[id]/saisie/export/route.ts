@@ -4,7 +4,7 @@ import * as XLSX from "xlsx";
 import { createClient as createClickhouseClient } from "@clickhouse/client";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import { prisma } from "@/lib/prisma";
-import { requirePermission } from "@/lib/permissions";
+import { requirePermission, requireClientAccess } from "@/lib/permissions";
 import { FICHIERS_ACTIONS } from "@/lib/permissions/actions";
 import { getClickhouseDbName, manualBatchId } from "@/lib/clickhouse/manual-sync";
 import { FLAG_IMPORT, FLAG_SAISIE } from "@/lib/comptable/saisie-refs";
@@ -73,6 +73,9 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     if (!client) return NextResponse.json({ error: "Client non trouvé" }, { status: 404 });
     if (client.companyId !== session.user.companyId)
       return NextResponse.json({ error: "Accès non autorisé" }, { status: 403 });
+
+    const refusDossier = await requireClientAccess(client.id, session.user);
+    if (refusDossier) return refusDossier;
 
     const { searchParams } = new URL(req.url);
     // Exercice exporté : ?year=AAAA, sinon le plus récent. Un exercice peut

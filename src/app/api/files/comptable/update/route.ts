@@ -6,7 +6,11 @@ import {
   DeleteObjectsCommand,
 } from "@aws-sdk/client-s3";
 import { prisma } from "@/lib/prisma";
-import { requirePermission, FICHIERS_ACTIONS } from "@/lib/permissions";
+import {
+  requirePermission,
+  requireClientAccess,
+  FICHIERS_ACTIONS,
+} from "@/lib/permissions";
 import {
   detectComptableFormat,
   validateComptableFormat,
@@ -153,6 +157,9 @@ export async function PUT(req: NextRequest) {
         { status: 403 },
       );
     }
+
+    const refusDossier = await requireClientAccess(existingPeriod.client.id, user);
+    if (refusDossier) return refusDossier;
 
     // Vérifier que la période n'est pas en cours de traitement
     if (

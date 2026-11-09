@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
 
 import { z } from "zod";
-import { authOptions } from "../../auth/[...nextauth]/route";
 
 import { prisma } from "@/lib/prisma";
 import {
@@ -15,16 +13,16 @@ const updateFolderSchema = z.object({
   name: z.string().min(1).max(255),
 });
 
-// UPDATE Folder
+// UPDATE Folder : renommer, comme créer, relève du chargement de fichiers.
 export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ folderId: string }> },
 ) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user) {
-      return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
-    }
+    const permission = await requirePermission(FICHIERS_ACTIONS.CHARGER);
+    if (permission instanceof NextResponse) return permission;
+    const { user } = permission;
+
     const { folderId } = await params;
     const body = await req.json();
     const data = updateFolderSchema.parse(body);
@@ -33,7 +31,7 @@ export async function PATCH(
       where: {
         id: folderId,
         client: {
-          companyId: session.user.companyId,
+          companyId: user.companyId,
         },
       },
     });
@@ -44,6 +42,9 @@ export async function PATCH(
         { status: 404 },
       );
     }
+
+    const refusDossier = await requireClientAccess(folder.clientId, user);
+    if (refusDossier) return refusDossier;
 
     const updatedFolder = await prisma.folder.update({
       where: { id: folderId },

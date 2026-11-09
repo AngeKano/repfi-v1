@@ -2,7 +2,10 @@
 import { getServerSession } from "next-auth";
 import { authOptions } from "../../../../api/auth/[...nextauth]/route";
 import { redirect } from "next/navigation";
-import { checkPermissionSync } from "@/lib/permissions/middleware";
+import {
+  checkPermissionSync,
+  filtreDossiersAccessibles,
+} from "@/lib/permissions/middleware";
 import { FICHIERS_ACTIONS } from "@/lib/permissions/actions";
 import { Button } from "@/components/ui/button";
 
@@ -34,11 +37,13 @@ export default async function DeclarationComptablePage({
 
   const { id } = await params;
 
-  // Récupérer le client
+  // Récupérer le client : dossier de l'entreprise, et attribué à ce membre si son
+  // rôle ne voit pas tous les dossiers (comme la page du dossier).
   const client = await prisma.client.findFirst({
     where: {
       id,
       companyId: session.user.companyId,
+      ...filtreDossiersAccessibles(session.user),
     },
     select: {
       id: true,

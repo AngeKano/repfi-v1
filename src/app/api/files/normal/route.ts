@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requirePermission, FICHIERS_ACTIONS } from "@/lib/permissions";
+import {
+  requirePermission,
+  requireClientAccess,
+  FICHIERS_ACTIONS,
+} from "@/lib/permissions";
 
 export async function GET(req: NextRequest) {
   try {
@@ -31,6 +35,9 @@ export async function GET(req: NextRequest) {
     if (!client || client.companyId !== user.companyId) {
       return NextResponse.json({ error: "Client non trouvé" }, { status: 404 });
     }
+
+    const refusDossier = await requireClientAccess(clientId, user);
+    if (refusDossier) return refusDossier;
 
     // Recherche des fichiers normaux
     const files = await prisma.normalFile.findMany({

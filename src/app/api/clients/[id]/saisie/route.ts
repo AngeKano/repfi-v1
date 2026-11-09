@@ -5,7 +5,11 @@ import { createClient as createClickhouseClient } from "@clickhouse/client";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import { prisma } from "@/lib/prisma";
 import { formatDeuxDecimales } from "@/lib/nombres";
-import { requirePermission } from "@/lib/permissions";
+import {
+  requirePermission,
+  requireClientAccess,
+  type SessionUser,
+} from "@/lib/permissions";
 import { FICHIERS_ACTIONS, SAISIE_ACTIONS } from "@/lib/permissions/actions";
 import {
   getClickhouseDbName,
@@ -158,14 +162,16 @@ async function lookupTiers(
   return map;
 }
 
-async function requireClient(id: string, companyId: string) {
+async function requireClient(id: string, user: SessionUser) {
   const client = await prisma.client.findUnique({
     where: { id },
     select: { id: true, name: true, companyId: true },
   });
   if (!client) return { error: NextResponse.json({ error: "Client non trouvé" }, { status: 404 }) };
-  if (client.companyId !== companyId)
+  if (client.companyId !== user.companyId)
     return { error: NextResponse.json({ error: "Accès non autorisé" }, { status: 403 }) };
+  const refusDossier = await requireClientAccess(client.id, user);
+  if (refusDossier) return { error: refusDossier };
   return { client };
 }
 
@@ -182,7 +188,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     if (perm instanceof NextResponse) return perm;
 
     const { id } = await params;
-    const check = await requireClient(id, session.user.companyId);
+    const check = await requireClient(id, perm.user);
     if (check.error) return check.error;
 
     const { searchParams } = new URL(req.url);
@@ -753,7 +759,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     if (perm instanceof NextResponse) return perm;
 
     const { id } = await params;
-    const check = await requireClient(id, perm.user.companyId);
+    const check = await requireClient(id, perm.user);
     if (check.error) return check.error;
 
     const body = await req.json().catch(() => null);
@@ -800,7 +806,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     if (perm instanceof NextResponse) return perm;
 
     const { id } = await params;
-    const check = await requireClient(id, perm.user.companyId);
+    const check = await requireClient(id, perm.user);
     if (check.error) return check.error;
 
     const body = await req.json().catch(() => null);
@@ -862,7 +868,7 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
     if (perm instanceof NextResponse) return perm;
 
     const { id } = await params;
-    const check = await requireClient(id, perm.user.companyId);
+    const check = await requireClient(id, perm.user);
     if (check.error) return check.error;
 
     const { searchParams } = new URL(req.url);

@@ -13,7 +13,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { ProcessingStatus } from "../../../../../../../prisma/generated/prisma/enums";
-import { requirePermission, FICHIERS_ACTIONS } from "@/lib/permissions";
+import {
+  requirePermission,
+  requireClientAccess,
+  FICHIERS_ACTIONS,
+} from "@/lib/permissions";
 import { DIMENSION_EN_COURS, dimensionParType } from "@/lib/comptable/dimensions";
 import { lancerMiseAJourDimension } from "@/lib/comptable/dimension-trigger";
 
@@ -39,6 +43,9 @@ export async function POST(
     if (!update) return NextResponse.json({ error: "Mise à jour introuvable" }, { status: 404 });
     if (update.client.companyId !== user.companyId)
       return NextResponse.json({ error: "Accès non autorisé" }, { status: 403 });
+
+    const refusDossier = await requireClientAccess(update.clientId, user);
+    if (refusDossier) return refusDossier;
 
     if (DIMENSION_EN_COURS.includes(update.status) && update.status !== ProcessingStatus.PENDING)
       return NextResponse.json({ error: "Traitement déjà en cours" }, { status: 409 });

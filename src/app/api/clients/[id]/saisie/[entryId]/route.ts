@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { createClient as createClickhouseClient } from "@clickhouse/client";
 import { prisma } from "@/lib/prisma";
-import { requirePermission } from "@/lib/permissions";
+import { requirePermission, requireClientAccess } from "@/lib/permissions";
 import { SAISIE_ACTIONS } from "@/lib/permissions/actions";
 import { getClickhouseDbName, syncManualBatch } from "@/lib/clickhouse/manual-sync";
 import { exigeTiers, rubriqueTiers, typeTiersRubrique } from "@/lib/comptable/saisie-refs";
@@ -62,6 +62,9 @@ export async function PATCH(
       include: { comptablePeriod: { select: { periodStart: true, periodEnd: true } } },
     });
     if (!entry) return NextResponse.json({ error: "Ligne introuvable" }, { status: 404 });
+
+    const refusDossier = await requireClientAccess(id, perm.user);
+    if (refusDossier) return refusDossier;
 
     const body = await req.json().catch(() => null);
     const parsed = patchSchema.safeParse(body);
@@ -199,6 +202,9 @@ export async function DELETE(
       select: { id: true, year: true, comptablePeriodId: true, numeroPiece: true },
     });
     if (!entry) return NextResponse.json({ error: "Ligne introuvable" }, { status: 404 });
+
+    const refusDossier = await requireClientAccess(id, perm.user);
+    if (refusDossier) return refusDossier;
 
     await prisma.manualLedgerEntry.delete({ where: { id: entry.id } });
     await syncManualBatch(id, entry.year);

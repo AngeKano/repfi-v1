@@ -3,7 +3,7 @@ import { getServerSession } from "next-auth";
 import { S3Client, GetObjectCommand } from "@aws-sdk/client-s3";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import { prisma } from "@/lib/prisma";
-import { requirePermission } from "@/lib/permissions";
+import { requirePermission, requireClientAccess } from "@/lib/permissions";
 import { FICHIERS_ACTIONS } from "@/lib/permissions/actions";
 
 const s3Client = new S3Client({
@@ -42,6 +42,9 @@ export async function GET(
         { status: 404 },
       );
     }
+
+    const refusDossier = await requireClientAccess(period.clientId, session.user);
+    if (refusDossier) return refusDossier;
 
     if (!period.excelFileUrl || !period.excelFileUrl.startsWith("s3://")) {
       return NextResponse.json(

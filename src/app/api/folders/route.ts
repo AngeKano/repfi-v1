@@ -1,10 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
 
 import { z } from "zod";
-import { authOptions } from "../auth/[...nextauth]/route";
 
 import { prisma } from "@/lib/prisma";
+import {
+  requirePermission,
+  requireClientAccess,
+  filtreDossiersAccessibles,
+  FICHIERS_ACTIONS,
+} from "@/lib/permissions";
 
 const createFolderSchema = z.object({
   name: z.string().min(1).max(255),
@@ -15,13 +19,12 @@ const createFolderSchema = z.object({
     .transform((val) => (val === null ? undefined : val)),
 });
 
-// CREATE Folder
+// CREATE Folder : organiser l'espace de dépôt relève du chargement de fichiers.
 export async function POST(req: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user) {
-      return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
-    }
+    const permission = await requirePermission(FICHIERS_ACTIONS.CHARGER);
+    if (permission instanceof NextResponse) return permission;
+    const { user } = permission;
 
     const body = await req.json();
 
@@ -35,7 +38,7 @@ export async function POST(req: NextRequest) {
     const client = await prisma.client.findFirst({
       where: {
         id: data.clientId,
-        companyId: session.user.companyId,
+        companyId: user.companyId,
       },
     });
 
@@ -43,12 +46,30 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Client non trouvé" }, { status: 404 });
     }
 
+    const refusDossier = await requireClientAccess(client.id, user);
+    if (refusDossier) return refusDossier;
+
+    // Le parent doit être dans le même dossier client : sinon le contrôle ci-dessus
+    // serait contourné, la réponse renvoyant le parent d'un autre dossier.
+    if (data.parentId) {
+      const parent = await prisma.folder.findFirst({
+        where: { id: data.parentId, clientId: data.clientId },
+        select: { id: true },
+      });
+      if (!parent) {
+        return NextResponse.json(
+          { error: "Dossier parent non trouvé" },
+          { status: 404 },
+        );
+      }
+    }
+
     const folder = await prisma.folder.create({
       data: {
         name: data.name,
         clientId: data.clientId,
         parentId: data.parentId,
-        createdById: session.user.id,
+        createdById: user.id,
       },
       include: {
         parent: true,
@@ -82,19 +103,24 @@ export async function POST(req: NextRequest) {
 // GET Folders
 export async function GET(req: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user) {
-      return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
-    }
+    const permission = await requirePermission(FICHIERS_ACTIONS.VOIR);
+    if (permission instanceof NextResponse) return permission;
+    const { user } = permission;
 
     const { searchParams } = new URL(req.url);
     const clientId = searchParams.get("clientId");
     const parentId = searchParams.get("parentId");
 
+    if (clientId) {
+      const refusDossier = await requireClientAccess(clientId, user);
+      if (refusDossier) return refusDossier;
+    }
+
     const folders = await prisma.folder.findMany({
       where: {
         client: {
-          companyId: session.user.companyId,
+          companyId: user.companyId,
+          ...filtreDossiersAccessibles(user),
         },
         ...(clientId && { clientId }),
         ...(parentId === "root"

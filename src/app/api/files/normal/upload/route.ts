@@ -2,7 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
-import { requirePermission, FICHIERS_ACTIONS } from "@/lib/permissions";
+import {
+  requirePermission,
+  requireClientAccess,
+  FICHIERS_ACTIONS,
+} from "@/lib/permissions";
 // Instantiate S3 client
 const s3Client = new S3Client({
   region: process.env.AWS_REGION!,
@@ -50,6 +54,9 @@ export async function POST(req: NextRequest) {
     if (!client) {
       return NextResponse.json({ error: "Client non trouvé" }, { status: 404 });
     }
+
+    const refusDossier = await requireClientAccess(client.id, user);
+    if (refusDossier) return refusDossier;
 
     if (folderId) {
       const folder = await prisma.folder.findFirst({

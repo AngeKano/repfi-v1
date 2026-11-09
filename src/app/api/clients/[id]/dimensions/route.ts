@@ -26,6 +26,7 @@ import {
 } from "../../../../../../prisma/generated/prisma/enums";
 import {
   requirePermission,
+  requireClientAccess,
   checkPermissionSync,
   FICHIERS_ACTIONS,
 } from "@/lib/permissions";
@@ -90,6 +91,9 @@ export async function GET(
     const { id } = await params;
     const client = await chargerClient(id, user.companyId);
     if (!client) return NextResponse.json({ error: "Client non trouvé" }, { status: 404 });
+
+    const refusDossier = await requireClientAccess(client.id, user);
+    if (refusDossier) return refusDossier;
 
     const updates = await prisma.dimensionUpdate.findMany({
       where: { clientId: id },
@@ -180,6 +184,9 @@ export async function POST(
     const { id } = await params;
     const client = await chargerClient(id, user.companyId);
     if (!client) return NextResponse.json({ error: "Client non trouvé" }, { status: 404 });
+
+    const refusDossier = await requireClientAccess(client.id, user);
+    if (refusDossier) return refusDossier;
 
     const formData = await req.formData();
     const fileType = String(formData.get("fileType") || "") as FileType;

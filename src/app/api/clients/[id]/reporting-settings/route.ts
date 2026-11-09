@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
-import { requirePermission } from "@/lib/permissions";
+import { requirePermission, requireClientAccess } from "@/lib/permissions";
 import { SAISIE_ACTIONS } from "@/lib/permissions/actions";
 
 const schema = z.object({
@@ -23,6 +23,9 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       select: { id: true },
     });
     if (!client) return NextResponse.json({ error: "Client introuvable" }, { status: 404 });
+
+    const refusDossier = await requireClientAccess(client.id, perm.user);
+    if (refusDossier) return refusDossier;
 
     const body = await req.json().catch(() => null);
     const parsed = schema.safeParse(body);

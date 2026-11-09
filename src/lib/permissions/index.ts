@@ -51,6 +51,7 @@ export {
   checkPermission,
   requirePermission,
   requireClientAccess,
+  filtreDossiersAccessibles,
   requireAnyPermission,
   requireAllPermissions,
   withPermission,
