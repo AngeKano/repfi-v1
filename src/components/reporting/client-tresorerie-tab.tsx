@@ -25,7 +25,7 @@ import {
   ChartTooltip,
   ChartTooltipContent,
 } from "@/components/ui/chart";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid } from "recharts";
+import { BarChart, Bar, Cell, XAxis, YAxis, CartesianGrid, ReferenceLine } from "recharts";
 import type { ChartConfig } from "@/components/ui/chart";
 import {
   Loader2,
@@ -53,6 +53,7 @@ import {
   type KpiValue,
 } from "./kpi-grid";
 import { formatAxeMontant, formatCompactOnly } from "@/lib/nombres";
+import { cn } from "@/lib/utils";
 import {
   TRESORERIE_KPIS,
   RUBRIQUES_TOTAL_TRESORERIE,
@@ -81,6 +82,8 @@ interface KpiValeur {
 interface CompteTreso {
   compte: string;
   intituleCompte: string;
+  /** Compte de trésorerie passif (D…) : solde en crédit − débit, en moins du Total. */
+  passif?: boolean;
   montantN: number;
   montantN1: number;
   variation: number;
@@ -142,6 +145,16 @@ const chartConfigTresorerie: ChartConfig = {
   montantN: { label: "Année N", color: "hsl(221, 83%, 53%)" },
   montantN1: { label: "Année N-1", color: "hsl(221, 83%, 73%)" },
 };
+
+// Barres : bleu pour un solde positif, rouge pour un solde négatif (découvert,
+// dépréciation) ; teinte foncée pour N, claire pour N-1.
+const COULEURS_BARRES = {
+  montantN: { positif: "hsl(221, 83%, 53%)", negatif: "hsl(0, 72%, 51%)" },
+  montantN1: { positif: "hsl(221, 83%, 73%)", negatif: "hsl(0, 84%, 75%)" },
+} as const;
+
+/** Montant négatif en rouge dans les tableaux. */
+const classeMontant = (v: number) => (v < 0 ? "text-red-600" : undefined);
 
 function LegendLine({ color, dashed }: { color: string; dashed?: boolean }) {
   return (
@@ -342,18 +355,92 @@ export default function ClientTresorerieTab({
     }),
   );
 
-  // Libellé d'axe « 571100 - Caisse Siège » : numéro et intitulé du compte.
+  // Libellé d'axe « 571100 - Caisse Siège » : numéro et intitulé du compte ;
+  // « (passif) » pour un compte de trésorerie passif, en moins du Total.
   const comptesChart = data.comptes.map((c) => ({
     ...c,
-    libelleAxe: `${c.compte} - ${c.intituleCompte}`,
+    libelleAxe: `${c.compte} - ${c.intituleCompte}${c.passif ? " (passif)" : ""}`,
   }));
   // Hauteur dynamique : 70px par compte, comme l'histogramme « Produits par Nature ».
   const chartHeight = Math.max(data.comptes.length * 70 + 40, 200);
-  // Total Trésorerie : la somme des comptes (chacun en débit − crédit). On
-  // reprend l'indicateur, qui fait foi même si un compte change de rubrique en
-  // cours d'exercice ; la somme des comptes ne sert qu'à défaut.
-  const totalN = data.kpis.total?.valeurN ?? data.comptes.reduce((s, c) => s + c.montantN, 0);
-  const totalN1 = data.kpis.total?.valeurN1 ?? data.comptes.reduce((s, c) => s + c.montantN1, 0);
+  // Comptes dans la convention des indicateurs : actif en débit − crédit,
+  // passif en crédit − débit (comme « Autres Trésorerie Passif »).
+  const comptesActif = data.comptes.filter((c) => !c.passif);
+  const comptesPassif = data.comptes.filter((c) => c.passif);
+  const somme = (l: CompteTreso[], cle: "montantN" | "montantN1") =>
+    l.reduce((s, c) => s + c[cle], 0);
+  const actifN = somme(comptesActif, "montantN");
+  const actifN1 = somme(comptesActif, "montantN1");
+  const passifN = somme(comptesPassif, "montantN");
+  const passifN1 = somme(comptesPassif, "montantN1");
+  // Total Trésorerie = actif − passif. On reprend l'indicateur, qui fait foi
+  // même si un compte change de rubrique en cours d'exercice ; le calcul par
+  // les comptes ne sert qu'à défaut.
+  const totalN = data.kpis.total?.valeurN ?? actifN - passifN;
+  const totalN1 = data.kpis.total?.valeurN1 ?? actifN1 - passifN1;
+
+  const ligneCompte = (c: CompteTreso) => (
+    <tr
+      key={`${c.compte}-${c.passif ? "P" : "A"}`}
+      className="border-b last:border-0 hover:bg-muted/50"
+    >
+      <td className="py-2.5">
+        <div className="flex items-center gap-2">
+          <span className="font-mono text-xs text-muted-foreground">{c.compte}</span>
+          <span className="font-medium">{c.intituleCompte}</span>
+        </div>
+      </td>
+      <td className={cn("text-right py-2.5 font-semibold", classeMontant(c.montantN))}>
+        {formatCompactOnly(c.montantN)}
+      </td>
+      <td
+        className={cn("text-right py-2.5 text-muted-foreground", n1Dispo && classeMontant(c.montantN1))}
+      >
+        {n1Dispo ? formatCompactOnly(c.montantN1) : "—"}
+      </td>
+      <td className="text-right py-2.5">{n1Dispo && <VariationBadge value={c.variation} />}</td>
+    </tr>
+  );
+  // Sous-total d'une section (actif, passif) ou Total Trésorerie.
+  const ligneTotal = (
+    libelle: string,
+    n: number,
+    n1: number,
+    total = false,
+  ) => (
+    <tr
+      key={libelle}
+      className={cn(total ? "border-t-2 font-bold" : "border-b font-semibold bg-muted/30")}
+    >
+      <td className="py-2.5">{libelle}</td>
+      <td
+        className={cn("text-right py-2.5", classeMontant(n) ?? (total ? "text-blue-600" : undefined))}
+      >
+        {formatCompactOnly(n)}
+      </td>
+      <td className={cn("text-right py-2.5 text-muted-foreground", n1Dispo && classeMontant(n1))}>
+        {n1Dispo ? formatCompactOnly(n1) : "—"}
+      </td>
+      <td className="text-right py-2.5">
+        {n1Dispo && (
+          <VariationBadge
+            value={n1 !== 0 ? ((n - n1) / Math.abs(n1)) * 100 : Math.sign(n) * 100}
+          />
+        )}
+      </td>
+    </tr>
+  );
+  const enteteSection = (libelle: string, detail: string) => (
+    <tr key={libelle} className="border-b">
+      <td colSpan={4} className="pt-4 pb-1.5">
+        <span className="text-xs font-semibold uppercase tracking-wide text-[#335890]">
+          {libelle}
+        </span>
+        <span className="ml-2 text-xs italic text-muted-foreground">{detail}</span>
+      </td>
+    </tr>
+  );
+  const aDesNegatifs = data.comptes.some((c) => c.montantN < 0 || (n1Dispo && c.montantN1 < 0));
 
   return (
     <div className="space-y-6">
@@ -383,8 +470,9 @@ export default function ClientTresorerieTab({
                 <CardTitle>Trésorerie par comptes</CardTitle>
                 <CardDescription>
                   Soldes des comptes des rubriques du Total Trésorerie (
-                  {RUBRIQUES_TOTAL_TRESORERIE.join(", ")}) en débit − crédit : un découvert ou une
-                  dépréciation est négatif, et la somme des comptes donne le Total —{" "}
+                  {RUBRIQUES_TOTAL_TRESORERIE.join(", ")}), comme dans les indicateurs : trésorerie
+                  actif en débit − crédit (une dépréciation est négative), trésorerie passif en
+                  crédit − débit ; Total = actif − passif —{" "}
                   {data.yearN} vs {data.yearN1}
                 </CardDescription>
               </div>
@@ -402,6 +490,17 @@ export default function ClientTresorerieTab({
                     {data.yearN1}
                   </span>
                 </div>
+                {aDesNegatifs && (
+                  <div className="flex items-center gap-3">
+                    <LegendLine color={COULEURS_BARRES.montantN.negatif} />
+                    <span
+                      className="text-base font-medium"
+                      style={{ color: COULEURS_BARRES.montantN.negatif }}
+                    >
+                      Négatif
+                    </span>
+                  </div>
+                )}
               </div>
             </CardHeader>
             <CardContent>
@@ -445,20 +544,28 @@ export default function ClientTresorerieTab({
                       />
                     }
                   />
-                  <Bar
-                    dataKey="montantN1"
-                    name={`${data.yearN1}`}
-                    fill="hsl(221, 83%, 73%)"
-                    barSize={18}
-                    radius={[0, 4, 4, 0]}
-                  />
-                  <Bar
-                    dataKey="montantN"
-                    name={`${data.yearN}`}
-                    fill="hsl(221, 83%, 53%)"
-                    barSize={18}
-                    radius={[0, 4, 4, 0]}
-                  />
+                  {aDesNegatifs && (
+                    <ReferenceLine x={0} stroke="hsl(var(--muted-foreground))" strokeOpacity={0.6} />
+                  )}
+                  {(["montantN1", "montantN"] as const).map((cle) => (
+                    <Bar
+                      key={cle}
+                      dataKey={cle}
+                      name={`${cle === "montantN" ? data.yearN : data.yearN1}`}
+                      fill={COULEURS_BARRES[cle].positif}
+                      barSize={18}
+                      radius={[0, 4, 4, 0]}
+                    >
+                      {comptesChart.map((c) => (
+                        <Cell
+                          key={c.compte}
+                          fill={
+                            c[cle] < 0 ? COULEURS_BARRES[cle].negatif : COULEURS_BARRES[cle].positif
+                          }
+                        />
+                      ))}
+                    </Bar>
+                  ))}
                 </BarChart>
               </ChartContainer>
 
@@ -481,47 +588,30 @@ export default function ClientTresorerieTab({
                     </tr>
                   </thead>
                   <tbody>
-                    {data.comptes.map((c) => (
-                      <tr key={c.compte} className="border-b last:border-0 hover:bg-muted/50">
-                        <td className="py-2.5">
-                          <div className="flex items-center gap-2">
-                            <span className="font-mono text-xs text-muted-foreground">
-                              {c.compte}
-                            </span>
-                            <span className="font-medium">{c.intituleCompte}</span>
-                          </div>
-                        </td>
-                        <td className="text-right py-2.5 font-semibold">
-                          {formatCompactOnly(c.montantN)}
-                        </td>
-                        <td className="text-right py-2.5 text-muted-foreground">
-                          {n1Dispo ? formatCompactOnly(c.montantN1) : "—"}
-                        </td>
-                        <td className="text-right py-2.5">
-                          {n1Dispo && <VariationBadge value={c.variation} />}
-                        </td>
-                      </tr>
-                    ))}
-                    <tr className="border-t-2 font-bold">
-                      <td className="py-2.5">Total Trésorerie</td>
-                      <td className="text-right py-2.5 text-blue-600">
-                        {formatCompactOnly(totalN)}
-                      </td>
-                      <td className="text-right py-2.5 text-muted-foreground">
-                        {n1Dispo ? formatCompactOnly(totalN1) : "—"}
-                      </td>
-                      <td className="text-right py-2.5">
-                        {n1Dispo && (
-                          <VariationBadge
-                            value={
-                              totalN1 !== 0
-                                ? ((totalN - totalN1) / Math.abs(totalN1)) * 100
-                                : Math.sign(totalN) * 100
-                            }
-                          />
+                    {comptesPassif.length === 0 ? (
+                      // Que des comptes d'actif : le Total est leur somme.
+                      comptesActif.map(ligneCompte)
+                    ) : (
+                      <>
+                        {enteteSection("Trésorerie actif", "débit − crédit")}
+                        {comptesActif.map(ligneCompte)}
+                        {ligneTotal("Total trésorerie actif", actifN, actifN1)}
+                        {enteteSection(
+                          "Trésorerie passif",
+                          "crédit − débit, comme les indicateurs de passif — en moins du Total",
                         )}
-                      </td>
-                    </tr>
+                        {comptesPassif.map(ligneCompte)}
+                        {ligneTotal("Total trésorerie passif", passifN, passifN1)}
+                      </>
+                    )}
+                    {ligneTotal(
+                      comptesPassif.length > 0
+                        ? "Total Trésorerie (actif − passif)"
+                        : "Total Trésorerie",
+                      totalN,
+                      totalN1,
+                      true,
+                    )}
                   </tbody>
                 </table>
               </div>
