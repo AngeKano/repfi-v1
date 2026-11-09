@@ -38,7 +38,7 @@ import { PiBankDuotone, PiHandCoinsDuotone, PiKeyDuotone } from "react-icons/pi"
 import { toast } from "sonner";
 import { KpiGrid, type KpiDef, type KpiValue } from "./kpi-grid";
 import { formatAxeMontant, formatCompactOnly } from "@/lib/nombres";
-import { Graphe, MenuGraphes, useGraphesMasques, type GrapheDef } from "./graphes-masquables";
+import { Graphe, useGraphesMasques, type GrapheDef } from "./graphes-masquables";
 import { RATIOS_FORMULES } from "@/lib/reporting/ratios-bilantiels";
 
 type PeriodType = "year" | "month" | "ytd" | "ytd-day";
@@ -324,7 +324,7 @@ export default function ClientDettesFinancieresTab({
         onglet="dettes-fi"
         defs={KPI_DEFS}
         values={kpiValues}
-        actions={<MenuGraphes etat={graphes} />}
+        graphes={graphes}
       />
 
       <Graphe etat={graphes} id="evolution">

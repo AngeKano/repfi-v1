@@ -612,13 +612,16 @@ détail par compte appliquent la même convention.
 
 ### Trésorerie par comptes
 
-Histogramme et tableau par compte sur **toutes les rubriques du Total**, dans
-la **convention des indicateurs** : compte d'actif en `débit − crédit`,
-compte de passif ou de dépréciation en `crédit − débit`.
-Un indicateur vaut donc la somme de ses comptes (ex. 565000, rubrique `DQ`,
-débiteur de 1 : −1 dans le tableau comme dans « Autres Trésorerie Passif »).
-La ligne **Total Trésorerie** reprend l'indicateur : comptes d'actif moins
-comptes de passif et de dépréciation.
+Histogramme et tableau par compte sur **toutes les rubriques du Total**, chaque
+compte en `débit − crédit`, soit **sa contribution au Total** : un compte
+d'actif débiteur est positif, un découvert (passif) ou une dépréciation est
+négatif. La **somme de la colonne est le Total Trésorerie**, que reprend la
+ligne Total.
+
+Les indicateurs gardent leur convention (§ Convention des soldes) : un compte
+de passif y est lu en `crédit − débit`. Exemple : 565000 (`DQ`), débiteur de
+1, vaut **+1** dans le tableau (il augmente la trésorerie) et **−1** dans
+« Autres Trésorerie Passif ».
 
 ### Filtres et fenêtre
 
@@ -1047,8 +1050,12 @@ sur la même fenêtre.
 
 ## 23. KPI et graphiques configurables
 
-**Tous les onglets à KPI** proposent **« Configurer les KPIs »** : afficher /
-masquer, réordonner par glisser-déposer, mémorisé par onglet et par client.
+**Un seul bouton par onglet, « Configurer l'affichage »**, met les KPI et les
+graphiques en mode configuration ; « Terminer » le referme. Les KPI se masquent
+et se réordonnent entre eux par glisser-déposer, les graphiques entre eux
+(§ Graphiques masquables) ; un KPI ne prend jamais la place d'un graphique.
+Le bouton indique le nombre d'éléments masqués. Choix mémorisé par onglet et par
+client.
 
 **Disposition commune** : 3 cartes par ligne (Ratios bilantiels : 2 × 2),
 libellé, formule, valeur, rappel N-1, variation.
@@ -1071,12 +1078,15 @@ libellé, formule, valeur, rappel N-1, variation.
 
 ### Graphiques masquables
 
-Dans chaque onglet, le menu **« Graphiques »** (à côté de « Configurer les
-KPIs » ; Bilan d'activité : au bout de la barre de filtres) affiche ou masque
-chaque graphique : une case par graphique, « Tout afficher », et le nombre de
-graphiques masqués sur le bouton. Tous sont affichés par défaut ; le choix est
-mémorisé par onglet et par client dans le navigateur
-(`localStorage` `graphes-config-{onglet}-{clientId}`). Un graphique masqué
+En mode configuration (« Configurer l'affichage » ; Bilan d'activité : au bout
+de la barre de filtres), chaque graphique porte une barre : **Masquer /
+Afficher**, et, quand l'onglet en a plusieurs, **↑ ↓** et une poignée de
+glisser-déposer pour le placer parmi les autres graphiques. Un graphique masqué
+reste présent en configuration (« Graphique masqué ») pour pouvoir le rétablir.
+Au Bilan d'activité, les graphiques se masquent mais ne se déplacent pas : ils
+illustrent le texte de leur section. Tous sont affichés par défaut ; masqués et
+ordre sont mémorisés par onglet et par client dans le navigateur
+(`localStorage` `graphes-config-{onglet}-{clientId}` : `{ masques, ordre }`). Un graphique masqué
 ne change aucun calcul ; au Bilan d'activité, la phrase qui l'annonce est
 masquée avec lui.
 
@@ -1099,7 +1109,7 @@ tableau Top 10 Clients n'ont pas de graphique à masquer.
 
 ### Visibilité par membre
 
-« Configurer les KPIs » et « Graphiques » sont des **préférences d'affichage**, dans
+« Configurer l'affichage » est une **préférence d'affichage**, dans
 le navigateur. La **visibilité par membre** est un **droit**, défini par un
 administrateur et appliqué par le serveur.
 
@@ -1110,7 +1120,7 @@ administrateur et appliqué par le serveur.
 | Portée | Un membre, un dossier. Retirer un membre du dossier ne supprime pas ses restrictions ; elles s'appliquent aussi aux administrateurs, qui voient tous les dossiers d'office sans y être assignés |
 | Dossiers | Administrateurs : tous les dossiers, **d'office** (onglet Membres : « D'office », jamais retirés). LOADER, LOADER_PLUS, VIEWER : seulement les dossiers **attribués**, aucun par défaut ; attribution à la création ou à la modification du membre (page Membres) ou depuis l'onglet Membres du dossier |
 | Granularité | 80 éléments sur 11 onglets : KPI, graphiques, tableaux, commentaires du Bilan d'activité. Un onglet sans élément visible disparaît de la navigation |
-| À l'écran | L'élément masqué n'est ni affiché, ni proposé dans « Configurer les KPIs » ou « Graphiques », ni exporté. Le membre voit une mention : des éléments lui sont masqués |
+| À l'écran | L'élément masqué n'est ni affiché, ni proposé dans « Configurer l'affichage », ni exporté. Le membre voit une mention : des éléments lui sont masqués |
 | Côté serveur | Un champ de réponse d'API est **neutralisé** (nombre → 0, texte → vide, liste → vide) dès que **tous** les éléments qui l'affichent sont masqués. Il reste envoyé si un autre élément visible l'utilise. La forme de la réponse ne change pas |
 | Cas particuliers | `/reporting/charges` : 403 si « Charges et rentabilité » est masqué. `/reporting/qc` : 403 dès qu'un élément est masqué. Le total des Dettes court terme garde ses composantes tant qu'il est visible |
 | Limite | Le grand livre n'est pas concerné : un rôle qui a accès à la Comptabilité peut y lire les écritures et en déduire un montant masqué. VIEWER n'y a pas accès |
@@ -1371,9 +1381,9 @@ Onglet Trésorerie : indicateurs calculés par rubrique et détail par compte, N
       // total = BSA + BSB − BSB1 + BSC + BSD − BSD1 + BSE − BSE1 + BSF + BSG − DRA − DRB − DRC − DQ
       // banque = BSB − BSB1 − DRA − DRB ; autresTresoreriePassif = DRC + DQ (montant positif)
   },
-  comptes: [{ compte, intituleCompte, montantN, montantN1, deduit, variation }]
-      // comptes des rubriques du Total Trésorerie, dans la convention des indicateurs : actif en débit − crédit,
-      // passif et dépréciations en crédit − débit (deduit = true, en moins du total) ;
+  comptes: [{ compte, intituleCompte, montantN, montantN1, variation }]
+      // comptes des rubriques du Total Trésorerie, en débit − crédit (contribution au Total :
+      // découvert et dépréciation négatifs) ; Σ montantN = kpis.total.valeurN ;
       // tri par |montantN| décroissant ; comptes nuls sur N et N-1 exclus
 }
 ```
@@ -1915,6 +1925,7 @@ que les onglets autorisés par son rôle et ceux dont il lui reste un élément 
 | 06/11/2026 | **Accès au reporting par membre** : dans l'onglet **Membres** du dossier, un administrateur définit quels KPI, graphiques, tableaux et commentaires (80 éléments, 11 onglets) un collaborateur ne voit pas, dans une fenêtre, sans changer de page. Par défaut tout est visible. Un élément masqué disparaît de l'écran, des menus de configuration et des exports, et son montant n'est plus envoyé par l'API (§23). L'**ancienne page d'assignation est supprimée** : assigner et retirer se font dans le même onglet. **Matrice des droits** : nouveau droit « Définir les KPI et métriques visibles par membre » (administrateurs) ; les droits existants ne changent pas, mais plusieurs n'étaient pas appliqués et le sont désormais : Voir le reporting (LOADER n'y a plus accès, écran et API), Exporter un rapport (Télécharger des États financiers réservé à ADMIN_ROOT et ADMIN_PARTENAIRE), Voir les fichiers et Exporter les fichiers finaux (VIEWER ne lit plus le grand livre), Voir les membres. Document **« Accès »** : `docs/acces.pdf`, généré depuis le code par `npm run docs:acces`. Nouvelle table `member_reporting_access` (§25.21, §25.22). |
 | 06/11/2026 | **Droits de la matrice appliqués (suite)**, matrice inchangée. **Supprimer fichiers chargés** : contrôlé par le serveur sur la suppression d'une période, d'un fichier et d'un dossier, assignation au dossier comprise pour les rôles sans « Voir tous les clients » ; boutons masqués sans ce droit. **Activer un membre** : le passage d'inactif à actif demande ce droit (serveur et case « Compte actif ») ; un membre créé par un rôle sans ce droit (Administrateur Partenaire) reste **inactif** jusqu'à son activation. **Voir historique fichiers** : liste « Historique des mises à jour » de l'onglet Import (§25.9). **Voir infos entreprise** : Paramètres › Comptes, carte du tableau de bord, bloc `company` de `GET /api/auth/session`. **Créer un compte** : `POST /api/auth/register/company` et `/register/user`, ouvertes à tous et sans appelant dans l'application, sont réservées à ce droit ; l'inscription `POST /api/auth/signup` reste publique, faute de session à ce stade. **Droits sans fonctionnalité, donc sans contrôle** : les 5 droits d'abonnement (seul le choix du pack à l'inscription existe), Activer un client (un client n'a pas de statut ; « Désactiver » le supprime définitivement), Modifier infos entreprise (Paramètres en lecture seule, aucune route), Créer / Modifier / Supprimer un rapport (aucun rapport enregistré ; « Configurer les KPIs » et « Graphiques » restent des préférences du navigateur, §23). |
 | 09/11/2026 | **Attribution des dossiers et page Membres en fenêtres** : « Voir tous les clients » est réservé aux administrateurs (ADMIN_ROOT, ADMIN_CF, ADMIN_PARTENAIRE) ; **LOADER_PLUS et VIEWER** ne voient plus, comme LOADER, que les dossiers qui leur sont **attribués, aucun par défaut**. Dans l'onglet Membres d'un dossier, les administrateurs figurent **d'office** (« Retirer » grisé) ; un administrateur ne s'assigne pas (400). Page **Membres** : création, consultation, modification et désactivation dans des **fenêtres**, avec le choix du rôle et des dossiers attribués ; les pages `/users/new` et `/users/[id]` sont supprimées ; la page est réservée au droit « Voir les membres ». API `/users` : `clientIds` à la création et en modification (remplace la liste ; ajout : Assigner un membre, retrait : Retirer un membre) ; un membre d'une autre entreprise est désormais introuvable. Document « Accès » : nouvelle section « Attribution des dossiers » (§23, §25.21, §25.23). |
+| 09/11/2026 | **Un seul bouton « Configurer l'affichage »** par onglet, à la place de « Configurer les KPIs » et du menu « Graphiques » : il met KPI et graphiques en mode configuration. Les KPI se masquent et s'échangent entre eux (glisser-déposer), les **graphiques aussi, entre graphiques** (glisser-déposer ou flèches ↑ ↓), avec un bouton Masquer / Afficher sur chacun ; un graphique masqué reste visible en configuration pour pouvoir le rétablir. Le bouton indique le nombre d'éléments masqués. Bilan d'activité : graphiques masquables, sans déplacement (liés au texte de leur section). **Trésorerie par comptes** : chaque compte en **débit − crédit**, sa contribution au Total (un découvert ou une dépréciation est négatif) ; la somme de la colonne est le Total Trésorerie (§11, §23, §25.4). |
 
 ---
 

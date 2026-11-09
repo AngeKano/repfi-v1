@@ -12,13 +12,12 @@ import { useState } from "react";
 import type { DragEvent, ReactNode } from "react";
 import { Card, CardContent, CardDescription, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { TrendingUp, TrendingDown, Minus, Eye, EyeOffIcon } from "lucide-react";
-import { PiGearDuotone } from "react-icons/pi";
 import { cn } from "@/lib/utils";
 import { formatCompactOnly, formatNombre } from "@/lib/nombres";
 import type { OngletReportingId } from "@/lib/reporting/elements";
 import { useVisibilite } from "./visibilite";
+import { BoutonConfiguration, nbGraphesMasques, type EtatGraphes } from "./graphes-masquables";
 
 /** Définition d'un indicateur : ce qui ne dépend pas des données. */
 export interface KpiDef {
@@ -127,6 +126,7 @@ export function KpiGrid({
   columns = 3,
   actions,
   onglet,
+  graphes,
 }: {
   /** Identifiant de persistance, unique par onglet et par client. */
   storageKey: string;
@@ -134,13 +134,17 @@ export function KpiGrid({
   values: Record<string, KpiValue | undefined>;
   /** Cartes par ligne. 3 par défaut ; 2 quand l'onglet n'a que 4 indicateurs. */
   columns?: 2 | 3 | 4;
-  /** Boutons placés à côté de « Configurer les KPIs » (ex. menu Graphiques). */
+  /** Boutons placés à côté de « Configurer l'affichage ». */
   actions?: ReactNode;
+  /** Graphiques de l'onglet : un seul bouton configure KPI et graphiques. */
+  graphes?: EtatGraphes;
   /** Onglet du catalogue : les KPI masqués à ce membre ne sont jamais proposés. */
   onglet?: OngletReportingId;
 }) {
   const [config, setConfig] = useState<KpiConfigItem[]>(() => loadConfig(storageKey, defs));
-  const [editMode, setEditMode] = useState(false);
+  const [editionLocale, setEditionLocale] = useState(false);
+  const editMode = graphes ? graphes.edition : editionLocale;
+  const setEditMode = graphes ? graphes.setEdition : setEditionLocale;
   const [dragId, setDragId] = useState<string | null>(null);
   const { estVisible } = useVisibilite();
   const permis = (id: string) => !onglet || estVisible(onglet, "kpi", id);
@@ -177,21 +181,15 @@ export function KpiGrid({
   return (
     <div>
       <div className="flex items-center gap-2 mb-3">
-        {defs.some((d) => permis(d.id)) && (
-          <Button
-            variant="outline"
-            size="sm"
+        {(defs.some((d) => permis(d.id)) || (graphes?.defs.length ?? 0) > 0) && (
+          <BoutonConfiguration
+            edition={editMode}
             onClick={() => setEditMode(!editMode)}
-            className={cn(
-              "gap-2 h-9 rounded-lg transition-colors",
-              editMode
-                ? "bg-[#0077C3] text-white border-[#0077C3] hover:bg-[#005992]"
-                : "border-[#D0E3F5] text-[#335890] hover:bg-[#EBF5FF]",
-            )}
-          >
-            <PiGearDuotone className="w-4 h-4" />
-            {editMode ? "Terminer" : "Configurer les KPIs"}
-          </Button>
+            nbMasques={
+              config.filter((c) => !c.visible && permis(c.id) && defs.some((d) => d.id === c.id)).length +
+              (graphes ? nbGraphesMasques(graphes) : 0)
+            }
+          />
         )}
         {actions}
       </div>

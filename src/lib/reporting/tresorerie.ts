@@ -106,33 +106,14 @@ export const RUBRIQUES_TRESORERIE: string[] = [
  * Rubriques du Total Trésorerie. Sur ces rubriques, la somme des
  * (débit − crédit) de toutes les lignes est EXACTEMENT le Total Trésorerie :
  * dépréciations et concours bancaires y sont créditeurs, donc déjà en moins.
- * Sert au périmètre du détail par compte et à la trésorerie de la Synthèse.
+ * Sert au périmètre du détail par compte (chaque compte en débit − crédit, sa
+ * contribution au Total) et à la trésorerie de la Synthèse.
  */
 export const RUBRIQUES_TOTAL_TRESORERIE: string[] = TRESORERIE_KPIS[0].termes.map((t) => t.code);
 
 /** Rubrique de passif (concours bancaires) : solde lu en crédit − débit. */
 export function estRubriquePassif(code: string): boolean {
   return code.startsWith("D");
-}
-
-/**
- * Ligne lue en crédit − débit, soit (débit − crédit) × −1 : compte de passif
- * (rubrique D…, solde normal créditeur) ou de dépréciation. Ces montants
- * viennent EN MOINS du Total Trésorerie.
- */
-export function ligneDeduiteSql(refExpr: string, estAmortSql: string): string {
-  return `(startsWith(${refExpr}, 'D') OR (${estAmortSql}))`;
-}
-
-/**
- * Solde d'un COMPTE selon la convention de l'onglet, ligne par ligne :
- * passif et dépréciations en crédit − débit, actif en débit − crédit. Un
- * indicateur vaut ainsi la somme (signée par sa formule) de ses comptes :
- * 565000 (DQ) débiteur de 1 vaut −1 dans « Autres Trésorerie Passif » comme
- * dans le détail par compte.
- */
-export function soldeCompteSql(refExpr: string, estAmortSql: string): string {
-  return `sum(if(${ligneDeduiteSql(refExpr, estAmortSql)}, credit - debit, debit - credit))`;
 }
 
 /**
