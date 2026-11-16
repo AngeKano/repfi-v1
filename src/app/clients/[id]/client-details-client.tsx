@@ -1,13 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
-import {
-  ReportingParamsDialog,
-  paramsToQuery,
-  getStoredReportingParams,
-  saveReportingParams,
-} from "@/app/clients/reporting-params-dialog";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -54,6 +48,11 @@ import ClientRatiosTab from "@/components/reporting/client-ratios-tab";
 import ClientDettesFinancieresTab from "@/components/reporting/client-dettes-financieres-tab";
 import ClientBilanTab from "@/components/reporting/client-bilan-tab";
 import ClientEtatsFinanciersTab from "@/components/reporting/client-etats-financiers-tab";
+import FiltrePeriode, {
+  periodeSurAnnee,
+  type AnneeReporting,
+  type Periode,
+} from "@/components/reporting/filtre-periode";
 import { VisibiliteProvider } from "@/components/reporting/visibilite";
 import { ongletVisible } from "@/lib/reporting/elements";
 import { MembresTab } from "./membres";
@@ -67,10 +66,6 @@ import {
 import { DashboardLayout } from "@/components/dashboard-layout";
 import { DEVISE, UNITE_ABREGEE } from "@/lib/devise";
 
-/** Granularité correspondant à un periodType : année entière ou un mois. */
-function granulariteDe(p: string): "mois" | "annee" {
-  return p === "year" || p === "ytd" ? "annee" : "mois";
-}
 
 interface ClientDetailsClientProps {
   session: any;
@@ -142,6 +137,20 @@ const REPORTING_TAB_IDS = new Set([
   "saisie",
 ]);
 
+// Onglets de SOLDES (encours lus depuis l'ouverture de l'exercice) : la
+// période part toujours du premier mois couvert, seule la fin se règle.
+// Les autres onglets (Synthèse, Chiffres d'affaires, Résultats, États
+// financiers) portent des flux : début et fin se règlent.
+const ONGLETS_SOLDES = new Set([
+  "recouvrement",
+  "dettes",
+  "dettes-ct",
+  "tresorerie",
+  "dettes-fi",
+  "ratios",
+  "bilan",
+]);
+
 // Onglets désactivés de manière permanente (fonctionnalité à venir).
 const DISABLED_TAB_IDS = new Set(["files"]);
 
@@ -159,7 +168,6 @@ export default function ClientDetailsClient({
   hasReporting,
 }: ClientDetailsClientProps) {
   const router = useRouter();
-  const searchParams = useSearchParams();
   const [client, setClient] = useState(initialClient);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -221,109 +229,94 @@ export default function ClientDetailsClient({
     }
   };
 
-  const initialPeriodType = (() => {
-    const qp = searchParams.get("periodType");
-    if (qp === "year" || qp === "month" || qp === "ytd") return qp;
-    return undefined;
-  })();
+  // ===== Filtre de période partagé par tous les onglets de reporting :
+  // l'année, puis les mois de début et de fin (curseur sur les mois couverts).
+  // Plus de mode « périodique » ou « cumulé » : un seul mois = ce mois, jour
+  // par jour ; plusieurs mois = leur somme. =====
+  const [annees, setAnnees] = useState<AnneeReporting[] | null>(null);
+  const [periode, setPeriode] = useState<Periode | null>(null);
 
-  // ===== Filtres reporting partagés entre Synthèse / Chiffres / Résultats /
-  // Dettes. Recouvrement conserve ses propres filtres en interne car son
-  // comportement diffère (toujours cumulé sur le graphe principal). =====
-  const [year, setYear] = useState<string>(new Date().getFullYear().toString());
-  // "ytd-day" : Cumulé + Granularité Mois (vue journalière intra-mois,
-  // avec baseline = cumul Jan → selectedMonth-1).
-  const [periodType, setPeriodType] = useState<
-    "year" | "month" | "ytd" | "ytd-day"
-  >(initialPeriodType || "year");
-  const [selectedMonth, setSelectedMonth] = useState<string>("12");
-  // La granularité affichée doit correspondre au periodType : « year »
-  // (Périodique) et « ytd » (Cumulé) portent sur l'année entière, « month » et
-  // « ytd-day » sur un mois. Démarrer sur « Mois » avec un periodType annuel
-  // affichait un filtre Mois / Février sur des chiffres calculés à l'année.
-  const [cumulGranularity, setCumulGranularity] = useState<"mois" | "annee">(
-    () => granulariteDe(initialPeriodType || "year"),
-  );
-
-  // Paramètres appliqués par l'URL (choix mémorisé ou fenêtre de paramètres) :
-  // le mode ET la granularité suivent, sans quoi l'état restait sur sa valeur
-  // initiale.
+  // Exercices et mois importés ; relus au rafraîchissement (nouvel import).
   useEffect(() => {
-    if (!initialPeriodType) return;
-    setPeriodType(initialPeriodType);
-    setCumulGranularity(granulariteDe(initialPeriodType));
-  }, [initialPeriodType]);
-
-  // Garde-fou : le periodType suit toujours la granularité affichée (et le
-  // mode, périodique ou cumulé, qu'il porte déjà).
-  useEffect(() => {
-    const cumule = periodType === "ytd" || periodType === "ytd-day";
-    const attendu =
-      cumulGranularity === "annee"
-        ? cumule
-          ? "ytd"
-          : "year"
-        : cumule
-          ? "ytd-day"
-          : "month";
-    if (attendu !== periodType) setPeriodType(attendu);
-  }, [periodType, cumulGranularity]);
-
-  // Setter transmis aux onglets : un changement de periodType emporte la
-  // granularité qui lui correspond (« month », « ytd-day » → Mois ; « year »,
-  // « ytd » → Année). Sans cela, choisir « Mois » en Périodique ne changeait
-  // que le periodType et le garde-fou ci-dessus le ramenait aussitôt à
-  // l'année : les filtres restaient bloqués sur « Année ».
-  const changerPeriodType = useCallback(
-    (p: "year" | "month" | "ytd" | "ytd-day") => {
-      setPeriodType(p);
-      setCumulGranularity(granulariteDe(p));
-    },
-    [],
-  );
-
-  // Les paramètres de reporting ne sont demandés qu'une seule fois par client.
-  // Si l'URL contient déjà un filtre, ou si on a mémorisé un choix précédent,
-  // on ne redemande pas. Sinon (et seulement si un reporting existe),
-  // on ouvre la dialog au premier chargement.
-  const [showParamsDialog, setShowParamsDialog] = useState(false);
-
-  // Au montage : si pas de filtre dans l'URL mais des paramètres mémorisés,
-  // on les ré-applique silencieusement à l'URL. Sinon, on ouvre la dialog.
-  useEffect(() => {
-    if (initialPeriodType) return;
     if (!hasReporting || !canViewReporting) return;
-    const stored = getStoredReportingParams(client.id);
-    if (stored) {
-      router.replace(`/clients/${client.id}?${stored}`);
-      return;
-    }
-    setShowParamsDialog(true);
-    // On ne dépend pas de router/searchParams pour éviter de boucler
-    // après le router.replace qui modifiera initialPeriodType au refresh.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [client.id, hasReporting, canViewReporting, initialPeriodType]);
+    let annule = false;
+    (async () => {
+      try {
+        const res = await fetch(`/api/clients/${client.id}/reporting/periodes`);
+        if (!res.ok) throw new Error("Périodes indisponibles");
+        const json = (await res.json()) as { annees: AnneeReporting[] };
+        if (annule) return;
+        setAnnees(json.annees);
+        // Par défaut : l'exercice le plus récent, tous ses mois. Une période
+        // déjà choisie est gardée si elle existe encore.
+        setPeriode((p) => {
+          const a = p && json.annees.find((x) => String(x.annee) === p.annee);
+          if (a) return periodeSurAnnee(a, p);
+          return json.annees[0] ? periodeSurAnnee(json.annees[0]) : null;
+        });
+      } catch (e) {
+        console.error(e);
+        if (!annule) setAnnees([]);
+      }
+    })();
+    return () => {
+      annule = true;
+    };
+  }, [client.id, hasReporting, canViewReporting, versionDonnees]);
+
+  const finSeule = ONGLETS_SOLDES.has(activeTab);
+  const anneeCourante = annees?.find((a) => String(a.annee) === periode?.annee);
+  const premierMois = anneeCourante?.mois[0] ?? "01";
+  // Valeurs transmises aux onglets (mêmes noms qu'avant) : année, mois de fin
+  // (`selectedMonth`) et de début (`startMonth`). `periodType` garde les
+  // conventions des API : « month » = un seul mois (jour par jour), « ytd » =
+  // du mois de début au mois de fin.
+  const year = periode?.annee ?? String(new Date().getFullYear());
+  const selectedMonth = periode?.fin ?? "12";
+  const debutChoisi = finSeule ? premierMois : (periode?.debut ?? premierMois);
+  const periodType: "month" | "ytd" =
+    !finSeule && debutChoisi === selectedMonth ? "month" : "ytd";
+  // Début transmis aux API de flux : « 01 » quand la période part du premier
+  // mois importé, pour garder les écritures saisies avant l'import (comme
+  // auparavant) ; sinon le mois choisi.
+  const startMonth = debutChoisi === premierMois ? "01" : debutChoisi;
+  const cumulGranularity = "mois" as const;
+
+  // Les API se calent sur un exercice ou un mois réellement importés : le
+  // filtre suit (l'année garde ses mois si elle les couvre).
+  const setYear = useCallback(
+    (y: string) => {
+      setPeriode((p) => {
+        if (p?.annee === y) return p;
+        const a = annees?.find((x) => String(x.annee) === y);
+        return a ? periodeSurAnnee(a, p ?? undefined) : p;
+      });
+    },
+    [annees],
+  );
+  const setSelectedMonth = useCallback((m: string) => {
+    setPeriode((p) =>
+      !p || p.fin === m ? p : { ...p, fin: m, debut: p.debut > m ? m : p.debut },
+    );
+  }, []);
+  // Le mode et la granularité n'existent plus : les onglets n'en changent pas.
+  const sansEffet = useCallback(() => {}, []);
+
+  // Sur un onglet de soldes, le curseur ne règle que la fin : le début choisi
+  // pour les onglets de flux est conservé.
+  const changerPeriode = useCallback(
+    (p: Periode) => {
+      setPeriode((prev) =>
+        finSeule && prev && prev.annee === p.annee
+          ? { ...p, debut: prev.debut > p.fin ? p.fin : prev.debut }
+          : p,
+      );
+    },
+    [finSeule],
+  );
 
   const roleLabel = getRoleLabel(session.user.role);
   const roleBadgeVariant = getRoleBadgeVariant(session.user.role);
-
-  // Onglets Dettes, Recouvrement, Dettes court terme et Ratios bilantiels :
-  // le mode de calcul est verrouillé sur "Cumulé". La granularité courante
-  // (mois/annee) détermine le periodType précis : "ytd-day" (vue jour avec
-  // baseline Jan→mois-1) ou "ytd" (mensuel Jan→Déc).
-  useEffect(() => {
-    if (
-      activeTab === "dettes" ||
-      activeTab === "recouvrement" ||
-      activeTab === "dettes-ct" ||
-      activeTab === "tresorerie" ||
-      activeTab === "dettes-fi" ||
-      activeTab === "ratios"
-    ) {
-      const target = cumulGranularity === "annee" ? "ytd" : "ytd-day";
-      if (periodType !== target) setPeriodType(target);
-    }
-  }, [activeTab, periodType, cumulGranularity]);
 
   // Si l'utilisateur tente d'accéder à un onglet grisé ou interdit (par exemple
   // via l'URL), on le ramène automatiquement sur le premier onglet utilisable.
@@ -580,7 +573,28 @@ export default function ClientDetailsClient({
               </p>
             )}
 
+            {GROUPE_REPORTING.has(activeTab) &&
+              hasReporting &&
+              periode &&
+              annees &&
+              annees.length > 0 && (
+                <div className="mb-6">
+                  <FiltrePeriode
+                    annees={annees}
+                    valeur={finSeule ? { ...periode, debut: premierMois } : periode}
+                    finSeule={finSeule}
+                    onChange={changerPeriode}
+                  />
+                </div>
+              )}
+
             <VisibiliteProvider masques={masquesReporting} peutExporter={canExportReporting}>
+            {/* Les onglets de reporting attendent la période (exercices importés). */}
+            {GROUPE_REPORTING.has(activeTab) && hasReporting && canViewReporting && annees === null ? (
+              <div className="flex items-center justify-center h-64 text-sm text-[#335890]">
+                Chargement des périodes…
+              </div>
+            ) : (
             <div className="min-w-0" key={versionDonnees}>
               {/* Onglets financiers — instance unique pour préserver les filtres
                 entre Synthèse / Chiffres / Résultats. Recouvrement a ses
@@ -637,14 +651,15 @@ export default function ClientDetailsClient({
                     clientId={client.id}
                     activeTab={internalTab}
                     hideNav
+                    startMonth={startMonth}
                     year={year}
                     setYear={setYear}
                     periodType={periodType}
-                    setPeriodType={changerPeriodType}
+                    setPeriodType={sansEffet}
                     selectedMonth={selectedMonth}
                     setSelectedMonth={setSelectedMonth}
                     cumulGranularity={cumulGranularity}
-                    setCumulGranularity={setCumulGranularity}
+                    setCumulGranularity={sansEffet}
                   />
                 );
               })()}
@@ -658,11 +673,11 @@ export default function ClientDetailsClient({
                     year={year}
                     setYear={setYear}
                     periodType={periodType}
-                    setPeriodType={changerPeriodType}
+                    setPeriodType={sansEffet}
                     selectedMonth={selectedMonth}
                     setSelectedMonth={setSelectedMonth}
                     cumulGranularity={cumulGranularity}
-                    setCumulGranularity={setCumulGranularity}
+                    setCumulGranularity={sansEffet}
                   />
                 ) : (
                   <Card className="p-12 border-[#D0E3F5] text-center">
@@ -696,11 +711,11 @@ export default function ClientDetailsClient({
                     year={year}
                     setYear={setYear}
                     periodType={periodType}
-                    setPeriodType={changerPeriodType}
+                    setPeriodType={sansEffet}
                     selectedMonth={selectedMonth}
                     setSelectedMonth={setSelectedMonth}
                     cumulGranularity={cumulGranularity}
-                    setCumulGranularity={setCumulGranularity}
+                    setCumulGranularity={sansEffet}
                   />
                 ) : (
                   <Card className="p-12 border-[#D0E3F5] text-center">
@@ -719,11 +734,11 @@ export default function ClientDetailsClient({
                     clientId={client.id}
                     year={year}
                     setYear={setYear}
-                    setPeriodType={changerPeriodType}
+                    setPeriodType={sansEffet}
                     selectedMonth={selectedMonth}
                     setSelectedMonth={setSelectedMonth}
                     cumulGranularity={cumulGranularity}
-                    setCumulGranularity={setCumulGranularity}
+                    setCumulGranularity={sansEffet}
                   />
                 ) : (
                   <Card className="p-12 border-[#D0E3F5] text-center">
@@ -742,11 +757,11 @@ export default function ClientDetailsClient({
                     clientId={client.id}
                     year={year}
                     setYear={setYear}
-                    setPeriodType={changerPeriodType}
+                    setPeriodType={sansEffet}
                     selectedMonth={selectedMonth}
                     setSelectedMonth={setSelectedMonth}
                     cumulGranularity={cumulGranularity}
-                    setCumulGranularity={setCumulGranularity}
+                    setCumulGranularity={sansEffet}
                   />
                 ) : (
                   <Card className="p-12 border-[#D0E3F5] text-center">
@@ -765,11 +780,11 @@ export default function ClientDetailsClient({
                     clientId={client.id}
                     year={year}
                     setYear={setYear}
-                    setPeriodType={changerPeriodType}
+                    setPeriodType={sansEffet}
                     selectedMonth={selectedMonth}
                     setSelectedMonth={setSelectedMonth}
                     cumulGranularity={cumulGranularity}
-                    setCumulGranularity={setCumulGranularity}
+                    setCumulGranularity={sansEffet}
                   />
                 ) : (
                   <Card className="p-12 border-[#D0E3F5] text-center">
@@ -786,14 +801,15 @@ export default function ClientDetailsClient({
                 (hasReporting ? (
                   <ClientEtatsFinanciersTab
                     clientId={client.id}
+                    startMonth={startMonth}
                     year={year}
                     setYear={setYear}
                     periodType={periodType}
-                    setPeriodType={changerPeriodType}
+                    setPeriodType={sansEffet}
                     selectedMonth={selectedMonth}
                     setSelectedMonth={setSelectedMonth}
                     cumulGranularity={cumulGranularity}
-                    setCumulGranularity={setCumulGranularity}
+                    setCumulGranularity={sansEffet}
                   />
                 ) : (
                   <Card className="p-12 border-[#D0E3F5] text-center">
@@ -813,11 +829,11 @@ export default function ClientDetailsClient({
                     year={year}
                     setYear={setYear}
                     periodType={periodType}
-                    setPeriodType={changerPeriodType}
+                    setPeriodType={sansEffet}
                     selectedMonth={selectedMonth}
                     setSelectedMonth={setSelectedMonth}
                     cumulGranularity={cumulGranularity}
-                    setCumulGranularity={setCumulGranularity}
+                    setCumulGranularity={sansEffet}
                   />
                 ) : (
                   <Card className="p-12 border-[#D0E3F5] text-center">
@@ -884,6 +900,7 @@ export default function ClientDetailsClient({
                 <FilesTabs clientId={client.id} canDeleteFiles={canDeleteFiles} />
               )}
             </div>
+            )}
             </VisibiliteProvider>
           </div>
         </main>
@@ -909,20 +926,6 @@ export default function ClientDetailsClient({
         onClose={() => setShowDeleteDialog(false)}
       />
 
-      {/* Demande de filtre au premier chargement quand un reporting existe et
-          qu'aucun filtre n'a encore été défini dans l'URL ni mémorisé. */}
-      <ReportingParamsDialog
-        open={showParamsDialog}
-        clientName={client.name}
-        onClose={() => setShowParamsDialog(false)}
-        onValidate={(params) => {
-          const qs = paramsToQuery(params);
-          // Mémoriser les paramètres : on ne redemandera plus pour ce client.
-          saveReportingParams(client.id, qs);
-          setShowParamsDialog(false);
-          router.replace(`/clients/${client.id}?${qs}`);
-        }}
-      />
     </DashboardLayout>
   );
 }

@@ -34,7 +34,7 @@
 1. [Architecture & sources de données](#1-architecture--sources-de-données)
 2. [Règle de calcul : rubriques et exceptions](#2-règle-de-calcul--rubriques-et-exceptions)
 3. [Référentiels (tables de dimension)](#3-référentiels-tables-de-dimension)
-4. [Modes de calcul & granularités](#4-modes-de-calcul--granularités)
+4. [Filtre de période](#4-filtre-de-période)
 5. [Rubriques OHADA — charges (RA à RS)](#5-rubriques-ohada--charges-ra-à-rs)
 6. [Rubriques OHADA — produits (TA à TO)](#6-rubriques-ohada--produits-ta-à-to)
 7. [Soldes Intermédiaires de Gestion (SIG)](#7-soldes-intermédiaires-de-gestion-sig)
@@ -354,44 +354,45 @@ contrôle échoue sur une période déjà importée, ses données en base sont
 
 ---
 
-## 4. Modes de calcul & granularités
+## 4. Filtre de période
 
-| Mode (`periodType`) | Libellé UI | Fenêtre | Usage |
+Un **seul filtre**, au-dessus de tous les onglets de reporting et commun à
+eux (`src/components/reporting/filtre-periode.tsx`, état tenu par la page du
+client) :
+
+1. **Année** : flèches ◀ ▶ entre les exercices importés (année de début de la
+   période saisie à l'import). Une année sans import n'est jamais proposée.
+2. **Curseur à deux poignées** sur les **mois couverts** par le reporting de
+   cette année (ex. import janvier → mars : 01, 02, 03). Glisser une poignée,
+   cliquer un mois (la poignée la plus proche y va) ou **double-cliquer** un
+   mois pour l'afficher seul ; flèches du clavier sur une poignée.
+
+Il n'y a plus de mode « Périodique / Cumulé » ni de granularité :
+
+| Sélection | Indicateurs de flux (CA, charges, résultats, Top 10, CA par nature) | Graphiques de la Synthèse | Soldes (trésorerie, bilan, encours) |
 |---|---|---|---|
-| `ytd` | Cumulé / Année | Jan → Déc | Comparaisons annuelles |
-| `ytd-day` | Cumulé / Mois | Jan → mois sélectionné, détail journalier | Vue fine intra-mois |
-| `year` | Périodique / Année | Jan → Déc, non cumulé | Évolution mensuelle |
-| `month` | Périodique / Mois | Mois sélectionné seul | Analyse ponctuelle |
+| **Un seul mois** M (poignées réunies, double-clic) | le mois M seul | jour par jour sur M | solde à la fin de M (janvier → M) |
+| **Plusieurs mois** D → F | somme de D à F ; les courbes cumulées repartent de D | mois par mois, de D à F | solde à la fin de F (janvier → F) |
 
-**Onglets à mode verrouillé sur Cumulé** (un encours se lit à une date) :
-Recouvrement Clients, Règlement Fournisseurs, Dettes court terme, Trésorerie,
-Dettes Financières, Ratios bilantiels, Bilan d'activité.
+Quand la période part du **premier mois importé**, les flux sont lus depuis
+janvier, comme avant : une écriture saisie avant l'import reste comptée.
 
-**Comparaison N / N-1** : la **même fenêtre** est appliquée à chaque exercice.
-Sans reporting en N-1, la comparaison est affichée « non disponible » (ni
-montant N-1, ni variation).
+**Onglets de flux** (début et fin se règlent) : Synthèse, Chiffres d'affaires,
+Résultats (dont l'analyse des charges), États financiers (Compte de résultat
+et Compte d'exploitation ; le Bilan reste une photo depuis le 1er janvier).
 
-**Période disponible = reporting importé** (Synthèse, Chiffre d'affaires,
-Résultats ; mêmes règles dans les onglets des §11 à §18) :
+**Onglets de soldes** (début verrouillé sur le premier mois, seule la fin se
+règle — un encours se lit depuis l'ouverture) : Recouvrement Clients,
+Règlement Fournisseurs, Dettes court terme, Trésorerie, Dettes Financières,
+Ratios bilantiels, Bilan d'activité. Le début choisi pour les onglets de flux
+est conservé en y revenant.
 
-| Filtre | Règle |
-|---|---|
-| Année | Seules les années d'un reporting importé (début de période). Une année sans import n'est jamais calculée : l'écran se cale sur la plus récente |
-| Mois | Seuls les mois couverts par la période saisie à l'import (ex. import janvier → mars : janvier, février, mars). Un mois hors reporting devient le dernier mois couvert |
-| Granularité Année | La fenêtre s'arrête au **dernier mois importé** (« Janvier - Mars 2026 », pas « Janvier - Décembre ») ; les courbes ne montrent que les mois couverts |
+**Changement d'année** : mêmes mois si la nouvelle année les couvre ; toute
+l'année si la sélection couvrait déjà toute l'année affichée.
 
-**Indicateurs selon le filtre** (Synthèse, Chiffre d'affaires, Résultats) :
-
-| Filtre | Indicateurs de flux (CA, charges, résultats) | Trésorerie |
-|---|---|---|
-| Périodique + Année | janvier → dernier mois importé | solde à la fin de la fenêtre |
-| Cumulé + Année | janvier → dernier mois importé | solde à la fin de la fenêtre |
-| Périodique + Mois M | mois M seul | **solde à la fin de M** (janvier → M) |
-| Cumulé + Mois M | **janvier → M** | solde à la fin de M |
-
-La trésorerie est un solde : sa courbe part toujours du solde de fin du mois
-précédent. En Cumulé + Mois, les autres courbes cumulées (CA, subventions,
-Charges vs Produits) partent du cumul de janvier au mois précédent.
+**Comparaison N / N-1** : la **même fenêtre** (même début, même fin) est
+appliquée à chaque exercice. Sans reporting en N-1, la comparaison est
+affichée « non disponible » (ni montant N-1, ni variation).
 
 **À-nouveaux** : une écriture des journaux `RAN` / `AN` datée de décembre
 (31/12 de l'exercice précédent, acceptée à l'import) compte en **janvier** :
@@ -399,16 +400,16 @@ c'est le solde d'ouverture (`src/lib/reporting/periode.ts` : Synthèse,
 Recouvrement, Règlement Fournisseurs, Dettes, Trésorerie, Ratios, États
 financiers).
 
-**Filtres partagés** : année, mode, granularité et mois sont communs aux
-onglets. À la première ouverture d'un client, l'année se cale sur l'exercice
-le plus récent ; ensuite, **l'année choisie est conservée** d'un onglet à
-l'autre et lors de la bascule « Prendre en compte les saisies ».
+**API** : `GET /api/clients/[id]/reporting/periodes` renvoie les exercices et
+leurs mois couverts (`moisCouverts`). Les API de flux reçoivent `year`,
+`month` (fin) et `startMonth` (début, « 01 » par défaut) avec
+`periodType` = `month` (un mois) ou `ytd` (plusieurs mois) ; les onglets de
+soldes envoient `ytd` depuis janvier.
 
-**Cohérence du filtre** : le calcul suit toujours ce qu'affiche la barre de
-filtres. Granularité « Année » → l'année entière (périodique) ou janvier →
-décembre (cumulé) ; granularité « Mois » → le mois choisi (périodique) ou
-janvier → ce mois (cumulé). Au premier affichage d'un client, la granularité
-est déduite du mode mémorisé (Périodique ou Cumulé portent sur l'année).
+À l'ouverture d'un client, la période est l'**exercice le plus récent, tous
+ses mois** ; elle est conservée d'un onglet à l'autre et lors de la bascule
+« Prendre en compte les saisies ». La fenêtre « mode de calcul » qui
+s'ouvrait au premier accès à un client est retirée.
 
 ---
 
@@ -637,9 +638,9 @@ N-1, Total), comme sur les cartes KPI.
 
 ### Filtres et fenêtre
 
-Mode toujours **Cumulé** : janvier → mois choisi, ou → dernier mois importé en
-granularité Année. Années et mois limités au reporting importé ; une année
-sans import devient la plus récente et le filtre de l'écran s'y aligne (§4).
+Onglet de soldes : janvier → mois de fin du filtre (début verrouillé, §4).
+Années et mois limités au reporting importé ; une année sans import devient la
+plus récente et le filtre de l'écran s'y aligne.
 Exercice d'un lot = année de début de sa période. Sans reporting en N-1, la
 colonne et la ligne N-1 affichent « non disponible », sans variation.
 
@@ -689,10 +690,8 @@ créances, un remboursement en déduction des encaissements.
 
 ### Filtres et fenêtre
 
-L'onglet suit les **filtres partagés** (année, mois, granularité) ; le mode y
-est toujours **Cumulé** : janvier → mois choisi (granularité Mois) ou → dernier
-mois importé (granularité Année). Années et mois limités au reporting importé
-(§4). Toutes les écritures sont lues par **date comptable**, tous lots
+Onglet de soldes : janvier → mois de fin du filtre partagé (début verrouillé,
+§4). Années et mois limités au reporting importé. Toutes les écritures sont lues par **date comptable**, tous lots
 confondus ; un à-nouveau daté du 31/12 précédent compte en janvier (solde
 d'ouverture des créances).
 
@@ -748,9 +747,8 @@ journaux de trésorerie, décaissement sur journaux de trésorerie).
 
 ### Filtres et fenêtre
 
-Mode toujours **Cumulé** ; filtres partagés (année, mois, granularité). Années
-et mois limités au reporting importé ; granularité Année → janvier → dernier
-mois importé (§4). Écritures lues par date comptable, tous lots confondus ; un
+Onglet de soldes : janvier → mois de fin du filtre partagé (début verrouillé,
+§4). Années et mois limités au reporting importé. Écritures lues par date comptable, tous lots confondus ; un
 à-nouveau daté du 31/12 précédent compte en janvier.
 
 > `src/lib/reporting/creances.ts` — `perimetreDettesFournisseursSql()`,
@@ -775,9 +773,9 @@ Contient le tableau **Analyse des Dettes par Type — Top 10** (solde de chaque
 rubrique ; ligne « Total Top 10 » = somme des parts).
 
 **Encours** : `Σ(crédit − débit)` par rubrique, de janvier à la fin du mois
-choisi (ou du dernier mois importé en granularité Année), à-nouveaux compris :
-un à-nouveau daté du 31/12 précédent compte en janvier. Mode toujours Cumulé ;
-années et mois limités au reporting importé (§4). Un grand livre sans
+de fin du filtre, à-nouveaux compris : un à-nouveau daté du 31/12 précédent
+compte en janvier. Onglet de soldes (début verrouillé) ; années et mois
+limités au reporting importé (§4). Un grand livre sans
 à-nouveaux ne donne que les mouvements de l'exercice. Le KPI « Dettes
 fournisseurs » porte sur toute la rubrique `DJ` (vue bilan), l'exception E2
 (408/409) ne concerne que le Règlement Fournisseurs.
@@ -796,9 +794,9 @@ Solde passif `crédit − débit`, cumulé depuis le 1er janvier, **à-nouveaux
 compris** (un à-nouveau daté du 31/12 précédent compte en janvier) : c'est
 l'encours à la fin du mois choisi, ou du dernier mois importé en granularité
 Année. Graphique : *Évolution des dettes financières* (histogramme empilé
-Emprunts + Crédit-bail), du premier au dernier mois couvert. Mode toujours
-Cumulé ; années et mois limités au reporting importé ; N-1 sans reporting
-affiché « non disponible » (§4).
+Emprunts + Crédit-bail), du premier au dernier mois couvert. Onglet de soldes
+(début verrouillé) ; années et mois limités au reporting importé ; N-1 sans
+reporting affiché « non disponible » (§4).
 
 ---
 
@@ -818,8 +816,8 @@ Le résultat net de l'exercice (`XI`) alimente `CJ`, donc `DF`. Grille de KPI
 2 × 2. Graphiques : *Évolution du FRNG* et *Évolution du BFR* (une donnée au
 choix : global, exploitation ou HAO, en N et N-1).
 
-**Filtres et fenêtre** : encours à la fin du mois choisi (ou du dernier mois
-importé en granularité Année), cumulés depuis janvier, à-nouveaux compris ;
+**Filtres et fenêtre** : encours à la fin du mois de fin du filtre (début
+verrouillé), cumulés depuis janvier, à-nouveaux compris ;
 courbes du premier au dernier mois couvert ; années et mois limités au
 reporting importé (§4). Sans reporting en N-1 : KPI N-1 « non disponible »,
 sans variation, et pas de courbe N-1 (FRNG, BFR, DSO du Recouvrement).
@@ -848,9 +846,9 @@ Côté **Passif** : `NET = Σ(crédit − débit)`.
 ### Fenêtre et exercices
 
 - Le **Bilan** est une photo à une date : il part **toujours du 1er janvier**,
-  quel que soit le mode, à-nouveaux compris (un à-nouveau `RAN` / `AN` daté
-  du 31/12 précédent compte en janvier, §4). Le **Compte de résultat** suit le
-  mode choisi (périodique : le mois seul ; cumulé : janvier → mois).
+  quelle que soit la période, à-nouveaux compris (un à-nouveau `RAN` / `AN`
+  daté du 31/12 précédent compte en janvier, §4). Le **Compte de résultat**
+  suit la période du filtre (un mois seul, ou du mois de début au mois de fin).
 - **Exercice N** = année du filtre si elle a un reporting importé, sinon la
   plus récente (le filtre se cale sur l'année calculée). Exercice d'un lot :
   année de **début** de sa période.
@@ -908,19 +906,18 @@ Troisième sous-onglet : les mêmes 42 lignes, **mois par mois**.
 |---|---|
 | REF, LIBELLES | Figées pendant le défilement horizontal |
 | Premier mois importé … mois du filtre (ex. 7 colonnes de janvier à juillet) | **Net périodique** : `Σ(crédit − débit)` des mouvements du seul mois, par rubrique |
-| TOTAL — cumul janvier → mois du filtre | Somme des mois affichés (« CUMUL JANV. - JUIL. », « CUMUL MARS - JUIL. » pour un import commencé en mars) |
+| TOTAL — cumul début → fin de la période | Somme des mois affichés (« CUMUL JANV. - JUIL. », « CUMUL MARS - JUIL. » pour un import commencé en mars ou une période commençant en mars) |
 
 - Les sous-totaux `XA…XI` sont recalculés pour chaque mois avec les formules
   de la §7 ; elles sont linéaires, donc le total d'un sous-total égale la
   somme de ses mois.
 - Exercice = l'**année du filtre** (reporting importé, sinon la plus
-  récente) ; les colonnes vont du **premier mois importé** au **mois du
-  filtre** (dernier mois importé en granularité Année) : aucun mois hors
-  reporting. Une écriture saisie avant le premier mois importé fait commencer
-  les colonnes à son mois, pour que le total reste le cumul depuis janvier
-  (égal au Compte de résultat cumulé). Le mode de calcul ne change rien :
-  chaque mois est **indépendant** (net périodique, période 1 sans lien avec
-  période 2) et seul le total est cumulé.
+  récente) ; les colonnes vont du **mois de début** au **mois de fin** de la
+  période du filtre : aucun mois hors reporting. Quand la période part du
+  premier mois importé, une écriture saisie avant ce mois fait commencer les
+  colonnes à son mois, pour que le total reste le cumul depuis janvier (égal
+  au Compte de résultat). Chaque mois est **indépendant** (mouvements du seul
+  mois) et seul le total est cumulé.
 - Chargé à la première ouverture du sous-onglet ; inclus dans les exports
   (§17).
 
@@ -1947,6 +1944,7 @@ que les onglets autorisés par son rôle et ceux dont il lui reste un élément 
 | 09/11/2026 | Trésorerie › Trésorerie par comptes : **montants négatifs en rouge**. Barre rouge pour un solde négatif (rouge foncé en N, clair en N-1, bleu sinon), ligne verticale au zéro et entrée « Négatif » dans la légende quand un compte est négatif ; dans le tableau, montants N, N-1 et Total négatifs en rouge. Calcul inchangé (§11). |
 | 09/11/2026 | Trésorerie › Trésorerie par comptes : **chaque compte dans la convention des indicateurs**, pour que tableau et cartes se rejoignent. Tableau en deux sections : **Trésorerie actif** (débit − crédit, dépréciation négative) avec son sous-total, **Trésorerie passif** (crédit − débit, comme « Autres Trésorerie Passif ») avec son sous-total, puis **Total Trésorerie (actif − passif)**, exactement l'indicateur. 565000 (`DQ`, débiteur de 1) vaut désormais **−1** dans le tableau comme sur la carte (il valait +1) ; le sous-total passif égale « Autres Trésorerie Passif » quand il n'y a que des rubriques DRC et DQ. Sans compte de passif, tableau inchangé (comptes puis Total). Histogramme : mêmes valeurs, comptes de passif en dernier, marqués « (passif) ». API : champ `passif` sur chaque compte (§11, §25.4). |
 | 16/11/2026 | Trésorerie › Trésorerie par comptes : **chaque compte avec le montant qu'il apporte à sa carte**, en une seule liste (sections actif / passif et sous-totaux retirés). Débit − crédit pour l'actif, les dépréciations et DRA / DRB (retranchés de « Banque ») ; **crédit − débit pour DRC et DQ**, comme « Autres Trésorerie Passif ». Les comptes d'une carte s'additionnent à sa valeur : 521102 et 521105 (DRA / DRB) à −269 295K et −405K donnent avec les BSB la carte Banque (−198 087K) ; 565000 (`DQ`) vaut −1 comme « Autres Trésorerie Passif ». Ligne Total = l'indicateur. **Design aligné sur les autres graphiques** : barres bleues (plus de barre rouge, de ligne du zéro ni d'entrée « Négatif » dans la légende) ; seule une valeur < 0 s'écrit en rouge dans le tableau, comme sur les cartes. API : champ `passif` retiré (§11, §25.4). |
+| 16/11/2026 | **Filtre de période unique** pour tous les onglets de reporting, au-dessus de l'onglet : l'**année** (flèches, exercices importés), puis un **curseur à deux poignées** sur les **mois couverts** par le reporting de cette année. Plus de mode « Périodique / Cumulé » ni de granularité : **un seul mois** (poignées réunies ou **double-clic** sur le mois) = ce mois (jour par jour en Synthèse) ; **plusieurs mois** = la somme des mois choisis. Onglets de **flux** (Synthèse, Chiffres d'affaires, Résultats, États financiers) : début et fin se règlent ; CA, SIG, charges, Top 10, CA par nature, Compte de résultat et Compte d'exploitation portent sur [début, fin], leurs cumuls repartent du mois de début. **Soldes** (trésorerie de la Synthèse, bilan) toujours lus depuis janvier. Onglets de **soldes** (Recouvrement, Règlement fournisseurs, Dettes court terme, Trésorerie, Dettes financières, Ratios, Bilan d'activité) : début verrouillé sur le premier mois, seule la fin se règle. Fenêtre « mode de calcul » à l'ouverture d'un client retirée. API : paramètre `startMonth` (reporting, charges, états financiers, compte d'exploitation) ; nouvelle route `GET /api/clients/[id]/reporting/periodes` (§4). |
 
 ---
 

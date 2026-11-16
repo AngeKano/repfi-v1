@@ -1,13 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useState, type ReactNode } from "react";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -24,7 +17,6 @@ import {
   AlertTriangle,
   ChevronLeft,
   ChevronRight,
-  CalendarRange,
   Download,
   FileSpreadsheet,
   FileText,
@@ -45,6 +37,12 @@ type PeriodType = "year" | "month" | "ytd" | "ytd-day";
 
 interface ClientEtatsFinanciersTabProps {
   clientId: string;
+  /**
+   * Mois de début « MM » de la période (curseur) ; « 01 » = depuis janvier.
+   * Seul le compte de résultat et le compte d'exploitation le suivent : le
+   * bilan part toujours du 1er janvier.
+   */
+  startMonth?: string;
   year: string;
   setYear: (y: string) => void;
   periodType: PeriodType;
@@ -240,14 +238,13 @@ export function TableauExploitation({ data, cumul }: { data: ExploitationData; c
 
 export default function ClientEtatsFinanciersTab({
   clientId,
+  startMonth = "01",
   year,
   setYear,
   periodType,
-  setPeriodType,
   selectedMonth,
   setSelectedMonth,
   cumulGranularity,
-  setCumulGranularity,
 }: ClientEtatsFinanciersTabProps) {
   const [data, setData] = useState<EtatsData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -279,6 +276,7 @@ export default function ClientEtatsFinanciersTab({
         periodType,
         month: moisDemande,
       });
+      if (periodType === "ytd" && startMonth !== "01") qs.set("startMonth", startMonth);
       const res = await fetch(`/api/clients/${clientId}/reporting/etats-financiers?${qs}`);
       if (!res.ok) throw new Error("Erreur API");
       const json = (await res.json()) as EtatsData;
@@ -298,7 +296,7 @@ export default function ClientEtatsFinanciersTab({
     } finally {
       setLoading(false);
     }
-  }, [clientId, year, periodType, moisDemande, selectedMonth, setYear, setSelectedMonth]);
+  }, [clientId, year, periodType, startMonth, moisDemande, selectedMonth, setYear, setSelectedMonth]);
 
   useEffect(() => {
     load();
@@ -310,7 +308,9 @@ export default function ClientEtatsFinanciersTab({
   // Mois de fin du filtre : dernier mois importé en granularité Année (l'API
   // ramène « 12 » sur le dernier mois couvert).
   const moisFinExploitation = periodType === "year" || cumulGranularity === "annee" ? "12" : selectedMonth;
-  const cleExploitation = `${clientId}:${year}:${moisFinExploitation}`;
+  // Premier mois des colonnes : le mois choisi seul, ou le début de période.
+  const moisDebutExploitation = periodType === "month" ? selectedMonth : startMonth;
+  const cleExploitation = `${clientId}:${year}:${moisDebutExploitation}:${moisFinExploitation}`;
   const [exploitation, setExploitation] = useState<{
     cle: string;
     data: ExploitationData | null;
@@ -320,10 +320,11 @@ export default function ClientEtatsFinanciersTab({
   const exploitationCourante = exploitation?.cle === cleExploitation ? exploitation : null;
 
   const chargerExploitation = useCallback(async (): Promise<ExploitationData | null> => {
-    const cle = `${clientId}:${year}:${moisFinExploitation}`;
+    const cle = `${clientId}:${year}:${moisDebutExploitation}:${moisFinExploitation}`;
     setExploitationLoading(true);
     try {
       const qs = new URLSearchParams({ year, month: moisFinExploitation, periodType: "ytd" });
+      if (moisDebutExploitation !== "01") qs.set("startMonth", moisDebutExploitation);
       const res = await fetch(`/api/clients/${clientId}/reporting/compte-exploitation?${qs}`);
       if (!res.ok) throw new Error("Erreur API");
       const json = (await res.json()) as ExploitationData;
@@ -336,24 +337,23 @@ export default function ClientEtatsFinanciersTab({
     } finally {
       setExploitationLoading(false);
     }
-  }, [clientId, year, moisFinExploitation]);
+  }, [clientId, year, moisDebutExploitation, moisFinExploitation]);
 
   useEffect(() => {
     if (subTab === "exploitation" && !exploitationCourante && !exploitationLoading) chargerExploitation();
   }, [subTab, exploitationCourante, exploitationLoading, chargerExploitation]);
 
-  const cumule = periodType === "ytd" || periodType === "ytd-day";
   // Fenêtre réellement calculée : du premier mois importé au mois de fin
   // renvoyé par l'API (le mois seul en périodique + Mois).
   const nomMois = (v?: string) => MONTHS.find((m) => m.value === v)?.label ?? "";
   const dispo = data?.moisDisponibles ?? [];
   const moisCalcule = data?.month ?? moisDemande;
+  // Début : le mois choisi au curseur, sinon le premier mois importé.
+  const moisDebutLibelle = startMonth !== "01" ? startMonth : (dispo[0] ?? "01");
   const periodLabel =
     periodType === "month"
       ? `${nomMois(moisCalcule)} ${year}`
-      : `${nomMois(dispo[0] ?? "01")} - ${nomMois(moisCalcule)} ${year}`;
-  // Mois proposés : ceux du reporting importé.
-  const moisChoisissables = MONTHS.filter((m) => !dispo.length || dispo.includes(m.value));
+      : `${nomMois(moisDebutLibelle)} - ${nomMois(moisCalcule)} ${year}`;
 
   // Compte d'exploitation : « Juillet », « CUMUL JANV. - JUIL. » — mois
   // réellement affichés (du premier mois importé au mois de fin).
@@ -366,117 +366,11 @@ export default function ClientEtatsFinanciersTab({
     exploitationCourante?.data?.moisDebut ?? 1,
   );
 
-  const yearOptions = (data?.availableYears ?? []).map(String);
-  const handleYearChange = (dir: "prev" | "next") => {
-    const idx = yearOptions.indexOf(year);
-    if (idx < 0) return;
-    const next = dir === "prev" ? idx + 1 : idx - 1;
-    if (next >= 0 && next < yearOptions.length) setYear(yearOptions[next]);
-  };
 
-  // ==================== Barre de filtres (commune au reporting) ====================
-  const filtres = (
-    <div className="flex flex-wrap items-center gap-3">
-      <div className="flex items-center gap-2 border border-[#D0E3F5] rounded-lg px-4 h-10">
-        <span className="text-xs text-[#335890]">Mode calcul :</span>
-        <Select
-          value={cumule ? "cumule" : "periodique"}
-          onValueChange={(v: string) => {
-            if (v === "cumule") {
-              setPeriodType(cumulGranularity === "annee" ? "ytd" : "ytd-day");
-              if (cumulGranularity === "annee") setSelectedMonth("12");
-            } else {
-              setPeriodType(cumulGranularity === "annee" ? "year" : "month");
-            }
-          }}
-        >
-          <SelectTrigger className="border-0 p-0 h-auto shadow-none min-w-[90px] font-semibold text-[#00122E]">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="periodique">Périodique</SelectItem>
-            <SelectItem value="cumule">Cumulé</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
-
-      <div className="flex items-center gap-2 border border-[#D0E3F5] rounded-lg px-4 h-10">
-        <span className="text-xs text-[#335890]">Année :</span>
-        <span className="font-semibold text-[#00122E]">{year}</span>
-        <div className="flex gap-1 ml-1">
-          <button
-            title="Année précédente"
-            onClick={() => handleYearChange("prev")}
-            disabled={yearOptions.indexOf(year) >= yearOptions.length - 1}
-            className="text-[#94A3B8] hover:text-[#0077C3] disabled:opacity-30"
-          >
-            <ChevronLeft className="w-4 h-4" />
-          </button>
-          <button
-            title="Année suivante"
-            onClick={() => handleYearChange("next")}
-            disabled={yearOptions.indexOf(year) <= 0}
-            className="text-[#94A3B8] hover:text-[#0077C3] disabled:opacity-30"
-          >
-            <ChevronRight className="w-4 h-4" />
-          </button>
-        </div>
-      </div>
-
-      <div className="flex items-center gap-2 border border-[#D0E3F5] rounded-lg px-4 h-10">
-        <span className="text-xs text-[#335890]">Granularité :</span>
-        <Select
-          value={cumulGranularity}
-          onValueChange={(v: string) => {
-            const g = v as "mois" | "annee";
-            setCumulGranularity(g);
-            if (cumule) {
-              setPeriodType(g === "annee" ? "ytd" : "ytd-day");
-              if (g === "annee") setSelectedMonth("12");
-            } else {
-              setPeriodType(g === "annee" ? "year" : "month");
-            }
-          }}
-        >
-          <SelectTrigger className="border-0 p-0 h-auto shadow-none min-w-[80px] font-semibold text-[#00122E]">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="mois">Mois</SelectItem>
-            <SelectItem value="annee">Année</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
-
-      {cumulGranularity === "mois" && (
-        <div className="flex items-center gap-2 border border-[#D0E3F5] rounded-lg px-4 h-10">
-          <span className="text-xs text-[#335890]">Mois :</span>
-          <Select value={selectedMonth} onValueChange={setSelectedMonth}>
-            <SelectTrigger className="border-0 p-0 h-auto shadow-none min-w-[80px] font-semibold text-[#00122E]">
-              <SelectValue placeholder="Mois" />
-            </SelectTrigger>
-            <SelectContent>
-              {moisChoisissables.map((m) => (
-                <SelectItem key={m.value} value={m.value}>
-                  {m.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-      )}
-
-      <div className="flex items-center gap-2 bg-[#F5F9FF] rounded-lg px-4 h-10 text-xs text-[#335890]">
-        <CalendarRange className="w-3.5 h-3.5 text-[#0077C3]" />
-        <span>{periodLabel}</span>
-      </div>
-    </div>
-  );
 
   if (loading && !data) {
     return (
       <div className="space-y-6">
-        {filtres}
         <div className="flex items-center justify-center h-64">
           <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
         </div>
@@ -486,7 +380,6 @@ export default function ClientEtatsFinanciersTab({
   if (error || !data) {
     return (
       <div className="space-y-6">
-        {filtres}
         <div className="flex flex-col items-center justify-center h-64 text-muted-foreground">
           <AlertTriangle className="w-10 h-10 mb-2 opacity-30" />
           <p>{error || "Aucune donnée"}</p>
@@ -572,7 +465,6 @@ export default function ClientEtatsFinanciersTab({
 
   return (
     <div className="space-y-6">
-      {filtres}
 
       <div>
         <h1 className="text-3xl font-bold text-[#00122E]">États Financiers</h1>
@@ -882,9 +774,9 @@ export default function ClientEtatsFinanciersTab({
         <div className="space-y-3">
           <p className="text-xs text-[#335890]">
             Exercice {exploitationCourante?.data?.year ?? year} — de {libelleMoisDebut.toLowerCase()} à{" "}
-            {libelleMoisFin.toLowerCase()} (mois importés jusqu&apos;au mois du filtre). Chaque mois est{" "}
-            <strong>indépendant</strong> : il porte les mouvements du seul mois (net périodique), en mode
-            périodique comme en mode cumulé. Le <strong>total</strong> est le cumul de{" "}
+            {libelleMoisFin.toLowerCase()} (mois de la période choisie). Chaque mois est{" "}
+            <strong>indépendant</strong> : il porte les mouvements du seul mois. Le{" "}
+            <strong>total</strong> est le cumul de{" "}
             {libelleMoisDebut.toLowerCase()} à {libelleMoisFin.toLowerCase()}.
           </p>
           {exploitationCourante?.erreur ? (

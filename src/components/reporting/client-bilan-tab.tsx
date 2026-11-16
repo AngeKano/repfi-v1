@@ -10,13 +10,6 @@ import {
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
   ChartContainer,
   ChartTooltip,
   ChartTooltipContent,
@@ -31,9 +24,6 @@ import {
   CartesianGrid,
 } from "recharts";
 import {
-  ChevronLeft,
-  ChevronRight,
-  CalendarRange,
   Loader2,
   TrendingUp,
   TrendingDown,
@@ -267,13 +257,9 @@ const GRAPHES: GrapheDef[] = [
 export default function ClientBilanTab({
   clientId,
   year,
-  setYear,
   periodType,
-  setPeriodType,
   selectedMonth,
-  setSelectedMonth,
   cumulGranularity,
-  setCumulGranularity,
 }: ClientBilanTabProps) {
   const [reporting, setReporting] = useState<ReportingData | null>(null);
   const [recouvrement, setRecouvrement] = useState<RecouvrementData | null>(
@@ -286,12 +272,6 @@ export default function ClientBilanTab({
   const voir = (type: "commentaire" | "graphe" | "tableau", cle: string) =>
     estVisible("bilan", type, cle);
 
-  const yearOptions = useMemo(() => {
-    const current = new Date().getFullYear();
-    const years: string[] = [];
-    for (let y = current + 2; y >= current - 10; y--) years.push(y.toString());
-    return years;
-  }, []);
 
   // Mois de fin du cumul : année entière (mode Année / granularité Année) →
   // Décembre ; sinon le mois sélectionné. Le rapport est TOUJOURS cumulé.
@@ -330,15 +310,6 @@ export default function ClientBilanTab({
     };
     fetchAll();
   }, [clientId, year, endMonth]);
-
-  const handleYearChange = (direction: "prev" | "next") => {
-    const idx = yearOptions.indexOf(year);
-    if (direction === "prev" && idx < yearOptions.length - 1) {
-      setYear(yearOptions[idx + 1]);
-    } else if (direction === "next" && idx > 0) {
-      setYear(yearOptions[idx - 1]);
-    }
-  };
 
   const getPeriodLabel = (): string => {
     if (periodType === "year") return `Janvier - Décembre ${year}`;
@@ -396,85 +367,8 @@ export default function ClientBilanTab({
 
   return (
     <div className="space-y-6">
-      {/* Barre de filtres globaux — identique aux autres onglets reporting. */}
-      <div className="flex flex-wrap items-center gap-3 mb-6">
-        {/* A8 — Le bilan d'activité est TOUJOURS cumulé : mode verrouillé
-            (pas d'option Périodique trompeuse). */}
-        <div
-          className="flex items-center gap-2 border border-[#D0E3F5] rounded-lg px-4 h-10 opacity-70"
-          title="Le bilan d'activité est toujours calculé en cumulé"
-        >
-          <span className="text-xs text-[#335890]">Mode calcul :</span>
-          <span className="font-semibold text-[#00122E]">Cumulé</span>
-        </div>
-        <div className="flex items-center gap-2 border border-[#D0E3F5] rounded-lg px-4 h-10">
-          <span className="text-xs text-[#335890]">Année :</span>
-          <span className="font-semibold text-[#00122E]">{year}</span>
-          <div className="flex gap-1 ml-1">
-            <button
-              title="Année précédente"
-              onClick={() => handleYearChange("prev")}
-              disabled={yearOptions.indexOf(year) >= yearOptions.length - 1}
-              className="text-[#94A3B8] hover:text-[#0077C3] disabled:opacity-30"
-            >
-              <ChevronLeft className="w-4 h-4" />
-            </button>
-            <button
-              title="Année suivante"
-              onClick={() => handleYearChange("next")}
-              disabled={yearOptions.indexOf(year) <= 0}
-              className="text-[#94A3B8] hover:text-[#0077C3] disabled:opacity-30"
-            >
-              <ChevronRight className="w-4 h-4" />
-            </button>
-          </div>
-        </div>
-        {/* Granularité du cumul (le Bilan est toujours en mode cumulé). */}
-        <div className="flex items-center gap-2 border border-[#D0E3F5] rounded-lg px-4 h-10">
-          <span className="text-xs text-[#335890]">Granularité :</span>
-          <Select
-            value={cumulGranularity}
-            onValueChange={(v: string) => {
-              const g = v as "mois" | "annee";
-              setCumulGranularity(g);
-              if (g === "annee") {
-                setPeriodType("ytd");
-                setSelectedMonth("12");
-              } else {
-                setPeriodType("ytd-day");
-              }
-            }}
-          >
-            <SelectTrigger className="border-0 p-0 h-auto shadow-none min-w-[80px] font-semibold text-[#00122E]">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="mois">Mois</SelectItem>
-              <SelectItem value="annee">Année</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-        {cumulGranularity === "mois" && (
-          <div className="flex items-center gap-2 border border-[#D0E3F5] rounded-lg px-4 h-10">
-            <span className="text-xs text-[#335890]">Mois :</span>
-            <Select value={selectedMonth} onValueChange={setSelectedMonth}>
-              <SelectTrigger className="border-0 p-0 h-auto shadow-none min-w-[80px] font-semibold text-[#00122E]">
-                <SelectValue placeholder="Mois" />
-              </SelectTrigger>
-              <SelectContent>
-                {MONTHS.map((m) => (
-                  <SelectItem key={m.value} value={m.value}>
-                    {m.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        )}
-        <div className="flex items-center gap-2 bg-[#F5F9FF] rounded-lg px-4 h-10 text-xs text-[#335890]">
-          <CalendarRange className="w-3.5 h-3.5 text-[#0077C3]" />
-          <span>{getPeriodLabel()}</span>
-        </div>
+      {/* La période se règle dans le filtre commun, au-dessus de l'onglet. */}
+      <div className="flex justify-end">
         <BoutonConfiguration
           className="ml-auto"
           edition={graphes.edition}

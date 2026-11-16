@@ -500,7 +500,7 @@ const DEFAULT_RECOUVREMENT_KPIS: RecouvrementKpiItem[] = [
     id: "taux",
     label: "Taux de Recouvrement",
     key: "tauxRecouvrement",
-    sub: "Cumulé : Janvier → mois sélectionné",
+    sub: "Cumulé sur la période choisie",
     color: "text-violet-600",
     icon: PiPercentDuotone,
     percent: true,
@@ -746,6 +746,7 @@ export default function ClientReportingChart({
   initialTab,
   activeTab: activeTabProp,
   hideNav = false,
+  startMonth = "01",
   year,
   setYear,
   periodType,
@@ -753,7 +754,6 @@ export default function ClientReportingChart({
   selectedMonth,
   setSelectedMonth,
   cumulGranularity,
-  setCumulGranularity,
 }: {
   clientId: string;
   initialTab?: TabId;
@@ -764,6 +764,11 @@ export default function ClientReportingChart({
    */
   activeTab?: TabId;
   hideNav?: boolean;
+  /**
+   * Mois de début « MM » de la période (curseur) ; « 01 » = depuis janvier.
+   * Ne sert qu'aux fenêtres de plusieurs mois (`periodType` « ytd »).
+   */
+  startMonth?: string;
   // Filtres reporting partagés (Synthèse / Chiffres / Résultats / Dettes).
   // Recouvrement conserve ses propres états en interne.
   year: string;
@@ -1003,16 +1008,11 @@ export default function ClientReportingChart({
   const recouvrementGranularity = cumulGranularity;
   const setRecouvrementYear = setYear;
   const setRecouvrementMonth = setSelectedMonth;
-  const setRecouvrementGranularity = (g: "mois" | "annee") => {
-    setCumulGranularity(g);
-    setPeriodType(g === "annee" ? "ytd" : "ytd-day");
-    if (g === "annee") setSelectedMonth("12");
-  };
   const [recouvrementLoading, setRecouvrementLoading] = useState(false);
 
   useEffect(() => {
     fetchData();
-  }, [clientId, year, periodType, selectedMonth]);
+  }, [clientId, year, periodType, selectedMonth, startMonth]);
 
   // Charger les données de recouvrement quand l'onglet est actif ou quand le mois/année/mode/granularité change
   useEffect(() => {
@@ -1040,6 +1040,8 @@ export default function ClientReportingChart({
       ) {
         url += `&month=${selectedMonth}`;
       }
+      // Fenêtre de plusieurs mois : du mois de début au mois de fin.
+      if (periodType === "ytd" && startMonth !== "01") url += `&startMonth=${startMonth}`;
       const res = await fetch(url);
       if (!res.ok) throw new Error("Erreur API");
       const json = await res.json();
@@ -1271,22 +1273,6 @@ export default function ClientReportingChart({
     return `${startMonth} - ${endMonth} ${yearStr}`;
   };
 
-  // Libellé de la fenêtre réellement calculée : du premier mois couvert par le
-  // reporting au mois de fin (en granularité Année, le dernier mois couvert).
-  const getPeriodLabel = (): string => {
-    const nom = (v?: string | null) => MONTHS.find((m) => m.value === v)?.label || "";
-    const dispo = data?.moisDisponibles ?? [];
-    const debut = nom(dispo[0] ?? "01");
-    const dernier = nom(dispo[dispo.length - 1] ?? "12");
-    if (periodType === "ytd") return `${debut} - ${nom(selectedMonth)} ${year}`;
-    if (periodType === "ytd-day") {
-      // Cumulé + jour : la base va du premier mois au mois précédent, puis on
-      // détaille jour par jour sur le mois sélectionné.
-      return `${debut} - ${nom(selectedMonth)} ${year} (jour par jour)`;
-    }
-    if (periodType === "month") return `${nom(selectedMonth)} ${year}`;
-    return `${debut} - ${dernier} ${year}`;
-  };
 
   // Mois proposés : ceux couverts par le reporting de l'année.
   const moisChoisissables = MONTHS.filter(
@@ -2527,6 +2513,7 @@ export default function ClientReportingChart({
                   year={year}
                   periodType={periodType}
                   selectedMonth={selectedMonth}
+                  startMonth={startMonth}
                 />
               </Graphe>
             </ZoneGraphes>
@@ -3226,248 +3213,9 @@ export default function ClientReportingChart({
       {/* Main Content */}
       <div className={hideNav ? "" : "flex-1 p-6 overflow-auto"}>
         {/* Header */}
-        {hideNav ? (
-          /* Barre de filtres globaux (Synthèse / Chiffres / Résultats) — l'état
-             est partagé donc une modification sur n'importe lequel de ces
-             onglets s'applique aux autres. Recouvrement conserve sa propre
-             barre dédiée car son calcul impose le mode périodique. */
-          <div className="flex flex-wrap items-center gap-3 mb-6">
-            {activeTab !== "recouvrement" ? (
-              <>
-                <div className="flex items-center gap-2 border border-[#D0E3F5] rounded-lg px-4 h-10">
-                  <span className="text-xs text-[#335890]">Mode calcul :</span>
-                  <Select
-                    value={
-                      periodType === "ytd" || periodType === "ytd-day"
-                        ? "cumule"
-                        : "periodique"
-                    }
-                    onValueChange={(v: string) => {
-                      // En cumulé : "mois" → ytd-day (jour avec baseline),
-                      //             "annee" → ytd (mensuel Jan→Déc).
-                      // En périodique : on conserve la granularité courante.
-                      if (v === "cumule") {
-                        setPeriodType(
-                          cumulGranularity === "annee" ? "ytd" : "ytd-day",
-                        );
-                        if (cumulGranularity === "annee")
-                          setSelectedMonth("12");
-                      } else {
-                        setPeriodType(
-                          cumulGranularity === "annee" ? "year" : "month",
-                        );
-                      }
-                    }}
-                  >
-                    <SelectTrigger className="border-0 p-0 h-auto shadow-none min-w-[90px] font-semibold text-[#00122E]">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="periodique">Périodique</SelectItem>
-                      <SelectItem value="cumule">Cumulé</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="flex items-center gap-2 border border-[#D0E3F5] rounded-lg px-4 h-10">
-                  <span className="text-xs text-[#335890]">Année :</span>
-                  <span className="font-semibold text-[#00122E]">{year}</span>
-                  <div className="flex gap-1 ml-1">
-                    <button
-                      title="Année précédente"
-                      onClick={() => handleYearChange("prev")}
-                      disabled={
-                        data.availableYears.indexOf(year) >=
-                        data.availableYears.length - 1
-                      }
-                      className="text-[#94A3B8] hover:text-[#0077C3] disabled:opacity-30"
-                    >
-                      <ChevronLeft className="w-4 h-4" />
-                    </button>
-                    <button
-                      title="Année suivante"
-                      onClick={() => handleYearChange("next")}
-                      disabled={data.availableYears.indexOf(year) <= 0}
-                      className="text-[#94A3B8] hover:text-[#0077C3] disabled:opacity-30"
-                    >
-                      <ChevronRight className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
-                {periodType !== "ytd" && periodType !== "ytd-day" ? (
-                  <div className="flex items-center gap-2 border border-[#D0E3F5] rounded-lg px-4 h-10">
-                    <span className="text-xs text-[#335890]">
-                      Granularité :
-                    </span>
-                    <Select
-                      value={periodType === "month" ? "month" : "year"}
-                      onValueChange={(v: string) =>
-                        setPeriodType(v as PeriodType)
-                      }
-                    >
-                      <SelectTrigger className="border-0 p-0 h-auto shadow-none min-w-[80px] font-semibold text-[#00122E]">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="year">Année</SelectItem>
-                        <SelectItem value="month">Mois</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                ) : (
-                  <div className="flex items-center gap-2 border border-[#D0E3F5] rounded-lg px-4 h-10">
-                    <span className="text-xs text-[#335890]">
-                      Granularité :
-                    </span>
-                    <Select
-                      value={cumulGranularity}
-                      onValueChange={(v: string) => {
-                        const g = v as "mois" | "annee";
-                        setCumulGranularity(g);
-                        // En cumulé : mois → "ytd-day" (vue journalière avec
-                        // baseline), annee → "ytd" (mensuel Jan→Déc).
-                        if (g === "annee") {
-                          setPeriodType("ytd");
-                          setSelectedMonth("12");
-                        } else {
-                          setPeriodType("ytd-day");
-                        }
-                      }}
-                    >
-                      <SelectTrigger className="border-0 p-0 h-auto shadow-none min-w-[80px] font-semibold text-[#00122E]">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="mois">Mois</SelectItem>
-                        <SelectItem value="annee">Année</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                )}
-                {(periodType === "ytd-day" || periodType === "month") && (
-                  <div className="flex items-center gap-2 border border-[#D0E3F5] rounded-lg px-4 h-10">
-                    <span className="text-xs text-[#335890]">Mois :</span>
-                    <Select
-                      value={selectedMonth}
-                      onValueChange={setSelectedMonth}
-                    >
-                      <SelectTrigger className="border-0 p-0 h-auto shadow-none min-w-[80px] font-semibold text-[#00122E]">
-                        <SelectValue placeholder="Mois" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {moisChoisissables.map((month) => (
-                          <SelectItem key={month.value} value={month.value}>
-                            {month.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                )}
-                {/* Period indicator */}
-                <div className="flex items-center gap-2 bg-[#F5F9FF] rounded-lg px-4 h-10 text-xs text-[#335890]">
-                  <CalendarRange className="w-3.5 h-3.5 text-[#0077C3]" />
-                  <span>{getPeriodLabel()}</span>
-                </div>
-              </>
-            ) : (
-              <>
-                {/* Mode calcul verrouillé sur Cumulé : l'onglet Recouvrement
-                    ne supporte pas le mode périodique. Le sélecteur reste
-                    visible mais désactivé. */}
-                <div
-                  className="flex items-center gap-2 border border-[#D0E3F5] rounded-lg px-4 h-10 opacity-70"
-                  title="Le mode de calcul est toujours Cumulé pour le Recouvrement"
-                >
-                  <span className="text-xs text-[#335890]">Mode calcul :</span>
-                  <Select value="cumule" disabled>
-                    <SelectTrigger className="border-0 p-0 h-auto shadow-none min-w-[90px] font-semibold text-[#00122E] cursor-not-allowed">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="cumule">Cumulé</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="flex items-center gap-2 border border-[#D0E3F5] rounded-lg px-4 h-10">
-                  <span className="text-xs text-[#335890]">Granularité :</span>
-                  <Select
-                    value={recouvrementGranularity}
-                    onValueChange={(v: string) =>
-                      setRecouvrementGranularity(v as "mois" | "annee")
-                    }
-                  >
-                    <SelectTrigger className="border-0 p-0 h-auto shadow-none min-w-[80px] font-semibold text-[#00122E]">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="mois">Mois</SelectItem>
-                      <SelectItem value="annee">Année</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="flex items-center gap-2 border border-[#D0E3F5] rounded-lg px-4 h-10">
-                  <span className="text-xs text-[#335890]">Année :</span>
-                  <Select
-                    value={recouvrementYear}
-                    onValueChange={setRecouvrementYear}
-                  >
-                    <SelectTrigger className="border-0 p-0 h-auto shadow-none min-w-[60px] font-semibold text-[#00122E]">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {data.availableYears.map((y) => (
-                        <SelectItem key={y} value={y}>
-                          {y}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                {recouvrementGranularity === "mois" && (
-                  <div className="flex items-center gap-2 border border-[#D0E3F5] rounded-lg px-4 h-10">
-                    <span className="text-xs text-[#335890]">Mois :</span>
-                    <Select
-                      value={recouvrementMonth}
-                      onValueChange={setRecouvrementMonth}
-                    >
-                      <SelectTrigger className="border-0 p-0 h-auto shadow-none min-w-[80px] font-semibold text-[#00122E]">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {moisChoisissables.map((month) => (
-                          <SelectItem key={month.value} value={month.value}>
-                            {month.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                )}
-                {/* Period indicator */}
-                <div className="flex items-center gap-2 bg-[#F5F9FF] rounded-lg px-4 h-10 text-xs text-[#335890]">
-                  <CalendarRange className="w-3.5 h-3.5 text-[#0077C3]" />
-                  <span>
-                    {(() => {
-                      // Fenêtre réellement calculée : du premier mois couvert
-                      // par le reporting au mois de fin (dernier mois couvert
-                      // en granularité Année).
-                      const nom = (v?: string) => MONTHS.find((m) => m.value === v)?.label ?? "";
-                      const dispo = recouvrementData?.moisDisponibles ?? data.moisDisponibles ?? [];
-                      const debut = nom(dispo[0] ?? "01");
-                      const fin =
-                        recouvrementData?.endMonth !== undefined
-                          ? String(recouvrementData.endMonth).padStart(2, "0")
-                          : recouvrementGranularity === "annee"
-                            ? (dispo[dispo.length - 1] ?? "12")
-                            : recouvrementMonth;
-                      return `${debut} - ${nom(fin)} ${recouvrementYear}`;
-                    })()}
-                  </span>
-                </div>
-              </>
-            )}
-          </div>
-        ) : (
+        {/* Mode intégré : le filtre de période (année, curseur des mois) est
+            rendu par la page, commun à tous les onglets de reporting. */}
+        {hideNav ? null : (
           <div className="flex items-center justify-between mb-6">
             <div>
               <h2 className="text-2xl font-bold">{data.client.name}</h2>

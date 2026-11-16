@@ -75,6 +75,8 @@ interface Props {
   year: string;
   periodType: string;
   selectedMonth: string | null;
+  /** Mois de début « MM » d'une période de plusieurs mois ; « 01 » par défaut. */
+  startMonth?: string;
 }
 
 // Couleurs : CA et autres produits en bleu, charge en orange, reprise
@@ -121,7 +123,13 @@ const couleurEtape = (e: EtapeCascade) => {
 const TH = "py-2 px-2 font-semibold text-[#00122E] whitespace-nowrap";
 const TD = "py-2 px-2 tabular-nums whitespace-nowrap";
 
-export default function ClientAnalyseCharges({ clientId, year, periodType, selectedMonth }: Props) {
+export default function ClientAnalyseCharges({
+  clientId,
+  year,
+  periodType,
+  selectedMonth,
+  startMonth = "01",
+}: Props) {
   const [data, setData] = useState<ChargesData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -129,8 +137,9 @@ export default function ClientAnalyseCharges({ clientId, year, periodType, selec
   const filtres = useMemo(() => {
     const qs = new URLSearchParams({ year, periodType });
     if (selectedMonth) qs.set("month", selectedMonth);
+    if (periodType === "ytd" && startMonth !== "01") qs.set("startMonth", startMonth);
     return qs.toString();
-  }, [year, periodType, selectedMonth]);
+  }, [year, periodType, selectedMonth, startMonth]);
 
   useEffect(() => {
     let annule = false;

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect } from "react";
 import {
   Card,
   CardContent,
@@ -8,13 +8,6 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import {
   ChartContainer,
   ChartTooltip,
@@ -33,9 +26,6 @@ import {
   Loader2,
   Eye,
   EyeOffIcon,
-  ChevronLeft,
-  ChevronRight,
-  CalendarRange,
 } from "lucide-react";
 import {
   PiCoinsDuotone,
@@ -186,21 +176,6 @@ function saveDetteKpiConfig(clientId: string, items: DetteKpiItem[]) {
 }
 
 // ==================== HELPERS ====================
-const MONTHS = [
-  { value: "01", label: "Janvier" },
-  { value: "02", label: "Février" },
-  { value: "03", label: "Mars" },
-  { value: "04", label: "Avril" },
-  { value: "05", label: "Mai" },
-  { value: "06", label: "Juin" },
-  { value: "07", label: "Juillet" },
-  { value: "08", label: "Août" },
-  { value: "09", label: "Septembre" },
-  { value: "10", label: "Octobre" },
-  { value: "11", label: "Novembre" },
-  { value: "12", label: "Décembre" },
-];
-
 type PeriodType = "year" | "month" | "ytd" | "ytd-day";
 
 interface ClientDettesTabProps {
@@ -254,11 +229,9 @@ export default function ClientDettesTab({
   year,
   setYear,
   periodType,
-  setPeriodType,
   selectedMonth,
   setSelectedMonth,
   cumulGranularity,
-  setCumulGranularity,
 }: ClientDettesTabProps) {
   const [data, setData] = useState<DetteData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -286,9 +259,6 @@ export default function ClientDettesTab({
   const { estVisible } = useVisibilite();
   // Un seul mode configuration : KPI et graphiques ensemble.
   const kpiEditMode = graphes.edition;
-
-  // Années proposées : celles d'un reporting importé (renvoyées par l'API).
-  const yearOptions = useMemo(() => data?.availableYears ?? [year], [data, year]);
 
   useEffect(() => {
     const fetchDettes = async () => {
@@ -379,31 +349,6 @@ export default function ClientDettesTab({
   const formatKpiValue = (item: DetteKpiItem, value: number) =>
     item.percent ? `${value.toFixed(1)}%` : formatCompactOnly(value);
 
-  // Libellé de la fenêtre réellement calculée : du premier mois couvert par le
-  // reporting au mois de fin (en granularité Année, le dernier mois couvert).
-  const getPeriodLabel = (): string => {
-    const nom = (v?: string | null) => MONTHS.find((x) => x.value === v)?.label || "";
-    const dispo = data?.moisDisponibles ?? [];
-    const debut = nom(dispo[0] ?? "01");
-    const fin = nom(data?.endMonth ? String(data.endMonth).padStart(2, "0") : month);
-    if (periodType === "ytd-day") return `${debut} - ${fin} ${year} (jour par jour)`;
-    if (periodType === "month") return `${nom(month)} ${year}`;
-    return `${debut} - ${fin} ${year}`;
-  };
-  // Mois proposés : ceux couverts par le reporting de l'année.
-  const moisChoisissables = MONTHS.filter(
-    (m) => !data?.moisDisponibles?.length || data.moisDisponibles.includes(m.value),
-  );
-
-  const handleYearChange = (direction: "prev" | "next") => {
-    const idx = yearOptions.indexOf(year);
-    if (direction === "prev" && idx < yearOptions.length - 1) {
-      setYear(yearOptions[idx + 1]);
-    } else if (direction === "next" && idx > 0) {
-      setYear(yearOptions[idx - 1]);
-    }
-  };
-
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -422,97 +367,6 @@ export default function ClientDettesTab({
 
   return (
     <div className="space-y-6">
-      {/* Barre de filtres globaux — strictement identique à celle des onglets
-          Synthèse / Chiffres / Résultats (l'état est partagé via le parent). */}
-      <div className="flex flex-wrap items-center gap-3 mb-6">
-        {/* Onglet Dettes : Mode calcul verrouillé sur Cumulé.
-            Le sélecteur reste visible mais désactivé pour signaler l'option
-            verrouillée à l'utilisateur. */}
-        <div
-          className="flex items-center gap-2 border border-[#D0E3F5] rounded-lg px-4 h-10 opacity-70"
-          title="Le mode de calcul est toujours Cumulé pour l'analyse des dettes"
-        >
-          <span className="text-xs text-[#335890]">Mode calcul :</span>
-          <Select value="cumule" disabled>
-            <SelectTrigger className="border-0 p-0 h-auto shadow-none min-w-[90px] font-semibold text-[#00122E] cursor-not-allowed">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="cumule">Cumulé</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="flex items-center gap-2 border border-[#D0E3F5] rounded-lg px-4 h-10">
-          <span className="text-xs text-[#335890]">Année :</span>
-          <span className="font-semibold text-[#00122E]">{year}</span>
-          <div className="flex gap-1 ml-1">
-            <button
-              title="Année précédente"
-              onClick={() => handleYearChange("prev")}
-              disabled={yearOptions.indexOf(year) >= yearOptions.length - 1}
-              className="text-[#94A3B8] hover:text-[#0077C3] disabled:opacity-30"
-            >
-              <ChevronLeft className="w-4 h-4" />
-            </button>
-            <button
-              title="Année suivante"
-              onClick={() => handleYearChange("next")}
-              disabled={yearOptions.indexOf(year) <= 0}
-              className="text-[#94A3B8] hover:text-[#0077C3] disabled:opacity-30"
-            >
-              <ChevronRight className="w-4 h-4" />
-            </button>
-          </div>
-        </div>
-        {/* Mode locked to cumulé → seul le sélecteur de granularité
-            "Mois / Année" (cumulé) est affiché. */}
-        <div className="flex items-center gap-2 border border-[#D0E3F5] rounded-lg px-4 h-10">
-          <span className="text-xs text-[#335890]">Granularité :</span>
-          <Select
-            value={cumulGranularity}
-            onValueChange={(v: string) => {
-              const g = v as "mois" | "annee";
-              setCumulGranularity(g);
-              if (g === "annee") {
-                setPeriodType("ytd");
-                setSelectedMonth("12");
-              } else {
-                setPeriodType("ytd-day");
-              }
-            }}
-          >
-            <SelectTrigger className="border-0 p-0 h-auto shadow-none min-w-[80px] font-semibold text-[#00122E]">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="mois">Mois</SelectItem>
-              <SelectItem value="annee">Année</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-        {(periodType === "ytd-day" || periodType === "month") && (
-          <div className="flex items-center gap-2 border border-[#D0E3F5] rounded-lg px-4 h-10">
-            <span className="text-xs text-[#335890]">Mois :</span>
-            <Select value={selectedMonth} onValueChange={setSelectedMonth}>
-              <SelectTrigger className="border-0 p-0 h-auto shadow-none min-w-[80px] font-semibold text-[#00122E]">
-                <SelectValue placeholder="Mois" />
-              </SelectTrigger>
-              <SelectContent>
-                {moisChoisissables.map((m) => (
-                  <SelectItem key={m.value} value={m.value}>
-                    {m.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        )}
-        <div className="flex items-center gap-2 bg-[#F5F9FF] rounded-lg px-4 h-10 text-xs text-[#335890]">
-          <CalendarRange className="w-3.5 h-3.5 text-[#0077C3]" />
-          <span>{getPeriodLabel()}</span>
-        </div>
-      </div>
-
       {/* KPIs configurables */}
       <div>
         <div className="flex items-center gap-2 mb-3">

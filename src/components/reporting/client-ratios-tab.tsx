@@ -32,9 +32,6 @@ import type { ChartConfig } from "@/components/ui/chart";
 import {
   Loader2,
   AlertTriangle,
-  ChevronLeft,
-  ChevronRight,
-  CalendarRange,
 } from "lucide-react";
 import {
   PiScalesDuotone,
@@ -178,11 +175,9 @@ export default function ClientRatiosTab({
   clientId,
   year,
   setYear,
-  setPeriodType,
   selectedMonth,
   setSelectedMonth,
   cumulGranularity,
-  setCumulGranularity,
 }: ClientRatiosTabProps) {
   const [data, setData] = useState<RatiosData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -226,99 +221,13 @@ export default function ClientRatiosTab({
   const nomMois = (v?: string) => MONTHS.find((m) => m.value === v)?.label ?? "";
   const dispo = data?.moisDisponibles ?? [];
   const moisCalcule = data?.month ?? moisFin;
-  const periodLabel = `${nomMois(dispo[0] ?? "01")} - ${nomMois(moisCalcule)} ${year}`;
-  // Mois et années proposés : ceux du reporting importé.
-  const moisChoisissables = MONTHS.filter((m) => !dispo.length || dispo.includes(m.value));
-  const annees = (data?.availableYears ?? [parseInt(year, 10)]).map(String);
-  const indexAnnee = annees.indexOf(year);
   // Comparaison N-1 seulement si N-1 a un reporting.
   const n1Dispo = data?.anneeN1Disponible !== false;
 
-  const filtres = (
-    <div className="flex flex-wrap items-center gap-3">
-      {/* Un ratio bilantiel se lit sur un encours : mode verrouillé. */}
-      <div
-        className="flex items-center gap-2 border border-[#D0E3F5] rounded-lg px-4 h-10 opacity-70"
-        title="Les ratios bilantiels sont toujours calculés en cumulé"
-      >
-        <span className="text-xs text-[#335890]">Mode calcul :</span>
-        <span className="font-semibold text-[#00122E]">Cumulé</span>
-      </div>
-
-      <div className="flex items-center gap-2 border border-[#D0E3F5] rounded-lg px-4 h-10">
-        <span className="text-xs text-[#335890]">Année :</span>
-        <span className="font-semibold text-[#00122E]">{year}</span>
-        <div className="flex gap-1 ml-1">
-          {/* Années d'un reporting importé uniquement (liste décroissante). */}
-          <button
-            title="Année précédente"
-            onClick={() => setYear(annees[indexAnnee + 1])}
-            disabled={indexAnnee < 0 || indexAnnee >= annees.length - 1}
-            className="text-[#94A3B8] hover:text-[#0077C3] disabled:opacity-30"
-          >
-            <ChevronLeft className="w-4 h-4" />
-          </button>
-          <button
-            title="Année suivante"
-            onClick={() => setYear(annees[indexAnnee - 1])}
-            disabled={indexAnnee <= 0}
-            className="text-[#94A3B8] hover:text-[#0077C3] disabled:opacity-30"
-          >
-            <ChevronRight className="w-4 h-4" />
-          </button>
-        </div>
-      </div>
-
-      <div className="flex items-center gap-2 border border-[#D0E3F5] rounded-lg px-4 h-10">
-        <span className="text-xs text-[#335890]">Granularité :</span>
-        <Select
-          value={cumulGranularity}
-          onValueChange={(v: string) => {
-            const g = v as "mois" | "annee";
-            setCumulGranularity(g);
-            setPeriodType(g === "annee" ? "ytd" : "ytd-day");
-            if (g === "annee") setSelectedMonth("12");
-          }}
-        >
-          <SelectTrigger className="border-0 p-0 h-auto shadow-none min-w-[80px] font-semibold text-[#00122E]">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="mois">Mois</SelectItem>
-            <SelectItem value="annee">Année</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
-
-      {cumulGranularity === "mois" && (
-        <div className="flex items-center gap-2 border border-[#D0E3F5] rounded-lg px-4 h-10">
-          <span className="text-xs text-[#335890]">Mois :</span>
-          <Select value={selectedMonth} onValueChange={setSelectedMonth}>
-            <SelectTrigger className="border-0 p-0 h-auto shadow-none min-w-[80px] font-semibold text-[#00122E]">
-              <SelectValue placeholder="Mois" />
-            </SelectTrigger>
-            <SelectContent>
-              {moisChoisissables.map((m) => (
-                <SelectItem key={m.value} value={m.value}>
-                  {m.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-      )}
-
-      <div className="flex items-center gap-2 bg-[#F5F9FF] rounded-lg px-4 h-10 text-xs text-[#335890]">
-        <CalendarRange className="w-3.5 h-3.5 text-[#0077C3]" />
-        <span>{periodLabel}</span>
-      </div>
-    </div>
-  );
 
   if (loading && !data) {
     return (
       <div className="space-y-6">
-        {filtres}
         <div className="flex items-center justify-center h-64">
           <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
         </div>
@@ -328,7 +237,6 @@ export default function ClientRatiosTab({
   if (!data) {
     return (
       <div className="space-y-6">
-        {filtres}
         <div className="flex flex-col items-center justify-center h-64 text-muted-foreground">
           <AlertTriangle className="w-10 h-10 mb-2 opacity-30" />
           <p>Aucune donnée de ratios</p>
@@ -357,7 +265,6 @@ export default function ClientRatiosTab({
 
   return (
     <div className="space-y-6">
-      {filtres}
 
       <div>
         <h1 className="text-3xl font-bold text-[#00122E]">Ratios bilantiels</h1>
