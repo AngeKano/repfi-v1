@@ -106,11 +106,28 @@ export const RUBRIQUES_TRESORERIE: string[] = [
  * Rubriques du Total Trésorerie. Sur ces rubriques, la somme des
  * (débit − crédit) de toutes les lignes est EXACTEMENT le Total Trésorerie :
  * dépréciations et concours bancaires y sont créditeurs, donc déjà en moins.
- * Sert au périmètre du détail par compte (dans la convention des indicateurs :
- * actif en débit − crédit, passif en crédit − débit ; Total = actif − passif)
- * et à la trésorerie de la Synthèse.
+ * Sert au périmètre du détail par compte et à la trésorerie de la Synthèse.
  */
 export const RUBRIQUES_TOTAL_TRESORERIE: string[] = TRESORERIE_KPIS[0].termes.map((t) => t.code);
+
+/**
+ * Détail par compte : chaque compte affiche le montant qu'il apporte à SA
+ * carte, pour que les comptes d'une carte s'additionnent à sa valeur.
+ *  - actif (BS…) et dépréciations (…1) : débit − crédit (une dépréciation est
+ *    négative, comme « BSB − BSB1 ») ;
+ *  - passif retranché de sa carte (DRA, DRB dans « Banque ») : débit − crédit
+ *    (un découvert est négatif) ;
+ *  - passif compté en plus dans sa carte (DRC, DQ dans « Autres Trésorerie
+ *    Passif ») : crédit − débit, comme la carte.
+ * Cette liste est la dernière catégorie.
+ */
+export const RUBRIQUES_DETAIL_CREDIT_DEBIT: string[] = [
+  ...new Set(
+    TRESORERIE_KPIS.filter((k) => k.id !== "total").flatMap((k) =>
+      k.termes.filter((t) => t.signe === 1 && estRubriquePassif(t.code)).map((t) => t.code),
+    ),
+  ),
+];
 
 /** Rubrique de passif (concours bancaires) : solde lu en crédit − débit. */
 export function estRubriquePassif(code: string): boolean {
