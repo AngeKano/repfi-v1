@@ -612,29 +612,28 @@ détail par compte appliquent la même convention.
 
 ### Trésorerie par comptes
 
-Histogramme et tableau par compte sur **toutes les rubriques du Total**, chaque
-compte dans la **convention des indicateurs**, pour que le tableau et les
-cartes se rejoignent :
+Histogramme et tableau par compte sur **toutes les rubriques du Total**, en
+une seule liste triée par montant. Chaque compte affiche **le montant qu'il
+apporte à sa carte**, pour que les comptes d'une carte s'additionnent à sa
+valeur :
 
-| Section | Rubriques | Solde d'un compte | Sous-total |
-|---|---|---|---|
-| Trésorerie actif | BS… (dépréciations BSB1, BSD1, BSE1 comprises) | `débit − crédit` : une dépréciation ou un compte créditeur est négatif | Total trésorerie actif |
-| Trésorerie passif | DRA, DRB, DRC, DQ | `crédit − débit`, comme « Autres Trésorerie Passif » : un compte débiteur est négatif | Total trésorerie passif |
+| Rubriques du compte | Carte | Solde affiché |
+|---|---|---|
+| BSA, BSB, BSC, BSD, BSE, BSF, BSG | Caisse, Banque, Régies… | `débit − crédit` (un compte créditeur est négatif) |
+| BSB1, BSD1, BSE1 (dépréciations) | retranchées de leur carte | `débit − crédit` (négatif) |
+| DRA, DRB | retranchées de « Banque » | `débit − crédit` (un découvert est négatif) |
+| DRC, DQ | « Autres Trésorerie Passif » | `crédit − débit`, comme la carte |
 
-**Total Trésorerie (actif − passif)** = sous-total actif − sous-total passif,
-exactement l'indicateur, que la ligne reprend. Le sous-total passif égale
-« Autres Trésorerie Passif » quand les comptes de passif sont en DRC et DQ.
-Exemple : 565000 (`DQ`), débiteur de 1, vaut **−1** dans le tableau comme sur
-la carte, et le Total vaut l'actif + 1.
+Exemple : 521102 et 521105 (DRA / DRB), à −269 295K et −405K, donnent avec les
+comptes BSB la carte Banque (−198 087K) ; 565000 (`DQ`), débiteur de 1, vaut
+**−1** comme « Autres Trésorerie Passif ». La ligne **Total Trésorerie**
+reprend l'indicateur. Les comptes DRC et DQ, comptés en plus dans leur carte,
+sont retranchés du Total : la colonne s'écarte du Total de deux fois leur
+montant (ici 2, invisible au format K).
 
-Un compte qui a des lignes dans les deux sections y figure deux fois. Sans
-compte de passif, le tableau n'a pas de sections : les comptes, puis le Total,
-leur somme. L'histogramme montre les mêmes valeurs, comptes de passif en
-dernier, marqués « (passif) ».
-
-Un montant **négatif est en rouge** : barre rouge (foncée en N, claire en N-1)
-à gauche du zéro, marqué par une ligne verticale, avec une entrée « Négatif »
-dans la légende ; dans le tableau, montant N, N-1 ou Total en rouge.
+Même présentation que les autres graphiques : barres bleues (N foncé, N-1
+clair) ; seule une **valeur négative s'écrit en rouge** dans le tableau (N,
+N-1, Total), comme sur les cartes KPI.
 
 ### Filtres et fenêtre
 
@@ -1394,10 +1393,9 @@ Onglet Trésorerie : indicateurs calculés par rubrique et détail par compte, N
       // total = BSA + BSB − BSB1 + BSC + BSD − BSD1 + BSE − BSE1 + BSF + BSG − DRA − DRB − DRC − DQ
       // banque = BSB − BSB1 − DRA − DRB ; autresTresoreriePassif = DRC + DQ (montant positif)
   },
-  comptes: [{ compte, intituleCompte, passif, montantN, montantN1, variation }]
-      // comptes des rubriques du Total Trésorerie ; passif = lignes en rubrique D… :
-      // actif en débit − crédit, passif en crédit − débit ;
-      // Σ actif − Σ passif = kpis.total.valeurN ; actif puis passif, chacun
+  comptes: [{ compte, intituleCompte, montantN, montantN1, variation }]
+      // comptes des rubriques du Total Trésorerie, chacun avec son apport à sa carte :
+      // débit − crédit, sauf DRC et DQ en crédit − débit (RUBRIQUES_DETAIL_CREDIT_DEBIT) ;
       // tri par |montantN| décroissant ; comptes nuls sur N et N-1 exclus
 }
 ```
@@ -1948,6 +1946,7 @@ que les onglets autorisés par son rôle et ceux dont il lui reste un élément 
 | 09/11/2026 | Page Membres : la fenêtre **Nouveau membre / Modifier** passe **en trois étapes**, comme la création d'un client : **Identité** (email, nom, mot de passe), **Rôle**, **Dossiers** (avec récapitulatif). Indicateur d'étapes cliquable pour revenir à une étape remplie ; en modification, « Enregistrer » reste disponible à chaque étape (§25.23). |
 | 09/11/2026 | Trésorerie › Trésorerie par comptes : **montants négatifs en rouge**. Barre rouge pour un solde négatif (rouge foncé en N, clair en N-1, bleu sinon), ligne verticale au zéro et entrée « Négatif » dans la légende quand un compte est négatif ; dans le tableau, montants N, N-1 et Total négatifs en rouge. Calcul inchangé (§11). |
 | 09/11/2026 | Trésorerie › Trésorerie par comptes : **chaque compte dans la convention des indicateurs**, pour que tableau et cartes se rejoignent. Tableau en deux sections : **Trésorerie actif** (débit − crédit, dépréciation négative) avec son sous-total, **Trésorerie passif** (crédit − débit, comme « Autres Trésorerie Passif ») avec son sous-total, puis **Total Trésorerie (actif − passif)**, exactement l'indicateur. 565000 (`DQ`, débiteur de 1) vaut désormais **−1** dans le tableau comme sur la carte (il valait +1) ; le sous-total passif égale « Autres Trésorerie Passif » quand il n'y a que des rubriques DRC et DQ. Sans compte de passif, tableau inchangé (comptes puis Total). Histogramme : mêmes valeurs, comptes de passif en dernier, marqués « (passif) ». API : champ `passif` sur chaque compte (§11, §25.4). |
+| 16/11/2026 | Trésorerie › Trésorerie par comptes : **chaque compte avec le montant qu'il apporte à sa carte**, en une seule liste (sections actif / passif et sous-totaux retirés). Débit − crédit pour l'actif, les dépréciations et DRA / DRB (retranchés de « Banque ») ; **crédit − débit pour DRC et DQ**, comme « Autres Trésorerie Passif ». Les comptes d'une carte s'additionnent à sa valeur : 521102 et 521105 (DRA / DRB) à −269 295K et −405K donnent avec les BSB la carte Banque (−198 087K) ; 565000 (`DQ`) vaut −1 comme « Autres Trésorerie Passif ». Ligne Total = l'indicateur. **Design aligné sur les autres graphiques** : barres bleues (plus de barre rouge, de ligne du zéro ni d'entrée « Négatif » dans la légende) ; seule une valeur < 0 s'écrit en rouge dans le tableau, comme sur les cartes. API : champ `passif` retiré (§11, §25.4). |
 
 ---
 
