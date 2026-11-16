@@ -107,17 +107,20 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 
     const { searchParams } = new URL(req.url);
     // Mêmes conventions que les autres onglets : « month » = le seul mois,
-    // « ytd » / « ytd-day » = janvier → mois, « year » = l'année entière.
+    // « ytd » = du mois de début (startMonth, janvier par défaut) au mois de
+    // fin, « year » = l'année entière.
     const periodType = searchParams.get("periodType") || "year";
     const moisParam = parseInt(searchParams.get("month") || "12", 10);
     const mois = moisParam >= 1 && moisParam <= 12 ? moisParam : 12;
+    const debutParam = parseInt(searchParams.get("startMonth") || "1", 10);
+    const debut = debutParam >= 1 && debutParam <= mois ? debutParam : 1;
     const selectedYear = parseInt(searchParams.get("year") || "", 10);
     const mm = (m: number) => String(m).padStart(2, "0");
     const fenetre =
       periodType === "month"
         ? { debut: mois, fin: mois }
         : periodType === "ytd" || periodType === "ytd-day"
-          ? { debut: 1, fin: mois }
+          ? { debut, fin: mois }
           : { debut: 1, fin: 12 };
     const periodeLabel =
       fenetre.debut === fenetre.fin

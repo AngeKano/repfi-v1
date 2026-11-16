@@ -27,6 +27,19 @@ export const YM_SQL =
   `concat(substring(date_transaction, 7, 4), substring(date_transaction, 4, 2)))`;
 
 /**
+ * Mois de début (1 à 12) d'une fenêtre de FLUX choisie au curseur. Le premier
+ * mois couvert par le reporting (ou avant) vaut janvier : la fenêtre garde les
+ * écritures saisies avant l'import, comme auparavant. Au-delà, le mois demandé.
+ * Les SOLDES (trésorerie, bilan, encours) partent toujours de janvier.
+ */
+export function moisDebutFenetre(demande: string | null | undefined, moisDisponibles: string[]): number {
+  const d = parseInt(demande ?? "", 10);
+  if (!(d >= 1 && d <= 12)) return 1;
+  const premier = parseInt(moisDisponibles[0] ?? "01", 10) || 1;
+  return d <= premier ? 1 : d;
+}
+
+/**
  * Mois « 01 » … « 12 » couverts par les périodes importées (du début à la fin
  * saisis à l'import), triés. Seuls ces mois se proposent dans le filtre ; la
  * fenêtre « Année » s'arrête au dernier. Les dates sont lues en UTC, comme

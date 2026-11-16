@@ -25,12 +25,6 @@ import {
 } from "@/lib/permissions/role-utils";
 import { formatNombre } from "@/lib/nombres";
 import { ClientDetailsDialog } from "./client-details-dialog";
-import {
-  ReportingParamsDialog,
-  paramsToQuery,
-  getStoredReportingParams,
-  saveReportingParams,
-} from "./reporting-params-dialog";
 import { NewClientDialog } from "./new-client-dialog";
 import { DeleteClientDialog } from "./delete-client-dialog";
 
@@ -80,7 +74,6 @@ export default function ClientsListClient({
   const [activeTab, setActiveTab] = useState<"active" | "deleted">("active");
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [detailsClient, setDetailsClient] = useState<any | null>(null);
-  const [reportingClient, setReportingClient] = useState<any | null>(null);
   const [showNewClient, setShowNewClient] = useState(false);
   const [deleteClient, setDeleteClient] = useState<any | null>(null);
 
@@ -143,15 +136,9 @@ export default function ClientsListClient({
     );
   };
 
-  // Ouvrir le reporting d'un client : si les paramètres ont déjà été choisis
-  // pour ce client, on navigue directement sans redemander.
+  // Ouvrir le reporting d'un client : la période se règle dans le dossier.
   const openReporting = (client: any) => {
-    const stored = getStoredReportingParams(client.id);
-    if (stored) {
-      router.push(`/clients/${client.id}?${stored}`);
-      return;
-    }
-    setReportingClient(client);
+    router.push(`/clients/${client.id}`);
   };
 
   // Generate page numbers for pagination
@@ -453,19 +440,6 @@ export default function ClientsListClient({
           open={!!detailsClient}
           onClose={() => setDetailsClient(null)}
           getCompanyTypeLabel={getCompanyTypeLabel}
-        />
-
-        <ReportingParamsDialog
-          open={!!reportingClient}
-          clientName={reportingClient?.name}
-          onClose={() => setReportingClient(null)}
-          onValidate={(params) => {
-            if (!reportingClient) return;
-            const qs = paramsToQuery(params);
-            // Mémoriser les paramètres pour ne plus redemander à l'avenir.
-            saveReportingParams(reportingClient.id, qs);
-            router.push(`/clients/${reportingClient.id}?${qs}`);
-          }}
         />
 
         <NewClientDialog

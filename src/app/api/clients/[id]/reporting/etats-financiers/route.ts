@@ -75,6 +75,9 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       Math.min(12, Math.max(1, parseInt(searchParams.get("month") || "12", 10) || 12)),
     ).padStart(2, "0");
     const selectedYear = parseInt(searchParams.get("year") || "", 10);
+    // Mois de début du compte de résultat (curseur de période) ; janvier par
+    // défaut. Le bilan, lui, part toujours du 1er janvier.
+    const debutParam = parseInt(searchParams.get("startMonth") || "1", 10);
 
     const dbName = getClickhouseDbName(id);
     // Schéma fusionné (une seule colonne `rubrique`) ou schéma d'origine :
@@ -133,17 +136,23 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     // pour les flux.
     const fenetreBilan = (y: number) => ({ start: `${y}01`, end: `${y}${moisFin}` });
 
-    // Le COMPTE DE RÉSULTAT porte des flux : il suit le mode choisi.
+    // Le COMPTE DE RÉSULTAT porte des flux : il suit la période choisie (un
+    // mois, ou du mois de début au mois de fin).
     const periodique = !cumule && !surAnnee;
+    const moisDebutResultat =
+      cumule && debutParam > 1 && debutParam <= parseInt(moisFin, 10)
+        ? String(debutParam).padStart(2, "0")
+        : "01";
     const fenetreResultat = (y: number) =>
       periodique
         ? { start: `${y}${month}`, end: `${y}${month}` }
-        : { start: `${y}01`, end: `${y}${moisFin}` };
+        : { start: `${y}${moisDebutResultat}`, end: `${y}${moisFin}` };
     const premierMois = moisDisponibles[0] ?? "01";
     const nomMois = (mm: string) => MOIS[parseInt(mm, 10) - 1];
+    const debutLibelle = moisDebutResultat === "01" ? premierMois : moisDebutResultat;
     const periodeLabel = periodique
       ? nomMois(month)
-      : `${nomMois(premierMois).replace(/^./, (c) => c.toUpperCase())} - ${nomMois(month)}`;
+      : `${nomMois(debutLibelle).replace(/^./, (c) => c.toUpperCase())} - ${nomMois(month)}`;
 
     // Intitulé d'un exercice : la date de fin de la fenêtre filtrée, bornée à
     // la clôture réelle (inutile d'annoncer 31/12 si l'exercice s'arrête en

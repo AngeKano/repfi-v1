@@ -29,7 +29,7 @@ import {
 import { bilanRefExpr } from "@/lib/clickhouse/schema";
 import { journauxTresorerie } from "@/lib/clickhouse/plan-comptable";
 import { RUBRIQUES_TOTAL_TRESORERIE } from "@/lib/reporting/tresorerie";
-import { MOIS_SQL, JOUR_SQL, moisCouverts } from "@/lib/reporting/periode";
+import { MOIS_SQL, JOUR_SQL, moisCouverts, moisDebutFenetre } from "@/lib/reporting/periode";
 import { planComptesMap, intituleCompte } from "@/lib/clickhouse/plan-comptable";
 
 const clickhouseClient = createClickhouseClient({
@@ -591,6 +591,8 @@ async function recupererCAParNature(
   batchIdsN1: string[],
   periodType?: string,
   selectedMonth?: string,
+  /** Premier mois « MM » de la fenêtre (cumulé) ; « 01 » par défaut. */
+  moisDebut = "01",
 ): Promise<CAParNatureItem[]> {
   // Construire le filtre de période
   let periodFilter = "";
@@ -603,11 +605,10 @@ async function recupererCAParNature(
     (periodType === "ytd" || periodType === "ytd-day") &&
     selectedMonth
   ) {
-    // "ytd" et "ytd-day" partagent le même filtre Jan → selectedMonth pour
-    // les agrégats totaux (Top 10, CA par nature). La différence porte sur
-    // la granularité de la chart principale.
-    periodFilter = `AND ${MOIS_SQL} <= {monthFilter:String}`;
+    // Cumulé : du mois de début (janvier par défaut) au mois de fin.
+    periodFilter = `AND ${MOIS_SQL} >= {debutFilter:String} AND ${MOIS_SQL} <= {monthFilter:String}`;
     baseParams.monthFilter = selectedMonth;
+    baseParams.debutFilter = moisDebut;
   }
 
   // Le plan comptable fait autorité pour l'intitulé : le grand livre porte
@@ -706,6 +707,8 @@ async function recupererTop10Clients(
   periodType?: string,
   selectedMonth?: string,
   assujettiTVA: boolean = true,
+  /** Premier mois « MM » de la fenêtre (cumulé) ; « 01 » par défaut. */
+  moisDebut = "01",
 ): Promise<TopClient[]> {
   if (batchIds.length === 0) return [];
   // Rubrique bilan (schéma fusionné ou d'origine) et journaux de trésorerie.
@@ -730,9 +733,10 @@ async function recupererTop10Clients(
     (periodType === "ytd" || periodType === "ytd-day") &&
     selectedMonth
   ) {
-    // "ytd-day" agrège comme "ytd" (Jan → mois sélectionné) pour le Top 10.
-    periodFilter = `AND ${MOIS_SQL} <= {monthFilter:String}`;
+    // Cumulé : du mois de début (janvier par défaut) au mois de fin.
+    periodFilter = `AND ${MOIS_SQL} >= {debutFilter:String} AND ${MOIS_SQL} <= {monthFilter:String}`;
     queryParams.monthFilter = selectedMonth;
+    queryParams.debutFilter = moisDebut;
   }
 
   let rows: Array<{ numero_client: string; nom_client: string; ca_client: string }>;
@@ -1152,6 +1156,8 @@ export async function GET(
       searchParams.get("year") || new Date().getFullYear().toString();
     const periodType = searchParams.get("periodType") || "year";
     const moisDemande = searchParams.get("month");
+    // Mois de début de la fenêtre (curseur de période) ; janvier par défaut.
+    const debutDemande = searchParams.get("startMonth");
 
     const client = await prisma.client.findUnique({
       where: { id },
@@ -1695,9 +1701,29 @@ export async function GET(
       periodType === "ytd" && selectedMonth ? parseInt(selectedMonth) : 12,
       dernierMois,
     );
+    // Début de fenêtre (curseur) : les FLUX et leurs cumuls partent de ce mois ;
+    // la trésorerie, un solde, part toujours de janvier.
+    const debutFenetre = Math.min(
+      periodType === "ytd" ? moisDebutFenetre(debutDemande, moisDisponibles) : 1,
+      endMonth,
+    );
+    const moisDebutStr = String(debutFenetre).padStart(2, "0");
 
     for (let m = 1; m <= 12; m++) {
       const monthStr = m.toString().padStart(2, "0");
+
+      // Les cumuls de flux repartent du mois de début de la fenêtre.
+      if (m === debutFenetre && debutFenetre > 1) {
+        cumulativeBalance = 0;
+        cumulativeCaTTCN = 0;
+        cumulativeCaEncaisseN = 0;
+        cumulativeCaTTCN1 = 0;
+        cumulativeCaEncaisseN1 = 0;
+        cumulativeCAXBN = 0;
+        cumulativeCAXBN1 = 0;
+        cumulTGN = 0;
+        cumulTGN1 = 0;
+      }
 
       const rubriquesN = rubriquesParMoisN.get(monthStr) || {
         ...RUBRIQUES_VIDES,
@@ -1784,17 +1810,20 @@ export async function GET(
       });
     }
 
-    // Indicateurs : janvier → fin de fenêtre, même fenêtre pour N-1.
+    // Indicateurs : début → fin de fenêtre, même fenêtre pour N-1.
     periodsToIncludeN = chartData
-      .filter((d) => parseInt(d.periodNumber) <= endMonth)
+      .filter((d) => {
+        const m = parseInt(d.periodNumber);
+        return m >= debutFenetre && m <= endMonth;
+      })
       .map((d) => d.periodNumber);
     periodsToIncludeN1 = periodsToIncludeN;
 
-    // Courbes : seuls les mois couverts par le reporting, jusqu'à la fin de
-    // fenêtre (les cumuls, eux, partent toujours de janvier).
+    // Courbes : les mois couverts par le reporting, du début à la fin de
+    // fenêtre (les cumuls partent du début de fenêtre, la trésorerie de janvier).
     chartData = chartData.filter((d) => {
       const m = parseInt(d.periodNumber);
-      return m >= premierMois && m <= endMonth;
+      return m >= Math.max(premierMois, debutFenetre) && m <= endMonth;
     });
 
     const indicateursN = calculerIndicateursPeriode(
@@ -1811,6 +1840,17 @@ export async function GET(
       periodsToIncludeN1,
       client.assujettiTVA,
     );
+    // La trésorerie est un SOLDE : janvier → fin de fenêtre, quel que soit le
+    // mois de début.
+    if (debutFenetre > 1) {
+      const soldeFin = (parMois: Map<string, number>) => {
+        let s = 0;
+        for (let m = 1; m <= endMonth; m++) s += parMois.get(String(m).padStart(2, "0")) || 0;
+        return s;
+      };
+      indicateursN.soldeTresorerie = soldeFin(tresorerieParMoisN);
+      indicateursN1.soldeTresorerie = soldeFin(tresorerieParMoisN1);
+    }
 
     // A3 — Harmonisation CA (cf. branche journalière) : KPI CA = CAXB cumulé.
     if (client.assujettiTVA && chartData.length > 0) {
@@ -1896,10 +1936,24 @@ export async function GET(
     const periods = await enrichirPeriodes(postgresPeriodsData, dbName);
 
     // Top 10 clients par CA (filtré par période sélectionnée)
-    const topClients = await recupererTop10Clients(dbName, batchIds, periodType, selectedMonth ?? undefined, client.assujettiTVA);
+    const topClients = await recupererTop10Clients(
+      dbName,
+      batchIds,
+      periodType,
+      selectedMonth ?? undefined,
+      client.assujettiTVA,
+      moisDebutStr,
+    );
 
     // CA par Nature — détail des comptes TC
-    const caParNature = await recupererCAParNature(dbName, batchIds, batchIdsN1, periodType, selectedMonth ?? undefined);
+    const caParNature = await recupererCAParNature(
+      dbName,
+      batchIds,
+      batchIdsN1,
+      periodType,
+      selectedMonth ?? undefined,
+      moisDebutStr,
+    );
 
     return NextResponse.json(filtrerReponse({
       client: { id: client.id, name: client.name, assujettiTVA: client.assujettiTVA },
@@ -1907,6 +1961,8 @@ export async function GET(
       yearN1: yearN1.toString(),
       periodType,
       selectedMonth,
+      // Début réellement calculé (« 01 » : depuis janvier).
+      startMonth: moisDebutStr,
       availableYears,
       moisDisponibles,
       anneeN1Disponible,
